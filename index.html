@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cierre de turno</title>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+<div class="header">
+  <h1>Cierre de Turno</h1>
+</div>
+
+<div class="container">
+<div class="bloque">
+<h2>Información del Turno</h2>
+
+<input id="fecha" type="date">
+
+<select id="responsable">
+  <option value="">Seleccione responsable</option>
+  <option>Laura Velásquez</option>
+  <option>Wendy Molina</option>
+  <option>Carlos Bejarano</option>
+  <option>Roberto Pérez</option>
+  <option>Daniela Ahumada</option>
+</select>
+
+<h4>Turno</h4>
+<input id="hora_inicio" type="time">
+<input id="hora_fin" type="time">
+
+<label>¿Se extendió tu turno?</label>
+<select id="extendido" onchange="mostrarExtension()">
+  <option value="No">No</option>
+  <option value="Si">Sí</option>
+</select>
+
+<div id="bloque_extension" style="display:none;">
+<select id="cuanto">
+<option value="">Seleccione tiempo</option>
+<option value="15">15 min</option><option value="30">30 min</option><option value="45">45 min</option>
+<option value="60">1 hora</option><option value="75">1h15</option><option value="90">1h30</option>
+<option value="120">2 horas</option><option value="180">3 horas</option>
+</select>
+</div>
+</div>
+
+<div class="bloque">
+<h2>Datos Financieros</h2>
+
+<input id="efectivo_apertura" type="number" placeholder="Efectivo Apertura">
+<input id="compras_turno" type="number" placeholder="Compras">
+<input id="domicilios_turno" type="number" placeholder="Domicilios">
+<input id="efectivo_sistema" type="number" placeholder="Efectivo Sistema">
+<input id="efectivo_real" type="number" placeholder="Efectivo Real">
+<input id="datafono_sistema" type="number" placeholder="Datafono Sistema">
+<input id="datafono_real" type="number" placeholder="Datafono Real">
+<input id="transferencias_sistema" type="number" placeholder="Transferencias Sistema">
+<input id="transferencia_real" type="number" placeholder="Transferencia Real">
+<input id="rappi_sistema" type="number" placeholder="Rappi Sistema">
+<input id="rappi_real" type="number" placeholder="Rappi Real">
+<input id="bolsa" type="number" placeholder="Bolsa">
+<input id="caja" type="number" placeholder="Caja">
+<input id="meta" type="number" placeholder="Meta">
+<textarea id="comentarios" placeholder="Comentarios"></textarea>
+</div>
+
+<div class="bloque">
+<button onclick="enviar()">Enviar cierre</button>
+<button onclick="verificar()">Verificar</button>
+
+<div id="status"></div>
+<div id="verificacion"></div>
+</div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
