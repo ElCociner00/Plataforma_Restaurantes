@@ -169,8 +169,23 @@ function verificar(){
   })
   .then(r=>r.json())
   .then(res=>{
-    document.getElementById("verificacion").innerText=JSON.stringify(res,null,2);
-  });
+  const r = res[0];   // n8n siempre responde en un array
+
+  const html = `
+    <div style="padding:15px;border-radius:8px;background:#f4f4f4;margin-top:10px;">
+      <h3>${r.status.toUpperCase()}</h3>
+      <p>${r.message}</p>
+      <hr>
+      <p><b>Datafono:</b> ${r.valores.datafono}</p>
+      <p><b>Transferencias:</b> ${r.valores.transferencias}</p>
+      <p><b>Efectivo esperado:</b> ${r.valores.efectivoEsperado}</p>
+      <p><b>Caja:</b> ${r.valores.caja}</p>
+      <p><b>Diferencia:</b> ${r.valores.diferenciaCaja}</p>
+    </div>
+  `;
+
+  document.getElementById("verificacion").innerHTML = html;
+});
 }
 </script>
 </body>
