@@ -4,46 +4,23 @@
 <meta charset="UTF-8">
 <title>Cierre de turno</title>
 <style>
-body {
-  font-family: Arial, sans-serif;
-  background:#f2f2f2;
-}
-
+body { font-family: Arial; background:#f2f2f2; }
 .container {
   max-width: 650px;
   margin: 40px auto;
-  background:white;
+  background: white;
   padding: 20px;
   border-radius: 8px;
 }
-
-h1 {
-  text-align:center;
-}
-
 input, textarea, select, button {
   width: 100%;
   padding: 10px;
   margin-top: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
 }
-
 button {
-  background:#000;
+  background:black;
   color:white;
   font-size:16px;
-  cursor:pointer;
-}
-
-button:hover {
-  background:#333;
-}
-
-#status {
-  margin-top: 15px;
-  text-align:center;
-  font-weight:bold;
 }
 </style>
 </head>
@@ -55,16 +32,10 @@ button:hover {
 <input id="fecha" type="date">
 <input id="responsable" placeholder="Responsable">
 
-<!-- TURNO -->
-<select id="turno">
-  <option value="">Seleccione turno</option>
-  <option value="LS_07:30_02:30">Lunes a Sábado — 07:30 a 02:30</option>
-  <option value="LS_02:30_09:00">Lunes a Sábado — 02:30 a 09:00</option>
-  <option value="DOM_08:30_02:30">Domingos — 08:30 a 02:30</option>
-  <option value="DOM_02:30_08:30">Domingos — 02:30 a 08:30</option>
-</select>
+<h3>Turno</h3>
+<input id="hora_inicio" type="time" placeholder="Hora inicio">
+<input id="hora_fin" type="time" placeholder="Hora fin">
 
-<!-- EXTENSION -->
 <label>¿Se extendió tu turno?</label>
 <select id="extendido" onchange="mostrarExtension()">
   <option value="No">No</option>
@@ -94,6 +65,10 @@ button:hover {
 <input id="domicilios_turno" type="number" placeholder="Domicilios Turno">
 <input id="efectivo_sistema" type="number" placeholder="Efectivo Sistema">
 <input id="efectivo_real" type="number" placeholder="Efectivo Real">
+
+<input id="datafono_sistema" type="number" placeholder="Datafono Sistema">
+<input id="datafono_real" type="number" placeholder="Datafono Real">
+
 <input id="transferencias_sistema" type="number" placeholder="Transferencias Sistema">
 <input id="transferencia_real" type="number" placeholder="Transferencia Real">
 <input id="rappi_sistema" type="number" placeholder="Rappi Sistema">
@@ -105,31 +80,31 @@ button:hover {
 <textarea id="comentarios" placeholder="Comentarios"></textarea>
 
 <button onclick="enviar()">Enviar cierre</button>
-
 <div id="status"></div>
 </div>
 
 <script>
 function mostrarExtension() {
-  const valor = document.getElementById("extendido").value;
-  document.getElementById("bloque_extension").style.display = 
-    valor === "Si" ? "block" : "none";
+  document.getElementById("bloque_extension").style.display =
+    document.getElementById("extendido").value === "Si" ? "block" : "none";
 }
 
 function enviar() {
   const data = {
     fecha: document.getElementById("fecha").value,
     responsable: document.getElementById("responsable").value,
-    turno: document.getElementById("turno").value,
+    hora_inicio: document.getElementById("hora_inicio").value,
+    hora_fin: document.getElementById("hora_fin").value,
     turno_extendido: document.getElementById("extendido").value,
-    minutos_extension: document.getElementById("extendido").value === "Si" 
-        ? document.getElementById("cuanto").value 
-        : 0,
+    minutos_extension: document.getElementById("extendido").value === "Si"
+        ? document.getElementById("cuanto").value : 0,
     efectivo_apertura: document.getElementById("efectivo_apertura").value,
     compras_turno: document.getElementById("compras_turno").value,
     domicilios_turno: document.getElementById("domicilios_turno").value,
     efectivo_sistema: document.getElementById("efectivo_sistema").value,
     efectivo_real: document.getElementById("efectivo_real").value,
+    datafono_sistema: document.getElementById("datafono_sistema").value,
+    datafono_real: document.getElementById("datafono_real").value,
     transferencias_sistema: document.getElementById("transferencias_sistema").value,
     transferencia_real: document.getElementById("transferencia_real").value,
     rappi_sistema: document.getElementById("rappi_sistema").value,
@@ -142,13 +117,12 @@ function enviar() {
 
   fetch("https://n8n.globalnexoshop.com/webhook/abeb7f0c-228e-429f-8abd-3cf0d21a962d", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {"Content-Type":"application/json"},
     body: JSON.stringify(data)
   })
-  .then(r => document.getElementById("status").innerText = "Cierre enviado ✔")
-  .catch(e => document.getElementById("status").innerText = "Error ❌");
+  .then(r => document.getElementById("status").innerText="Cierre enviado ✔")
+  .catch(e => document.getElementById("status").innerText="Error ❌");
 }
 </script>
-
 </body>
 </html>
