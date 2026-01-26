@@ -1,55 +1,121 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-  <title>Formulario</title>
-  <style>
-    body { font-family: Arial; background:#f5f5f5; }
-    .box {
-      width: 400px;
-      margin: 50px auto;
-      background: white;
-      padding: 20px;
-      border-radius: 8px;
-    }
-    input, button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>Cierre de turno</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background:#f2f2f2;
+}
+
+.container {
+  max-width: 600px;
+  margin: 40px auto;
+  background:white;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+h1 {
+  text-align:center;
+}
+
+input, textarea, button {
+  width: 100%;
+  padding: 10px;
+  margin-top: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+button {
+  background:#000;
+  color:white;
+  font-size:16px;
+  cursor:pointer;
+}
+
+button:hover {
+  background:#333;
+}
+
+#status {
+  margin-top: 15px;
+  text-align:center;
+  font-weight:bold;
+}
+</style>
 </head>
+
 <body>
+<div class="container">
+<h1>Cierre de turno</h1>
 
-<div class="box">
-  <h2>Formulario de contacto</h2>
+<input id="fecha" type="date" placeholder="Fecha">
+<input id="responsable" placeholder="Responsable">
+<input id="turno" placeholder="Turno">
 
-  <input id="name" placeholder="Nombre">
-  <input id="email" placeholder="Email">
-  <input id="phone" placeholder="Teléfono">
+<input id="efectivo_apertura" type="number" placeholder="Efectivo Apertura">
+<input id="compras_turno" type="number" placeholder="Compras Turno">
+<input id="domicilios_turno" type="number" placeholder="Domicilios Turno">
 
-  <button onclick="send()">Enviar</button>
+<input id="efectivo_sistema" type="number" placeholder="Efectivo Sistema">
+<input id="efectivo_real" type="number" placeholder="Efectivo Real">
 
-  <p id="msg"></p>
+<input id="transferencias_sistema" type="number" placeholder="Transferencias Sistema">
+<input id="transferencia_real" type="number" placeholder="Transferencia Real">
+
+<input id="rappi_sistema" type="number" placeholder="Rappi Sistema">
+<input id="rappi_real" type="number" placeholder="Rappi Real">
+
+<input id="bolsa" type="number" placeholder="Bolsa">
+<input id="caja" type="number" placeholder="Caja">
+<input id="meta" type="number" placeholder="Meta">
+
+<textarea id="comentarios" placeholder="Comentarios"></textarea>
+
+<button onclick="enviar()">Enviar cierre</button>
+
+<div id="status"></div>
 </div>
 
 <script>
-function send() {
-  fetch("https://TU_WEBHOOK_AQUI", {
+function enviar() {
+  const data = {
+    fecha: document.getElementById("fecha").value,
+    responsable: document.getElementById("responsable").value,
+    turno: document.getElementById("turno").value,
+    efectivo_apertura: document.getElementById("efectivo_apertura").value,
+    compras_turno: document.getElementById("compras_turno").value,
+    domicilios_turno: document.getElementById("domicilios_turno").value,
+    efectivo_sistema: document.getElementById("efectivo_sistema").value,
+    efectivo_real: document.getElementById("efectivo_real").value,
+    transferencias_sistema: document.getElementById("transferencias_sistema").value,
+    transferencia_real: document.getElementById("transferencia_real").value,
+    rappi_sistema: document.getElementById("rappi_sistema").value,
+    rappi_real: document.getElementById("rappi_real").value,
+    bolsa: document.getElementById("bolsa").value,
+    caja: document.getElementById("caja").value,
+    meta: document.getElementById("meta").value,
+    comentarios: document.getElementById("comentarios").value
+  };
+
+  fetch("https://n8n.globalnexoshop.com/webhook/abeb7f0c-228e-429f-8abd-3cf0d21a962d", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({
-      name: document.getElementById("name").value,
-      email: document.getElementById("email").value,
-      phone: document.getElementById("phone").value
-    })
+    body: JSON.stringify(data)
   })
-  .then(r => document.getElementById("msg").innerText = "Enviado ✔")
-  .catch(e => document.getElementById("msg").innerText = "Error");
+  .then(r => {
+    document.getElementById("status").innerText = "Cierre enviado correctamente ✔";
+  })
+  .catch(e => {
+    document.getElementById("status").innerText = "Error al enviar ❌";
+  });
 }
 </script>
 
 </body>
 </html>
-
