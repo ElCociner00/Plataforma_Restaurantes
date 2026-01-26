@@ -6,35 +6,48 @@
 <style>
 body { font-family: Arial; background:#f2f2f2; }
 .container {
-  max-width: 650px;
+  max-width: 700px;
   margin: 40px auto;
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
+  background:white;
+  padding:25px;
+  border-radius:8px;
 }
-input, textarea, select, button {
-  width: 100%;
-  padding: 10px;
-  margin-top: 8px;
+input, select, textarea, button {
+  width:100%;
+  padding:10px;
+  margin-top:8px;
 }
 button {
   background:black;
   color:white;
   font-size:16px;
+  margin-top:15px;
 }
+#status { margin-top:15px; font-weight:bold; }
+.loading { color: orange; }
+.error { color:red; }
+.success { color:green; }
 </style>
 </head>
 
 <body>
 <div class="container">
-<h1>Cierre de turno</h1>
+<h2>Cierre de Turno</h2>
 
 <input id="fecha" type="date">
-<input id="responsable" placeholder="Responsable">
 
-<h3>Turno</h3>
-<input id="hora_inicio" type="time" placeholder="Hora inicio">
-<input id="hora_fin" type="time" placeholder="Hora fin">
+<select id="responsable">
+  <option value="">Seleccione responsable</option>
+  <option>Laura Velásquez</option>
+  <option>Wendy Molina</option>
+  <option>Carlos Bejarano</option>
+  <option>Roberto Pérez</option>
+  <option>Daniela Ahumada</option>
+</select>
+
+<h4>Turno</h4>
+<input id="hora_inicio" type="time">
+<input id="hora_fin" type="time">
 
 <label>¿Se extendió tu turno?</label>
 <select id="extendido" onchange="mostrarExtension()">
@@ -43,32 +56,21 @@ button {
 </select>
 
 <div id="bloque_extension" style="display:none;">
-  <label>¿Cuánto se extendió?</label>
-  <select id="cuanto">
-    <option value="15">15 minutos</option>
-    <option value="30">30 minutos</option>
-    <option value="45">45 minutos</option>
-    <option value="60">1 hora</option>
-    <option value="75">1 hora 15 min</option>
-    <option value="90">1 hora 30 min</option>
-    <option value="105">1 hora 45 min</option>
-    <option value="120">2 horas</option>
-    <option value="135">2 horas 15 min</option>
-    <option value="150">2 horas 30 min</option>
-    <option value="165">2 horas 45 min</option>
-    <option value="180">3 horas</option>
-  </select>
+<select id="cuanto">
+<option value="">Seleccione tiempo</option>
+<option value="15">15 min</option><option value="30">30 min</option><option value="45">45 min</option>
+<option value="60">1 hora</option><option value="75">1h15</option><option value="90">1h30</option>
+<option value="120">2 horas</option><option value="180">3 horas</option>
+</select>
 </div>
 
 <input id="efectivo_apertura" type="number" placeholder="Efectivo Apertura">
-<input id="compras_turno" type="number" placeholder="Compras Turno">
-<input id="domicilios_turno" type="number" placeholder="Domicilios Turno">
+<input id="compras_turno" type="number" placeholder="Compras">
+<input id="domicilios_turno" type="number" placeholder="Domicilios">
 <input id="efectivo_sistema" type="number" placeholder="Efectivo Sistema">
 <input id="efectivo_real" type="number" placeholder="Efectivo Real">
-
 <input id="datafono_sistema" type="number" placeholder="Datafono Sistema">
 <input id="datafono_real" type="number" placeholder="Datafono Real">
-
 <input id="transferencias_sistema" type="number" placeholder="Transferencias Sistema">
 <input id="transferencia_real" type="number" placeholder="Transferencia Real">
 <input id="rappi_sistema" type="number" placeholder="Rappi Sistema">
@@ -76,52 +78,99 @@ button {
 <input id="bolsa" type="number" placeholder="Bolsa">
 <input id="caja" type="number" placeholder="Caja">
 <input id="meta" type="number" placeholder="Meta">
-
 <textarea id="comentarios" placeholder="Comentarios"></textarea>
 
 <button onclick="enviar()">Enviar cierre</button>
+<button onclick="verificar()">Verificar</button>
+
 <div id="status"></div>
+<div id="verificacion"></div>
+
 </div>
 
 <script>
-function mostrarExtension() {
+function mostrarExtension(){
   document.getElementById("bloque_extension").style.display =
-    document.getElementById("extendido").value === "Si" ? "block" : "none";
+  document.getElementById("extendido").value==="Si"?"block":"none";
 }
 
-function enviar() {
-  const data = {
-    fecha: document.getElementById("fecha").value,
-    responsable: document.getElementById("responsable").value,
-    hora_inicio: document.getElementById("hora_inicio").value,
-    hora_fin: document.getElementById("hora_fin").value,
-    turno_extendido: document.getElementById("extendido").value,
-    minutos_extension: document.getElementById("extendido").value === "Si"
-        ? document.getElementById("cuanto").value : 0,
-    efectivo_apertura: document.getElementById("efectivo_apertura").value,
-    compras_turno: document.getElementById("compras_turno").value,
-    domicilios_turno: document.getElementById("domicilios_turno").value,
-    efectivo_sistema: document.getElementById("efectivo_sistema").value,
-    efectivo_real: document.getElementById("efectivo_real").value,
-    datafono_sistema: document.getElementById("datafono_sistema").value,
-    datafono_real: document.getElementById("datafono_real").value,
-    transferencias_sistema: document.getElementById("transferencias_sistema").value,
-    transferencia_real: document.getElementById("transferencia_real").value,
-    rappi_sistema: document.getElementById("rappi_sistema").value,
-    rappi_real: document.getElementById("rappi_real").value,
-    bolsa: document.getElementById("bolsa").value,
-    caja: document.getElementById("caja").value,
-    meta: document.getElementById("meta").value,
-    comentarios: document.getElementById("comentarios").value
-  };
+function obtenerDatos(){
+  const campos = [
+    "fecha","responsable","hora_inicio","hora_fin","efectivo_apertura","compras_turno","domicilios_turno",
+    "efectivo_sistema","efectivo_real","datafono_sistema","datafono_real",
+    "transferencias_sistema","transferencia_real","rappi_sistema","rappi_real","bolsa","caja","meta"
+  ];
 
-  fetch("https://n8n.globalnexoshop.com/webhook/abeb7f0c-228e-429f-8abd-3cf0d21a962d", {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify(data)
+  for (let c of campos){
+    if(document.getElementById(c).value===""){
+      mostrarMensaje(`Falta el campo: ${c}`, "error");
+      return null;
+    }
+  }
+
+  return {
+    fecha: fecha.value,
+    responsable: responsable.value,
+    hora_inicio: hora_inicio.value,
+    hora_fin: hora_fin.value,
+    extendido: extendido.value,
+    minutos: extendido.value==="Si"?cuanto.value:0,
+    efectivo_apertura: efectivo_apertura.value,
+    compras: compras_turno.value,
+    domicilios: domicilios_turno.value,
+    efectivo_sistema: efectivo_sistema.value,
+    efectivo_real: efectivo_real.value,
+    datafono_sistema: datafono_sistema.value,
+    datafono_real: datafono_real.value,
+    transferencias_sistema: transferencias_sistema.value,
+    transferencia_real: transferencia_real.value,
+    rappi_sistema: rappi_sistema.value,
+    rappi_real: rappi_real.value,
+    bolsa: bolsa.value,
+    caja: caja.value,
+    meta: meta.value,
+    comentarios: comentarios.value
+  };
+}
+
+function mostrarMensaje(msg,tipo){
+  const s=document.getElementById("status");
+  s.className=tipo;
+  s.innerText=msg;
+  setTimeout(()=>{s.innerText="";},5000);
+}
+
+function limpiar(){
+  document.querySelectorAll("input,textarea,select").forEach(e=>e.value="");
+}
+
+function enviar(){
+  const data=obtenerDatos();
+  if(!data) return;
+
+  mostrarMensaje("Enviando...", "loading");
+
+  fetch("https://n8n.globalnexoshop.com/webhook/abeb7f0c-228e-429f-8abd-3cf0d21a962d",{
+    method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)
+  }).then(()=>{
+    mostrarMensaje("Cierre enviado ✔","success");
+    setTimeout(limpiar,3000);
+  });
+}
+
+function verificar(){
+  const data=obtenerDatos();
+  if(!data) return;
+
+  document.getElementById("verificacion").innerText="Verificando…";
+
+  fetch("https://n8n.globalnexoshop.com/webhook/verificar",{
+    method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)
   })
-  .then(r => document.getElementById("status").innerText="Cierre enviado ✔")
-  .catch(e => document.getElementById("status").innerText="Error ❌");
+  .then(r=>r.json())
+  .then(res=>{
+    document.getElementById("verificacion").innerText=JSON.stringify(res,null,2);
+  });
 }
 </script>
 </body>
