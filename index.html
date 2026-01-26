@@ -1,1 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Formulario</title>
+  <style>
+    body { font-family: Arial; background:#f5f5f5; }
+    .box {
+      width: 400px;
+      margin: 50px auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="box">
+  <h2>Formulario de contacto</h2>
+
+  <input id="name" placeholder="Nombre">
+  <input id="email" placeholder="Email">
+  <input id="phone" placeholder="Teléfono">
+
+  <button onclick="send()">Enviar</button>
+
+  <p id="msg"></p>
+</div>
+
+<script>
+function send() {
+  fetch("https://TU_WEBHOOK_AQUI", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      name: document.getElementById("name").value,
+      email: document.getElementById("email").value,
+      phone: document.getElementById("phone").value
+    })
+  })
+  .then(r => document.getElementById("msg").innerText = "Enviado ✔")
+  .catch(e => document.getElementById("msg").innerText = "Error");
+}
+</script>
+
+</body>
+</html>
 
