@@ -1,7 +1,7 @@
-import { supabase } from "./supabase.js";
+import { getUserContext } from "./session.js";
 
-const { data } = await supabase.auth.getSession();
+const context = await getUserContext();
 
-if (!data.session) {
-  window.location.href = "../";
+if (!context || context.rol === "operativo") {
+  window.location.href = "/Plataforma_Restaurantes/login/";
 }
