@@ -2,11 +2,20 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Plataforma</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login</title>
 </head>
+
 <body>
-  <script>
-    window.location.href = "/login/";
-  </script>
+  <h2>Iniciar sesión</h2>
+
+  <form id="loginForm">
+    <input id="emailInput" type="email" placeholder="Email" required>
+    <input id="passwordInput" type="password" placeholder="Contraseña" required>
+    <button type="submit">Entrar</button>
+  </form>
+
+  <!-- RUTA RELATIVA, NO ABSOLUTA -->
+  <script type="module" src="./js/auth.js"></script>
 </body>
 </html>
