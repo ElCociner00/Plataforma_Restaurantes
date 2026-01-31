@@ -20,7 +20,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   menu += `<a href="/Plataforma_Restaurantes/cierre_turno/">Cierre de Turno</a>`;
 
   if (context.rol === "admin_root") {
-    menu += `<a href="/Plataforma_Restaurantes/config/">Configuración</a>`;
+    menu += `<a href="/Plataforma_Restaurantes/configuracion/">Configuración</a>`;
   }
 
   menu += `<a href="#" id="logoutBtn">Salir</a>`;
