@@ -2,6 +2,7 @@ import { supabase } from "./supabase.js";
 
 export async function getUserContext() {
   const { data: { user } } = await supabase.auth.getUser();
+
   if (!user) return null;
 
   const { data, error } = await supabase
