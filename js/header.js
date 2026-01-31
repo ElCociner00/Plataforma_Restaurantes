@@ -30,5 +30,5 @@ document.body.prepend(header);
 document.getElementById("logout").onclick = async () => {
   const { supabase } = await import("./supabase.js");
   await supabase.auth.signOut();
-  window.location.href = "/Plataforma_Restaurantes/login/";
+  window.location.href = "/Plataforma_Restaurantes/";
 };
