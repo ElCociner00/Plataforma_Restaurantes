@@ -1,7 +1,8 @@
 import { getUserContext } from "./session.js";
+import { supabase } from "./supabase.js";
 
 const context = await getUserContext();
-if (!context) return;
+if (!context) return; // no logueado → no header
 
 const header = document.createElement("header");
 header.className = "app-header";
@@ -12,7 +13,7 @@ if (context.rol !== "operativo") {
   menu += `<a href="/Plataforma_Restaurantes/dashboard/">Dashboard</a>`;
 }
 
-menu += `<a href="/Plataforma_Restaurantes/cierre_turno/">Cierre Turno</a>`;
+menu += `<a href="/Plataforma_Restaurantes/cierre_turno/">Cierre de Turno</a>`;
 
 if (context.rol === "admin_root") {
   menu += `<a href="/Plataforma_Restaurantes/config/">Configuración</a>`;
@@ -28,7 +29,6 @@ header.innerHTML = `
 document.body.prepend(header);
 
 document.getElementById("logoutBtn").onclick = async () => {
-  const { supabase } = await import("./supabase.js");
   await supabase.auth.signOut();
   window.location.href = "/Plataforma_Restaurantes/login/";
 };
