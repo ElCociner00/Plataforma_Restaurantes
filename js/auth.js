@@ -8,7 +8,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
 
   const { error } = await supabase.auth.signInWithPassword({
     email,
-    password
+    password,
   });
 
   if (error) {
@@ -16,5 +16,5 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
     return;
   }
 
-  window.location.href = "/dashboard/";
+  window.location.href = "./dashboard/";
 });
