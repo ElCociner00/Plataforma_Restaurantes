@@ -1,34 +1,39 @@
-import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
+import { getUserContext } from "./session.js";
 
-const context = await getUserContext();
-if (!context) return; // no logueado → no header
+// Esperar a que el DOM esté listo
+document.addEventListener("DOMContentLoaded", async () => {
+  const context = await getUserContext();
 
-const header = document.createElement("header");
-header.className = "app-header";
+  // Si no hay usuario, NO mostramos header (ej: login)
+  if (!context) return;
 
-let menu = "";
+  const header = document.createElement("header");
+  header.className = "app-header";
 
-if (context.rol !== "operativo") {
-  menu += `<a href="/Plataforma_Restaurantes/dashboard/">Dashboard</a>`;
-}
+  let menu = "";
 
-menu += `<a href="/Plataforma_Restaurantes/cierre_turno/">Cierre de Turno</a>`;
+  if (context.rol !== "operativo") {
+    menu += `<a href="/Plataforma_Restaurantes/dashboard/">Dashboard</a>`;
+  }
 
-if (context.rol === "admin_root") {
-  menu += `<a href="/Plataforma_Restaurantes/config/">Configuración</a>`;
-}
+  menu += `<a href="/Plataforma_Restaurantes/cierre_turno/">Cierre de Turno</a>`;
 
-menu += `<a href="#" id="logoutBtn">Salir</a>`;
+  if (context.rol === "admin_root") {
+    menu += `<a href="/Plataforma_Restaurantes/config/">Configuración</a>`;
+  }
 
-header.innerHTML = `
-  <div class="logo">🍽 Plataforma Restaurantes</div>
-  <nav>${menu}</nav>
-`;
+  menu += `<a href="#" id="logoutBtn">Salir</a>`;
 
-document.body.prepend(header);
+  header.innerHTML = `
+    <div class="logo">🍽 Plataforma Restaurantes</div>
+    <nav>${menu}</nav>
+  `;
 
-document.getElementById("logoutBtn").onclick = async () => {
-  await supabase.auth.signOut();
-  window.location.href = "/Plataforma_Restaurantes/login/";
-};
+  document.body.prepend(header);
+
+  document.getElementById("logoutBtn").onclick = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/Plataforma_Restaurantes/login/";
+  };
+});
