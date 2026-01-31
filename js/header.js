@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     menu += `<a href="/Plataforma_Restaurantes/configuracion/">Configuración</a>`;
   }
 
-  menu += `<a href="#" id="logoutBtn">Salir</a>`;
+  menu += `<button id="logoutBtn" class="logout-btn">Salir</button>`;
 
   header.innerHTML = `
     <div class="logo">🍽 Plataforma Restaurantes</div>
