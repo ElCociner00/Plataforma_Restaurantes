@@ -1,4 +1,4 @@
-import { createClient } from "https://ivgzwgyjyqfunheaesxx.supabase.co";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 export const supabase = createClient(
   "https://ivgzwgyjyqfunheaesxx.supabase.co",
