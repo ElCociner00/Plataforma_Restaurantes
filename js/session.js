@@ -1,7 +1,9 @@
 import { supabase } from "./supabase.js";
 
 export async function getUserContext() {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  console.log("AUTH USER:", user, authError);
 
   if (!user) return null;
 
@@ -11,7 +13,9 @@ export async function getUserContext() {
     .eq("id", user.id)
     .single();
 
-  if (error || !data || !data.activo) return null;
+  console.log("DB USER:", data, error);
+
+  if (error || !data || data.activo === false) return null;
 
   return {
     user,
