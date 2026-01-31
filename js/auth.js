@@ -1,14 +1,26 @@
-import { getUserContext } from "./session.js";
+import { supabase } from "./supabase.js";
 
-const context = await getUserContext();
+const form = document.getElementById("loginForm");
 
-if (!context) {
-  alert("Usuario no autorizado");
-  return;
-}
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-if (context.rol === "operativo") {
-  window.location.href = "/Plataforma_Restaurantes/cierre_turno/";
-} else {
+  const email = document.getElementById("emailInput").value;
+  const password = document.getElementById("passwordInput").value;
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  console.log("LOGIN DATA:", data);
+  console.log("LOGIN ERROR:", error);
+
+  if (error) {
+    alert("Credenciales incorrectas");
+    return;
+  }
+
+  // Redirección inicial (luego el rol decide)
   window.location.href = "/Plataforma_Restaurantes/dashboard/";
-}
+});
