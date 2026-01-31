@@ -2,16 +2,18 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cierre de turno</title>
-
-  <!-- CSS global -->
   <link rel="stylesheet" href="../css/main.css">
 </head>
 
 <body>
-  <!-- Seguridad + header -->
-  <script type="module" src="../js/guard_operativo.js"></script>
+  <!-- 🔐 Guard por permisos -->
+  <script type="module">
+    import { guardPage } from "../js/guard_page.js";
+    guardPage("cierre_turno");
+  </script>
+
+  <!-- 🧭 Header -->
   <script type="module" src="../js/header.js"></script>
 
   <div class="main">
@@ -19,9 +21,7 @@
 
     <section class="bloque">
       <h2>Información del Turno</h2>
-
       <input id="fecha" type="date">
-
       <select id="responsable">
         <option value="">Seleccione responsable</option>
         <option>Laura Velásquez</option>
@@ -38,7 +38,6 @@
 
     <section class="bloque">
       <h2>Datos Financieros</h2>
-
       <input type="number" placeholder="Efectivo Apertura">
       <input type="number" placeholder="Efectivo Sistema">
       <input type="number" placeholder="Efectivo Real">
@@ -46,19 +45,16 @@
       <input type="number" placeholder="Datafono Real">
       <input type="number" placeholder="Transferencias Sistema">
       <input type="number" placeholder="Transferencia Real">
-
       <textarea placeholder="Comentarios"></textarea>
     </section>
 
     <section class="bloque">
       <button id="verificar">Verificar</button>
       <button id="enviar">Enviar cierre</button>
-
       <div id="status"></div>
     </section>
   </div>
 
-  <!-- JS del módulo (vacío por ahora) -->
   <script type="module" src="../js/cierre_turno.js"></script>
 </body>
 </html>
