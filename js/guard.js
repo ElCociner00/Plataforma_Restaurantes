@@ -1,7 +1,8 @@
 import { getUserContext } from "./session.js";
 
 const context = await getUserContext();
+console.log("GUARD DASHBOARD:", context);
 
-if (!context || context.rol === "operativo") {
+if (!context) {
   window.location.href = "/Plataforma_Restaurantes/login/";
 }
