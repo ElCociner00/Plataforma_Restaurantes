@@ -11,9 +11,38 @@
     <h1>Crear usuario administrador</h1>
 
     <form id="registroUsuario">
-      <input type="text" id="nombre_visible" placeholder="Tu nombre" required>
-      <input type="email" id="email" placeholder="Correo" required>
-      <input type="password" id="password" placeholder="Contraseña" required>
+      <!-- Nombre completo -->
+      <input
+        type="text"
+        id="nombre_visible"
+        placeholder="Nombre completo"
+        required
+      >
+
+      <!-- Username con dominio fijo -->
+      <div style="display:flex; gap:6px;">
+        <input
+          type="text"
+          id="username"
+          placeholder="Username"
+          required
+          style="flex:1;"
+        >
+        <input
+          type="text"
+          value="@globalnexo.com"
+          disabled
+          style="width:160px; background:#f3f4f6; color:#6b7280;"
+        >
+      </div>
+
+      <!-- Contraseña -->
+      <input
+        type="password"
+        id="password"
+        placeholder="Contraseña"
+        required
+      >
 
       <button type="submit">Crear cuenta</button>
     </form>
@@ -21,50 +50,7 @@
     <div id="status"></div>
   </div>
 
-  <script type="module">
-    const status = document.getElementById("status");
-
-    // 🔍 Recuperamos el NIT de la sesión
-    const empresaNIT = sessionStorage.getItem("empresa_nit");
-
-    if (!empresaNIT) {
-      status.innerText = "Error: no se encontró información de la empresa.";
-      document.getElementById("registroUsuario").style.display = "none";
-      throw new Error("NIT no encontrado en sessionStorage");
-    }
-
-    document.getElementById("registroUsuario").addEventListener("submit", async (e) => {
-      e.preventDefault();
-
-      const payload = {
-        nombre_visible: nombre_visible.value,
-        email: email.value,
-        password: password.value,
-        nit: empresaNIT // 🔗 vínculo empresa ↔ admin_root
-      };
-
-      const res = await fetch(
-        "https://n8n.globalnexoshop.com/webhook/registro_usuario",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        }
-      );
-
-      const data = await res.json();
-
-      if (!data.ok) {
-        status.innerText = data.error || "Error creando el usuario";
-        return;
-      }
-
-      // 🧹 Limpieza de sesión
-      sessionStorage.removeItem("empresa_nit");
-
-      alert("Registro exitoso. Ahora puedes iniciar sesión.");
-      window.location.href = "/Plataforma_Restaurantes/login/";
-    });
-  </script>
+  <!-- JS separado -->
+  <script type="module" src="../js/usuario.js"></script>
 </body>
 </html>
