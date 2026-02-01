@@ -40,7 +40,7 @@ body {
 }
 
 /* =========================
-   CONTENEDOR PRINCIPAL
+   CONTENEDOR PRINCIPAL BASE
 ========================= */
 .main {
   max-width: 420px;
@@ -58,7 +58,6 @@ body {
   font-weight: 600;
 }
 
-/* Texto auxiliar debajo de títulos */
 .main p {
   text-align: center;
   font-size: 0.9rem;
@@ -67,13 +66,12 @@ body {
 }
 
 /* =========================
-   FORMULARIOS
+   FORMULARIOS BASE
 ========================= */
 form {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  margin-bottom: 8px;
 }
 
 input,
@@ -101,7 +99,6 @@ button {
   padding: 12px;
   font-size: 1rem;
   font-weight: 600;
-  letter-spacing: 0.3px;
   border-radius: 6px;
   border: none;
   cursor: pointer;
@@ -114,7 +111,7 @@ button:hover {
 }
 
 /* =========================
-   LOGIN EXTRA (REGISTRO)
+   LOGIN / REGISTRO
 ========================= */
 .login-extra {
   margin-top: 18px;
@@ -138,14 +135,4 @@ button:hover {
   margin-top: 14px;
   font-size: 0.9rem;
   text-align: center;
-}
-
-.main {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.main > * {
-  width: 100%;
 }
