@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Crear Usuario Administrador</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+
+<body>
+  <div class="main">
+    <h1>Crear usuario administrador</h1>
+
+    <form id="registroUsuario">
+      <input type="text" id="nombre_visible" placeholder="Tu nombre" required>
+      <input type="email" id="email" placeholder="Correo" required>
+      <input type="password" id="password" placeholder="Contraseña" required>
+
+      <button type="submit">Crear cuenta</button>
+    </form>
+
+    <div id="status"></div>
+  </div>
+
+  <script type="module">
+    document.getElementById("registroUsuario").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const payload = {
+        nombre_visible: nombre_visible.value,
+        email: email.value,
+        password: password.value
+      };
+
+      await fetch("https://ejemplo.com@aqui_va_el_webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      alert("Registro exitoso. Ahora puedes iniciar sesión.");
+      window.location.href = "/Plataforma_Restaurantes/login/";
+    });
+  </script>
+</body>
+</html>
