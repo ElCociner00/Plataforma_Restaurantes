@@ -6,22 +6,24 @@
   <link rel="stylesheet" href="../css/main.css">
 </head>
 
-<body>
-  <!-- 🔐 Guard por permisos -->
-  
+<body style="display:none">
+
+  <!-- 🔐 Auth global -->
   <script type="module" src="../js/auth-guard.js"></script>
-  
+
+  <!-- 🔐 Permisos por rol -->
   <script type="module">
     import { guardPage } from "../js/guard_page.js";
     guardPage("dashboard");
   </script>
 
-  <!-- 🧭 Header dinámico -->
+  <!-- 🧭 Header -->
   <script type="module" src="../js/header.js"></script>
 
   <div class="main">
     <h1>Dashboard</h1>
     <p>Bienvenido al panel principal</p>
   </div>
+
 </body>
 </html>
