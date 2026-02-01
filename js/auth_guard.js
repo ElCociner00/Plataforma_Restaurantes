@@ -1,14 +1,28 @@
-import { getUserContext } from "./session.js";
+import { supabase } from "./supabase.js";
+
+// ⛔ Bloqueo inmediato de interacción si no hay sesión
+function forceRedirect() {
+  window.location.replace("/Plataforma_Restaurantes/");
+}
+
+// Escuchamos cualquier intento de interacción
+["click", "keydown", "touchstart"].forEach(event => {
+  document.addEventListener(event, async () => {
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) {
+      forceRedirect();
+    }
+  });
+});
 
 document.addEventListener("DOMContentLoaded", async () => {
-  const context = await getUserContext();
+  const { data } = await supabase.auth.getSession();
 
-  // 🚫 Si NO hay usuario → fuera
-  if (!context) {
-    window.location.replace("/Plataforma_Restaurantes/");
+  if (!data.session) {
+    forceRedirect();
     return;
   }
 
-  // (Opcional) Exponer contexto globalmente
-  window.USER_CONTEXT = context;
+  // ✅ Sesión válida → mostramos la página
+  document.body.style.display = "block";
 });
