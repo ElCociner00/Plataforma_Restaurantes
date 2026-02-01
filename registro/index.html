@@ -16,31 +16,129 @@
       <input type="text" id="nit" placeholder="NIT" required>
       <input type="email" id="correo_empresa" placeholder="Correo de la empresa" required>
 
-      <button type="submit">Registrar empresa</button>
+      <button type="submit" id="enviarCodigo">
+        Enviar código de verificación
+      </button>
     </form>
+
+    <!-- Código dinámico (oculto al inicio) -->
+    <div id="verificacion" style="display:none; margin-top:16px;">
+      <input type="text" id="codigo" placeholder="Código recibido por correo">
+      <button id="verificarCodigo">Verificar código</button>
+    </div>
+
+    <button id="continuar" style="display:none; margin-top:16px;">
+      Continuar registro
+    </button>
 
     <div id="status"></div>
   </div>
 
   <script type="module">
-    document.getElementById("registroEmpresa").addEventListener("submit", async (e) => {
-      e.preventDefault();
+    const form = document.getElementById("registroEmpresa");
+    const status = document.getElementById("status");
+    const verificacion = document.getElementById("verificacion");
+    const continuarBtn = document.getElementById("continuar");
 
-      const payload = {
+    let datosEmpresa = null;
+    let codigoValidado = false;
+
+    // 1️⃣ Enviar código
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      status.innerText = "Enviando código...";
+
+      datosEmpresa = {
         nombre_comercial: nombre_comercial.value,
         razon_social: razon_social.value,
         nit: nit.value,
         correo_empresa: correo_empresa.value
       };
 
-      await fetch("https://n8n.globalnexoshop.com/webhook/registro", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+      const res = await fetch(
+        "https://n8n.globalnexoshop.com/webhook/crear_codigo_verificacion",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(datosEmpresa)
+        }
+      );
 
-      window.location.href = "/Plataforma_Restaurantes/registro/usuario.html";
+      const data = await res.json();
+
+      if (data.ok) {
+        status.innerText = "Código enviado. Revisa tu correo.";
+        verificacion.style.display = "block";
+        form.querySelectorAll("input").forEach(i => i.disabled = true);
+      } else {
+        status.innerText = data.error || "Error enviando el código";
+      }
     });
+
+    // 2️⃣ Verificar código
+    document.getElementById("verificarCodigo").addEventListener("click", async () => {
+      status.innerText = "Verificando código...";
+
+      const res = await fetch(
+        "https://n8n.globalnexoshop.com/webhook/verificar_codigo",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            correo_empresa: datosEmpresa.correo_empresa,
+            codigo: codigo.value
+          })
+        }
+      );
+
+      const data = await res.json();
+
+      if (data.ok) {
+        codigoValidado = true;
+        status.innerText = "Correo verificado correctamente ✅";
+        continuarBtn.style.display = "block";
+        verificacion.style.display = "none";
+      } else {
+        status.innerText = data.error || "Código inválido o expirado";
+      }
+    });
+
+    // 3️⃣ Continuar
+continuarBtn.addEventListener("click", async () => {
+  if (!codigoValidado) {
+    status.innerText = "Debes verificar tu correo primero";
+    return;
+  }
+
+  status.innerText = "Registrando empresa...";
+
+  const res = await fetch(
+    "https://n8n.globalnexoshop.com/webhook/registro",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(datosEmpresa)
+    }
+  );
+
+  const data = await res.json();
+
+  if (!data.ok) {
+    status.innerText = data.error || "Error registrando la empresa";
+    return;
+  }
+
+  // Guardamos empresa confirmada
+  sessionStorage.setItem(
+    "empresa_registro",
+    JSON.stringify({
+      ...datosEmpresa,
+      empresa_id: data.empresa_id // UUID devuelto por n8n
+    })
+  );
+
+  window.location.href = "/Plataforma_Restaurantes/registro/usuario.html";
+});
   </script>
 </body>
 </html>
