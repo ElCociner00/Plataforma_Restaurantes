@@ -3,12 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <title>Registrar Empleado</title>
+
   <link rel="stylesheet" href="../css/main.css">
   <link rel="stylesheet" href="../css/registro_empleados.css">
 </head>
 
 <body style="display:none">
 
+  <!-- Guardia de autenticación -->
   <script type="module" src="../js/auth_guard.js"></script>
 
   <script type="module">
@@ -17,23 +19,52 @@
   </script>
 
   <script type="module" src="../js/header.js"></script>
+  <script type="module" src="../js/registro_empleado.js"></script>
 
   <div class="main">
-    <h1>Registrar Empleado</h1>
+    <h1>Registrar empleado</h1>
 
-    <form>
-      <input type="text" placeholder="Nombre completo" required>
-      <input type="text" placeholder="Cédula" required>
-      <input type="date" placeholder="Fecha de ingreso" required>
+    <form id="registroEmpleadoForm">
 
+      <!-- Datos personales -->
+      <input type="text" id="nombre" placeholder="Nombre completo del empleado" required>
+      <input type="text" id="cedula" placeholder="Cédula del empleado" required>
+
+      <!-- Fecha laboral -->
+      <label class="label-info">Fecha de ingreso laboral</label>
+      <input type="date" id="fecha_ingreso" required>
+
+      <!-- Usuario -->
       <div class="username-field">
-        <input type="text" placeholder="username" required>
+        <input type="text" id="username" placeholder="Nombre de usuario" required>
         <span>@globalnexo.com</span>
       </div>
 
-      <input type="password" placeholder="Contraseña" required>
+      <input type="password" id="password" placeholder="Contraseña temporal" required>
 
-      <button type="submit">Registrar</button>
+      <hr>
+
+      <!-- Seguridad empresarial -->
+      <h3>Validación de empresa</h3>
+
+      <input
+        type="text"
+        id="nit_empresa"
+        placeholder="NIT de la empresa"
+        required
+      >
+
+      <div class="nit-verificacion">
+        <input type="checkbox" id="confirmarNit">
+        <label for="confirmarNit">
+          Aseguro que soy el encargado de realizar este registro y me hago responsable
+        </label>
+      </div>
+
+      <button type="submit" id="btnRegistrar" disabled>
+        Registrar empleado
+      </button>
+
       <div id="status"></div>
     </form>
   </div>
