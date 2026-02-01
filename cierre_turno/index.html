@@ -6,11 +6,12 @@
   <link rel="stylesheet" href="../css/main.css">
 </head>
 
-<body>
-  <!-- 🔐 Guard por permisos -->
-  
+<body style="display:none">
+
+  <!-- 🔐 Auth global -->
   <script type="module" src="../js/auth-guard.js"></script>
-  
+
+  <!-- 🔐 Permisos -->
   <script type="module">
     import { guardPage } from "../js/guard_page.js";
     guardPage("cierre_turno");
@@ -59,5 +60,6 @@
   </div>
 
   <script type="module" src="../js/cierre_turno.js"></script>
+
 </body>
 </html>
