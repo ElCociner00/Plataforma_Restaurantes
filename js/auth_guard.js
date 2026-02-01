@@ -2,7 +2,7 @@ import { supabase } from "./supabase.js";
 
 // ⛔ Bloqueo inmediato de interacción si no hay sesión
 function forceRedirect() {
-  window.location.replace("/Plataforma_Restaurantes/");
+  window.location.replace("/Plataforma_Restaurantes/index.html");
 }
 
 // Escuchamos cualquier intento de interacción
