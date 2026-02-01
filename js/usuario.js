@@ -53,7 +53,7 @@ form.addEventListener("submit", async (e) => {
     sessionStorage.removeItem("empresa_nit");
 
     alert("Registro exitoso. Ahora puedes iniciar sesión.");
-    window.location.href = "/Plataforma_Restaurantes/login/";
+    window.location.href = "/Plataforma_Restaurantes/index.html";
 
   } catch (err) {
     status.innerText = "Error inesperado. Intenta nuevamente.";
