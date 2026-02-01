@@ -33,7 +33,7 @@
         correo_empresa: correo_empresa.value
       };
 
-      await fetch("https://n8n.globalnexoshop.com/webhook/Registro", {
+      await fetch("https://n8n.globalnexoshop.com/webhook/registro", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
