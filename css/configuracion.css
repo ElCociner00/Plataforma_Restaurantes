@@ -1,0 +1,23 @@
+.config-list {
+  list-style: none;
+  padding: 0;
+  margin-top: 20px;
+}
+
+.config-list li {
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  background: #f9fafb;
+}
+
+.config-list a {
+  text-decoration: none;
+  color: #111827;
+  font-weight: 500;
+}
+
+.config-list li:hover {
+  background: #eef2ff;
+}
