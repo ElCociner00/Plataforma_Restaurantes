@@ -1,0 +1,20 @@
+.finanzas-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.col-title {
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.row-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #374151;
+}
