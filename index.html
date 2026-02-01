@@ -4,23 +4,31 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login</title>
+
+  <!-- CSS GLOBAL -->
+  <link rel="stylesheet" href="../css/main.css">
 </head>
 
 <body>
-  <h2>Iniciar sesión</h2>
+  <div class="main">
+    <h2>Iniciar sesión</h2>
 
-  <form id="loginForm">
-    <input id="emailInput" type="email" placeholder="Email" required>
-    <input id="passwordInput" type="password" placeholder="Contraseña" required>
-    <button type="submit">Entrar</button>
-  </form>
+    <form id="loginForm">
+      <input id="emailInput" type="email" placeholder="Email" required>
+      <input id="passwordInput" type="password" placeholder="Contraseña" required>
+      <button type="submit">Entrar</button>
+    </form>
 
-<div class="login-extra">
-  <a href="/Plataforma_Restaurantes/registro/index.html" class="registro-link">
-    ¿No tienes cuenta? Regístrate aquí
-  </a>
-</div>
+    <div class="login-extra">
+      <a href="/Plataforma_Restaurantes/registro/index.html" class="registro-link">
+        ¿No tienes cuenta? Regístrate aquí
+      </a>
+    </div>
+  </div>
 
+  <script type="module" src="./js/auth.js"></script>
+</body>
+</html>
   <!-- RUTA RELATIVA, NO ABSOLUTA -->
   <script type="module" src="./js/auth.js"></script>
 </body>
