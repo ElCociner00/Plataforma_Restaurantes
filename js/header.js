@@ -1,11 +1,10 @@
 import { supabase } from "./supabase.js";
 import { getUserContext } from "./session.js";
 
-// Esperar a que el DOM esté listo
 document.addEventListener("DOMContentLoaded", async () => {
   const context = await getUserContext();
 
-  // Si no hay usuario, NO mostramos header (ej: login)
+  // Si no hay usuario, no mostramos header (login, registro, etc.)
   if (!context) return;
 
   const header = document.createElement("header");
@@ -34,6 +33,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.getElementById("logoutBtn").onclick = async () => {
     await supabase.auth.signOut();
-    window.location.href = "/Plataforma_Restaurantes/login/";
+
+    // 🔁 Redirigir al login real
+    window.location.href = "/Plataforma_Restaurantes/";
   };
 });
