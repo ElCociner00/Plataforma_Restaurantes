@@ -39,3 +39,18 @@ body {
 .logout-btn:hover {
   text-decoration: underline;
 }
+
+.login-extra {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.registro-link {
+  color: #1a73e8;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.registro-link:hover {
+  text-decoration: underline;
+}
