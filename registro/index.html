@@ -16,9 +16,7 @@
       <input type="text" id="nit" placeholder="NIT" required>
       <input type="email" id="correo_empresa" placeholder="Correo de la empresa" required>
 
-      <button type="submit">
-        Enviar código de verificación
-      </button>
+      <button type="submit">Enviar código de verificación</button>
     </form>
 
     <div id="verificacion" style="display:none; margin-top:16px;">
@@ -33,105 +31,7 @@
     <div id="status"></div>
   </div>
 
-  <script type="module">
-    const form = document.getElementById("registroEmpresa");
-    const status = document.getElementById("status");
-    const verificacion = document.getElementById("verificacion");
-    const continuarBtn = document.getElementById("continuar");
-
-    let datosEmpresa = null;
-    let codigoValidado = false;
-
-    // 1️⃣ Enviar código
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      status.innerText = "Enviando código...";
-
-      datosEmpresa = {
-        nombre_comercial: nombre_comercial.value,
-        razon_social: razon_social.value,
-        nit: nit.value,
-        correo_empresa: correo_empresa.value
-      };
-
-      const res = await fetch(
-        "https://n8n.globalnexoshop.com/webhook/crear_codigo_verificacion",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(datosEmpresa)
-        }
-      );
-
-      const data = await res.json();
-
-      if (data.ok) {
-        status.innerText = "Código enviado. Revisa tu correo.";
-        verificacion.style.display = "block";
-        form.querySelectorAll("input").forEach(i => i.disabled = true);
-      } else {
-        status.innerText = data.error || "Error enviando el código";
-      }
-    });
-
-    // 2️⃣ Verificar código
-    document.getElementById("verificarCodigo").addEventListener("click", async () => {
-      status.innerText = "Verificando código...";
-
-      const res = await fetch(
-        "https://n8n.globalnexoshop.com/webhook/verificar_codigo",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            correo_empresa: datosEmpresa.correo_empresa,
-            codigo: codigo.value
-          })
-        }
-      );
-
-      const data = await res.json();
-
-      if (data.ok) {
-        codigoValidado = true;
-        status.innerText = "Correo verificado correctamente ✅";
-        continuarBtn.style.display = "block";
-        verificacion.style.display = "none";
-      } else {
-        status.innerText = data.error || "Código inválido o expirado";
-      }
-    });
-
-    // 3️⃣ Continuar → registrar empresa
-    continuarBtn.addEventListener("click", async () => {
-      if (!codigoValidado) {
-        status.innerText = "Debes verificar tu correo primero";
-        return;
-      }
-
-      status.innerText = "Registrando empresa...";
-
-      const res = await fetch(
-        "https://n8n.globalnexoshop.com/webhook/registro",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(datosEmpresa)
-        }
-      );
-
-      const data = await res.json();
-
-      if (!data.ok) {
-        status.innerText = data.error || "Error registrando la empresa";
-        return;
-      }
-
-      // 🔐 GUARDAMOS SOLO EL NIT (dato puente)
-      sessionStorage.setItem("empresa_nit", datosEmpresa.nit);
-
-      window.location.href = "/Plataforma_Restaurantes/registro/usuario.html";
-    });
-  </script>
+  <!-- JS separado -->
+  <script type="module" src="../js/registro.js"></script>
 </body>
 </html>
