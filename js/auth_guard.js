@@ -1,28 +1,42 @@
 import { supabase } from "./supabase.js";
 
-// ⛔ Bloqueo inmediato de interacción si no hay sesión
-function forceRedirect() {
-  window.location.replace("/Plataforma_Restaurantes/index.html");
+const LOGIN_URL = "/Plataforma_Restaurantes/";
+
+// 🔒 Redirección dura
+function redirectToLogin() {
+  window.location.replace(LOGIN_URL);
 }
 
-// Escuchamos cualquier intento de interacción
-["click", "keydown", "touchstart"].forEach(event => {
-  document.addEventListener(event, async () => {
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) {
-      forceRedirect();
-    }
+// 🚫 Bloqueo de interacción si NO hay sesión
+function protectInteractions() {
+  ["click", "keydown", "touchstart"].forEach(event => {
+    document.addEventListener(event, async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        redirectToLogin();
+      }
+    });
   });
-});
+}
 
+// ⏳ Esperar a que Supabase confirme el estado real
 document.addEventListener("DOMContentLoaded", async () => {
-  const { data } = await supabase.auth.getSession();
+  const { data: listener } = supabase.auth.onAuthStateChange(
+    (event, session) => {
 
-  if (!data.session) {
-    forceRedirect();
-    return;
-  }
+      if (!session) {
+        redirectToLogin();
+        return;
+      }
 
-  // ✅ Sesión válida → mostramos la página
-  document.body.style.display = "block";
+      // ✅ Sesión válida
+      document.body.style.display = "block";
+      protectInteractions();
+    }
+  );
+
+  // Limpieza automática si se navega
+  window.addEventListener("beforeunload", () => {
+    listener.subscription.unsubscribe();
+  });
 });
