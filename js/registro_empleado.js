@@ -3,7 +3,7 @@
 // ===============================
 
 // 🔗 WEBHOOKS
-const WEBHOOK_VERIFICAR_NIT = "https://aqui_va_el_webhook@pegaloaqui";
+const WEBHOOK_VERIFICAR_NIT = "https://n8n.globalnexoshop.com/webhook/verificar_nit_empresa";
 const WEBHOOK_REGISTRAR_EMPLEADO = "https://aqui_va_el_webhook@pegaloaqui";
 
 // ===============================
