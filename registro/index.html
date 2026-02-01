@@ -16,12 +16,11 @@
       <input type="text" id="nit" placeholder="NIT" required>
       <input type="email" id="correo_empresa" placeholder="Correo de la empresa" required>
 
-      <button type="submit" id="enviarCodigo">
+      <button type="submit">
         Enviar código de verificación
       </button>
     </form>
 
-    <!-- Código dinámico (oculto al inicio) -->
     <div id="verificacion" style="display:none; margin-top:16px;">
       <input type="text" id="codigo" placeholder="Código recibido por correo">
       <button id="verificarCodigo">Verificar código</button>
@@ -103,42 +102,36 @@
       }
     });
 
-    // 3️⃣ Continuar
-continuarBtn.addEventListener("click", async () => {
-  if (!codigoValidado) {
-    status.innerText = "Debes verificar tu correo primero";
-    return;
-  }
+    // 3️⃣ Continuar → registrar empresa
+    continuarBtn.addEventListener("click", async () => {
+      if (!codigoValidado) {
+        status.innerText = "Debes verificar tu correo primero";
+        return;
+      }
 
-  status.innerText = "Registrando empresa...";
+      status.innerText = "Registrando empresa...";
 
-  const res = await fetch(
-    "https://n8n.globalnexoshop.com/webhook/registro",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(datosEmpresa)
-    }
-  );
+      const res = await fetch(
+        "https://n8n.globalnexoshop.com/webhook/registro",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(datosEmpresa)
+        }
+      );
 
-  const data = await res.json();
+      const data = await res.json();
 
-  if (!data.ok) {
-    status.innerText = data.error || "Error registrando la empresa";
-    return;
-  }
+      if (!data.ok) {
+        status.innerText = data.error || "Error registrando la empresa";
+        return;
+      }
 
-  // Guardamos empresa confirmada
-  sessionStorage.setItem(
-    "empresa_registro",
-    JSON.stringify({
-      ...datosEmpresa,
-      empresa_id: data.empresa_id // UUID devuelto por n8n
-    })
-  );
+      // 🔐 GUARDAMOS SOLO EL NIT (dato puente)
+      sessionStorage.setItem("empresa_nit", datosEmpresa.nit);
 
-  window.location.href = "/Plataforma_Restaurantes/registro/usuario.html";
-});
+      window.location.href = "/Plataforma_Restaurantes/registro/usuario.html";
+    });
   </script>
 </body>
 </html>
