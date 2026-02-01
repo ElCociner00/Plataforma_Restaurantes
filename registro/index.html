@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Registro de Empresa</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+
+<body>
+  <div class="main">
+    <h1>Registrar Empresa</h1>
+
+    <form id="registroEmpresa">
+      <input type="text" id="nombre_comercial" placeholder="Nombre comercial" required>
+      <input type="text" id="razon_social" placeholder="Razón social" required>
+      <input type="text" id="nit" placeholder="NIT" required>
+      <input type="email" id="correo_empresa" placeholder="Correo de la empresa" required>
+
+      <button type="submit">Registrar empresa</button>
+    </form>
+
+    <div id="status"></div>
+  </div>
+
+  <script type="module">
+    document.getElementById("registroEmpresa").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const payload = {
+        nombre_comercial: nombre_comercial.value,
+        razon_social: razon_social.value,
+        nit: nit.value,
+        correo_empresa: correo_empresa.value
+      };
+
+      await fetch("https://ejemplo.com@aqui_va_el_webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      window.location.href = "/Plataforma_Restaurantes/registro/usuario.html";
+    });
+  </script>
+</body>
+</html>
