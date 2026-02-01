@@ -35,6 +35,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     await supabase.auth.signOut();
 
     // 🔁 Redirigir al login real
-    window.location.href = "/Plataforma_Restaurantes/";
+    window.location.href = "/Plataforma_Restaurantes/index.html";
   };
 });
