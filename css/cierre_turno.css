@@ -1,7 +1,17 @@
+.main {
+  max-width: 760px;
+}
+
+/* Bloques visuales */
+.bloque {
+  margin-bottom: 24px;
+}
+
+/* Grid financiero */
 .finanzas-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
   margin-bottom: 14px;
 }
@@ -17,4 +27,9 @@
   font-size: 0.9rem;
   font-weight: 500;
   color: #374151;
+}
+
+/* Botones finales */
+.bloque button {
+  margin-top: 10px;
 }
