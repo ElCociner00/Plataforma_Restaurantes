@@ -1,23 +1,50 @@
+.config-section {
+  max-width: 600px;
+}
+
+.accordion-toggle {
+  width: 100%;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 6px;
+  margin-top: 12px;
+}
+
+.accordion-toggle.active {
+  background: #e5e7eb;
+}
+
+.accordion-content {
+  display: none;
+  padding: 10px 16px;
+  border-left: 2px solid #d1d5db;
+}
+
 .config-list {
   list-style: none;
-  padding: 0;
-  margin-top: 20px;
+  padding-left: 0;
 }
 
 .config-list li {
-  padding: 14px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  margin-bottom: 12px;
-  background: #f9fafb;
+  margin: 8px 0;
 }
 
 .config-list a {
   text-decoration: none;
-  color: #111827;
+  color: #2563eb;
   font-weight: 500;
 }
 
-.config-list li:hover {
-  background: #eef2ff;
+.config-list a:hover {
+  text-decoration: underline;
+}
+
+.coming-soon {
+  color: #6b7280;
+  font-size: 0.9rem;
 }
