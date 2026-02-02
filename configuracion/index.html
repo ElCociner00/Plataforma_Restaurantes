@@ -3,32 +3,70 @@
 <head>
   <meta charset="UTF-8">
   <title>Configuración</title>
+
   <link rel="stylesheet" href="../css/main.css">
   <link rel="stylesheet" href="../css/configuracion.css">
 </head>
 
 <body style="display:none">
 
+  <!-- Guardia de autenticación -->
   <script type="module" src="../js/auth_guard.js"></script>
 
+  <!-- Guardia de permisos -->
   <script type="module">
     import { guardPage } from "../js/guard_page.js";
     guardPage("configuracion");
   </script>
 
+  <!-- Header -->
   <script type="module" src="../js/header.js"></script>
 
   <div class="main">
     <h1>Configuración</h1>
 
-    <ul class="config-list">
-      <li>
-        <a href="registro_empleados.html">
-          ➕ Registrar usuarios nuevos
-        </a>
-      </li>
-    </ul>
+    <div class="config-section">
+
+      <!-- USUARIOS -->
+      <button class="accordion-toggle">
+        👥 Usuarios
+      </button>
+
+      <div class="accordion-content">
+        <ul class="config-list">
+          <li>
+            <a href="registro_empleados.html">
+              ➕ Registrar empleados
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- (FUTURO) SEGURIDAD -->
+      <button class="accordion-toggle">
+        🔐 Seguridad y permisos
+      </button>
+
+      <div class="accordion-content">
+        <p class="coming-soon">
+          Próximamente: gestión de permisos y roles
+        </p>
+      </div>
+
+    </div>
   </div>
+
+  <!-- JS Accordion -->
+  <script>
+    document.querySelectorAll(".accordion-toggle").forEach(button => {
+      button.addEventListener("click", () => {
+        button.classList.toggle("active");
+        const content = button.nextElementSibling;
+        content.style.display =
+          content.style.display === "block" ? "none" : "block";
+      });
+    });
+  </script>
 
 </body>
 </html>
