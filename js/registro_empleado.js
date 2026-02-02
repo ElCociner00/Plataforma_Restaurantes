@@ -3,8 +3,11 @@
 // ===============================
 
 // 🔗 WEBHOOKS
-const WEBHOOK_VERIFICAR_NIT = "https://n8n.globalnexoshop.com/webhook/verificar_nit_empresa";
-const WEBHOOK_REGISTRAR_EMPLEADO = "https://aqui_va_el_webhook@pegaloaqui";
+const WEBHOOK_VERIFICAR_NIT =
+  "https://n8n.globalnexoshop.com/webhook/verificar_nit_empresa";
+
+const WEBHOOK_REGISTRAR_EMPLEADO =
+  "https://aqui_va_el_webhook@pegaloaqui";
 
 // ===============================
 // ELEMENTOS
@@ -19,6 +22,7 @@ const nitInput = document.getElementById("nit_empresa");
 // ESTADO INTERNO
 // ===============================
 let nitVerificado = false;
+let verificandoNit = false;
 
 // ===============================
 // VERIFICACIÓN DE NIT
@@ -40,6 +44,11 @@ checkboxNit.addEventListener("change", async () => {
     return;
   }
 
+  // Bloqueo mientras espera
+  verificandoNit = true;
+  btnRegistrar.disabled = true;
+  checkboxNit.disabled = true;
+
   statusDiv.textContent = "Verificando NIT...";
 
   try {
@@ -51,23 +60,26 @@ checkboxNit.addEventListener("change", async () => {
 
     const data = await res.json();
 
-    if (data.valido === true) {
+    if (data.ok === true) {
       nitVerificado = true;
-      btnRegistrar.disabled = false;
-      statusDiv.textContent = "NIT verificado correctamente.";
+      statusDiv.textContent =
+        data.message || "NIT verificado correctamente.";
     } else {
       nitVerificado = false;
-      btnRegistrar.disabled = true;
       checkboxNit.checked = false;
-      statusDiv.textContent = "El NIT no corresponde a la empresa registrada.";
+      statusDiv.textContent =
+        data.message || "El NIT no es válido.";
     }
 
   } catch (err) {
     nitVerificado = false;
-    btnRegistrar.disabled = true;
     checkboxNit.checked = false;
     statusDiv.textContent = "Error al verificar el NIT.";
   }
+
+  verificandoNit = false;
+  checkboxNit.disabled = false;
+  btnRegistrar.disabled = !nitVerificado;
 });
 
 // ===============================
@@ -76,8 +88,15 @@ checkboxNit.addEventListener("change", async () => {
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
 
+  if (verificandoNit) {
+    statusDiv.textContent =
+      "Espera a que termine la verificación del NIT.";
+    return;
+  }
+
   if (!nitVerificado) {
-    statusDiv.textContent = "Debes verificar el NIT antes de registrar.";
+    statusDiv.textContent =
+      "Debes verificar el NIT antes de registrar.";
     return;
   }
 
@@ -85,7 +104,9 @@ form.addEventListener("submit", async (e) => {
     nombre: document.getElementById("nombre").value.trim(),
     cedula: document.getElementById("cedula").value.trim(),
     fecha_ingreso: document.getElementById("fecha_ingreso").value,
-    username: document.getElementById("username").value.trim() + "@globalnexo.com",
+    username:
+      document.getElementById("username").value.trim() +
+      "@globalnexo.com",
     password: document.getElementById("password").value,
     nit_empresa: nitInput.value.trim()
   };
@@ -101,16 +122,19 @@ form.addEventListener("submit", async (e) => {
 
     const data = await res.json();
 
-    if (data.success) {
-      statusDiv.textContent = "Empleado registrado correctamente.";
+    if (data.success === true) {
+      statusDiv.textContent =
+        "Empleado registrado correctamente.";
       form.reset();
       btnRegistrar.disabled = true;
       nitVerificado = false;
     } else {
-      statusDiv.textContent = "Error al registrar empleado.";
+      statusDiv.textContent =
+        data.message || "Error al registrar empleado.";
     }
 
   } catch (err) {
-    statusDiv.textContent = "Error de conexión con el servidor.";
+    statusDiv.textContent =
+      "Error de conexión con el servidor.";
   }
 });
