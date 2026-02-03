@@ -1,13 +1,10 @@
 import { enforceNumericInput } from "./input_utils.js";
 import { getUserContext } from "./session.js";
+import { WEBHOOK_REGISTRAR_EMPLEADO } from "./webhooks.js";
 
 // ===============================
 // REGISTRO DE EMPLEADO
 // ===============================
-
-// 🔗 WEBHOOKS
-const WEBHOOK_REGISTRAR_EMPLEADO =
-  "https://n8n.globalnexoshop.com/webhook/registro_empleados";
 
 // ===============================
 // ELEMENTOS

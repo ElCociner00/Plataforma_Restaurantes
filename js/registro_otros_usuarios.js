@@ -1,13 +1,10 @@
 import { enforceNumericInput } from "./input_utils.js";
 import { getUserContext } from "./session.js";
+import { WEBHOOK_REGISTRO_OTROS_USUARIOS } from "./webhooks.js";
 
 // ===============================
 // REGISTRO DE ADMINS Y REVISORES
 // ===============================
-
-// 🔗 WEBHOOKS
-const WEBHOOK_REGISTRO_OTROS_USUARIOS =
-  "https://n8n.globalnexoshop.com/webhook/registro_admins_y_revisores";
 
 // ===============================
 // ELEMENTOS

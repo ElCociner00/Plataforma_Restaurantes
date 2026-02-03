@@ -1,3 +1,5 @@
+import { WEBHOOK_REGISTRO_USUARIO } from "./webhooks.js";
+
 const status = document.getElementById("status");
 const form = document.getElementById("registroUsuario");
 const nombreVisibleInput = document.getElementById("nombre_visible");
@@ -40,7 +42,7 @@ form.addEventListener("submit", async (e) => {
 
   try {
     const res = await fetch(
-      "https://n8n.globalnexoshop.com/webhook/registro_usuario",
+      WEBHOOK_REGISTRO_USUARIO,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
