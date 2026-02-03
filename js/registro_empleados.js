@@ -1,4 +1,5 @@
 import { enforceNumericInput } from "./input_utils.js";
+import { getUserContext } from "./session.js";
 
 // ===============================
 // REGISTRO DE EMPLEADO
@@ -6,7 +7,7 @@ import { enforceNumericInput } from "./input_utils.js";
 
 // 🔗 WEBHOOKS
 const WEBHOOK_REGISTRAR_EMPLEADO =
-  "https://aqui_va_el_webhook@pegaloaqui";
+  "https://n8n.globalnexoshop.com/webhook/registro_empleados";
 
 // ===============================
 // ELEMENTOS
@@ -16,10 +17,9 @@ const btnRegistrar = document.getElementById("btnRegistrar");
 const statusDiv = document.getElementById("status");
 const nitInput = document.getElementById("nit_empresa");
 const cedulaInput = document.getElementById("cedula");
+const emailInput = document.getElementById("email");
 
 enforceNumericInput([nitInput, cedulaInput]);
-
-enforceNumericInput([cedulaInput]);
 
 // ===============================
 // ENVÍO DEL FORMULARIO
@@ -63,7 +63,9 @@ form.addEventListener("submit", async (e) => {
 
     const data = await res.json();
 
-    if (data.success === true) {
+    const isSuccess = data?.success === true || data?.ok === true;
+
+    if (isSuccess) {
       statusDiv.textContent =
         "Empleado registrado correctamente.";
       form.reset();
