@@ -41,7 +41,26 @@
 
       <hr>
 
-      <button type="submit" id="btnRegistrar">
+      <!-- Seguridad empresarial -->
+      <h3>Validación de empresa</h3>
+
+      <input
+        type="text"
+        id="nit_empresa"
+        placeholder="NIT de la empresa"
+        inputmode="numeric"
+        pattern="[0-9]*"
+        required
+      >
+
+      <div class="nit-verificacion">
+        <input type="checkbox" id="confirmarNit">
+        <label for="confirmarNit">
+          Aseguro que soy el encargado de realizar este registro y me hago responsable
+        </label>
+      </div>
+
+      <button type="submit" id="btnRegistrar" disabled>
         Registrar empleado
       </button>
 

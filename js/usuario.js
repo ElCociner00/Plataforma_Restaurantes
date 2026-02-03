@@ -1,7 +1,7 @@
 const status = document.getElementById("status");
 const form = document.getElementById("registroUsuario");
 const nombreVisibleInput = document.getElementById("nombre_visible");
-const emailInput = document.getElementById("email");
+const usernameInput = document.getElementById("username");
 const passwordInput = document.getElementById("password");
 
 // 🔍 Recuperamos el NIT de la sesión
@@ -16,16 +16,19 @@ if (!empresaNIT) {
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  const emailValue = emailInput.value.trim();
+  const usernameValue = usernameInput.value.trim();
 
-  if (!emailValue || !emailInput.checkValidity()) {
-    status.innerText = "Ingresa un correo válido";
+  if (!usernameValue) {
+    status.innerText = "El username es obligatorio";
     return;
   }
 
+  // 🔐 Construimos el email real (sin cambiar el nombre del campo)
+  const emailFinal = `${usernameValue}@globalnexo.com`;
+
   const payload = {
     nombre_visible: nombreVisibleInput.value.trim(),
-    email: emailValue,
+    email: emailFinal,       // ⬅️ MISMO CAMPO, MEJOR UX
     password: passwordInput.value,
     nit: empresaNIT
   };
