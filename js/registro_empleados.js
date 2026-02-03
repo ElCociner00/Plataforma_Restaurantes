@@ -63,7 +63,9 @@ form.addEventListener("submit", async (e) => {
 
     const data = await res.json();
 
-    if (data.success === true) {
+    const isSuccess = data?.success === true || data?.ok === true;
+
+    if (isSuccess) {
       statusDiv.textContent =
         "Empleado registrado correctamente.";
       form.reset();
