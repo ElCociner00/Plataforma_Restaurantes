@@ -17,13 +17,6 @@ input[type="date"] {
   border: 1px solid #d1d5db;
 }
 
-/* Username con dominio fijo */
-.username-field {
-  display: flex;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
 .username-field input {
   flex: 1;
   border-radius: 6px 0 0 6px;
@@ -37,15 +30,6 @@ input[type="date"] {
   border-radius: 0 6px 6px 0;
   font-size: 0.9rem;
   color: #374151;
-}
-
-/* Verificación NIT */
-.nit-verificacion {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin: 12px 0;
-  font-size: 0.9rem;
 }
 
 /* Botón */
