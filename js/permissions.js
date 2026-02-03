@@ -4,5 +4,6 @@ export const PERMISSIONS = {
   cierre_turno: ["admin_root", "admin", "operativo"],
   configuracion: ["admin_root"],
   inventarios: ["admin_root", "admin", "operativo"],
-  nomina: ["admin_root", "admin"]
+  nomina: ["admin_root", "admin"],
+  permisos: ["admin_root"]
 };
