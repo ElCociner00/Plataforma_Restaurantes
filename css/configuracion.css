@@ -1,108 +1,67 @@
 /* ===============================
-   CONFIGURACIÓN - ESTILOS
+   CONFIGURACIÓN
    =============================== */
 
 .main {
-  max-width: 600px;
+  max-width: 700px;
   margin: 0 auto;
 }
 
 /* -------------------------------
-   Formularios
+   CONTENEDOR GENERAL
 -------------------------------- */
 
-form {
+.config-section {
+  background-color: #ffffff;
+  margin-bottom: 16px; /* ← separación real entre acordeones */
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* -------------------------------
+   BOTÓN DEL ACORDEÓN
+   (hereda main.css)
+-------------------------------- */
+
+.accordion-toggle {
+  width: 100%;
+  text-align: left;
+  padding: 16px;
+  font-size: 15px;
+}
+
+/* -------------------------------
+   CONTENIDO DEL ACORDEÓN
+-------------------------------- */
+
+.accordion-content {
+  display: none; /* ← CERRADO POR DEFECTO */
+  padding: 16px;
+  border-top: 1px solid #e0e0e0;
+}
+
+/* -------------------------------
+   FORMULARIOS INTERNOS
+-------------------------------- */
+
+.accordion-content form {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-input[type="text"],
-input[type="password"],
-input[type="date"] {
+.accordion-content input {
   padding: 12px;
   border-radius: 6px;
   border: 1px solid #ccc;
   font-size: 14px;
-  width: 100%;
 }
 
 /* -------------------------------
-   Etiquetas informativas
--------------------------------- */
-
-.label-info {
-  font-size: 13px;
-  color: #555;
-  margin-bottom: -6px;
-}
-
-/* -------------------------------
-   Campo username
--------------------------------- */
-
-.username-field {
-  display: flex;
-  align-items: center;
-}
-
-.username-field input {
-  flex: 1;
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.username-field span {
-  background-color: #eee;
-  padding: 12px;
-  border: 1px solid #ccc;
-  border-left: none;
-  border-top-right-radius: 6px;
-  border-bottom-right-radius: 6px;
-  font-size: 14px;
-  color: #333;
-}
-
-/* -------------------------------
-   Verificación de NIT
--------------------------------- */
-
-.nit-verificacion {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 13px;
-  color: #444;
-}
-
-.nit-verificacion input[type="checkbox"] {
-  margin-top: 2px;
-}
-
-/* -------------------------------
-   BOTONES
-   ⚠️ IMPORTANTE:
-   - NO redefinimos colores
-   - Respetamos main.css
--------------------------------- */
-
-button {
-  width: 100%;
-}
-
-/* Estado deshabilitado coherente con el sistema */
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* -------------------------------
-   Estado / mensajes
+   ESTADO
 -------------------------------- */
 
 #status {
-  margin-top: 8px;
   font-size: 13px;
-  min-height: 16px;
+  margin-top: 8px;
 }
