@@ -2,24 +2,23 @@ import { enforceNumericInput } from "./input_utils.js";
 import { getUserContext } from "./session.js";
 
 // ===============================
-// REGISTRO DE EMPLEADO
+// REGISTRO DE ADMINS Y REVISORES
 // ===============================
 
 // 🔗 WEBHOOKS
-const WEBHOOK_REGISTRAR_EMPLEADO =
-  "https://n8n.globalnexoshop.com/webhook/registro_empleados";
+const WEBHOOK_REGISTRO_OTROS_USUARIOS =
+  "https://n8n.globalnexoshop.com/webhook/registro_admins_y_revisores";
 
 // ===============================
 // ELEMENTOS
 // ===============================
-const form = document.getElementById("registroEmpleadoForm");
-const btnRegistrar = document.getElementById("btnRegistrar");
+const form = document.getElementById("registroOtrosUsuariosForm");
 const statusDiv = document.getElementById("status");
-const nitInput = document.getElementById("nit_empresa");
 const cedulaInput = document.getElementById("cedula");
 const emailInput = document.getElementById("email");
+const rolSelect = document.getElementById("rol");
 
-enforceNumericInput([nitInput, cedulaInput]);
+enforceNumericInput([cedulaInput]);
 
 // ===============================
 // ENVÍO DEL FORMULARIO
@@ -35,6 +34,12 @@ form.addEventListener("submit", async (e) => {
     return;
   }
 
+  if (!rolSelect.value) {
+    statusDiv.textContent = "Selecciona un rol.";
+    rolSelect.focus();
+    return;
+  }
+
   const context = await getUserContext();
 
   if (!context) {
@@ -45,17 +50,17 @@ form.addEventListener("submit", async (e) => {
   const payload = {
     nombre: document.getElementById("nombre").value.trim(),
     cedula: cedulaInput.value.trim(),
-    fecha_ingreso: document.getElementById("fecha_ingreso").value,
     email: emailValue,
     password: document.getElementById("password").value,
+    rol: rolSelect.value,
     empresa_id: context.empresa_id,
     registrado_por: context.user?.id || context.user?.user_id
   };
 
-  statusDiv.textContent = "Registrando empleado...";
+  statusDiv.textContent = "Enviando registro...";
 
   try {
-    const res = await fetch(WEBHOOK_REGISTRAR_EMPLEADO, {
+    const res = await fetch(WEBHOOK_REGISTRO_OTROS_USUARIOS, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -63,19 +68,13 @@ form.addEventListener("submit", async (e) => {
 
     const data = await res.json();
 
-    const isSuccess = data?.success === true || data?.ok === true;
-
-    if (isSuccess) {
-      statusDiv.textContent =
-        "Empleado registrado correctamente.";
+    if (data?.ok === true) {
+      statusDiv.textContent = data.message || "";
       form.reset();
     } else {
-      statusDiv.textContent =
-        data.message || "Error al registrar empleado.";
+      statusDiv.textContent = data?.message || "";
     }
-
   } catch (err) {
-    statusDiv.textContent =
-      "Error de conexión con el servidor.";
+    statusDiv.textContent = "Error de conexión con el servidor.";
   }
 });

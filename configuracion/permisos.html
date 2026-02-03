@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Permisos</title>
+
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/permisos.css">
+</head>
+
+<body style="display:none">
+
+  <!-- Guardia de autenticación -->
+  <script type="module" src="../js/auth_guard.js"></script>
+
+  <script type="module">
+    import { guardPage } from "../js/guard_page.js";
+    guardPage("permisos");
+  </script>
+
+  <script type="module" src="../js/header.js"></script>
+  <script type="module" src="../js/permisos.js"></script>
+
+  <div class="main">
+    <h1>Permisos</h1>
+    <p class="helper-text">
+      Administra accesos por empleado y rol. Los cambios se aplican con un clic.
+    </p>
+
+    <div class="bulk-actions">
+      <button type="button" data-role="operativo" data-action="grant">
+        Dar permiso a todos los operativos
+      </button>
+      <button type="button" data-role="operativo" data-action="revoke">
+        Quitar permiso a todos los operativos
+      </button>
+      <button type="button" data-role="revisor" data-action="grant">
+        Dar permiso a todos los revisores
+      </button>
+      <button type="button" data-role="revisor" data-action="revoke">
+        Quitar permiso a todos los revisores
+      </button>
+      <button type="button" data-role="admin" data-action="grant">
+        Dar permiso a todos los admins
+      </button>
+      <button type="button" data-role="admin" data-action="revoke">
+        Quitar permiso a todos los admins
+      </button>
+    </div>
+
+    <div id="permisosTable" class="permisos-table"></div>
+    <div id="status" class="status"></div>
+  </div>
+
+</body>
+</html>

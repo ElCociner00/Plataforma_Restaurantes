@@ -1,0 +1,35 @@
+/* ===============================
+   FORM REGISTRO OTROS USUARIOS
+   =============================== */
+
+form {
+  max-width: 520px;
+}
+
+/* Inputs generales */
+input[type="text"],
+input[type="password"],
+input[type="email"],
+select {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 12px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+}
+
+select {
+  cursor: pointer;
+}
+
+/* Botón */
+button[type="submit"] {
+  margin-top: 12px;
+}
+
+/* Estado */
+#status {
+  margin-top: 10px;
+  font-size: 0.9rem;
+}

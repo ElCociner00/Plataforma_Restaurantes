@@ -2,10 +2,10 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Registrar Empleado</title>
+  <title>Registro revisores y admins</title>
 
   <link rel="stylesheet" href="../css/main.css">
-  <link rel="stylesheet" href="../css/registro_empleados.css">
+  <link rel="stylesheet" href="../css/registro_otros_usuarios.css">
 </head>
 
 <body style="display:none">
@@ -19,30 +19,34 @@
   </script>
 
   <script type="module" src="../js/header.js"></script>
-  <script type="module" src="../js/registro_empleados.js"></script>
+  <script type="module" src="../js/registro_otros_usuarios.js"></script>
 
   <div class="main">
-    <h1>Registrar empleado</h1>
+    <h1>Registro revisores y admins</h1>
 
-    <form id="registroEmpleadoForm">
+    <form id="registroOtrosUsuariosForm">
 
       <!-- Datos personales -->
-      <input type="text" id="nombre" placeholder="Nombre completo del empleado" required>
-      <input type="text" id="cedula" placeholder="Cédula del empleado" inputmode="numeric" pattern="[0-9]*" required>
-
-      <!-- Fecha laboral -->
-      <label class="label-info">Fecha de contratación</label>
-      <input type="date" id="fecha_ingreso" required>
+      <input type="text" id="nombre" placeholder="Nombre completo" required>
+      <input type="text" id="cedula" placeholder="Cédula" inputmode="numeric" pattern="[0-9]*" required>
 
       <!-- Usuario -->
       <input type="email" id="email" placeholder="Correo electrónico" required>
 
       <input type="password" id="password" placeholder="Contraseña" required>
 
+      <!-- Rol -->
+      <label class="label-info" for="rol">Rol</label>
+      <select id="rol" required>
+        <option value="" disabled selected>Selecciona un rol</option>
+        <option value="admin">Admin</option>
+        <option value="revisor">Revisor</option>
+      </select>
+
       <hr>
-      
+
       <button type="submit" id="btnRegistrar">
-        Registrar empleado
+        Registrar
       </button>
 
       <div id="status"></div>

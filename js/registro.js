@@ -124,6 +124,7 @@ continuarBtn.addEventListener("click", async () => {
 
     // ✅ ÉXITO
     sessionStorage.setItem("empresa_nit", datosEmpresa.nit);
+    sessionStorage.setItem("empresa_correo", datosEmpresa.correo_empresa);
     window.location.href = "/Plataforma_Restaurantes/registro/usuario.html";
 
   } catch (err) {
