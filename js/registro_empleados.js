@@ -6,7 +6,7 @@ import { enforceNumericInput } from "./input_utils.js";
 
 // 🔗 WEBHOOKS
 const WEBHOOK_REGISTRAR_EMPLEADO =
-  "https://aqui_va_el_webhook@pegaloaqui";
+  "https://n8n.globalnexoshop.com/webhook/registro_empleados";
 
 // ===============================
 // ELEMENTOS
