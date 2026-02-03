@@ -1,3 +1,5 @@
+import { enforceNumericInput } from "./input_utils.js";
+
 // ===============================
 // REGISTRO DE EMPLEADO
 // ===============================
@@ -17,6 +19,9 @@ const checkboxNit = document.getElementById("confirmarNit");
 const btnRegistrar = document.getElementById("btnRegistrar");
 const statusDiv = document.getElementById("status");
 const nitInput = document.getElementById("nit_empresa");
+const cedulaInput = document.getElementById("cedula");
+
+enforceNumericInput([nitInput, cedulaInput]);
 
 // ===============================
 // ESTADO INTERNO
@@ -102,7 +107,7 @@ form.addEventListener("submit", async (e) => {
 
   const payload = {
     nombre: document.getElementById("nombre").value.trim(),
-    cedula: document.getElementById("cedula").value.trim(),
+    cedula: cedulaInput.value.trim(),
     fecha_ingreso: document.getElementById("fecha_ingreso").value,
     username:
       document.getElementById("username").value.trim() +
