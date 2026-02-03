@@ -1,3 +1,5 @@
+import { enforceNumericInput } from "./input_utils.js";
+
 // ../js/cierre_turno.js
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -10,21 +12,29 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnVerificar = document.getElementById("verificar");
   const btnEnviar = document.getElementById("enviar");
 
-  // Inputs financieros (ordenados)
   const inputsFinanzas = {
     efectivo: {
-      sistema: document.querySelectorAll(".finanzas-grid input")[0],
-      real: document.querySelectorAll(".finanzas-grid input")[1],
+      sistema: document.getElementById("efectivo_sistema"),
+      real: document.getElementById("efectivo_real"),
     },
     datafono: {
-      sistema: document.querySelectorAll(".finanzas-grid input")[2],
-      real: document.querySelectorAll(".finanzas-grid input")[3],
+      sistema: document.getElementById("datafono_sistema"),
+      real: document.getElementById("datafono_real"),
     },
     transferencias: {
-      sistema: document.querySelectorAll(".finanzas-grid input")[4],
-      real: document.querySelectorAll(".finanzas-grid input")[5],
+      sistema: document.getElementById("transferencias_sistema"),
+      real: document.getElementById("transferencias_real"),
     }
   };
+
+  enforceNumericInput([
+    inputsFinanzas.efectivo.sistema,
+    inputsFinanzas.efectivo.real,
+    inputsFinanzas.datafono.sistema,
+    inputsFinanzas.datafono.real,
+    inputsFinanzas.transferencias.sistema,
+    inputsFinanzas.transferencias.real
+  ]);
 
   const comentarios = document.querySelector("textarea");
 

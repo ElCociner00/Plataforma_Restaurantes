@@ -1,8 +1,13 @@
+import { getUserContext } from "./session.js";
+import { PERMISSIONS } from "./permissions.js";
+
+const LOGIN_URL = "/Plataforma_Restaurantes/index.html";
+
 export async function guardPage(pageKey) {
   const context = await getUserContext();
 
   if (!context) {
-    window.location.href = "/Plataforma_Restaurantes/index.html";
+    window.location.href = LOGIN_URL;
     return;
   }
 

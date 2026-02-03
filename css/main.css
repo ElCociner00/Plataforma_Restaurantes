@@ -28,15 +28,32 @@ body {
   font-weight: bold;
 }
 
+.app-header nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .app-header nav a {
   color: white;
-  margin-left: 15px;
   text-decoration: none;
   font-size: 0.95rem;
 }
 
 .app-header nav a:hover {
   text-decoration: underline;
+}
+
+.app-header .logout-btn {
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  color: #ffffff;
+}
+
+.app-header .logout-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 /* =========================

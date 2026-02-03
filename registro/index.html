@@ -14,14 +14,14 @@
     <form id="registroEmpresa">
       <input type="text" id="nombre_comercial" placeholder="Nombre comercial" required>
       <input type="text" id="razon_social" placeholder="Razón social" required>
-      <input type="text" id="nit" placeholder="NIT" required>
+      <input type="text" id="nit" placeholder="NIT" inputmode="numeric" pattern="[0-9]*" required>
       <input type="email" id="correo_empresa" placeholder="Correo de la empresa" required>
 
       <button type="submit">Enviar código de verificación</button>
     </form>
 
     <div id="verificacion" style="display:none; margin-top:16px;">
-      <input type="text" id="codigo" placeholder="Código recibido por correo">
+      <input type="text" id="codigo" placeholder="Código recibido por correo" inputmode="numeric" pattern="[0-9]*">
       <button id="verificarCodigo">Verificar código</button>
     </div>
 

@@ -28,7 +28,7 @@
 
       <!-- Datos personales -->
       <input type="text" id="nombre" placeholder="Nombre completo del empleado" required>
-      <input type="text" id="cedula" placeholder="Cédula del empleado" required>
+      <input type="text" id="cedula" placeholder="Cédula del empleado" inputmode="numeric" pattern="[0-9]*" required>
 
       <!-- Fecha laboral -->
       <label class="label-info">Fecha de ingreso laboral</label>
@@ -51,6 +51,8 @@
         type="text"
         id="nit_empresa"
         placeholder="NIT de la empresa"
+        inputmode="numeric"
+        pattern="[0-9]*"
         required
       >
 

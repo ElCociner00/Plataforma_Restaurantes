@@ -1,7 +1,16 @@
+import { enforceNumericInput } from "./input_utils.js";
+
 const form = document.getElementById("registroEmpresa");
 const status = document.getElementById("status");
 const verificacion = document.getElementById("verificacion");
 const continuarBtn = document.getElementById("continuar");
+const nombreComercialInput = document.getElementById("nombre_comercial");
+const razonSocialInput = document.getElementById("razon_social");
+const nitInput = document.getElementById("nit");
+const correoEmpresaInput = document.getElementById("correo_empresa");
+const codigoInput = document.getElementById("codigo");
+
+enforceNumericInput([nitInput, codigoInput]);
 
 let datosEmpresa = null;
 let codigoValidado = false;
@@ -14,10 +23,10 @@ form.addEventListener("submit", async (e) => {
   status.innerText = "Enviando código...";
 
   datosEmpresa = {
-    nombre_comercial: nombre_comercial.value,
-    razon_social: razon_social.value,
-    nit: nit.value,
-    correo_empresa: correo_empresa.value
+    nombre_comercial: nombreComercialInput.value.trim(),
+    razon_social: razonSocialInput.value.trim(),
+    nit: nitInput.value.trim(),
+    correo_empresa: correoEmpresaInput.value.trim()
   };
 
   try {
@@ -60,7 +69,7 @@ document.getElementById("verificarCodigo").addEventListener("click", async () =>
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           correo_empresa: datosEmpresa.correo_empresa,
-          codigo: codigo.value
+          codigo: codigoInput.value.trim()
         })
       }
     );
