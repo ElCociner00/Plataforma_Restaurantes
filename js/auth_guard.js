@@ -1,6 +1,6 @@
 import { supabase } from "./supabase.js";
 
-const LOGIN_URL = "/Plataforma_Restaurantes/";
+const LOGIN_URL = "/Plataforma_Restaurantes/index.html";
 
 // 🔒 Redirección dura
 function redirectToLogin() {
