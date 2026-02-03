@@ -1,4 +1,5 @@
 import { enforceNumericInput } from "./input_utils.js";
+import { getUserContext } from "./session.js";
 
 // ===============================
 // REGISTRO DE EMPLEADO
@@ -16,10 +17,9 @@ const btnRegistrar = document.getElementById("btnRegistrar");
 const statusDiv = document.getElementById("status");
 const nitInput = document.getElementById("nit_empresa");
 const cedulaInput = document.getElementById("cedula");
+const emailInput = document.getElementById("email");
 
 enforceNumericInput([nitInput, cedulaInput]);
-
-enforceNumericInput([cedulaInput]);
 
 // ===============================
 // ENVÍO DEL FORMULARIO
