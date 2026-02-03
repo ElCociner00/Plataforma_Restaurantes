@@ -2,7 +2,7 @@ export async function guardPage(pageKey) {
   const context = await getUserContext();
 
   if (!context) {
-    window.location.href = "/Plataforma_Restaurantes/login/";
+    window.location.href = "/Plataforma_Restaurantes/index.html";
     return;
   }
 
