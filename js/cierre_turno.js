@@ -2,6 +2,7 @@ import { enforceNumericInput } from "./input_utils.js";
 import { getUserContext } from "./session.js";
 import {
   WEBHOOK_CONSULTAR_DATOS_CIERRE,
+  WEBHOOK_LISTAR_RESPONSABLES,
   WEBHOOK_SUBIR_CIERRE,
   WEBHOOK_VERIFICAR_CIERRE
 } from "./webhooks.js";
@@ -19,6 +20,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnVerificar = document.getElementById("verificar");
   const btnEnviar = document.getElementById("enviar");
   const btnLimpiar = document.getElementById("limpiarDatos");
+  const confirmacionEnvio = document.getElementById("confirmacionEnvio");
+  const mensajeEnvio = document.getElementById("mensajeEnvio");
+  const btnConfirmarEnvio = document.getElementById("confirmarEnvio");
+  const btnCancelarEnvio = document.getElementById("cancelarEnvio");
 
   const inputsFinanzas = {
     efectivo: {
@@ -46,6 +51,39 @@ document.addEventListener("DOMContentLoaded", () => {
   const inputsSoloVista = {
     propina: document.getElementById("propina"),
     domicilios: document.getElementById("domicilios"),
+    propinaReal: document.getElementById("propina_real"),
+    domiciliosReal: document.getElementById("domicilios_real"),
+  };
+
+  const inputsDiferencias = {
+    efectivo: {
+      input: document.getElementById("efectivo_diferencia"),
+      nota: document.getElementById("efectivo_diferencia_nota")
+    },
+    datafono: {
+      input: document.getElementById("datafono_diferencia"),
+      nota: document.getElementById("datafono_diferencia_nota")
+    },
+    rappi: {
+      input: document.getElementById("rappi_diferencia"),
+      nota: document.getElementById("rappi_diferencia_nota")
+    },
+    nequi: {
+      input: document.getElementById("nequi_diferencia"),
+      nota: document.getElementById("nequi_diferencia_nota")
+    },
+    transferencias: {
+      input: document.getElementById("transferencias_diferencia"),
+      nota: document.getElementById("transferencias_diferencia_nota")
+    },
+    propina: {
+      input: document.getElementById("propina_diferencia"),
+      nota: document.getElementById("propina_diferencia_nota")
+    },
+    domicilios: {
+      input: document.getElementById("domicilios_diferencia"),
+      nota: document.getElementById("domicilios_diferencia_nota")
+    }
   };
 
   const filasFinanzas = document.querySelectorAll(".finanzas-row");
@@ -62,7 +100,16 @@ document.addEventListener("DOMContentLoaded", () => {
     inputsFinanzas.transferencias.sistema,
     inputsFinanzas.transferencias.real,
     inputsSoloVista.propina,
-    inputsSoloVista.domicilios
+    inputsSoloVista.propinaReal,
+    inputsSoloVista.domicilios,
+    inputsSoloVista.domiciliosReal,
+    inputsDiferencias.efectivo.input,
+    inputsDiferencias.datafono.input,
+    inputsDiferencias.rappi.input,
+    inputsDiferencias.nequi.input,
+    inputsDiferencias.transferencias.input,
+    inputsDiferencias.propina.input,
+    inputsDiferencias.domicilios.input
   ]);
 
   const comentarios = document.querySelector("textarea");
@@ -82,6 +129,32 @@ document.addEventListener("DOMContentLoaded", () => {
       empresa_id: context.empresa_id,
       registrado_por: context.user?.id || context.user?.user_id
     };
+  };
+
+  const cargarResponsables = async () => {
+    try {
+      const contextPayload = await getContextPayload();
+      if (!contextPayload) return;
+
+      const res = await fetch(WEBHOOK_LISTAR_RESPONSABLES, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(contextPayload)
+      });
+
+      const data = await res.json();
+      const responsables = Array.isArray(data.responsables) ? data.responsables : [];
+
+      responsable.innerHTML = "<option value=\"\">Seleccione responsable</option>";
+      responsables.forEach((item) => {
+        const option = document.createElement("option");
+        option.value = item.id ?? item.value ?? item.nombre ?? item.name ?? item;
+        option.textContent = item.nombre ?? item.name ?? item.label ?? item;
+        responsable.appendChild(option);
+      });
+    } catch (error) {
+      setStatus("No se pudieron cargar los responsables.");
+    }
   };
 
   const formatFechaCompleta = (fechaValue) => {
@@ -130,6 +203,28 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  function actualizarEstadoDiferencia(field, rawValue) {
+    const value = Number(rawValue);
+    const { input, nota } = inputsDiferencias[field];
+    input.classList.remove("diff-faltante", "diff-sobrante", "diff-ok");
+    if (Number.isNaN(value)) {
+      nota.textContent = "";
+      return;
+    }
+    if (value < 0) {
+      input.classList.add("diff-faltante");
+      nota.textContent = "Aquí hay un faltante!";
+      return;
+    }
+    if (value > 0) {
+      input.classList.add("diff-sobrante");
+      nota.textContent = "Aquí hay un sobrante";
+      return;
+    }
+    input.classList.add("diff-ok");
+    nota.textContent = "Muy bien, todo en orden";
+  }
+
   const applyVisibilitySettings = () => {
     const settings = getVisibilitySettings();
     filasFinanzas.forEach((row) => {
@@ -143,6 +238,16 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (inputsSoloVista[field]) {
           inputsSoloVista[field].value = "0";
+        }
+        if (field === "propina") {
+          inputsSoloVista.propinaReal.value = "0";
+        }
+        if (field === "domicilios") {
+          inputsSoloVista.domiciliosReal.value = "0";
+        }
+        if (inputsDiferencias[field]) {
+          inputsDiferencias[field].input.value = "0";
+          actualizarEstadoDiferencia(field, 0);
         }
       }
     });
@@ -174,6 +279,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!verificado) return;
     verificado = false;
     toggleButtons({ enviar: false });
+    confirmacionEnvio.classList.add("is-hidden");
   };
 
   const limpiarCamposDatos = () => {
@@ -181,8 +287,14 @@ document.addEventListener("DOMContentLoaded", () => {
       grupo.sistema.value = "";
       grupo.real.value = "";
     });
-    Object.values(inputsSoloVista).forEach((input) => {
+    inputsSoloVista.propina.value = "";
+    inputsSoloVista.propinaReal.value = "";
+    inputsSoloVista.domicilios.value = "";
+    inputsSoloVista.domiciliosReal.value = "";
+    Object.values(inputsDiferencias).forEach(({ input, nota }) => {
       input.value = "";
+      input.classList.remove("diff-faltante", "diff-sobrante", "diff-ok");
+      nota.textContent = "";
     });
     comentarios.value = "";
     marcarComoNoVerificado();
@@ -194,6 +306,7 @@ document.addEventListener("DOMContentLoaded", () => {
   toggleButtons({ consultar: true, verificar: false, enviar: false });
 
   actualizarEstadoHoraFin();
+  cargarResponsables();
 
   fecha.addEventListener("change", () => {
     actualizarEstadoHoraFin();
@@ -205,6 +318,9 @@ document.addEventListener("DOMContentLoaded", () => {
   comentarios.addEventListener("input", marcarComoNoVerificado);
   Object.values(inputsFinanzas).forEach((grupo) => {
     grupo.real.addEventListener("input", marcarComoNoVerificado);
+  });
+  Object.values(inputsDiferencias).forEach(({ input }) => {
+    input.addEventListener("input", marcarComoNoVerificado);
   });
 
   btnConsultar.addEventListener("click", async () => {
@@ -246,7 +362,14 @@ document.addEventListener("DOMContentLoaded", () => {
       inputsFinanzas.nequi.sistema.value = data.nequi_sistema ?? "";
       inputsFinanzas.transferencias.sistema.value = data.transferencias_sistema ?? "";
       inputsSoloVista.propina.value = data.propina ?? "";
+      inputsSoloVista.propinaReal.value = data.propina ?? "";
       inputsSoloVista.domicilios.value = data.domicilios ?? "";
+      inputsSoloVista.domiciliosReal.value = data.domicilios ?? "";
+      Object.values(inputsDiferencias).forEach(({ input, nota }) => {
+        input.value = "";
+        input.classList.remove("diff-faltante", "diff-sobrante", "diff-ok");
+        nota.textContent = "";
+      });
 
       if (settingsVisibilidad.efectivo === false) {
         inputsFinanzas.efectivo.sistema.value = "0";
@@ -265,9 +388,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       if (settingsVisibilidad.propina === false) {
         inputsSoloVista.propina.value = "0";
+        inputsSoloVista.propinaReal.value = "0";
       }
       if (settingsVisibilidad.domicilios === false) {
         inputsSoloVista.domicilios.value = "0";
+        inputsSoloVista.domiciliosReal.value = "0";
       }
 
       setStatus(data.message || "Datos consultados.");
@@ -312,7 +437,9 @@ document.addEventListener("DOMContentLoaded", () => {
         transferencias: {
           sistema: inputsFinanzas.transferencias.sistema.value || 0,
           real: inputsFinanzas.transferencias.real.value || 0
-        }
+        },
+        propina: inputsSoloVista.propina.value || 0,
+        domicilios: inputsSoloVista.domicilios.value || 0
       },
       comentarios: comentarios.value || "",
       ...contextPayload
@@ -326,6 +453,22 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       const data = await res.json();
+      const diferencias = {
+        efectivo: data.efectivo_diferencia,
+        datafono: data.datafono_diferencia,
+        rappi: data.rappi_diferencia,
+        nequi: data.nequi_diferencia,
+        transferencias: data.transferencias_diferencia,
+        propina: data.propina_diferencia,
+        domicilios: data.domicilios_diferencia
+      };
+
+      Object.entries(diferencias).forEach(([field, value]) => {
+        if (!inputsDiferencias[field]) return;
+        inputsDiferencias[field].input.value = value ?? "";
+        actualizarEstadoDiferencia(field, value);
+      });
+
       setStatus(data.message || "");
       verificado = true;
       toggleButtons({ enviar: true });
@@ -334,15 +477,37 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  btnEnviar.addEventListener("click", async () => {
-    setStatus("Enviando cierre...");
+  const obtenerEstadoGlobalDiferencias = () => {
+    let tieneFaltante = false;
+    let tieneSobrante = false;
+    Object.values(inputsDiferencias).forEach(({ input }) => {
+      const value = Number(input.value);
+      if (Number.isNaN(value)) return;
+      if (value < 0) tieneFaltante = true;
+      if (value > 0) tieneSobrante = true;
+    });
+    if (tieneFaltante) return "faltante";
+    if (tieneSobrante) return "sobrante";
+    return "ok";
+  };
 
+  const obtenerMensajeEnvio = (estado) => {
+    if (estado === "faltante") {
+      return "En estos datos hay un faltante, ten en cuenta que esto se descontará de tu nómina.";
+    }
+    if (estado === "sobrante") {
+      return "En estos datos hay un sobrante, verifica bien las cuentas antes de enviar.";
+    }
+    return "Buen trabajo! todo se ve bien, apreciamos tu esfuerzo.";
+  };
+
+  const construirPayloadEnvio = async () => {
     const contextPayload = await getContextPayload();
-    if (!contextPayload) return;
+    if (!contextPayload) return null;
 
     const fechaCompleta = formatFechaCompleta(fecha.value);
 
-    const payload = {
+    return {
       fecha: fecha.value,
       responsable: responsable.value,
       turno: {
@@ -373,11 +538,25 @@ document.addEventListener("DOMContentLoaded", () => {
         transferencias: {
           sistema: inputsFinanzas.transferencias.sistema.value || 0,
           real: inputsFinanzas.transferencias.real.value || 0
-        }
+        },
+        propina: inputsSoloVista.propina.value || 0,
+        domicilios: inputsSoloVista.domicilios.value || 0
       },
       comentarios: comentarios.value || "",
       ...contextPayload
     };
+  };
+
+  btnEnviar.addEventListener("click", async () => {
+    const estado = obtenerEstadoGlobalDiferencias();
+    mensajeEnvio.textContent = obtenerMensajeEnvio(estado);
+    confirmacionEnvio.classList.remove("is-hidden");
+  });
+
+  btnConfirmarEnvio.addEventListener("click", async () => {
+    setStatus("Enviando cierre...");
+    const payload = await construirPayloadEnvio();
+    if (!payload) return;
 
     try {
       const res = await fetch(WEBHOOK_SUBIR_CIERRE, {
@@ -388,9 +567,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const data = await res.json();
       setStatus(data.message || "");
+      window.location.reload();
     } catch (err) {
       setStatus("Error de conexión al subir cierre.");
     }
+  });
+
+  btnCancelarEnvio.addEventListener("click", () => {
+    confirmacionEnvio.classList.add("is-hidden");
   });
 
   btnLimpiar.addEventListener("click", () => {

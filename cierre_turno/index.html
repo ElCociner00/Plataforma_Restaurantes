@@ -29,11 +29,6 @@
       <input id="fecha" type="date">
       <select id="responsable">
         <option value="">Seleccione responsable</option>
-        <option>Laura Velásquez</option>
-        <option>Wendy Molina</option>
-        <option>Carlos Bejarano</option>
-        <option>Roberto Pérez</option>
-        <option>Daniela Ahumada</option>
       </select>
 
       <h4>Turno</h4>
@@ -48,45 +43,76 @@
     <div></div>
     <div class="col-title">Sistema</div>
     <div class="col-title">Real</div>
+    <div class="col-title">Diferencias</div>
 
     <div class="finanzas-row" data-field="efectivo">
       <div class="row-title">Efectivo</div>
       <input id="efectivo_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
       <input id="efectivo_real" type="text" inputmode="numeric" pattern="[0-9]*">
+      <div class="diff-cell">
+        <input id="efectivo_diferencia" type="text" inputmode="numeric" pattern="[0-9-]*" readonly class="diff-input">
+        <div class="diff-note" id="efectivo_diferencia_nota"></div>
+      </div>
     </div>
 
     <div class="finanzas-row" data-field="datafono">
       <div class="row-title">Datáfono</div>
       <input id="datafono_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
       <input id="datafono_real" type="text" inputmode="numeric" pattern="[0-9]*">
+      <div class="diff-cell">
+        <input id="datafono_diferencia" type="text" inputmode="numeric" pattern="[0-9-]*" readonly class="diff-input">
+        <div class="diff-note" id="datafono_diferencia_nota"></div>
+      </div>
     </div>
 
     <div class="finanzas-row" data-field="rappi">
       <div class="row-title">Rappi</div>
       <input id="rappi_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
       <input id="rappi_real" type="text" inputmode="numeric" pattern="[0-9]*">
+      <div class="diff-cell">
+        <input id="rappi_diferencia" type="text" inputmode="numeric" pattern="[0-9-]*" readonly class="diff-input">
+        <div class="diff-note" id="rappi_diferencia_nota"></div>
+      </div>
     </div>
 
     <div class="finanzas-row" data-field="nequi">
       <div class="row-title">Nequi</div>
       <input id="nequi_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
       <input id="nequi_real" type="text" inputmode="numeric" pattern="[0-9]*">
+      <div class="diff-cell">
+        <input id="nequi_diferencia" type="text" inputmode="numeric" pattern="[0-9-]*" readonly class="diff-input">
+        <div class="diff-note" id="nequi_diferencia_nota"></div>
+      </div>
     </div>
 
     <div class="finanzas-row" data-field="transferencias">
       <div class="row-title">Transferencias</div>
       <input id="transferencias_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
       <input id="transferencias_real" type="text" inputmode="numeric" pattern="[0-9]*">
+      <div class="diff-cell">
+        <input id="transferencias_diferencia" type="text" inputmode="numeric" pattern="[0-9-]*" readonly class="diff-input">
+        <div class="diff-note" id="transferencias_diferencia_nota"></div>
+      </div>
     </div>
 
     <div class="finanzas-row" data-field="propina">
       <div class="row-title">Propina</div>
-      <input id="propina" type="text" inputmode="numeric" pattern="[0-9]*" readonly class="input-span-2">
+      <input id="propina" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+      <input id="propina_real" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+      <div class="diff-cell">
+        <input id="propina_diferencia" type="text" inputmode="numeric" pattern="[0-9-]*" readonly class="diff-input">
+        <div class="diff-note" id="propina_diferencia_nota"></div>
+      </div>
     </div>
 
     <div class="finanzas-row" data-field="domicilios">
       <div class="row-title">Domicilios</div>
-      <input id="domicilios" type="text" inputmode="numeric" pattern="[0-9]*" readonly class="input-span-2">
+      <input id="domicilios" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+      <input id="domicilios_real" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+      <div class="diff-cell">
+        <input id="domicilios_diferencia" type="text" inputmode="numeric" pattern="[0-9-]*" readonly class="diff-input">
+        <div class="diff-note" id="domicilios_diferencia_nota"></div>
+      </div>
     </div>
   </div>
 
@@ -99,6 +125,14 @@
         <button id="verificar" disabled>Verificar</button>
         <button id="enviar" disabled>Subir cierre</button>
         <button id="limpiarDatos" type="button">Limpiar datos</button>
+      </div>
+      <div id="confirmacionEnvio" class="confirmacion-envio is-hidden">
+        <p id="mensajeEnvio"></p>
+        <p class="confirmacion-pregunta">¿Estás seguro de subir este cierre?</p>
+        <div class="confirmacion-acciones">
+          <button id="confirmarEnvio" type="button">Sí</button>
+          <button id="cancelarEnvio" type="button">No</button>
+        </div>
       </div>
       <div id="status"></div>
     </section>
