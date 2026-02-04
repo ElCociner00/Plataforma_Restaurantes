@@ -84,44 +84,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
-  const inputsSoloVista = {
-    propina: document.getElementById("propina"),
-    domicilios: document.getElementById("domicilios"),
-    propinaReal: document.getElementById("propina_real"),
-    domiciliosReal: document.getElementById("domicilios_real"),
-  };
-
-  const inputsDiferencias = {
-    efectivo: {
-      input: document.getElementById("efectivo_diferencia"),
-      nota: document.getElementById("efectivo_diferencia_nota")
-    },
-    datafono: {
-      input: document.getElementById("datafono_diferencia"),
-      nota: document.getElementById("datafono_diferencia_nota")
-    },
-    rappi: {
-      input: document.getElementById("rappi_diferencia"),
-      nota: document.getElementById("rappi_diferencia_nota")
-    },
-    nequi: {
-      input: document.getElementById("nequi_diferencia"),
-      nota: document.getElementById("nequi_diferencia_nota")
-    },
-    transferencias: {
-      input: document.getElementById("transferencias_diferencia"),
-      nota: document.getElementById("transferencias_diferencia_nota")
-    },
-    propina: {
-      input: document.getElementById("propina_diferencia"),
-      nota: document.getElementById("propina_diferencia_nota")
-    },
-    domicilios: {
-      input: document.getElementById("domicilios_diferencia"),
-      nota: document.getElementById("domicilios_diferencia_nota")
-    }
-  };
-
   const filasFinanzas = document.querySelectorAll(".finanzas-row");
 
   enforceNumericInput([
@@ -135,17 +97,10 @@ document.addEventListener("DOMContentLoaded", () => {
     inputsFinanzas.nequi.real,
     inputsFinanzas.transferencias.sistema,
     inputsFinanzas.transferencias.real,
+    inputsFinanzas.bono_regalo.sistema,
+    inputsFinanzas.bono_regalo.real,
     inputsSoloVista.propina,
-    inputsSoloVista.propinaReal,
     inputsSoloVista.domicilios,
-    inputsSoloVista.domiciliosReal,
-    inputsDiferencias.efectivo.input,
-    inputsDiferencias.datafono.input,
-    inputsDiferencias.rappi.input,
-    inputsDiferencias.nequi.input,
-    inputsDiferencias.transferencias.input,
-    inputsDiferencias.propina.input,
-    inputsDiferencias.domicilios.input
   ]);
 
   const comentarios = document.querySelector("textarea");
@@ -179,7 +134,10 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       const data = await res.json();
-      const responsables = Array.isArray(data.responsables) ? data.responsables : [];
+      const baseResponsables = Array.isArray(data)
+        ? data.flatMap((item) => item.responsables || [])
+        : data.responsables || [];
+      const responsables = Array.isArray(baseResponsables) ? baseResponsables : [];
 
       responsable.innerHTML = "<option value=\"\">Seleccione responsable</option>";
       responsables.forEach((item) => {
@@ -220,6 +178,7 @@ document.addEventListener("DOMContentLoaded", () => {
         rappi: true,
         nequi: true,
         transferencias: true,
+        bono_regalo: true,
         propina: true,
         domicilios: true,
       };
@@ -233,6 +192,7 @@ document.addEventListener("DOMContentLoaded", () => {
         rappi: true,
         nequi: true,
         transferencias: true,
+        bono_regalo: true,
         propina: true,
         domicilios: true,
       };
@@ -274,12 +234,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (inputsSoloVista[field]) {
           inputsSoloVista[field].value = "0";
-        }
-        if (field === "propina") {
-          inputsSoloVista.propinaReal.value = "0";
-        }
-        if (field === "domicilios") {
-          inputsSoloVista.domiciliosReal.value = "0";
         }
         if (inputsDiferencias[field]) {
           inputsDiferencias[field].input.value = "0";
@@ -324,9 +278,7 @@ document.addEventListener("DOMContentLoaded", () => {
       grupo.real.value = "";
     });
     inputsSoloVista.propina.value = "";
-    inputsSoloVista.propinaReal.value = "";
     inputsSoloVista.domicilios.value = "";
-    inputsSoloVista.domiciliosReal.value = "";
     Object.values(inputsDiferencias).forEach(({ input, nota }) => {
       input.value = "";
       input.classList.remove("diff-faltante", "diff-sobrante", "diff-ok");
@@ -397,10 +349,9 @@ document.addEventListener("DOMContentLoaded", () => {
       inputsFinanzas.rappi.sistema.value = data.rappi_sistema ?? "";
       inputsFinanzas.nequi.sistema.value = data.nequi_sistema ?? "";
       inputsFinanzas.transferencias.sistema.value = data.transferencias_sistema ?? "";
+      inputsFinanzas.bono_regalo.sistema.value = data.bono_regalo_sistema ?? "";
       inputsSoloVista.propina.value = data.propina ?? "";
-      inputsSoloVista.propinaReal.value = data.propina ?? "";
       inputsSoloVista.domicilios.value = data.domicilios ?? "";
-      inputsSoloVista.domiciliosReal.value = data.domicilios ?? "";
       Object.values(inputsDiferencias).forEach(({ input, nota }) => {
         input.value = "";
         input.classList.remove("diff-faltante", "diff-sobrante", "diff-ok");
@@ -422,13 +373,14 @@ document.addEventListener("DOMContentLoaded", () => {
       if (settingsVisibilidad.transferencias === false) {
         inputsFinanzas.transferencias.sistema.value = "0";
       }
+      if (settingsVisibilidad.bono_regalo === false) {
+        inputsFinanzas.bono_regalo.sistema.value = "0";
+      }
       if (settingsVisibilidad.propina === false) {
         inputsSoloVista.propina.value = "0";
-        inputsSoloVista.propinaReal.value = "0";
       }
       if (settingsVisibilidad.domicilios === false) {
         inputsSoloVista.domicilios.value = "0";
-        inputsSoloVista.domiciliosReal.value = "0";
       }
 
       setStatus(data.message || "Datos consultados.");
@@ -473,6 +425,11 @@ document.addEventListener("DOMContentLoaded", () => {
         transferencias: {
           sistema: inputsFinanzas.transferencias.sistema.value || 0,
           real: inputsFinanzas.transferencias.real.value || 0
+        }
+        },
+        bono_regalo: {
+          sistema: inputsFinanzas.bono_regalo.sistema.value || 0,
+          real: inputsFinanzas.bono_regalo.real.value || 0
         },
         propina: inputsSoloVista.propina.value || 0,
         domicilios: inputsSoloVista.domicilios.value || 0
@@ -495,8 +452,7 @@ document.addEventListener("DOMContentLoaded", () => {
         rappi: data.rappi_diferencia,
         nequi: data.nequi_diferencia,
         transferencias: data.transferencias_diferencia,
-        propina: data.propina_diferencia,
-        domicilios: data.domicilios_diferencia
+        bono_regalo: data.bono_regalo_diferencia
       };
 
       Object.entries(diferencias).forEach(([field, value]) => {
@@ -574,6 +530,10 @@ document.addEventListener("DOMContentLoaded", () => {
         transferencias: {
           sistema: inputsFinanzas.transferencias.sistema.value || 0,
           real: inputsFinanzas.transferencias.real.value || 0
+        },
+        bono_regalo: {
+          sistema: inputsFinanzas.bono_regalo.sistema.value || 0,
+          real: inputsFinanzas.bono_regalo.real.value || 0
         },
         propina: inputsSoloVista.propina.value || 0,
         domicilios: inputsSoloVista.domicilios.value || 0
