@@ -1,0 +1,75 @@
+.main {
+  max-width: 640px;
+}
+
+.descripcion {
+  font-size: 0.95rem;
+  color: #4b5563;
+  margin-bottom: 18px;
+}
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.campo label {
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ayuda {
+  margin: 6px 0 8px;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 0.75rem;
+  cursor: help;
+  position: relative;
+}
+
+.info-icon::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #111827;
+  color: #ffffff;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  width: 240px;
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 2;
+}
+
+.info-icon:hover::after {
+  opacity: 1;
+}
+
+.status {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #4b5563;
+}

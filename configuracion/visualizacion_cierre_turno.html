@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Visualización cierre turno</title>
+
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/visualizacion_cierre_turno.css">
+</head>
+
+<body style="display:none">
+
+  <!-- Guardia de autenticación -->
+  <script type="module" src="../js/auth_guard.js"></script>
+
+  <!-- Guardia de permisos -->
+  <script type="module">
+    import { guardPage } from "../js/guard_page.js";
+    guardPage("visualizacion_cierre_turno");
+  </script>
+
+  <!-- Header -->
+  <script type="module" src="../js/header.js"></script>
+
+  <div class="main">
+    <h1>Visualización cierre turno</h1>
+    <p class="descripcion">
+      Activa o desactiva los datos visibles en el cierre de turno. Los campos ocultos se mantendrán en cero.
+    </p>
+
+    <div class="panel">
+      <div class="vis-row">
+        <span>Efectivo</span>
+        <label class="switch">
+          <input type="checkbox" data-field="efectivo">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="vis-row">
+        <span>Datáfono</span>
+        <label class="switch">
+          <input type="checkbox" data-field="datafono">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="vis-row">
+        <span>Rappi</span>
+        <label class="switch">
+          <input type="checkbox" data-field="rappi">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="vis-row">
+        <span>Nequi</span>
+        <label class="switch">
+          <input type="checkbox" data-field="nequi">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="vis-row">
+        <span>Transferencias</span>
+        <label class="switch">
+          <input type="checkbox" data-field="transferencias">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="vis-row">
+        <span>Bono de regalo</span>
+        <label class="switch">
+          <input type="checkbox" data-field="bono_regalo">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="vis-row">
+        <span>Propina</span>
+        <label class="switch">
+          <input type="checkbox" data-field="propina">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="vis-row">
+        <span>Domicilios</span>
+        <label class="switch">
+          <input type="checkbox" data-field="domicilios">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div id="status" class="status"></div>
+  </div>
+
+  <script type="module" src="../js/visualizacion_cierre_turno.js"></script>
+</body>
+</html>
