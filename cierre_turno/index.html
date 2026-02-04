@@ -95,6 +95,16 @@
       </div>
     </div>
 
+    <div class="finanzas-row" data-field="bono_regalo">
+      <div class="row-title">Bono de regalo</div>
+      <input id="bono_regalo_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+      <input id="bono_regalo_real" type="text" inputmode="numeric" pattern="[0-9]*">
+      <div class="diff-cell">
+        <input id="bono_regalo_diferencia" type="text" inputmode="numeric" pattern="[0-9-]*" readonly class="diff-input">
+        <div class="diff-note" id="bono_regalo_diferencia_nota"></div>
+      </div>
+    </div>
+
     <div class="finanzas-row" data-field="propina">
       <div class="row-title">Propina</div>
       <input id="propina" type="text" inputmode="numeric" pattern="[0-9]*" readonly class="input-span-3">
@@ -102,7 +112,7 @@
 
     <div class="finanzas-row" data-field="domicilios">
       <div class="row-title">Domicilios</div>
-      <input id="domicilios" type="text" inputmode="numeric" pattern="[0-9]*" readonly class="diff-input">
+      <input id="domicilios" type="text" inputmode="numeric" pattern="[0-9]*" readonly class="input-span-3">
     </div>
   </div>
 

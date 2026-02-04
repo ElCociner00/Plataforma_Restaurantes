@@ -425,7 +425,6 @@ document.addEventListener("DOMContentLoaded", () => {
         transferencias: {
           sistema: inputsFinanzas.transferencias.sistema.value || 0,
           real: inputsFinanzas.transferencias.real.value || 0
-        }
         },
         bono_regalo: {
           sistema: inputsFinanzas.bono_regalo.sistema.value || 0,
