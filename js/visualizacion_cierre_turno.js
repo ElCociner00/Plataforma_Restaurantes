@@ -6,7 +6,6 @@ const DEFAULT_SETTINGS = {
   rappi: true,
   nequi: true,
   transferencias: true,
-  bono_regalo: true,
   propina: true,
   domicilios: true,
 };

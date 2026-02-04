@@ -53,10 +53,6 @@
   border: 1px solid transparent;
 }
 
-.input-span-3 {
-  grid-column: 2 / span 3;
-}
-
 .diff-faltante {
   background: rgba(239, 68, 68, 0.15);
 }
