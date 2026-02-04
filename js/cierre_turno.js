@@ -45,6 +45,42 @@ document.addEventListener("DOMContentLoaded", () => {
     transferencias: {
       sistema: document.getElementById("transferencias_sistema"),
       real: document.getElementById("transferencias_real"),
+    },
+    bono_regalo: {
+      sistema: document.getElementById("bono_regalo_sistema"),
+      real: document.getElementById("bono_regalo_real"),
+    }
+  };
+
+  const inputsSoloVista = {
+    propina: document.getElementById("propina"),
+    domicilios: document.getElementById("domicilios"),
+  };
+
+  const inputsDiferencias = {
+    efectivo: {
+      input: document.getElementById("efectivo_diferencia"),
+      nota: document.getElementById("efectivo_diferencia_nota")
+    },
+    datafono: {
+      input: document.getElementById("datafono_diferencia"),
+      nota: document.getElementById("datafono_diferencia_nota")
+    },
+    rappi: {
+      input: document.getElementById("rappi_diferencia"),
+      nota: document.getElementById("rappi_diferencia_nota")
+    },
+    nequi: {
+      input: document.getElementById("nequi_diferencia"),
+      nota: document.getElementById("nequi_diferencia_nota")
+    },
+    transferencias: {
+      input: document.getElementById("transferencias_diferencia"),
+      nota: document.getElementById("transferencias_diferencia_nota")
+    },
+    bono_regalo: {
+      input: document.getElementById("bono_regalo_diferencia"),
+      nota: document.getElementById("bono_regalo_diferencia_nota")
     }
   };
 
