@@ -36,3 +36,11 @@ export const WEBHOOK_VERIFICAR_CIERRE =
 // cierre_turno/index.html (botón: "Subir cierre" en Cierre de Turno)
 export const WEBHOOK_SUBIR_CIERRE =
   "https://n8n.globalnexoshop.com/webhook/subir_cierre";
+
+// cierre_turno/index.html (select: "Responsable" en Cierre de Turno)
+export const WEBHOOK_LISTAR_RESPONSABLES =
+  "https://n8n.globalnexoshop.com/webhook/listar_responsables";
+
+// configuracion/Loggro.html (guardar credenciales Loggro)
+export const WEBHOOK_REGISTRO_CREDENCIALES =
+  "https://n8n.globalnexoshop.com/webhook/Registro_Credenciales";
