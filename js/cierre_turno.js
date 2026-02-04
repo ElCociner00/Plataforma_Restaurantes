@@ -451,7 +451,7 @@ document.addEventListener("DOMContentLoaded", () => {
         rappi: data.rappi_diferencia,
         nequi: data.nequi_diferencia,
         transferencias: data.transferencias_diferencia,
-        bono_regalo: data.bono_regalo_diferencia
+        bono_regalo: data.bono_de_regalo_diferencia
       };
 
       Object.entries(diferencias).forEach(([field, value]) => {
