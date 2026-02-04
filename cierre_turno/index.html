@@ -49,17 +49,45 @@
     <div class="col-title">Sistema</div>
     <div class="col-title">Real</div>
 
-    <div class="row-title">Efectivo</div>
-    <input id="efectivo_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
-    <input id="efectivo_real" type="text" inputmode="numeric" pattern="[0-9]*">
+    <div class="finanzas-row" data-field="efectivo">
+      <div class="row-title">Efectivo</div>
+      <input id="efectivo_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+      <input id="efectivo_real" type="text" inputmode="numeric" pattern="[0-9]*">
+    </div>
 
-    <div class="row-title">Datáfono</div>
-    <input id="datafono_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
-    <input id="datafono_real" type="text" inputmode="numeric" pattern="[0-9]*">
+    <div class="finanzas-row" data-field="datafono">
+      <div class="row-title">Datáfono</div>
+      <input id="datafono_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+      <input id="datafono_real" type="text" inputmode="numeric" pattern="[0-9]*">
+    </div>
 
-    <div class="row-title">Transferencias</div>
-    <input id="transferencias_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
-    <input id="transferencias_real" type="text" inputmode="numeric" pattern="[0-9]*">
+    <div class="finanzas-row" data-field="rappi">
+      <div class="row-title">Rappi</div>
+      <input id="rappi_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+      <input id="rappi_real" type="text" inputmode="numeric" pattern="[0-9]*">
+    </div>
+
+    <div class="finanzas-row" data-field="nequi">
+      <div class="row-title">Nequi</div>
+      <input id="nequi_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+      <input id="nequi_real" type="text" inputmode="numeric" pattern="[0-9]*">
+    </div>
+
+    <div class="finanzas-row" data-field="transferencias">
+      <div class="row-title">Transferencias</div>
+      <input id="transferencias_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+      <input id="transferencias_real" type="text" inputmode="numeric" pattern="[0-9]*">
+    </div>
+
+    <div class="finanzas-row" data-field="propina">
+      <div class="row-title">Propina</div>
+      <input id="propina" type="text" inputmode="numeric" pattern="[0-9]*" readonly class="input-span-2">
+    </div>
+
+    <div class="finanzas-row" data-field="domicilios">
+      <div class="row-title">Domicilios</div>
+      <input id="domicilios" type="text" inputmode="numeric" pattern="[0-9]*" readonly class="input-span-2">
+    </div>
   </div>
 
   <textarea placeholder="Comentarios"></textarea>
@@ -70,6 +98,7 @@
         <button id="consultarDatos">Consultar datos</button>
         <button id="verificar" disabled>Verificar</button>
         <button id="enviar" disabled>Subir cierre</button>
+        <button id="limpiarDatos" type="button">Limpiar datos</button>
       </div>
       <div id="status"></div>
     </section>
