@@ -24,15 +24,3 @@ export const WEBHOOK_REGISTRAR_EMPLEADO =
 // configuracion/registro_otros_usuarios.html (botón: "Registrar")
 export const WEBHOOK_REGISTRO_OTROS_USUARIOS =
   "https://n8n.globalnexoshop.com/webhook/registro_admins_y_revisores";
-
-// cierre_turno/index.html (botón: "Consultar datos" en Cierre de Turno)
-export const WEBHOOK_CONSULTAR_DATOS_CIERRE =
-  "https://n8n.globalnexoshop.com/webhook/consultar_datos_cierre";
-
-// cierre_turno/index.html (botón: "Verificar" en Cierre de Turno)
-export const WEBHOOK_VERIFICAR_CIERRE =
-  "https://n8n.globalnexoshop.com/webhook/verificar_cierre";
-
-// cierre_turno/index.html (botón: "Subir cierre" en Cierre de Turno)
-export const WEBHOOK_SUBIR_CIERRE =
-  "https://n8n.globalnexoshop.com/webhook/subir_cierre";
