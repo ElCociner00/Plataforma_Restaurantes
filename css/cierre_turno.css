@@ -30,6 +30,23 @@
 }
 
 /* Botones finales */
-.bloque button {
+.acciones-cierre {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
   margin-top: 10px;
+}
+
+.acciones-cierre button {
+  flex: 1 1 160px;
+}
+
+.acciones-cierre button:disabled {
+  background: #e5e7eb;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+input[readonly] {
+  background: #f3f4f6;
 }
