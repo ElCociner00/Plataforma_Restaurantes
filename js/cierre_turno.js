@@ -62,44 +62,6 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   };
 
-  // NUEVA FUNCIÓN: Convertir hora HH:mm a formato completo
-  const convertirHoraCompleta = (fechaValue, horaValue) => {
-    if (!fechaValue || !horaValue) return "";
-    
-    // Asegurar que la fecha tenga el formato correcto
-    const fechaFormateada = fechaValue.replace(/-/g, "/");
-    
-    // Crear objeto Date con fecha y hora
-    const [horas, minutos] = horaValue.split(":");
-    const fechaHora = new Date(`${fechaFormateada}T${horaValue}:00`);
-    
-    // OPCIÓN 1: Formato ISO (recomendado para APIs)
-    const isoString = fechaHora.toISOString();
-    
-    // OPCIÓN 2: Formato legible con AM/PM
-    const opciones = { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      hour12: true 
-    };
-    const horaConAmPm = fechaHora.toLocaleTimeString('es-ES', opciones);
-    
-    // OPCIÓN 3: Formato 24 horas completo
-    const formato24Horas = fechaHora.toLocaleTimeString('es-ES', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      hour12: false 
-    });
-    
-    return {
-      iso: isoString,                     // "2025-02-04T08:00:00.000Z"
-      legible: horaConAmPm,               // "08:00 AM" o "13:00 PM"
-      formato24: formato24Horas,          // "08:00" o "13:00"
-      periodo: parseInt(horas) >= 12 ? "PM" : "AM", // "AM" o "PM"
-      timestamp: fechaHora.getTime()      // timestamp en milisegundos
-    };
-  };
-
   const formatFechaCompleta = (fechaValue) => {
     if (!fechaValue) return "";
     return `${fechaValue.replace(/-/g, "/")}T00:00:00`;
@@ -124,26 +86,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const contextPayload = await getContextPayload();
     if (!contextPayload) return;
 
-    // Convertir horas a formato completo
-    const horaInicioCompleta = convertirHoraCompleta(fecha.value, horaInicio.value);
-    const horaFinCompleta = convertirHoraCompleta(fecha.value, horaFin.value);
-
     const payload = {
       fecha: fecha.value,
       responsable: responsable.value,
       turno: {
-        inicio: horaInicio.value,          // Mantener formato original
-        fin: horaFin.value,                // Mantener formato original
-        inicio_completo: horaInicioCompleta, // NUEVO: objeto completo
-        fin_completo: horaFinCompleta,       // NUEVO: objeto completo
-        inicio_iso: horaInicioCompleta?.iso, // Para APIs
-        fin_iso: horaFinCompleta?.iso,       // Para APIs
-        periodo_inicio: horaInicioCompleta?.periodo, // "AM" o "PM"
-        periodo_fin: horaFinCompleta?.periodo        // "AM" o "PM"
-      },
-      metadata: {
-        timestamp_envio: new Date().toISOString(),
-        momento_dia: determinarMomentoDia(horaInicio.value, horaFin.value)
+        inicio: horaInicio.value,
+        fin: horaFin.value
       },
       ...contextPayload
     };
@@ -174,22 +122,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const contextPayload = await getContextPayload();
     if (!contextPayload) return;
 
-    // Convertir horas a formato completo
-    const horaInicioCompleta = convertirHoraCompleta(fecha.value, horaInicio.value);
-    const horaFinCompleta = convertirHoraCompleta(fecha.value, horaFin.value);
-
     const payload = {
       fecha: fecha.value,
       responsable: responsable.value,
       turno: {
         inicio: horaInicio.value,
-        fin: horaFin.value,
-        inicio_completo: horaInicioCompleta,
-        fin_completo: horaFinCompleta,
-        inicio_iso: horaInicioCompleta?.iso,
-        fin_iso: horaFinCompleta?.iso,
-        periodo_inicio: horaInicioCompleta?.periodo,
-        periodo_fin: horaFinCompleta?.periodo
+        fin: horaFin.value
       },
       finanzas: {
         efectivo: {
@@ -206,10 +144,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       },
       comentarios: comentarios.value || "",
-      metadata: {
-        timestamp_envio: new Date().toISOString(),
-        momento_dia: determinarMomentoDia(horaInicio.value, horaFin.value)
-      },
       ...contextPayload
     };
 
@@ -235,10 +169,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!contextPayload) return;
 
     const fechaCompleta = formatFechaCompleta(fecha.value);
-    
-    // Convertir horas a formato completo
-    const horaInicioCompleta = convertirHoraCompleta(fecha.value, horaInicio.value);
-    const horaFinCompleta = convertirHoraCompleta(fecha.value, horaFin.value);
 
     const payload = {
       fecha: fecha.value,
@@ -246,12 +176,6 @@ document.addEventListener("DOMContentLoaded", () => {
       turno: {
         inicio: horaInicio.value,
         fin: horaFin.value,
-        inicio_completo: horaInicioCompleta,
-        fin_completo: horaFinCompleta,
-        inicio_iso: horaInicioCompleta?.iso,
-        fin_iso: horaFinCompleta?.iso,
-        periodo_inicio: horaInicioCompleta?.periodo,
-        periodo_fin: horaFinCompleta?.periodo,
         fecha_inicio: fechaCompleta,
         fecha_fin: fechaCompleta
       },
@@ -270,10 +194,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       },
       comentarios: comentarios.value || "",
-      metadata: {
-        timestamp_envio: new Date().toISOString(),
-        momento_dia: determinarMomentoDia(horaInicio.value, horaFin.value)
-      },
       ...contextPayload
     };
 
@@ -290,22 +210,4 @@ document.addEventListener("DOMContentLoaded", () => {
       setStatus("Error de conexión al subir cierre.");
     }
   });
-  
-  // FUNCIÓN AUXILIAR: Determinar momento del día basado en horarios
-  function determinarMomentoDia(horaInicio, horaFin) {
-    const [horaInicioNum] = horaInicio.split(":").map(Number);
-    const [horaFinNum] = horaFin.split(":").map(Number);
-    
-    if (horaInicioNum >= 5 && horaFinNum <= 11) {
-      return "MAÑANA";
-    } else if (horaInicioNum >= 12 && horaFinNum <= 17) {
-      return "TARDE";
-    } else if (horaInicioNum >= 18 && horaFinNum <= 23) {
-      return "NOCHE";
-    } else if (horaInicioNum >= 0 && horaFinNum <= 4) {
-      return "MADRUGADA";
-    } else {
-      return "MIXTO";
-    }
-  }
 });
