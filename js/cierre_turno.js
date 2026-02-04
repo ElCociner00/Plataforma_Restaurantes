@@ -497,6 +497,30 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!contextPayload) return null;
 
     const fechaCompleta = formatFechaCompleta(fecha.value);
+    const sistemas = {
+      efectivo_sistema: inputsFinanzas.efectivo.sistema.value || 0,
+      datafono_sistema: inputsFinanzas.datafono.sistema.value || 0,
+      rappi_sistema: inputsFinanzas.rappi.sistema.value || 0,
+      nequi_sistema: inputsFinanzas.nequi.sistema.value || 0,
+      transferencias_sistema: inputsFinanzas.transferencias.sistema.value || 0,
+      bono_regalo_sistema: inputsFinanzas.bono_regalo.sistema.value || 0
+    };
+    const reales = {
+      efectivo_real: inputsFinanzas.efectivo.real.value || 0,
+      datafono_real: inputsFinanzas.datafono.real.value || 0,
+      rappi_real: inputsFinanzas.rappi.real.value || 0,
+      nequi_real: inputsFinanzas.nequi.real.value || 0,
+      transferencias_real: inputsFinanzas.transferencias.real.value || 0,
+      bono_regalo_real: inputsFinanzas.bono_regalo.real.value || 0
+    };
+    const diferencias = {
+      efectivo_diferencia: inputsDiferencias.efectivo.input.value || 0,
+      datafono_diferencia: inputsDiferencias.datafono.input.value || 0,
+      rappi_diferencia: inputsDiferencias.rappi.input.value || 0,
+      nequi_diferencia: inputsDiferencias.nequi.input.value || 0,
+      transferencias_diferencia: inputsDiferencias.transferencias.input.value || 0,
+      bono_de_regalo_diferencia: inputsDiferencias.bono_regalo.input.value || 0
+    };
 
     return {
       fecha: fecha.value,
@@ -537,6 +561,11 @@ document.addEventListener("DOMContentLoaded", () => {
         propina: inputsSoloVista.propina.value || 0,
         domicilios: inputsSoloVista.domicilios.value || 0
       },
+      sistemas,
+      reales,
+      diferencias,
+      propina: inputsSoloVista.propina.value || 0,
+      domicilios: inputsSoloVista.domicilios.value || 0,
       comentarios: comentarios.value || "",
       ...contextPayload
     };
