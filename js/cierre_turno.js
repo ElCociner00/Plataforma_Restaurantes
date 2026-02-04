@@ -67,6 +67,13 @@ document.addEventListener("DOMContentLoaded", () => {
     return `${fechaValue.replace(/-/g, "/")}T00:00:00`;
   };
 
+  const getMomentoDia = (timeValue) => {
+    if (!timeValue) return "";
+    const [hour] = timeValue.split(":").map(Number);
+    if (Number.isNaN(hour)) return "";
+    return hour >= 12 ? "PM" : "AM";
+  };
+
   const toggleButtons = ({ consultar, verificar, enviar }) => {
     if (typeof consultar === "boolean") btnConsultar.disabled = !consultar;
     if (typeof verificar === "boolean") btnVerificar.disabled = !verificar;
@@ -91,7 +98,9 @@ document.addEventListener("DOMContentLoaded", () => {
       responsable: responsable.value,
       turno: {
         inicio: horaInicio.value,
-        fin: horaFin.value
+        fin: horaFin.value,
+        inicio_momento: getMomentoDia(horaInicio.value),
+        fin_momento: getMomentoDia(horaFin.value)
       },
       ...contextPayload
     };
@@ -127,7 +136,9 @@ document.addEventListener("DOMContentLoaded", () => {
       responsable: responsable.value,
       turno: {
         inicio: horaInicio.value,
-        fin: horaFin.value
+        fin: horaFin.value,
+        inicio_momento: getMomentoDia(horaInicio.value),
+        fin_momento: getMomentoDia(horaFin.value)
       },
       finanzas: {
         efectivo: {
@@ -176,6 +187,8 @@ document.addEventListener("DOMContentLoaded", () => {
       turno: {
         inicio: horaInicio.value,
         fin: horaFin.value,
+        inicio_momento: getMomentoDia(horaInicio.value),
+        fin_momento: getMomentoDia(horaFin.value),
         fecha_inicio: fechaCompleta,
         fecha_fin: fechaCompleta
       },
