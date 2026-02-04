@@ -18,6 +18,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnConsultar = document.getElementById("consultarDatos");
   const btnVerificar = document.getElementById("verificar");
   const btnEnviar = document.getElementById("enviar");
+  const btnLimpiar = document.getElementById("limpiarDatos");
 
   const inputsFinanzas = {
     efectivo: {
@@ -28,19 +29,40 @@ document.addEventListener("DOMContentLoaded", () => {
       sistema: document.getElementById("datafono_sistema"),
       real: document.getElementById("datafono_real"),
     },
+    rappi: {
+      sistema: document.getElementById("rappi_sistema"),
+      real: document.getElementById("rappi_real"),
+    },
+    nequi: {
+      sistema: document.getElementById("nequi_sistema"),
+      real: document.getElementById("nequi_real"),
+    },
     transferencias: {
       sistema: document.getElementById("transferencias_sistema"),
       real: document.getElementById("transferencias_real"),
     }
   };
 
+  const inputsSoloVista = {
+    propina: document.getElementById("propina"),
+    domicilios: document.getElementById("domicilios"),
+  };
+
+  const filasFinanzas = document.querySelectorAll(".finanzas-row");
+
   enforceNumericInput([
     inputsFinanzas.efectivo.sistema,
     inputsFinanzas.efectivo.real,
     inputsFinanzas.datafono.sistema,
     inputsFinanzas.datafono.real,
+    inputsFinanzas.rappi.sistema,
+    inputsFinanzas.rappi.real,
+    inputsFinanzas.nequi.sistema,
+    inputsFinanzas.nequi.real,
     inputsFinanzas.transferencias.sistema,
-    inputsFinanzas.transferencias.real
+    inputsFinanzas.transferencias.real,
+    inputsSoloVista.propina,
+    inputsSoloVista.domicilios
   ]);
 
   const comentarios = document.querySelector("textarea");
@@ -80,12 +102,116 @@ document.addEventListener("DOMContentLoaded", () => {
     if (typeof enviar === "boolean") btnEnviar.disabled = !enviar;
   };
 
+  const getVisibilitySettings = () => {
+    const stored = localStorage.getItem("cierre_turno_visibilidad");
+    if (!stored) {
+      return {
+        efectivo: true,
+        datafono: true,
+        rappi: true,
+        nequi: true,
+        transferencias: true,
+        propina: true,
+        domicilios: true,
+      };
+    }
+    try {
+      return JSON.parse(stored);
+    } catch (error) {
+      return {
+        efectivo: true,
+        datafono: true,
+        rappi: true,
+        nequi: true,
+        transferencias: true,
+        propina: true,
+        domicilios: true,
+      };
+    }
+  };
+
+  const applyVisibilitySettings = () => {
+    const settings = getVisibilitySettings();
+    filasFinanzas.forEach((row) => {
+      const field = row.dataset.field;
+      const visible = settings[field] !== false;
+      row.classList.toggle("is-hidden", !visible);
+      if (!visible) {
+        if (inputsFinanzas[field]) {
+          inputsFinanzas[field].sistema.value = "0";
+          inputsFinanzas[field].real.value = "0";
+        }
+        if (inputsSoloVista[field]) {
+          inputsSoloVista[field].value = "0";
+        }
+      }
+    });
+    return settings;
+  };
+
+  const fechaEsPasada = (fechaValue) => {
+    if (!fechaValue) return false;
+    const [year, month, day] = fechaValue.split("-").map(Number);
+    if (!year || !month || !day) return false;
+    const fechaSeleccionada = new Date(year, month - 1, day);
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    return fechaSeleccionada < hoy;
+  };
+
+  const actualizarEstadoHoraFin = () => {
+    if (fechaEsPasada(fecha.value)) {
+      horaFin.value = "";
+      horaFin.disabled = true;
+      return;
+    }
+    horaFin.disabled = false;
+  };
+
+  let verificado = false;
+
+  const marcarComoNoVerificado = () => {
+    if (!verificado) return;
+    verificado = false;
+    toggleButtons({ enviar: false });
+  };
+
+  const limpiarCamposDatos = () => {
+    Object.values(inputsFinanzas).forEach((grupo) => {
+      grupo.sistema.value = "";
+      grupo.real.value = "";
+    });
+    Object.values(inputsSoloVista).forEach((input) => {
+      input.value = "";
+    });
+    comentarios.value = "";
+    marcarComoNoVerificado();
+    applyVisibilitySettings();
+  };
+
+  const settingsVisibilidad = applyVisibilitySettings();
+
   toggleButtons({ consultar: true, verificar: false, enviar: false });
+
+  actualizarEstadoHoraFin();
+
+  fecha.addEventListener("change", () => {
+    actualizarEstadoHoraFin();
+    marcarComoNoVerificado();
+  });
+  responsable.addEventListener("change", marcarComoNoVerificado);
+  horaInicio.addEventListener("change", marcarComoNoVerificado);
+  horaFin.addEventListener("change", marcarComoNoVerificado);
+  comentarios.addEventListener("input", marcarComoNoVerificado);
+  Object.values(inputsFinanzas).forEach((grupo) => {
+    grupo.real.addEventListener("input", marcarComoNoVerificado);
+  });
 
   btnConsultar.addEventListener("click", async () => {
     setStatus("Consultando datos...");
 
-    if (!fecha.value || !responsable.value || !horaInicio.value || !horaFin.value) {
+    const requiereHoraFin = !fechaEsPasada(fecha.value);
+    if (!fecha.value || !responsable.value || !horaInicio.value || (requiereHoraFin && !horaFin.value)) {
       setStatus("⚠️ Completa todos los datos del turno.");
       return;
     }
@@ -116,7 +242,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
       inputsFinanzas.efectivo.sistema.value = data.efectivo_sistema ?? "";
       inputsFinanzas.datafono.sistema.value = data.datafono_sistema ?? "";
+      inputsFinanzas.rappi.sistema.value = data.rappi_sistema ?? "";
+      inputsFinanzas.nequi.sistema.value = data.nequi_sistema ?? "";
       inputsFinanzas.transferencias.sistema.value = data.transferencias_sistema ?? "";
+      inputsSoloVista.propina.value = data.propina ?? "";
+      inputsSoloVista.domicilios.value = data.domicilios ?? "";
+
+      if (settingsVisibilidad.efectivo === false) {
+        inputsFinanzas.efectivo.sistema.value = "0";
+      }
+      if (settingsVisibilidad.datafono === false) {
+        inputsFinanzas.datafono.sistema.value = "0";
+      }
+      if (settingsVisibilidad.rappi === false) {
+        inputsFinanzas.rappi.sistema.value = "0";
+      }
+      if (settingsVisibilidad.nequi === false) {
+        inputsFinanzas.nequi.sistema.value = "0";
+      }
+      if (settingsVisibilidad.transferencias === false) {
+        inputsFinanzas.transferencias.sistema.value = "0";
+      }
+      if (settingsVisibilidad.propina === false) {
+        inputsSoloVista.propina.value = "0";
+      }
+      if (settingsVisibilidad.domicilios === false) {
+        inputsSoloVista.domicilios.value = "0";
+      }
 
       setStatus(data.message || "Datos consultados.");
       toggleButtons({ verificar: true });
@@ -149,6 +301,14 @@ document.addEventListener("DOMContentLoaded", () => {
           sistema: inputsFinanzas.datafono.sistema.value || 0,
           real: inputsFinanzas.datafono.real.value || 0
         },
+        rappi: {
+          sistema: inputsFinanzas.rappi.sistema.value || 0,
+          real: inputsFinanzas.rappi.real.value || 0
+        },
+        nequi: {
+          sistema: inputsFinanzas.nequi.sistema.value || 0,
+          real: inputsFinanzas.nequi.real.value || 0
+        },
         transferencias: {
           sistema: inputsFinanzas.transferencias.sistema.value || 0,
           real: inputsFinanzas.transferencias.real.value || 0
@@ -167,6 +327,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const data = await res.json();
       setStatus(data.message || "");
+      verificado = true;
       toggleButtons({ enviar: true });
     } catch (err) {
       setStatus("Error de conexión al verificar.");
@@ -201,6 +362,14 @@ document.addEventListener("DOMContentLoaded", () => {
           sistema: inputsFinanzas.datafono.sistema.value || 0,
           real: inputsFinanzas.datafono.real.value || 0
         },
+        rappi: {
+          sistema: inputsFinanzas.rappi.sistema.value || 0,
+          real: inputsFinanzas.rappi.real.value || 0
+        },
+        nequi: {
+          sistema: inputsFinanzas.nequi.sistema.value || 0,
+          real: inputsFinanzas.nequi.real.value || 0
+        },
         transferencias: {
           sistema: inputsFinanzas.transferencias.sistema.value || 0,
           real: inputsFinanzas.transferencias.real.value || 0
@@ -222,5 +391,10 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       setStatus("Error de conexión al subir cierre.");
     }
+  });
+
+  btnLimpiar.addEventListener("click", () => {
+    limpiarCamposDatos();
+    setStatus("Datos limpiados.");
   });
 });
