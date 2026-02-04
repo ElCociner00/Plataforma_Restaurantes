@@ -1,11 +1,15 @@
+import { WEBHOOK_REGISTRO_USUARIO } from "./webhooks.js";
+
 const status = document.getElementById("status");
 const form = document.getElementById("registroUsuario");
 const nombreVisibleInput = document.getElementById("nombre_visible");
-const usernameInput = document.getElementById("username");
+const emailInput = document.getElementById("email");
 const passwordInput = document.getElementById("password");
+const correoSugerido = document.getElementById("correoSugerido");
 
 // 🔍 Recuperamos el NIT de la sesión
 const empresaNIT = sessionStorage.getItem("empresa_nit");
+const empresaCorreo = sessionStorage.getItem("empresa_correo");
 
 if (!empresaNIT) {
   status.innerText = "Error: no se encontró información de la empresa.";
@@ -13,22 +17,23 @@ if (!empresaNIT) {
   throw new Error("NIT no encontrado en sessionStorage");
 }
 
+if (empresaCorreo && correoSugerido) {
+  correoSugerido.textContent = `Sugerido: ${empresaCorreo}`;
+}
+
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  const usernameValue = usernameInput.value.trim();
+  const emailValue = emailInput.value.trim();
 
-  if (!usernameValue) {
-    status.innerText = "El username es obligatorio";
+  if (!emailValue || !emailInput.checkValidity()) {
+    status.innerText = "Ingresa un correo válido";
     return;
   }
 
-  // 🔐 Construimos el email real (sin cambiar el nombre del campo)
-  const emailFinal = `${usernameValue}@globalnexo.com`;
-
   const payload = {
     nombre_visible: nombreVisibleInput.value.trim(),
-    email: emailFinal,       // ⬅️ MISMO CAMPO, MEJOR UX
+    email: emailValue,
     password: passwordInput.value,
     nit: empresaNIT
   };
@@ -37,7 +42,7 @@ form.addEventListener("submit", async (e) => {
 
   try {
     const res = await fetch(
-      "https://n8n.globalnexoshop.com/webhook/registro_usuario",
+      WEBHOOK_REGISTRO_USUARIO,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

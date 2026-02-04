@@ -50,15 +50,15 @@
     <div class="col-title">Real</div>
 
     <div class="row-title">Efectivo</div>
-    <input id="efectivo_sistema" type="text" inputmode="numeric" pattern="[0-9]*">
+    <input id="efectivo_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
     <input id="efectivo_real" type="text" inputmode="numeric" pattern="[0-9]*">
 
     <div class="row-title">Datáfono</div>
-    <input id="datafono_sistema" type="text" inputmode="numeric" pattern="[0-9]*">
+    <input id="datafono_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
     <input id="datafono_real" type="text" inputmode="numeric" pattern="[0-9]*">
 
     <div class="row-title">Transferencias</div>
-    <input id="transferencias_sistema" type="text" inputmode="numeric" pattern="[0-9]*">
+    <input id="transferencias_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
     <input id="transferencias_real" type="text" inputmode="numeric" pattern="[0-9]*">
   </div>
 
@@ -66,8 +66,11 @@
     </section>
 
     <section class="bloque">
-      <button id="verificar">Verificar</button>
-      <button id="enviar">Enviar cierre</button>
+      <div class="acciones-cierre">
+        <button id="consultarDatos">Consultar datos</button>
+        <button id="verificar" disabled>Verificar</button>
+        <button id="enviar" disabled>Subir cierre</button>
+      </div>
       <div id="status"></div>
     </section>
   </div>

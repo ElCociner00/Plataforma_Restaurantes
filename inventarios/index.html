@@ -1,1 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Inventarios</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
 
+<body style="display:none">
+
+  <!-- 🔐 Auth global -->
+  <script type="module" src="../js/auth_guard.js"></script>
+
+  <!-- 🔐 Permisos por rol -->
+  <script type="module">
+    import { guardPage } from "../js/guard_page.js";
+    guardPage("inventarios");
+  </script>
+
+  <!-- 🧭 Header -->
+  <script type="module" src="../js/header.js"></script>
+
+  <div class="main">
+    <h1>Inventarios</h1>
+    <p>Gestión de inventarios próximamente.</p>
+  </div>
+
+</body>
+</html>

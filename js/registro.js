@@ -1,4 +1,9 @@
 import { enforceNumericInput } from "./input_utils.js";
+import {
+  WEBHOOK_CREAR_CODIGO_VERIFICACION,
+  WEBHOOK_VERIFICAR_CODIGO,
+  WEBHOOK_REGISTRO_EMPRESA
+} from "./webhooks.js";
 
 const form = document.getElementById("registroEmpresa");
 const status = document.getElementById("status");
@@ -31,7 +36,7 @@ form.addEventListener("submit", async (e) => {
 
   try {
     const res = await fetch(
-      "https://n8n.globalnexoshop.com/webhook/crear_codigo_verificacion",
+      WEBHOOK_CREAR_CODIGO_VERIFICACION,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -63,7 +68,7 @@ document.getElementById("verificarCodigo").addEventListener("click", async () =>
 
   try {
     const res = await fetch(
-      "https://n8n.globalnexoshop.com/webhook/verificar_codigo",
+      WEBHOOK_VERIFICAR_CODIGO,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -105,7 +110,7 @@ continuarBtn.addEventListener("click", async () => {
 
   try {
     const res = await fetch(
-      "https://n8n.globalnexoshop.com/webhook/registro",
+      WEBHOOK_REGISTRO_EMPRESA,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -124,6 +129,7 @@ continuarBtn.addEventListener("click", async () => {
 
     // ✅ ÉXITO
     sessionStorage.setItem("empresa_nit", datosEmpresa.nit);
+    sessionStorage.setItem("empresa_correo", datosEmpresa.correo_empresa);
     window.location.href = "/Plataforma_Restaurantes/registro/usuario.html";
 
   } catch (err) {
