@@ -36,8 +36,30 @@ const getContextPayload = async () => {
 };
 
 const normalizeList = (raw, keys = []) => {
-  if (Array.isArray(raw)) return raw;
-  if (!raw || typeof raw !== "object") return [];
+  if (!raw) return [];
+
+  if (Array.isArray(raw)) {
+    if (!raw.length) return [];
+
+    for (const key of keys) {
+      const nested = raw.flatMap((item) => {
+        if (!item || typeof item !== "object") return [];
+        if (Array.isArray(item[key])) return item[key];
+        if (item[key] && typeof item[key] === "object") {
+          return Object.entries(item[key]).map(([id, value]) => ({
+            id,
+            ...(typeof value === "object" ? value : { value })
+          }));
+        }
+        return [];
+      });
+      if (nested.length) return nested;
+    }
+
+    return raw;
+  }
+
+  if (typeof raw !== "object") return [];
 
   for (const key of keys) {
     if (Array.isArray(raw[key])) return raw[key];
@@ -49,10 +71,12 @@ const normalizeList = (raw, keys = []) => {
     }
   }
 
-  return Object.entries(raw).map(([id, item]) => ({
-    id,
-    ...(typeof item === "object" ? item : { value: item })
-  }));
+  return Object.entries(raw)
+    .filter(([id]) => id !== "ok" && id !== "message")
+    .map(([id, item]) => ({
+      id,
+      ...(typeof item === "object" ? item : { value: item })
+    }));
 };
 
 const getVisibilityKey = (tenantId) => `cierre_inventarios_visibilidad_${tenantId || "global"}`;
