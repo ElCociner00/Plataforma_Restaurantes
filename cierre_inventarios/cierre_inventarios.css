@@ -1,0 +1,43 @@
+.tabla-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 10px;
+  text-align: left;
+}
+
+th {
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+td input {
+  width: 100%;
+}
+
+.acciones-cierre {
+  display: grid;
+  gap: 10px;
+}
+
+.acciones-cierre button {
+  width: fit-content;
+}
+
+#status {
+  color: #374151;
+  font-size: 0.9rem;
+  margin-top: 6px;
+}
+
+.is-hidden {
+  display: none;
+}
