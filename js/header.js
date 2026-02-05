@@ -4,7 +4,6 @@ import { getUserContext } from "./session.js";
 document.addEventListener("DOMContentLoaded", async () => {
   const context = await getUserContext();
 
-  // Si no hay usuario, no mostramos header (login, registro, etc.)
   if (!context) return;
 
   const header = document.createElement("header");
@@ -17,8 +16,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   menu += `<a href="/Plataforma_Restaurantes/cierre_turno/">Cierre de Turno</a>`;
+  menu += `<a href="/Plataforma_Restaurantes/cierre_inventarios/">Cierre inventarios</a>`;
 
-  if (context.rol === "admin_root") {
+  if (context.rol === "admin_root" || context.rol === "admin") {
     menu += `<a href="/Plataforma_Restaurantes/configuracion/">Configuración</a>`;
   }
 
@@ -33,8 +33,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.getElementById("logoutBtn").onclick = async () => {
     await supabase.auth.signOut();
-
-    // 🔁 Redirigir al login real
     window.location.href = "/Plataforma_Restaurantes/index.html";
   };
 });

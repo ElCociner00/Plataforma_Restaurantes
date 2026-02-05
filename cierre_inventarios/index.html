@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Cierre de inventarios</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="./cierre_inventarios.css">
+</head>
+
+<body style="display:none">
+  <script type="module" src="../js/auth_guard.js"></script>
+
+  <script type="module">
+    import { guardPage } from "../js/guard_page.js";
+    guardPage("cierre_inventarios");
+  </script>
+
+  <script type="module" src="../js/header.js"></script>
+
+  <div class="main">
+    <h1>Cierre inventarios</h1>
+
+    <section class="bloque">
+      <h2>Información del turno</h2>
+      <input id="fecha" type="date">
+      <select id="responsable">
+        <option value="">Seleccione responsable</option>
+      </select>
+      <h4>Turno</h4>
+      <input id="hora_inicio" type="time">
+      <input id="hora_fin" type="time">
+    </section>
+
+    <section class="bloque">
+      <h2>Detalle de productos</h2>
+      <div class="tabla-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Stock</th>
+              <th>Stock gastado</th>
+              <th>Restante</th>
+            </tr>
+          </thead>
+          <tbody id="inventarioBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="bloque acciones-cierre">
+      <button id="consultar">Consultar</button>
+      <button id="verificar" disabled>Verificar</button>
+      <button id="subir" disabled>Subir datos</button>
+      <button id="limpiar" type="button">Limpiar datos</button>
+      <div id="status"></div>
+    </section>
+  </div>
+
+  <script type="module" src="./cierre_inventarios.js"></script>
+</body>
+</html>
