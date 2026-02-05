@@ -1,11 +1,13 @@
 // /js/permissions.js
 export const PERMISSIONS = {
-  dashboard: ["admin_root", "admin"],
-  cierre_turno: ["admin_root", "admin", "operativo"],
-  configuracion: ["admin_root"],
-  loggro: ["admin_root"],
-  visualizacion_cierre_turno: ["admin_root"],
-  inventarios: ["admin_root", "admin", "operativo"],
+  dashboard: ["admin_root", "admin", "revisor"],
+  cierre_turno: ["admin_root", "admin", "operativo", "revisor"],
+  cierre_inventarios: ["admin_root", "admin", "operativo", "revisor"],
+  configuracion: ["admin_root", "admin"],
+  loggro: ["admin_root", "admin"],
+  visualizacion_cierre_turno: ["admin_root", "admin"],
+  visualizacion_cierre_inventarios: ["admin_root", "admin"],
+  inventarios: ["admin_root", "admin", "operativo", "revisor"],
   nomina: ["admin_root", "admin"],
-  permisos: ["admin_root"]
+  permisos: ["admin_root", "admin"]
 };

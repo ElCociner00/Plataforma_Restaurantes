@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Visualización cierre inventarios</title>
+
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="./visualizacion_cierre_inventarios.css">
+</head>
+
+<body style="display:none">
+  <script type="module" src="../js/auth_guard.js"></script>
+
+  <script type="module">
+    import { guardPage } from "../js/guard_page.js";
+    guardPage("visualizacion_cierre_inventarios");
+  </script>
+
+  <script type="module" src="../js/header.js"></script>
+
+  <div class="main">
+    <h1>Visualización cierre inventarios</h1>
+    <p class="descripcion">
+      Define qué productos se mostrarán en cierre inventarios. Los ocultos se enviarán con valor 0.
+    </p>
+
+    <div id="productosPanel" class="panel"></div>
+    <div id="status" class="status"></div>
+  </div>
+
+  <script type="module" src="./visualizacion_cierre_inventarios.js"></script>
+</body>
+</html>

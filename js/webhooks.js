@@ -44,3 +44,23 @@ export const WEBHOOK_LISTAR_RESPONSABLES =
 // configuracion/Loggro.html (guardar credenciales Loggro)
 export const WEBHOOK_REGISTRO_CREDENCIALES =
   "https://n8n.globalnexoshop.com/webhook/Registro_Credenciales";
+
+// cierre_inventarios/index.html (auto-carga al abrir pestaña: traer productos)
+export const WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS =
+  "https://n8n.globalnexoshop.com/webhook/consultar_inventarios_productos";
+
+// cierre_inventarios/index.html (botón: "Consultar" para traer stock por producto)
+export const WEBHOOK_CIERRE_INVENTARIOS_CONSULTAR =
+  "https://n8n.globalnexoshop.com/webhook/cierre_inventarios_consultar";
+
+// cierre_inventarios/index.html (botón: "Verificar" para calcular/traer restante por producto)
+export const WEBHOOK_CIERRE_INVENTARIOS_VERIFICAR =
+  "https://n8n.globalnexoshop.com/webhook/cierre_inventarios_verificar";
+
+// cierre_inventarios/index.html (botón: "Subir datos" para persistir cierre de inventarios)
+export const WEBHOOK_CIERRE_INVENTARIOS_SUBIR =
+  "https://n8n.globalnexoshop.com/webhook/cierre_inventarios_subir";
+
+// configuracion/visualizacion_cierre_inventarios.html (auto-carga productos para switches de visualización)
+export const WEBHOOK_CIERRE_INVENTARIOS_VISUALIZACION_PRODUCTOS =
+  "https://n8n.globalnexoshop.com/webhook/consultar_inventarios_productos";
