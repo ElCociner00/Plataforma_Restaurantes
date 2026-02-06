@@ -168,6 +168,120 @@ const loadResponsables = async () => {
   }
 };
 
+// 1. FUNCIÓN PARA OBTENER Y FILTRAR PRODUCTOS
+const obtenerProductosVisibles = async () => {
+  const contextPayload = await getContextPayload();
+  if (!contextPayload) {
+    return { productosVisibles: [], totalProductos: 0 };
+  }
+
+  try {
+    // Obtener productos del webhook
+    const res = await fetch(WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(contextPayload)
+    });
+    
+    const data = await res.json();
+    
+    // Usar EXACTAMENTE el mismo método que funciona en visualizacion
+    const productos = normalizeList(data, ["productos", "items"]);
+    
+    // Obtener configuración de visibilidad
+    const visibilidad = getVisibilitySettings(contextPayload.tenant_id);
+    
+    // Filtrar productos por visibilidad
+    const productosVisibles = [];
+    const productosOcultos = [];
+    
+    productos.forEach((item) => {
+      const productId = String(item.id ?? item.producto_id ?? item.codigo ?? "");
+      if (!productId) return;
+      
+      const nombre = item.nombre ?? item.name ?? item.descripcion ?? `Producto ${productId}`;
+      const productoCompleto = { ...item, productId, nombre };
+      
+      // Verificar si hay configuración de visibilidad
+      const tieneConfiguracion = Object.keys(visibilidad).length > 0;
+      
+      if (!tieneConfiguracion) {
+        // Si NO hay configuración, mostrar TODOS por defecto
+        productosVisibles.push(productoCompleto);
+      } else {
+        // Si HAY configuración, aplicar filtro
+        const visible = visibilidad[productId] !== false;
+        if (visible) {
+          productosVisibles.push(productoCompleto);
+        } else {
+          productosOcultos.push(productoCompleto);
+        }
+      }
+    });
+    
+    return {
+      productosVisibles,
+      totalProductos: productos.length,
+      productosOcultos: productosOcultos.length
+    };
+    
+  } catch (error) {
+    console.error("Error obteniendo productos:", error);
+    return { productosVisibles: [], totalProductos: 0, productosOcultos: 0, error: error.message };
+  }
+};
+
+// 2. FUNCIÓN PARA RENDERIZAR PRODUCTOS VISIBLES
+const renderizarProductos = (productosVisibles) => {
+  inventarioBody.innerHTML = "";
+  productRows.clear();
+  
+  if (productosVisibles.length === 0) {
+    return 0;
+  }
+  
+  let productosRenderizados = 0;
+  
+  productosVisibles.forEach((item) => {
+    const productId = item.productId;
+    const nombre = item.nombre;
+    
+    // Crear fila de tabla
+    const tr = document.createElement("tr");
+    tr.dataset.productId = productId;
+    tr.innerHTML = `
+      <td>${nombre}</td>
+      <td><input type="text" class="stock" readonly value="0"></td>
+      <td><input type="text" class="stock-gastado" value=""></td>
+      <td><input type="text" class="restante" readonly value="0"></td>
+    `;
+    inventarioBody.appendChild(tr);
+    
+    // Obtener referencias a los inputs
+    const stockInput = tr.querySelector(".stock");
+    const gastadoInput = tr.querySelector(".stock-gastado");
+    const restanteInput = tr.querySelector(".restante");
+    
+    // Configurar validación y eventos
+    enforceNumericInput(gastadoInput);
+    gastadoInput.addEventListener("input", resetVerification);
+    
+    // Guardar en el mapa de productos
+    productRows.set(productId, {
+      nombre,
+      stockInput,
+      gastadoInput,
+      restanteInput,
+      visible: true
+    });
+    
+    productosRenderizados++;
+  });
+  
+  return productosRenderizados;
+};
+
+// 3. FUNCIÓN PRINCIPAL QUE ORQUESTA EL PROCESO
 const renderProducts = async () => {
   const contextPayload = await getContextPayload();
   if (!contextPayload) {
@@ -178,55 +292,34 @@ const renderProducts = async () => {
   setStatus("Cargando productos...");
 
   try {
-    const res = await fetch(WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(contextPayload)
-    });
-    const data = await res.json();
-    const productos = normalizeList(data, ["productos", "items"]);
-    const visibilidad = getVisibilitySettings(contextPayload.tenant_id);
-
-    inventarioBody.innerHTML = "";
-    productRows.clear();
-
-    productos.forEach((item) => {
-      const productId = String(item.id ?? item.producto_id ?? item.codigo ?? "");
-      if (!productId) return;
-      const nombre = item.nombre ?? item.name ?? item.descripcion ?? `Producto ${productId}`;
-      const visible = visibilidad[productId] !== false;
-
-      if (!visible) return;
-
-      const tr = document.createElement("tr");
-      tr.dataset.productId = productId;
-      tr.innerHTML = `
-        <td>${nombre}</td>
-        <td><input type="text" class="stock" readonly value="0"></td>
-        <td><input type="text" class="stock-gastado" value=""></td>
-        <td><input type="text" class="restante" readonly value="0"></td>
-      `;
-      inventarioBody.appendChild(tr);
-
-      const stockInput = tr.querySelector(".stock");
-      const gastadoInput = tr.querySelector(".stock-gastado");
-      const restanteInput = tr.querySelector(".restante");
-
-      enforceNumericInput(gastadoInput);
-      gastadoInput.addEventListener("input", resetVerification);
-
-      productRows.set(productId, {
-        nombre,
-        stockInput,
-        gastadoInput,
-        restanteInput,
-        visible
-      });
-    });
-
-    setStatus(productRows.size ? "Productos cargados." : "No hay productos para mostrar.");
+    // PASO 1: Obtener y filtrar productos
+    const { productosVisibles, totalProductos, productosOcultos, error } = await obtenerProductosVisibles();
+    
+    if (error) {
+      throw new Error(error);
+    }
+    
+    // Debug en consola
+    console.log("Total productos recibidos:", totalProductos);
+    console.log("Productos visibles:", productosVisibles.length);
+    console.log("Productos ocultos:", productosOcultos);
+    console.log("Primer producto (si existe):", productosVisibles[0]);
+    
+    // PASO 2: Renderizar productos visibles
+    const productosRenderizados = renderizarProductos(productosVisibles);
+    
+    // PASO 3: Actualizar estado
+    if (totalProductos === 0) {
+      setStatus("No se recibieron productos del sistema.");
+    } else if (productosRenderizados === 0 && totalProductos > 0) {
+      setStatus(`⚠️ Hay ${totalProductos} productos pero todos están ocultos. Ve a "Visualizar productos" para activarlos.`);
+    } else {
+      setStatus(`Cargados ${productosRenderizados} de ${totalProductos} productos. ${productosOcultos > 0 ? `(${productosOcultos} ocultos)` : ''}`);
+    }
+    
   } catch (error) {
-    setStatus("Error al cargar productos.");
+    console.error("Error en renderProducts:", error);
+    setStatus("Error al cargar productos: " + error.message);
   }
 };
 
