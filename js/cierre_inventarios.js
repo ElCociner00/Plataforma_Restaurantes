@@ -184,18 +184,60 @@ const renderProducts = async () => {
       body: JSON.stringify(contextPayload)
     });
     const data = await res.json();
-    const productos = normalizeList(data, ["productos", "items"]);
+    
+    // DEBUG: Ver qué llega del webhook
+    console.log("Datos recibidos del webhook:", data);
+    
+    // Extraer productos del formato esperado
+    let productos = [];
+    
+    // Si viene como { ok: true, productos: [...] }
+    if (data.ok && Array.isArray(data.productos)) {
+      productos = data.productos;
+    }
+    // Si viene como array directo [{...}, {...}]
+    else if (Array.isArray(data)) {
+      productos = data;
+    }
+    // Usar normalizeList como fallback
+    else {
+      productos = normalizeList(data, ["productos", "items"]);
+    }
+    
+    console.log("Productos extraídos:", productos);
+    
     const visibilidad = getVisibilitySettings(contextPayload.tenant_id);
+    
+    // DEBUG: Ver configuración de visibilidad
+    console.log("Configuración de visibilidad:", visibilidad);
 
     inventarioBody.innerHTML = "";
     productRows.clear();
 
+    if (productos.length === 0) {
+      setStatus("No se recibieron productos del webhook.");
+      return;
+    }
+
+    let productosMostrados = 0;
+    
     productos.forEach((item) => {
       const productId = String(item.id ?? item.producto_id ?? item.codigo ?? "");
       if (!productId) return;
+      
       const nombre = item.nombre ?? item.name ?? item.descripcion ?? `Producto ${productId}`;
-      const visible = visibilidad[productId] !== false;
+      
+      // Por defecto, si no hay configuración de visibilidad, mostrar todos
+      let visible = true;
+      if (Object.keys(visibilidad).length > 0) {
+        // Solo aplicar filtro si hay configuración guardada
+        visible = visibilidad[productId] !== false;
+      }
+      
+      // DEBUG para cada producto
+      console.log(`Producto: ${nombre} (ID: ${productId}), Visible: ${visible}`);
 
+      // Si el producto no es visible según preferencias, saltarlo
       if (!visible) return;
 
       const tr = document.createElement("tr");
@@ -222,11 +264,19 @@ const renderProducts = async () => {
         restanteInput,
         visible
       });
+      
+      productosMostrados++;
     });
 
-    setStatus(productRows.size ? "Productos cargados." : "No hay productos para mostrar.");
+    setStatus(`Se cargaron ${productosMostrados} de ${productos.length} productos.`);
+    
+    if (productosMostrados === 0 && productos.length > 0) {
+      setStatus("⚠️ Todos los productos están ocultos. Ve a 'Visualizar productos' para mostrarlos.");
+    }
+    
   } catch (error) {
-    setStatus("Error al cargar productos.");
+    console.error("Error en renderProducts:", error);
+    setStatus("Error al cargar productos: " + error.message);
   }
 };
 
