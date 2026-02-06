@@ -36,6 +36,47 @@ const getContextPayload = async () => {
 };
 
 const normalizeList = (raw, keys = []) => {
+  const parsePossiblyWrappedJson = (value) => {
+    if (typeof value !== "string") return value;
+
+    const trimmed = value.trim();
+    if (!trimmed) return value;
+
+    const objectPrefix = "[Object:";
+    if (trimmed.startsWith(objectPrefix) && trimmed.endsWith("]")) {
+      const objectContent = trimmed.slice(objectPrefix.length, -1).trim();
+      try {
+        return JSON.parse(objectContent);
+      } catch (error) {
+        return value;
+      }
+    }
+
+    if (
+      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+      (trimmed.startsWith("[") && trimmed.endsWith("]"))
+    ) {
+      try {
+        return JSON.parse(trimmed);
+      } catch (error) {
+        return value;
+      }
+    }
+
+    return value;
+  };
+
+  const parsedRaw = parsePossiblyWrappedJson(raw);
+
+  if (Array.isArray(parsedRaw) && parsedRaw.length === 1) {
+    const single = parsePossiblyWrappedJson(parsedRaw[0]);
+    if (single && typeof single === "object") {
+      return normalizeList(single, keys);
+    }
+  }
+
+  raw = parsedRaw;
+
   if (!raw) return [];
 
   if (Array.isArray(raw)) {
@@ -43,10 +84,11 @@ const normalizeList = (raw, keys = []) => {
 
     for (const key of keys) {
       const nested = raw.flatMap((item) => {
-        if (!item || typeof item !== "object") return [];
-        if (Array.isArray(item[key])) return item[key];
-        if (item[key] && typeof item[key] === "object") {
-          return Object.entries(item[key]).map(([id, value]) => ({
+        const parsedItem = parsePossiblyWrappedJson(item);
+        if (!parsedItem || typeof parsedItem !== "object") return [];
+        if (Array.isArray(parsedItem[key])) return parsedItem[key];
+        if (parsedItem[key] && typeof parsedItem[key] === "object") {
+          return Object.entries(parsedItem[key]).map(([id, value]) => ({
             id,
             ...(typeof value === "object" ? value : { value })
           }));
@@ -56,7 +98,9 @@ const normalizeList = (raw, keys = []) => {
       if (nested.length) return nested;
     }
 
-    return raw;
+    return raw
+      .map((item) => parsePossiblyWrappedJson(item))
+      .filter((item) => item && typeof item === "object");
   }
 
   if (typeof raw !== "object") return [];
