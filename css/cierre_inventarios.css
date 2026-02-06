@@ -75,3 +75,7 @@ input[readonly] {
   font-weight: 600;
   z-index: 999;
 }
+
+.loading-overlay.is-hidden {
+  display: none;
+}
