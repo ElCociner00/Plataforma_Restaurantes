@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Visualización histórico cierre turno</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/visualizacion_cierre_turno_historico.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../js/auth_guard.js"></script>
+
+  <script type="module">
+    import { guardPage } from "../js/guard_page.js";
+    guardPage("visualizacion_cierre_turno_historico");
+  </script>
+
+  <script type="module" src="../js/header.js"></script>
+
+  <div class="main">
+    <h1>Visualización histórico cierre turno</h1>
+    <p class="descripcion">Activa o desactiva las columnas visibles en el histórico de cierres de turno.</p>
+
+    <div id="columnasPanel" class="panel"></div>
+    <div id="status" class="status"></div>
+  </div>
+
+  <script type="module" src="../js/visualizacion_cierre_turno_historico.js"></script>
+</body>
+</html>
