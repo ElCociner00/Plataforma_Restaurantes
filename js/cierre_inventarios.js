@@ -168,6 +168,7 @@ const loadResponsables = async () => {
   }
 };
 
+// FUNCIÓN CORREGIDA - igual que visualizacion_cierre_inventarios.js
 const renderProducts = async () => {
   const contextPayload = await getContextPayload();
   if (!contextPayload) {
@@ -183,56 +184,21 @@ const renderProducts = async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(contextPayload)
     });
+    
     const data = await res.json();
-    
-    // CORRECCIÓN: Manejar el formato que llega [Object: {...}]
-    let productosArray = [];
-    
-    if (Array.isArray(data)) {
-      // Si llega como array: [Object: {...}]
-      const firstItem = data[0];
-      if (firstItem && firstItem.productos && Array.isArray(firstItem.productos)) {
-        // Formato: [{ok: true, productos: [...]}]
-        productosArray = firstItem.productos;
-      } else if (firstItem && Array.isArray(firstItem)) {
-        // Formato: [[...]] (array dentro de array)
-        productosArray = firstItem;
-      } else {
-        // Intentar usar normalizeList como fallback
-        productosArray = normalizeList(data, ["productos", "items"]);
-      }
-    } else if (data && data.productos && Array.isArray(data.productos)) {
-      // Formato: {ok: true, productos: [...]}
-      productosArray = data.productos;
-    } else {
-      // Último recurso: usar normalizeList
-      productosArray = normalizeList(data, ["productos", "items"]);
-    }
-    
-    const visibilidad = getVisibilitySettings(contextPayload.tenant_id);
+    const productos = normalizeList(data, ["productos", "items"]);
+    const settings = getVisibilitySettings(contextPayload.tenant_id);
 
     inventarioBody.innerHTML = "";
     productRows.clear();
 
-    // Validar que tenemos un array
-    if (!Array.isArray(productosArray)) {
-      console.error("productosArray no es un array:", productosArray);
-      setStatus("Error: formato de productos no válido");
-      return;
-    }
-
-    let productosMostrados = 0;
-    let productosTotales = 0;
-
-    productosArray.forEach((item) => {
-      productosTotales++;
+    productos.forEach((item) => {
       const productId = String(item.id ?? item.producto_id ?? item.codigo ?? "");
       if (!productId) return;
       
       const nombre = item.nombre ?? item.name ?? item.descripcion ?? `Producto ${productId}`;
-      const visible = visibilidad[productId] !== false;
+      const visible = settings[productId] !== false;
 
-      // Si el producto no es visible según preferencias, saltarlo
       if (!visible) return;
 
       const tr = document.createElement("tr");
@@ -259,15 +225,12 @@ const renderProducts = async () => {
         restanteInput,
         visible
       });
-      
-      productosMostrados++;
     });
 
-    setStatus(`Productos: ${productosMostrados} de ${productosTotales} visibles`);
+    setStatus(productos.length ? `Cargados ${productRows.size} de ${productos.length} productos.` : "No se recibieron productos.");
     
   } catch (error) {
-    console.error("Error en renderProducts:", error);
-    setStatus("Error al cargar productos.");
+    setStatus("Error cargando productos.");
   }
 };
 
