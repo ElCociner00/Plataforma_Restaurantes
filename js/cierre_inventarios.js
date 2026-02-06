@@ -185,57 +185,52 @@ const renderProducts = async () => {
     });
     const data = await res.json();
     
-    // DEBUG: Ver qué llega del webhook
-    console.log("Datos recibidos del webhook:", data);
+    // CORRECCIÓN: Manejar el formato que llega [Object: {...}]
+    let productosArray = [];
     
-    // Extraer productos del formato esperado
-    let productos = [];
-    
-    // Si viene como { ok: true, productos: [...] }
-    if (data.ok && Array.isArray(data.productos)) {
-      productos = data.productos;
+    if (Array.isArray(data)) {
+      // Si llega como array: [Object: {...}]
+      const firstItem = data[0];
+      if (firstItem && firstItem.productos && Array.isArray(firstItem.productos)) {
+        // Formato: [{ok: true, productos: [...]}]
+        productosArray = firstItem.productos;
+      } else if (firstItem && Array.isArray(firstItem)) {
+        // Formato: [[...]] (array dentro de array)
+        productosArray = firstItem;
+      } else {
+        // Intentar usar normalizeList como fallback
+        productosArray = normalizeList(data, ["productos", "items"]);
+      }
+    } else if (data && data.productos && Array.isArray(data.productos)) {
+      // Formato: {ok: true, productos: [...]}
+      productosArray = data.productos;
+    } else {
+      // Último recurso: usar normalizeList
+      productosArray = normalizeList(data, ["productos", "items"]);
     }
-    // Si viene como array directo [{...}, {...}]
-    else if (Array.isArray(data)) {
-      productos = data;
-    }
-    // Usar normalizeList como fallback
-    else {
-      productos = normalizeList(data, ["productos", "items"]);
-    }
-    
-    console.log("Productos extraídos:", productos);
     
     const visibilidad = getVisibilitySettings(contextPayload.tenant_id);
-    
-    // DEBUG: Ver configuración de visibilidad
-    console.log("Configuración de visibilidad:", visibilidad);
 
     inventarioBody.innerHTML = "";
     productRows.clear();
 
-    if (productos.length === 0) {
-      setStatus("No se recibieron productos del webhook.");
+    // Validar que tenemos un array
+    if (!Array.isArray(productosArray)) {
+      console.error("productosArray no es un array:", productosArray);
+      setStatus("Error: formato de productos no válido");
       return;
     }
 
     let productosMostrados = 0;
-    
-    productos.forEach((item) => {
+    let productosTotales = 0;
+
+    productosArray.forEach((item) => {
+      productosTotales++;
       const productId = String(item.id ?? item.producto_id ?? item.codigo ?? "");
       if (!productId) return;
       
       const nombre = item.nombre ?? item.name ?? item.descripcion ?? `Producto ${productId}`;
-      
-      // Por defecto, si no hay configuración de visibilidad, mostrar todos
-      let visible = true;
-      if (Object.keys(visibilidad).length > 0) {
-        // Solo aplicar filtro si hay configuración guardada
-        visible = visibilidad[productId] !== false;
-      }
-      
-      // DEBUG para cada producto
-      console.log(`Producto: ${nombre} (ID: ${productId}), Visible: ${visible}`);
+      const visible = visibilidad[productId] !== false;
 
       // Si el producto no es visible según preferencias, saltarlo
       if (!visible) return;
@@ -268,15 +263,11 @@ const renderProducts = async () => {
       productosMostrados++;
     });
 
-    setStatus(`Se cargaron ${productosMostrados} de ${productos.length} productos.`);
-    
-    if (productosMostrados === 0 && productos.length > 0) {
-      setStatus("⚠️ Todos los productos están ocultos. Ve a 'Visualizar productos' para mostrarlos.");
-    }
+    setStatus(`Productos: ${productosMostrados} de ${productosTotales} visibles`);
     
   } catch (error) {
     console.error("Error en renderProducts:", error);
-    setStatus("Error al cargar productos: " + error.message);
+    setStatus("Error al cargar productos.");
   }
 };
 
