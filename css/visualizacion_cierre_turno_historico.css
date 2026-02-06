@@ -1,5 +1,5 @@
 .main {
-  max-width: 720px;
+  max-width: 760px;
 }
 
 .descripcion {
@@ -23,6 +23,8 @@
   align-items: center;
   font-size: 0.95rem;
   color: #1f2937;
+  border-bottom: 1px solid #f3f4f6;
+  padding-bottom: 8px;
 }
 
 .switch {
@@ -74,12 +76,4 @@
   margin-top: 12px;
   font-size: 0.85rem;
   color: #4b5563;
-}
-
-
-.extras-title {
-  margin-top: 24px;
-  text-align: left;
-  font-size: 1.05rem;
-  color: #111827;
 }

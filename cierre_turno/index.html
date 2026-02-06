@@ -120,8 +120,19 @@
     </section>
 
     <section class="bloque">
+      <h2>Gastos (extras)</h2>
+      <div id="extrasList" class="extras-list"></div>
+    </section>
+
+    <section class="bloque">
       <div class="acciones-cierre">
-        <button id="consultarDatos">Consultar datos</button>
+        <div class="consultar-dropdown">
+          <button id="consultarToggle" type="button">Consultar ▾</button>
+          <div class="consultar-menu">
+            <button id="consultarDatos" type="button">Consultar datos</button>
+            <button id="consultarGastos" type="button">Consultar gastos</button>
+          </div>
+        </div>
         <button id="verificar" disabled>Verificar</button>
         <button id="enviar" disabled>Subir cierre</button>
         <button id="limpiarDatos" type="button">Limpiar datos</button>

@@ -63,3 +63,19 @@ input[readonly] {
 .is-hidden {
   display: none;
 }
+
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.35);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  z-index: 999;
+}
+
+.loading-overlay.is-hidden {
+  display: none;
+}
