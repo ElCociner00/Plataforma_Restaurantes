@@ -178,108 +178,26 @@ const renderProducts = async () => {
   setStatus("Cargando productos...");
 
   try {
-    // 1. OBTENER DATOS DEL WEBHOOK
     const res = await fetch(WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(contextPayload)
     });
-    
     const data = await res.json();
-    console.log("🔍 DEBUG - Datos del webhook:", data);
-    
-    // 2. ANALIZAR LA ESTRUCTURA DE DATOS
-    console.log("🔍 Tipo de datos:", typeof data);
-    console.log("🔍 ¿Es array?:", Array.isArray(data));
-    
-    // 3. EXTRAER PRODUCTOS DE FORMA SEGURA
-    let productos = [];
-    
-    // Formato 1: [{ok: true, productos: [...]}]
-    if (Array.isArray(data) && data.length > 0) {
-      const primerElemento = data[0];
-      if (primerElemento && primerElemento.productos && Array.isArray(primerElemento.productos)) {
-        console.log("✅ Formato detectado: [{ok: true, productos: [...]}]");
-        productos = primerElemento.productos;
-      }
-      // Formato 2: Array directo de productos
-      else if (primerElemento && primerElemento.id && primerElemento.nombre) {
-        console.log("✅ Formato detectado: Array directo de productos");
-        productos = data;
-      }
-    }
-    // Formato 3: {ok: true, productos: [...]}
-    else if (data && data.productos && Array.isArray(data.productos)) {
-      console.log("✅ Formato detectado: {ok: true, productos: [...]}");
-      productos = data.productos;
-    }
-    // Formato desconocido - usar normalizeList
-    else {
-      console.log("⚠️ Formato no reconocido, usando normalizeList");
-      productos = normalizeList(data, ["productos", "items"]);
-    }
-    
-    console.log("🔍 Productos extraídos:", productos);
-    console.log("🔍 Cantidad de productos:", productos.length);
-    
-    // 4. OBTENER CONFIGURACIÓN DE VISIBILIDAD
+    const productos = normalizeList(data, ["productos", "items"]);
     const visibilidad = getVisibilitySettings(contextPayload.tenant_id);
-    console.log("🔍 Configuración de visibilidad:", visibilidad);
-    console.log("🔍 Claves en visibilidad:", Object.keys(visibilidad));
-    
-    // 5. LIMPIAR TABLA
+
     inventarioBody.innerHTML = "";
     productRows.clear();
-    
-    if (!Array.isArray(productos) || productos.length === 0) {
-      setStatus("No se recibieron productos.");
-      return;
-    }
-    
-    // 6. PROCESAR CADA PRODUCTO
-    let productosMostrados = 0;
-    let productosOcultos = 0;
-    
-    for (let i = 0; i < productos.length; i++) {
-      const item = productos[i];
-      
-      // Extraer ID (igual que en visualizacion_cierre_inventarios.js)
-      const productId = String(item.id || item.producto_id || item.codigo || "");
-      
-      if (!productId) {
-        console.log(`❌ Producto ${i} sin ID, saltando`);
-        continue;
-      }
-      
-      // Extraer nombre (igual que en visualizacion_cierre_inventarios.js)
-      const nombre = item.nombre || item.name || item.descripcion || `Producto ${productId}`;
-      
-      // Determinar visibilidad
-      let visible = true;
-      
-      // Si hay configuración de visibilidad guardada
-      if (Object.keys(visibilidad).length > 0) {
-        // Verificar si este producto tiene configuración
-        if (visibilidad.hasOwnProperty(productId)) {
-          visible = visibilidad[productId] !== false;
-        } else {
-          // Si el producto NO está en la configuración, mostrarlo por defecto
-          visible = true;
-        }
-      }
-      // Si NO hay configuración, mostrar todos
-      else {
-        visible = true;
-      }
-      
-      console.log(`🔍 Producto ${i}: "${nombre}" (ID: ${productId}) - Visible: ${visible}`);
-      
-      if (!visible) {
-        productosOcultos++;
-        continue;
-      }
-      
-      // CREAR LA FILA EN LA TABLA
+
+    productos.forEach((item) => {
+      const productId = String(item.id ?? item.producto_id ?? item.codigo ?? "");
+      if (!productId) return;
+      const nombre = item.nombre ?? item.name ?? item.descripcion ?? `Producto ${productId}`;
+      const visible = visibilidad[productId] !== false;
+
+      if (!visible) return;
+
       const tr = document.createElement("tr");
       tr.dataset.productId = productId;
       tr.innerHTML = `
@@ -289,42 +207,26 @@ const renderProducts = async () => {
         <td><input type="text" class="restante" readonly value="0"></td>
       `;
       inventarioBody.appendChild(tr);
-      
-      // Obtener referencias a los inputs
+
       const stockInput = tr.querySelector(".stock");
       const gastadoInput = tr.querySelector(".stock-gastado");
       const restanteInput = tr.querySelector(".restante");
-      
-      // Configurar validación numérica
+
       enforceNumericInput(gastadoInput);
       gastadoInput.addEventListener("input", resetVerification);
-      
-      // Guardar en el mapa de productos
+
       productRows.set(productId, {
         nombre,
         stockInput,
         gastadoInput,
         restanteInput,
-        visible: true
+        visible
       });
-      
-      productosMostrados++;
-    }
-    
-    // 7. ACTUALIZAR ESTADO
-    console.log(`🎯 Resultado: ${productosMostrados} mostrados, ${productosOcultos} ocultos`);
-    
-    if (productosMostrados === 0 && productos.length > 0) {
-      setStatus(`⚠️ Hay ${productos.length} productos pero todos están ocultos. Ve a "Visualizar productos" para activarlos.`);
-    } else if (productosMostrados > 0) {
-      setStatus(`Cargados ${productosMostrados} de ${productos.length} productos${productosOcultos > 0 ? ` (${productosOcultos} ocultos)` : ''}`);
-    } else {
-      setStatus("No se recibieron productos.");
-    }
-    
+    });
+
+    setStatus(productRows.size ? "Productos cargados." : "No hay productos para mostrar.");
   } catch (error) {
-    console.error("🔥 ERROR en renderProducts:", error);
-    setStatus(`Error al cargar productos: ${error.message}`);
+    setStatus("Error al cargar productos.");
   }
 };
 
