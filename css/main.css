@@ -153,3 +153,49 @@ button:hover {
   font-size: 0.9rem;
   text-align: center;
 }
+
+
+.app-header .nav-dropdown {
+  position: relative;
+}
+
+.app-header .nav-dropdown-toggle {
+  background: transparent;
+  border: 1px solid #4b5563;
+  color: white;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+}
+
+.app-header .nav-dropdown-toggle:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.app-header .nav-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 220px;
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 8px;
+  z-index: 1000;
+}
+
+.app-header .nav-dropdown.open .nav-dropdown-menu {
+  display: grid;
+  gap: 6px;
+}
+
+.app-header .nav-dropdown-menu a {
+  display: block;
+  padding: 8px;
+  border-radius: 6px;
+}
+
+.app-header .nav-dropdown-menu a:hover {
+  background: rgba(255, 255, 255, 0.1);
+  text-decoration: none;
+}

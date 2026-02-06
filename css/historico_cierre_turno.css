@@ -1,0 +1,98 @@
+.main {
+  max-width: 1200px;
+}
+
+.bloque {
+  margin-bottom: 20px;
+}
+
+.filtros-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.filtros-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.88rem;
+}
+
+.acciones-filtros,
+.acciones-descarga {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.hint {
+  text-align: left;
+  margin: 0 0 8px;
+  color: #6b7280;
+}
+
+.tabla-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+}
+
+th,
+td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 10px;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+th {
+  background: #f9fafb;
+  cursor: grab;
+  user-select: none;
+}
+
+th.dragging {
+  opacity: 0.4;
+}
+
+.paginacion {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.paginacion button {
+  padding: 8px 10px;
+  font-size: 0.85rem;
+}
+
+.paginacion button.active {
+  background: #312e81;
+}
+
+.status {
+  margin-top: 12px;
+}
+
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.35);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  z-index: 999;
+}
+
+.loading-overlay.is-hidden {
+  display: none;
+}

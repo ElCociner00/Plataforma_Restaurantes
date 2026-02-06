@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Histórico cierres de turno</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/historico_cierre_turno.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../js/auth_guard.js"></script>
+
+  <script type="module">
+    import { guardPage } from "../js/guard_page.js";
+    guardPage("historico_cierre_turno");
+  </script>
+
+  <script type="module" src="../js/header.js"></script>
+
+  <div id="loadingOverlay" class="loading-overlay is-hidden">Cargando histórico...</div>
+
+  <div class="main">
+    <h1>Histórico de cierres de turno</h1>
+
+    <section class="bloque filtros">
+      <h2>Filtros</h2>
+      <div class="filtros-grid">
+        <label>
+          Fecha desde
+          <input type="date" id="filtroFechaDesde">
+        </label>
+        <label>
+          Fecha hasta
+          <input type="date" id="filtroFechaHasta">
+        </label>
+        <label>
+          Hora inicio
+          <input type="time" id="filtroHoraInicio">
+        </label>
+        <label>
+          Hora fin
+          <input type="time" id="filtroHoraFin">
+        </label>
+        <label>
+          Fila exacta
+          <input type="number" id="filtroFila" min="1" placeholder="Ej: 105">
+        </label>
+      </div>
+      <div class="acciones-filtros">
+        <button id="aplicarFiltros" type="button">Aplicar filtros</button>
+        <button id="limpiarFiltros" type="button">Limpiar filtros</button>
+      </div>
+    </section>
+
+    <section class="bloque acciones-descarga">
+      <button id="descargarPagina" type="button">Descargar página (Excel)</button>
+      <button id="descargarFiltrado" type="button">Descargar filtrado (Excel)</button>
+      <button id="descargarFila" type="button">Descargar fila exacta (Excel)</button>
+    </section>
+
+    <section class="bloque">
+      <h2>Tabla histórica</h2>
+      <p class="hint">Puedes reordenar columnas arrastrando el encabezado.</p>
+      <div class="tabla-wrap">
+        <table>
+          <thead id="historicoHead"></thead>
+          <tbody id="historicoBody"></tbody>
+        </table>
+      </div>
+      <div id="paginacion" class="paginacion"></div>
+      <div id="status" class="status"></div>
+    </section>
+  </div>
+
+  <script type="module" src="../js/historico_cierre_turno.js"></script>
+</body>
+</html>
