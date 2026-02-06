@@ -72,3 +72,7 @@ export const WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS =
 // configuracion/visualizacion_cierre_turno_historico.html (auto-carga columnas disponibles del histórico)
 export const WEBHOOK_HISTORICO_CIERRE_TURNO_COLUMNAS =
   "https://n8n.globalnexoshop.com/webhook/historico_cierre_turno_columnas";
+
+// cierre_turno/index.html (botón: "Consultar gastos" para traer gastos extras)
+export const WEBHOOK_CONSULTAR_GASTOS =
+  "https://n8n.globalnexoshop.com/webhook/consultar_gastos";

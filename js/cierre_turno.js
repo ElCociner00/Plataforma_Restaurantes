@@ -4,7 +4,8 @@ import {
   WEBHOOK_CONSULTAR_DATOS_CIERRE,
   WEBHOOK_LISTAR_RESPONSABLES,
   WEBHOOK_SUBIR_CIERRE,
-  WEBHOOK_VERIFICAR_CIERRE
+  WEBHOOK_VERIFICAR_CIERRE,
+  WEBHOOK_CONSULTAR_GASTOS
 } from "./webhooks.js";
 
 // ../js/cierre_turno.js
@@ -15,8 +16,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const horaInicio = document.getElementById("hora_inicio");
   const horaFin = document.getElementById("hora_fin");
   const status = document.getElementById("status");
+  const extrasList = document.getElementById("extrasList");
 
+  const btnConsultarToggle = document.getElementById("consultarToggle");
   const btnConsultar = document.getElementById("consultarDatos");
+  const btnConsultarGastos = document.getElementById("consultarGastos");
   const btnVerificar = document.getElementById("verificar");
   const btnEnviar = document.getElementById("enviar");
   const btnLimpiar = document.getElementById("limpiarDatos");
@@ -86,6 +90,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const filasFinanzas = document.querySelectorAll(".finanzas-row");
 
+  const EXTRAS_STORAGE_KEY = "cierre_turno_extras_visibilidad";
+  const MAX_LOADING_MS = 5000;
+  const extrasRows = new Map();
+
   enforceNumericInput([
     inputsFinanzas.efectivo.sistema,
     inputsFinanzas.efectivo.real,
@@ -109,6 +117,86 @@ document.addEventListener("DOMContentLoaded", () => {
     status.textContent = message;
   };
 
+  const fetchWithTimeout = async (url, options = {}, timeoutMs = MAX_LOADING_MS) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      return await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
+
+  const normalizeExtras = (raw) => {
+    if (!raw) return [];
+
+    if (Array.isArray(raw)) {
+      if (!raw.length) return [];
+      if (raw[0] && typeof raw[0] === "object") return raw;
+      return [];
+    }
+
+    if (typeof raw !== "object") return [];
+
+    const keys = ["gastos", "extras", "items", "data"];
+    for (const key of keys) {
+      if (Array.isArray(raw[key])) return raw[key];
+    }
+
+    return Object.entries(raw)
+      .filter(([key]) => key !== "ok" && key !== "message")
+      .map(([id, value]) => ({ id, ...(typeof value === "object" ? value : { value }) }));
+  };
+
+  const getExtrasVisibilitySettings = () => {
+    const stored = localStorage.getItem(EXTRAS_STORAGE_KEY);
+    if (!stored) return {};
+    try {
+      return JSON.parse(stored);
+    } catch (error) {
+      return {};
+    }
+  };
+
+  const buildExtrasRows = (extras) => {
+    if (!extrasList) return;
+    extrasList.innerHTML = "";
+    extrasRows.clear();
+
+    const visibility = getExtrasVisibilitySettings();
+
+    extras.forEach((item) => {
+      const id = String(item.id ?? item.codigo ?? item.key ?? "");
+      if (!id) return;
+
+      const nombre = item.nombre ?? item.name ?? item.descripcion ?? id;
+      const visible = visibility[id] !== false;
+
+      let input = null;
+      if (visible) {
+        const row = document.createElement("div");
+        row.className = "extra-row";
+
+        const label = document.createElement("span");
+        label.textContent = nombre;
+
+        input = document.createElement("input");
+        input.type = "text";
+        input.readOnly = true;
+        input.value = "0";
+
+        row.append(label, input);
+        extrasList.appendChild(row);
+      }
+
+      extrasRows.set(id, { nombre, input, visible, value: 0 });
+    });
+  };
+
   const getContextPayload = async () => {
     const context = await getUserContext();
     if (!context) {
@@ -118,6 +206,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     return {
       empresa_id: context.empresa_id,
+      tenant_id: context.empresa_id,
+      usuario_id: context.user?.id || context.user?.user_id,
+      rol: context.rol,
       registrado_por: context.user?.id || context.user?.user_id
     };
   };
@@ -151,6 +242,30 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  const cargarExtrasCatalogo = async () => {
+    if (!extrasList) return;
+
+    try {
+      const contextPayload = await getContextPayload();
+      if (!contextPayload) return;
+
+      const res = await fetchWithTimeout(WEBHOOK_CONSULTAR_GASTOS, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(contextPayload)
+      });
+
+      const data = await res.json();
+      const extras = normalizeExtras(data);
+
+      if (extras.length) {
+        buildExtrasRows(extras);
+      }
+    } catch (error) {
+      // silencioso: los extras se cargan también al consultar gastos
+    }
+  };
+
   const formatFechaCompleta = (fechaValue) => {
     if (!fechaValue) return "";
     return `${fechaValue.replace(/-/g, "/")}T00:00:00`;
@@ -167,6 +282,23 @@ document.addEventListener("DOMContentLoaded", () => {
     if (typeof consultar === "boolean") btnConsultar.disabled = !consultar;
     if (typeof verificar === "boolean") btnVerificar.disabled = !verificar;
     if (typeof enviar === "boolean") btnEnviar.disabled = !enviar;
+  };
+
+  const buildTurnoPayload = async () => {
+    const contextPayload = await getContextPayload();
+    if (!contextPayload) return null;
+
+    return {
+      fecha: fecha.value,
+      responsable: responsable.value,
+      turno: {
+        inicio: horaInicio.value,
+        fin: horaFin.value,
+        inicio_momento: getMomentoDia(horaInicio.value),
+        fin_momento: getMomentoDia(horaFin.value)
+      },
+      ...contextPayload
+    };
   };
 
   const getVisibilitySettings = () => {
@@ -291,10 +423,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const settingsVisibilidad = applyVisibilitySettings();
 
+  const consultarDropdown = btnConsultarToggle?.closest(".consultar-dropdown");
+
+  if (btnConsultarToggle) {
+    const dropdown = consultarDropdown;
+    btnConsultarToggle.addEventListener("click", (event) => {
+      event.stopPropagation();
+      dropdown?.classList.toggle("open");
+    });
+
+    document.addEventListener("click", () => {
+      dropdown?.classList.remove("open");
+    });
+  }
+
   toggleButtons({ consultar: true, verificar: false, enviar: false });
 
   actualizarEstadoHoraFin();
   cargarResponsables();
+  cargarExtrasCatalogo();
 
   fecha.addEventListener("change", () => {
     actualizarEstadoHoraFin();
@@ -312,6 +459,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   btnConsultar.addEventListener("click", async () => {
+    consultarDropdown?.classList.remove("open");
     setStatus("Consultando datos...");
 
     const requiereHoraFin = !fechaEsPasada(fecha.value);
@@ -320,20 +468,8 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const contextPayload = await getContextPayload();
-    if (!contextPayload) return;
-
-    const payload = {
-      fecha: fecha.value,
-      responsable: responsable.value,
-      turno: {
-        inicio: horaInicio.value,
-        fin: horaFin.value,
-        inicio_momento: getMomentoDia(horaInicio.value),
-        fin_momento: getMomentoDia(horaFin.value)
-      },
-      ...contextPayload
-    };
+    const payload = await buildTurnoPayload();
+    if (!payload) return;
 
     try {
       const res = await fetch(WEBHOOK_CONSULTAR_DATOS_CIERRE, {
@@ -387,6 +523,55 @@ document.addEventListener("DOMContentLoaded", () => {
       toggleButtons({ verificar: true });
     } catch (err) {
       setStatus("Error de conexión al consultar datos.");
+    }
+  });
+
+  btnConsultarGastos?.addEventListener("click", async () => {
+    consultarDropdown?.classList.remove("open");
+    setStatus("Consultando gastos...");
+
+    const requiereHoraFin = !fechaEsPasada(fecha.value);
+    if (!fecha.value || !responsable.value || !horaInicio.value || (requiereHoraFin && !horaFin.value)) {
+      setStatus("⚠️ Completa todos los datos del turno.");
+      return;
+    }
+
+    const payload = await buildTurnoPayload();
+    if (!payload) return;
+
+    try {
+      const res = await fetchWithTimeout(WEBHOOK_CONSULTAR_GASTOS, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      const extras = normalizeExtras(data);
+
+      if (!extrasRows.size) {
+        buildExtrasRows(extras);
+      }
+
+      extras.forEach((item) => {
+        const id = String(item.id ?? item.codigo ?? item.key ?? "");
+        if (!id) return;
+        const row = extrasRows.get(id);
+        if (!row) return;
+
+        const value = item.valor ?? item.value ?? item.monto ?? item.total ?? item.gasto ?? 0;
+        row.value = value;
+
+        if (row.input && row.visible) {
+          row.input.value = String(value ?? 0);
+        }
+      });
+
+      setStatus("Gastos consultados.");
+    } catch (error) {
+      setStatus(error?.name === "AbortError"
+        ? "La consulta de gastos tardó más de 5 segundos."
+        : "Error consultando gastos.");
     }
   });
 

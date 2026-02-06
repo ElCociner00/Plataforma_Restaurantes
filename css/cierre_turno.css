@@ -117,3 +117,59 @@
 input[readonly] {
   background: #f3f4f6;
 }
+
+
+.extras-list {
+  display: grid;
+  gap: 10px;
+}
+
+.extra-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.extra-row span {
+  font-size: 0.9rem;
+  color: #374151;
+}
+
+.extra-row input {
+  width: 160px;
+  text-align: right;
+}
+
+.consultar-dropdown {
+  position: relative;
+}
+
+.consultar-dropdown .consultar-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 6px;
+  min-width: 180px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  z-index: 10;
+}
+
+.consultar-dropdown.open .consultar-menu {
+  display: grid;
+  gap: 6px;
+}
+
+.consultar-dropdown .consultar-menu button {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+}
