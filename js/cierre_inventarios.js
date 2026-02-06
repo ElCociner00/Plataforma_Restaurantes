@@ -33,6 +33,22 @@ const setLoading = (isLoading, message = "") => {
   if (message) setStatus(message);
 };
 
+const MAX_LOADING_MS = 10000;
+
+const fetchWithTimeout = async (url, options = {}, timeoutMs = MAX_LOADING_MS) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
 const getContextPayload = async () => {
   const context = await getUserContext();
   if (!context) return null;
@@ -200,7 +216,7 @@ const loadResponsables = async () => {
   }
 
   try {
-    const res = await fetch(WEBHOOK_LISTAR_RESPONSABLES, {
+    const res = await fetchWithTimeout(WEBHOOK_LISTAR_RESPONSABLES, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(contextPayload)
@@ -222,7 +238,7 @@ const loadResponsables = async () => {
 };
 
 const fetchProductosConfigurados = async (contextPayload) => {
-  const res = await fetch(WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS, {
+  const res = await fetchWithTimeout(WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(contextPayload)
@@ -322,7 +338,10 @@ const renderProducts = async () => {
 
     setStatus(productRows.size ? "Productos cargados." : "No hay productos para mostrar.");
   } catch (error) {
-    setStatus("Error al cargar productos.");
+    const timedOut = error?.name === "AbortError";
+    setStatus(timedOut
+      ? "La carga tardó más de 10 segundos. Intenta nuevamente."
+      : "Error al cargar productos.");
     console.error("Error renderizando cierre de inventarios:", error);
   } finally {
     setLoading(false);
