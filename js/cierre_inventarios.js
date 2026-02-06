@@ -168,7 +168,6 @@ const loadResponsables = async () => {
   }
 };
 
-// FUNCIÓN CORREGIDA - igual que visualizacion_cierre_inventarios.js
 const renderProducts = async () => {
   const contextPayload = await getContextPayload();
   if (!contextPayload) {
@@ -184,10 +183,9 @@ const renderProducts = async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(contextPayload)
     });
-    
     const data = await res.json();
     const productos = normalizeList(data, ["productos", "items"]);
-    const settings = getVisibilitySettings(contextPayload.tenant_id);
+    const visibilidad = getVisibilitySettings(contextPayload.tenant_id);
 
     inventarioBody.innerHTML = "";
     productRows.clear();
@@ -195,9 +193,8 @@ const renderProducts = async () => {
     productos.forEach((item) => {
       const productId = String(item.id ?? item.producto_id ?? item.codigo ?? "");
       if (!productId) return;
-      
       const nombre = item.nombre ?? item.name ?? item.descripcion ?? `Producto ${productId}`;
-      const visible = settings[productId] !== false;
+      const visible = visibilidad[productId] !== false;
 
       if (!visible) return;
 
@@ -227,10 +224,9 @@ const renderProducts = async () => {
       });
     });
 
-    setStatus(productos.length ? `Cargados ${productRows.size} de ${productos.length} productos.` : "No se recibieron productos.");
-    
+    setStatus(productRows.size ? "Productos cargados." : "No hay productos para mostrar.");
   } catch (error) {
-    setStatus("Error cargando productos.");
+    setStatus("Error al cargar productos.");
   }
 };
 
