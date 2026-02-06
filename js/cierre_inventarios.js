@@ -242,95 +242,117 @@ const renderProducts = async () => {
   setStatus("Cargando productos...");
 
   try {
-    // 1. Llamar al webhook
+    // 1. OBTENER DATOS (esto funciona)
     const res = await fetch(WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(contextPayload)
     });
     
-    // 2. Obtener la respuesta
     const data = await res.json();
-    console.log("DEBUG - Respuesta completa:", data);
+    console.log("🔍 DEBUG - Datos COMPLETOS del webhook:", JSON.stringify(data, null, 2));
     
-    // 3. EXTRAER PRODUCTOS DE FORMA DIRECTA Y SIMPLE
-    let productosArray = [];
+    // 2. ANÁLISIS DETALLADO de la estructura
+    console.log("🔍 Tipo de 'data':", typeof data);
+    console.log("🔍 ¿Es array 'data'?:", Array.isArray(data));
     
-    // Opción 1: Si viene como { ok: true, productos: [...] }
-    if (data && data.ok && Array.isArray(data.productos)) {
-      productosArray = data.productos;
+    if (Array.isArray(data)) {
+      console.log("🔍 Longitud del array 'data':", data.length);
+      data.forEach((item, index) => {
+        console.log(`🔍 Item ${index}:`, item);
+        console.log(`🔍 Item ${index} tipo:`, typeof item);
+        console.log(`🔍 Item ${index} tiene 'productos'?:`, item && item.productos);
+        console.log(`🔍 Item ${index} 'productos' es array?:`, item && Array.isArray(item.productos));
+      });
     }
-    // Opción 2: Si viene como [{ ok: true, productos: [...] }]
-    else if (Array.isArray(data) && data.length > 0 && data[0].productos) {
-      productosArray = data[0].productos;
+    
+    // 3. FORZAR LA ESTRUCTURA QUE SABEMOS QUE LLEGA
+    let productos = [];
+    
+    // Si los datos vienen como [{ok: true, productos: [...]}]
+    if (Array.isArray(data) && data.length > 0 && data[0].productos && Array.isArray(data[0].productos)) {
+      console.log("✅ Usando formato: [{ok: true, productos: [...]}]");
+      productos = data[0].productos;
     }
-    // Opción 3: Si viene como array directo de productos
-    else if (Array.isArray(data) && data.length > 0 && data[0].id) {
-      productosArray = data;
-    }
-    // Opción 4: Usar la función normalizeList como última opción
+    // Si los datos vienen directamente como {ok: true, productos: [...]}
+    else if (data && data.productos && Array.isArray(data.productos)) {
+      console.log("✅ Usando formato: {ok: true, productos: [...]}");
+      productos = data.productos;
+    } 
     else {
-      try {
-        productosArray = normalizeList(data, ["productos", "items"]);
-      } catch (error) {
-        console.error("Error usando normalizeList:", error);
-        productosArray = [];
+      console.warn("⚠️ Formato no reconocido, intentando extraer de otra forma");
+      // Intentar encontrar productos en cualquier parte de la respuesta
+      if (Array.isArray(data)) {
+        // Buscar en cada elemento del array
+        for (const item of data) {
+          if (item && item.productos && Array.isArray(item.productos)) {
+            productos = item.productos;
+            break;
+          }
+        }
       }
     }
     
-    console.log("DEBUG - Productos extraídos:", productosArray);
-    console.log("DEBUG - Es array?", Array.isArray(productosArray));
-    console.log("DEBUG - Cantidad:", productosArray ? productosArray.length : 0);
+    console.log("🔍 Productos extraídos:", productos);
+    console.log("🔍 Cantidad de productos:", productos.length);
+    console.log("🔍 Primer producto:", productos[0]);
+    console.log("🔍 Segundo producto:", productos[1]);
     
-    // Validar que tenemos un array
-    if (!Array.isArray(productosArray)) {
-      console.error("productosArray no es un array:", productosArray);
-      setStatus("Error: Formato de productos no válido");
-      return;
-    }
-    
-    // 4. Obtener configuración de visibilidad
+    // 4. VERIFICACIÓN DE VISIBILIDAD
     const visibilidad = getVisibilitySettings(contextPayload.tenant_id);
-    console.log("DEBUG - Configuración de visibilidad:", visibilidad);
+    console.log("🔍 Configuración de visibilidad:", visibilidad);
+    console.log("🔍 Claves en visibilidad:", Object.keys(visibilidad));
     
-    // 5. Limpiar tabla
+    // 5. LIMPIAR Y PREPARAR
     inventarioBody.innerHTML = "";
     productRows.clear();
     
-    // 6. Determinar si mostrar todos por defecto
-    const mostrarTodosPorDefecto = Object.keys(visibilidad).length === 0;
+    if (productos.length === 0) {
+      setStatus("No se recibieron productos.");
+      return;
+    }
     
-    let productosMostrados = 0;
-    let productosOcultos = 0;
+    // 6. PROCESAR EXACTAMENTE COMO EL PRIMERO
+    console.log("🚀 PROCESANDO PRODUCTOS...");
     
-    // 7. Renderizar productos
-    for (let i = 0; i < productosArray.length; i++) {
-      const item = productosArray[i];
+    // PRUEBA: Procesar solo los primeros 3 para debug
+    for (let i = 0; i < productos.length; i++) {
+      const item = productos[i];
+      console.log(`--- Procesando producto ${i} ---`);
+      console.log("Item completo:", item);
       
-      // Extraer ID de forma segura
-      const productId = item.id || item.producto_id || item.codigo || "";
+      // EXACTAMENTE como se hace en visualizacion_cierre_inventarios.js
+      const productId = String(item.id || item.producto_id || item.codigo || "");
+      console.log("Product ID extraído:", productId);
+      
       if (!productId) {
-        console.log("DEBUG - Item sin ID:", item);
+        console.log("❌ Saltando - Sin ID");
         continue;
       }
       
-      // Extraer nombre de forma segura
       const nombre = item.nombre || item.name || item.descripcion || `Producto ${productId}`;
+      console.log("Nombre extraído:", nombre);
       
-      // Determinar visibilidad
+      // VISIBILIDAD: Mostrar mensaje específico
+      const tieneConfigVisibilidad = Object.keys(visibilidad).length > 0;
+      console.log("¿Tiene configuración de visibilidad?", tieneConfigVisibilidad);
+      
       let visible = true;
-      if (!mostrarTodosPorDefecto) {
-        visible = visibilidad[productId] !== false;
+      if (tieneConfigVisibilidad) {
+        const configValue = visibilidad[productId];
+        console.log(`Configuración para ${productId}:`, configValue);
+        visible = configValue !== false;
       }
       
-      console.log(`DEBUG - Producto ${i}: ${nombre}, ID: ${productId}, Visible: ${visible}`);
+      console.log("¿Producto visible?", visible);
       
       if (!visible) {
-        productosOcultos++;
+        console.log(`❌ Saltando - ${nombre} está oculto por configuración`);
         continue;
       }
       
-      // Crear fila de tabla
+      // CREAR FILA (exactamente igual para todos)
+      console.log(`✅ Creando fila para: ${nombre}`);
       const tr = document.createElement("tr");
       tr.dataset.productId = productId;
       tr.innerHTML = `
@@ -341,16 +363,15 @@ const renderProducts = async () => {
       `;
       inventarioBody.appendChild(tr);
       
-      // Obtener referencias a inputs
+      // Configurar inputs
       const stockInput = tr.querySelector(".stock");
       const gastadoInput = tr.querySelector(".stock-gastado");
       const restanteInput = tr.querySelector(".restante");
       
-      // Configurar validación y eventos
       enforceNumericInput(gastadoInput);
       gastadoInput.addEventListener("input", resetVerification);
       
-      // Guardar en mapa
+      // Guardar referencia
       productRows.set(productId, {
         nombre,
         stockInput,
@@ -359,63 +380,24 @@ const renderProducts = async () => {
         visible: true
       });
       
-      productosMostrados++;
+      console.log(`✅ ${nombre} agregado correctamente`);
     }
     
-    // 8. Actualizar estado
-    if (productosArray.length === 0) {
-      setStatus("No se recibieron productos del sistema.");
-    } else if (productosMostrados === 0) {
-      setStatus(`⚠️ Hay ${productosArray.length} productos pero todos están ocultos. Configura la visibilidad primero.`);
+    // 7. RESULTADO FINAL
+    console.log("🎯 PRODUCTOS PROCESADOS:");
+    console.log("Total en productRows:", productRows.size);
+    console.log("Filas en la tabla:", inventarioBody.querySelectorAll("tr").length);
+    
+    if (productRows.size === 0) {
+      setStatus(`⚠️ De ${productos.length} productos, 0 son visibles. Configura la visibilidad.`);
     } else {
-      setStatus(`Cargados ${productosMostrados} productos${productosOcultos > 0 ? ` (${productosOcultos} ocultos)` : ''}`);
+      setStatus(`Cargados ${productRows.size} de ${productos.length} productos`);
     }
     
   } catch (error) {
-    console.error("ERROR COMPLETO:", error);
-    setStatus("Error al cargar productos: " + error.message);
-  }
-};
-
-// 3. FUNCIÓN PRINCIPAL QUE ORQUESTA EL PROCESO
-const renderProducts = async () => {
-  const contextPayload = await getContextPayload();
-  if (!contextPayload) {
-    setStatus("No se pudo validar la sesión.");
-    return;
-  }
-
-  setStatus("Cargando productos...");
-
-  try {
-    // PASO 1: Obtener y filtrar productos
-    const { productosVisibles, totalProductos, productosOcultos, error } = await obtenerProductosVisibles();
-    
-    if (error) {
-      throw new Error(error);
-    }
-    
-    // Debug en consola
-    console.log("Total productos recibidos:", totalProductos);
-    console.log("Productos visibles:", productosVisibles.length);
-    console.log("Productos ocultos:", productosOcultos);
-    console.log("Primer producto (si existe):", productosVisibles[0]);
-    
-    // PASO 2: Renderizar productos visibles
-    const productosRenderizados = renderizarProductos(productosVisibles);
-    
-    // PASO 3: Actualizar estado
-    if (totalProductos === 0) {
-      setStatus("No se recibieron productos del sistema.");
-    } else if (productosRenderizados === 0 && totalProductos > 0) {
-      setStatus(`⚠️ Hay ${totalProductos} productos pero todos están ocultos. Ve a "Visualizar productos" para activarlos.`);
-    } else {
-      setStatus(`Cargados ${productosRenderizados} de ${totalProductos} productos. ${productosOcultos > 0 ? `(${productosOcultos} ocultos)` : ''}`);
-    }
-    
-  } catch (error) {
-    console.error("Error en renderProducts:", error);
-    setStatus("Error al cargar productos: " + error.message);
+    console.error("🔥 ERROR CRÍTICO:", error);
+    console.error("Stack trace:", error.stack);
+    setStatus(`Error: ${error.message}`);
   }
 };
 
