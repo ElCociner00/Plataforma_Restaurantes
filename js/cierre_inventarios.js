@@ -232,53 +232,149 @@ const obtenerProductosVisibles = async () => {
 };
 
 // 2. FUNCIÓN PARA RENDERIZAR PRODUCTOS VISIBLES
-const renderizarProductos = (productosVisibles) => {
-  inventarioBody.innerHTML = "";
-  productRows.clear();
-  
-  if (productosVisibles.length === 0) {
-    return 0;
+const renderProducts = async () => {
+  const contextPayload = await getContextPayload();
+  if (!contextPayload) {
+    setStatus("No se pudo validar la sesión.");
+    return;
   }
-  
-  let productosRenderizados = 0;
-  
-  productosVisibles.forEach((item) => {
-    const productId = item.productId;
-    const nombre = item.nombre;
-    
-    // Crear fila de tabla
-    const tr = document.createElement("tr");
-    tr.dataset.productId = productId;
-    tr.innerHTML = `
-      <td>${nombre}</td>
-      <td><input type="text" class="stock" readonly value="0"></td>
-      <td><input type="text" class="stock-gastado" value=""></td>
-      <td><input type="text" class="restante" readonly value="0"></td>
-    `;
-    inventarioBody.appendChild(tr);
-    
-    // Obtener referencias a los inputs
-    const stockInput = tr.querySelector(".stock");
-    const gastadoInput = tr.querySelector(".stock-gastado");
-    const restanteInput = tr.querySelector(".restante");
-    
-    // Configurar validación y eventos
-    enforceNumericInput(gastadoInput);
-    gastadoInput.addEventListener("input", resetVerification);
-    
-    // Guardar en el mapa de productos
-    productRows.set(productId, {
-      nombre,
-      stockInput,
-      gastadoInput,
-      restanteInput,
-      visible: true
+
+  setStatus("Cargando productos...");
+
+  try {
+    // 1. Llamar al webhook
+    const res = await fetch(WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(contextPayload)
     });
     
-    productosRenderizados++;
-  });
-  
-  return productosRenderizados;
+    // 2. Obtener la respuesta
+    const data = await res.json();
+    console.log("DEBUG - Respuesta completa:", data);
+    
+    // 3. EXTRAER PRODUCTOS DE FORMA DIRECTA Y SIMPLE
+    let productosArray = [];
+    
+    // Opción 1: Si viene como { ok: true, productos: [...] }
+    if (data && data.ok && Array.isArray(data.productos)) {
+      productosArray = data.productos;
+    }
+    // Opción 2: Si viene como [{ ok: true, productos: [...] }]
+    else if (Array.isArray(data) && data.length > 0 && data[0].productos) {
+      productosArray = data[0].productos;
+    }
+    // Opción 3: Si viene como array directo de productos
+    else if (Array.isArray(data) && data.length > 0 && data[0].id) {
+      productosArray = data;
+    }
+    // Opción 4: Usar la función normalizeList como última opción
+    else {
+      try {
+        productosArray = normalizeList(data, ["productos", "items"]);
+      } catch (error) {
+        console.error("Error usando normalizeList:", error);
+        productosArray = [];
+      }
+    }
+    
+    console.log("DEBUG - Productos extraídos:", productosArray);
+    console.log("DEBUG - Es array?", Array.isArray(productosArray));
+    console.log("DEBUG - Cantidad:", productosArray ? productosArray.length : 0);
+    
+    // Validar que tenemos un array
+    if (!Array.isArray(productosArray)) {
+      console.error("productosArray no es un array:", productosArray);
+      setStatus("Error: Formato de productos no válido");
+      return;
+    }
+    
+    // 4. Obtener configuración de visibilidad
+    const visibilidad = getVisibilitySettings(contextPayload.tenant_id);
+    console.log("DEBUG - Configuración de visibilidad:", visibilidad);
+    
+    // 5. Limpiar tabla
+    inventarioBody.innerHTML = "";
+    productRows.clear();
+    
+    // 6. Determinar si mostrar todos por defecto
+    const mostrarTodosPorDefecto = Object.keys(visibilidad).length === 0;
+    
+    let productosMostrados = 0;
+    let productosOcultos = 0;
+    
+    // 7. Renderizar productos
+    for (let i = 0; i < productosArray.length; i++) {
+      const item = productosArray[i];
+      
+      // Extraer ID de forma segura
+      const productId = item.id || item.producto_id || item.codigo || "";
+      if (!productId) {
+        console.log("DEBUG - Item sin ID:", item);
+        continue;
+      }
+      
+      // Extraer nombre de forma segura
+      const nombre = item.nombre || item.name || item.descripcion || `Producto ${productId}`;
+      
+      // Determinar visibilidad
+      let visible = true;
+      if (!mostrarTodosPorDefecto) {
+        visible = visibilidad[productId] !== false;
+      }
+      
+      console.log(`DEBUG - Producto ${i}: ${nombre}, ID: ${productId}, Visible: ${visible}`);
+      
+      if (!visible) {
+        productosOcultos++;
+        continue;
+      }
+      
+      // Crear fila de tabla
+      const tr = document.createElement("tr");
+      tr.dataset.productId = productId;
+      tr.innerHTML = `
+        <td>${nombre}</td>
+        <td><input type="text" class="stock" readonly value="0"></td>
+        <td><input type="text" class="stock-gastado" value=""></td>
+        <td><input type="text" class="restante" readonly value="0"></td>
+      `;
+      inventarioBody.appendChild(tr);
+      
+      // Obtener referencias a inputs
+      const stockInput = tr.querySelector(".stock");
+      const gastadoInput = tr.querySelector(".stock-gastado");
+      const restanteInput = tr.querySelector(".restante");
+      
+      // Configurar validación y eventos
+      enforceNumericInput(gastadoInput);
+      gastadoInput.addEventListener("input", resetVerification);
+      
+      // Guardar en mapa
+      productRows.set(productId, {
+        nombre,
+        stockInput,
+        gastadoInput,
+        restanteInput,
+        visible: true
+      });
+      
+      productosMostrados++;
+    }
+    
+    // 8. Actualizar estado
+    if (productosArray.length === 0) {
+      setStatus("No se recibieron productos del sistema.");
+    } else if (productosMostrados === 0) {
+      setStatus(`⚠️ Hay ${productosArray.length} productos pero todos están ocultos. Configura la visibilidad primero.`);
+    } else {
+      setStatus(`Cargados ${productosMostrados} productos${productosOcultos > 0 ? ` (${productosOcultos} ocultos)` : ''}`);
+    }
+    
+  } catch (error) {
+    console.error("ERROR COMPLETO:", error);
+    setStatus("Error al cargar productos: " + error.message);
+  }
 };
 
 // 3. FUNCIÓN PRINCIPAL QUE ORQUESTA EL PROCESO
