@@ -43,7 +43,7 @@ export const WEBHOOK_LISTAR_RESPONSABLES =
 
 // configuracion/Loggro.html (guardar credenciales Loggro)
 export const WEBHOOK_REGISTRO_CREDENCIALES =
-  "https://n8n.globalnexoshop.com/webhook/Registro_Credenciales";
+  "https://n8n.globalnexoshop.com/webhook/registro_credenciales";
 
 // cierre_inventarios/index.html (auto-carga al abrir pestaña: traer productos)
 export const WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS =
