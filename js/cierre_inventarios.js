@@ -21,19 +21,35 @@ const btnVerificar = document.getElementById("verificar");
 const btnSubir = document.getElementById("subir");
 const btnLimpiar = document.getElementById("limpiar");
 
+let loadingSafetyTimeoutId = null;
+
 const setStatus = (message) => {
   status.textContent = message;
 };
 
 
 const setLoading = (isLoading, message = "") => {
+  if (loadingSafetyTimeoutId) {
+    clearTimeout(loadingSafetyTimeoutId);
+    loadingSafetyTimeoutId = null;
+  }
+
   if (loadingOverlay) {
     loadingOverlay.classList.toggle("is-hidden", !isLoading);
+
+    if (isLoading) {
+      loadingSafetyTimeoutId = setTimeout(() => {
+        loadingOverlay.classList.add("is-hidden");
+        setStatus("Carga finalizada por límite de 5 segundos.");
+        loadingSafetyTimeoutId = null;
+      }, MAX_LOADING_MS);
+    }
   }
+
   if (message) setStatus(message);
 };
 
-const MAX_LOADING_MS = 10000;
+const MAX_LOADING_MS = 5000;
 
 const fetchWithTimeout = async (url, options = {}, timeoutMs = MAX_LOADING_MS) => {
   const controller = new AbortController();
@@ -340,7 +356,7 @@ const renderProducts = async () => {
   } catch (error) {
     const timedOut = error?.name === "AbortError";
     setStatus(timedOut
-      ? "La carga tardó más de 10 segundos. Intenta nuevamente."
+      ? "La carga tardó más de 5 segundos. Intenta nuevamente."
       : "Error al cargar productos.");
     console.error("Error renderizando cierre de inventarios:", error);
   } finally {
