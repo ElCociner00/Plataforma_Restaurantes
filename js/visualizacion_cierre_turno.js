@@ -106,7 +106,7 @@ const loadExtras = async () => {
   }
 
   try {
-    const res = await fetchWithTimeout(WEBHOOK_CONSULTAR_GASTOS, {
+    const res = await fetchWithTimeout(WEBHOOK_CONSULTAR_GASTOS_VISUALIZACION, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
