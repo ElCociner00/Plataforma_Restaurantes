@@ -24,6 +24,7 @@ const btnDescargarFila = document.getElementById("descargarFila");
 
 const PAGE_SIZE = 20;
 const MAX_LOADING_MS = 5000;
+const getTimestamp = () => new Date().toISOString();
 
 let loadingSafetyTimeoutId = null;
 
@@ -425,7 +426,8 @@ const loadInitialData = async () => {
       tenant_id: state.context.empresa_id,
       empresa_id: state.context.empresa_id,
       usuario_id: state.context.user?.id || state.context.user?.user_id,
-      rol: state.context.rol
+      rol: state.context.rol,
+      timestamp: getTimestamp()
     };
 
     const visibilitySettings = loadVisibilitySettings(payload.tenant_id);
