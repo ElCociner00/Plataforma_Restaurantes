@@ -369,20 +369,39 @@ const renderTable = () => {
   setStatus(`Mostrando ${state.filteredRows.length} fila(s). Página ${state.currentPage}.`);
 };
 
+const escapeHtml = (value) => (
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#039;")
+);
+
 const buildExcelBlob = (rows) => {
   const headers = ["#", ...state.visibleColumns];
-  const lines = [headers.join("\t")];
+  const headCells = headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("");
 
-  rows.forEach((row, idx) => {
+  const bodyRows = rows.map((row, idx) => {
     const rowNumber = String(idx + 1);
-    const values = state.visibleColumns.map((col) => {
-      const value = formatCellValue(row[col]).replace(/\t|\n/g, " ");
-      return value;
-    });
-    lines.push([rowNumber, ...values].join("\t"));
-  });
+    const values = state.visibleColumns.map((col) => escapeHtml(formatCellValue(row[col])));
+    const cells = [rowNumber, ...values].map((value) => `<td>${value}</td>`).join("");
+    return `<tr>${cells}</tr>`;
+  }).join("");
 
-  return new Blob([`\uFEFF${lines.join("\n")}`], {
+  const html = `
+    <html>
+      <head><meta charset="utf-8" /></head>
+      <body>
+        <table>
+          <thead><tr>${headCells}</tr></thead>
+          <tbody>${bodyRows}</tbody>
+        </table>
+      </body>
+    </html>
+  `.trim();
+
+  return new Blob([html], {
     type: "application/vnd.ms-excel;charset=utf-8;"
   });
 };
