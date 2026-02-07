@@ -1,5 +1,5 @@
 import { getUserContext } from "./session.js";
-import { WEBHOOK_CONSULTAR_GASTOS } from "./webhooks.js";
+import { WEBHOOK_CONSULTAR_GASTOS_VISUALIZACION } from "./webhooks.js";
 
 const STORAGE_KEY = "cierre_turno_visibilidad";
 
