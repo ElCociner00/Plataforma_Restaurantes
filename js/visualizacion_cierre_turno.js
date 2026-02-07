@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS = {
 
 const EXTRAS_STORAGE_KEY = "cierre_turno_extras_visibilidad";
 const MAX_LOADING_MS = 5000;
+const getTimestamp = () => new Date().toISOString();
 
 const status = document.getElementById("status");
 const extrasPanel = document.getElementById("extrasPanel");
@@ -69,13 +70,21 @@ const normalizeExtras = (raw) => {
 
   if (Array.isArray(raw)) {
     if (!raw.length) return [];
-    if (raw[0] && typeof raw[0] === "object") return raw;
-    return [];
+    const nested = raw.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      if (Array.isArray(item.Gastos)) return item.Gastos;
+      if (Array.isArray(item.gastos)) return item.gastos;
+      if (Array.isArray(item.extras)) return item.extras;
+      if (Array.isArray(item.items)) return item.items;
+      if (Array.isArray(item.data)) return item.data;
+      return [item];
+    });
+    return nested.filter((item) => item && typeof item === "object");
   }
 
   if (typeof raw !== "object") return [];
 
-  const keys = ["gastos", "extras", "items", "data"];
+  const keys = ["Gastos", "gastos", "extras", "items", "data"];
   for (const key of keys) {
     if (Array.isArray(raw[key])) return raw[key];
   }
@@ -113,7 +122,8 @@ const loadExtras = async () => {
         empresa_id: context.empresa_id,
         tenant_id: context.empresa_id,
         usuario_id: context.user?.id || context.user?.user_id,
-        rol: context.rol
+        rol: context.rol,
+        timestamp: getTimestamp()
       })
     });
 
@@ -124,7 +134,7 @@ const loadExtras = async () => {
     extrasPanel.innerHTML = "";
 
     extras.forEach((item) => {
-      const id = String(item.id ?? item.codigo ?? item.key ?? "");
+      const id = String(item.id ?? item.Id ?? item.ID ?? item.codigo ?? item.key ?? "");
       if (!id) return;
       const nombre = item.nombre ?? item.name ?? item.descripcion ?? id;
       const visible = settings[id] !== false;

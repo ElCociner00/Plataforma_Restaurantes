@@ -2,7 +2,7 @@
 export const PERMISSIONS = {
   dashboard: ["admin_root", "admin", "revisor"],
   cierre_turno: ["admin_root", "admin", "operativo", "revisor"],
-  historico_cierre_turno: ["admin_root", "admin", "operativo", "revisor"],
+  historico_cierre_turno: ["admin_root", "admin", "revisor"],
   cierre_inventarios: ["admin_root", "admin", "operativo", "revisor"],
   configuracion: ["admin_root", "admin"],
   loggro: ["admin_root", "admin"],
