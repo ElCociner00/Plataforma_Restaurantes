@@ -15,6 +15,7 @@ const bulkButtons = document.querySelectorAll(".bulk-actions button");
 
 let state = { pages: [], empleados: [] };
 let userContext = null;
+const getTimestamp = () => new Date().toISOString();
 
 // ===============================
 // UTILIDADES
@@ -85,7 +86,10 @@ const persistPermissionChange = async ({ empleadoId, page, value }) => {
         page,
         allowed: value,
         empresa_id: userContext?.empresa_id,
-        actualizado_por: userContext?.user?.id || userContext?.user?.user_id
+        tenant_id: userContext?.empresa_id,
+        usuario_id: userContext?.user?.id || userContext?.user?.user_id,
+        actualizado_por: userContext?.user?.id || userContext?.user?.user_id,
+        timestamp: getTimestamp()
       })
     });
   } catch (err) {
@@ -158,7 +162,10 @@ const loadPermissions = async () => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       empresa_id: userContext?.empresa_id,
-      solicitado_por: userContext?.user?.id || userContext?.user?.user_id
+      tenant_id: userContext?.empresa_id,
+      usuario_id: userContext?.user?.id || userContext?.user?.user_id,
+      solicitado_por: userContext?.user?.id || userContext?.user?.user_id,
+      timestamp: getTimestamp()
     })
   });
 
