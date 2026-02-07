@@ -1,8 +1,5 @@
 import { getUserContext } from "./session.js";
-import {
-  WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS,
-  WEBHOOK_HISTORICO_CIERRE_TURNO_COLUMNAS
-} from "./webhooks.js";
+import { WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS } from "./webhooks.js";
 
 const head = document.getElementById("historicoHead");
 const body = document.getElementById("historicoBody");
@@ -419,7 +416,7 @@ const loadInitialData = async () => {
     return;
   }
 
-  setLoading(true, "Cargando configuración de columnas...");
+  setLoading(true, "Cargando histórico...");
 
   try {
     const payload = {
@@ -433,14 +430,6 @@ const loadInitialData = async () => {
     const visibilitySettings = loadVisibilitySettings(payload.tenant_id);
     const orderSettings = loadOrderSettings(payload.tenant_id);
 
-    setStatus("Consultando columnas dinámicas...");
-    const columnsRes = await fetchWithTimeout(WEBHOOK_HISTORICO_CIERRE_TURNO_COLUMNAS, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    const columnsData = await columnsRes.json();
-
     setStatus("Consultando datos históricos...");
     const rowsRes = await fetchWithTimeout(WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS, {
       method: "POST",
@@ -449,12 +438,11 @@ const loadInitialData = async () => {
     });
     const rowsData = await rowsRes.json();
 
-    const webhookColumns = normalizeColumns(columnsData);
     const rows = normalizeRows(rowsData);
     const inferredColumns = inferColumnsFromRows(rows);
 
     state.allRows = rows;
-    state.allColumns = mergeColumns([...new Set([...webhookColumns, ...inferredColumns])], orderSettings);
+    state.allColumns = mergeColumns([...new Set(inferredColumns)], orderSettings);
     state.visibleColumns = state.allColumns.filter((column) => visibilitySettings[column] !== false);
 
     if (!state.visibleColumns.length) {

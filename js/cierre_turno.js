@@ -431,6 +431,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     inputsSoloVista.propina.value = "";
     inputsSoloVista.domicilios.value = "";
+    extrasRows.forEach((row) => {
+      row.value = 0;
+      if (row.input) {
+        row.input.value = "0";
+      }
+    });
     Object.values(inputsDiferencias).forEach(({ input, nota }) => {
       input.value = "";
       input.classList.remove("diff-faltante", "diff-sobrante", "diff-ok");
