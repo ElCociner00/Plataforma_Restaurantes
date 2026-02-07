@@ -15,6 +15,7 @@ const statusDiv = document.getElementById("status");
 const nitInput = document.getElementById("nit_empresa");
 const cedulaInput = document.getElementById("cedula");
 const emailInput = document.getElementById("email");
+const getTimestamp = () => new Date().toISOString();
 
 enforceNumericInput([nitInput, cedulaInput]);
 
@@ -46,7 +47,10 @@ form.addEventListener("submit", async (e) => {
     email: emailValue,
     password: document.getElementById("password").value,
     empresa_id: context.empresa_id,
-    registrado_por: context.user?.id || context.user?.user_id
+    tenant_id: context.empresa_id,
+    usuario_id: context.user?.id || context.user?.user_id,
+    registrado_por: context.user?.id || context.user?.user_id,
+    timestamp: getTimestamp()
   };
 
   statusDiv.textContent = "Registrando empleado...";
