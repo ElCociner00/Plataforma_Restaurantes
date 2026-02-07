@@ -13,6 +13,7 @@ const DEFAULT_PAGES = [
   "cierre_inventarios",
   "configuracion"
 ];
+const getPermissionsStorageKey = (tenantId) => `permisos_por_usuario_${tenantId || "global"}`;
 
 // ===============================
 // ELEMENTOS
@@ -80,6 +81,15 @@ const setStatus = (message) => {
 };
 
 const persistPermissionChange = async ({ empleadoId, page, value }) => {
+  const storageKey = getPermissionsStorageKey(userContext?.empresa_id);
+  const stored = localStorage.getItem(storageKey);
+  const parsed = stored ? JSON.parse(stored) : {};
+  parsed[empleadoId] = {
+    ...(parsed[empleadoId] || {}),
+    [page]: value
+  };
+  localStorage.setItem(storageKey, JSON.stringify(parsed));
+
   if (!UPDATE_ENDPOINT) {
     setStatus("Configura UPDATE_ENDPOINT para guardar cambios.");
     return;
@@ -180,12 +190,17 @@ const loadPermissions = async () => {
       ? data.flatMap((item) => item.responsables || [])
       : data.responsables || [];
 
+    const storageKey = getPermissionsStorageKey(userContext?.empresa_id);
+    const stored = localStorage.getItem(storageKey);
+    const storedPermissions = stored ? JSON.parse(stored) : {};
+
     return {
       pages: DEFAULT_PAGES,
       empleados: responsables.map((item) => ({
         id: item.id ?? item.value ?? item,
         nombre: item.nombre ?? item.name ?? item,
-        rol: item.rol ?? item.role ?? ""
+        rol: item.rol ?? item.role ?? "",
+        permisos: storedPermissions[item.id ?? item.value ?? item] || {}
       }))
     };
   }
@@ -202,7 +217,18 @@ const loadPermissions = async () => {
     })
   });
 
-  return response.json();
+  const data = await response.json();
+  const storageKey = getPermissionsStorageKey(userContext?.empresa_id);
+  const stored = localStorage.getItem(storageKey);
+  const storedPermissions = stored ? JSON.parse(stored) : {};
+
+  return {
+    ...data,
+    empleados: (data.empleados || []).map((empleado) => ({
+      ...empleado,
+      permisos: storedPermissions[empleado.id] || empleado.permisos || {}
+    }))
+  };
 };
 
 // ===============================
