@@ -591,7 +591,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (error) {
       setStatus(error?.name === "AbortError"
         ? "La consulta de gastos tardó más de 5 segundos."
-        : "Error consultando gastos.");
+        : "Error consultando gastos/No hay gastos de caja  por obtener");
     }
   });
 
