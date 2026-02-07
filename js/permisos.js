@@ -1,10 +1,18 @@
 import { getUserContext } from "./session.js";
+import { WEBHOOK_LISTAR_RESPONSABLES } from "./webhooks.js";
 
 // ===============================
 // CONFIGURACIÓN
 // ===============================
 const DATA_ENDPOINT = "";
 const UPDATE_ENDPOINT = "";
+const DEFAULT_PAGES = [
+  "dashboard",
+  "cierre_turno",
+  "historico_cierre_turno",
+  "cierre_inventarios",
+  "configuracion"
+];
 
 // ===============================
 // ELEMENTOS
@@ -154,7 +162,32 @@ const loadPermissions = async () => {
   if (window.PERMISOS_DATA) return window.PERMISOS_DATA;
 
   if (!DATA_ENDPOINT) {
-    throw new Error("Configura DATA_ENDPOINT para cargar permisos.");
+    const response = await fetch(WEBHOOK_LISTAR_RESPONSABLES, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        empresa_id: userContext?.empresa_id,
+        tenant_id: userContext?.empresa_id,
+        usuario_id: userContext?.user?.id || userContext?.user?.user_id,
+        solicitado_por: userContext?.user?.id || userContext?.user?.user_id,
+        timestamp: getTimestamp(),
+        origen: "permisos"
+      })
+    });
+
+    const data = await response.json();
+    const responsables = Array.isArray(data)
+      ? data.flatMap((item) => item.responsables || [])
+      : data.responsables || [];
+
+    return {
+      pages: DEFAULT_PAGES,
+      empleados: responsables.map((item) => ({
+        id: item.id ?? item.value ?? item,
+        nombre: item.nombre ?? item.name ?? item,
+        rol: item.rol ?? item.role ?? ""
+      }))
+    };
   }
 
   const response = await fetch(DATA_ENDPOINT, {

@@ -207,6 +207,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
 
+  const buildExtrasPayload = () => (
+    Array.from(extrasRows.entries()).map(([id, row]) => ({
+      Id: id,
+      name: row.nombre,
+      valor: row.visible ? Number(row.value || 0) : 0,
+      visible: row.visible
+    }))
+  );
+
   const getContextPayload = async () => {
     const context = await getUserContext();
     if (!context) {
@@ -630,6 +639,7 @@ document.addEventListener("DOMContentLoaded", () => {
         domicilios: inputsSoloVista.domicilios.value || 0
       },
       comentarios: comentarios.value || "",
+      gastos_extras: buildExtrasPayload(),
       ...contextPayload
     };
 
@@ -762,6 +772,7 @@ document.addEventListener("DOMContentLoaded", () => {
       diferencias,
       propina: inputsSoloVista.propina.value || 0,
       domicilios: inputsSoloVista.domicilios.value || 0,
+      gastos_extras: buildExtrasPayload(),
       comentarios: comentarios.value || "",
       ...contextPayload
     };
