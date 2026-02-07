@@ -6,6 +6,7 @@ const body = document.getElementById("historicoBody");
 const status = document.getElementById("status");
 const paginacion = document.getElementById("paginacion");
 const loadingOverlay = document.getElementById("loadingOverlay");
+const columnasPanel = document.getElementById("columnasPanel");
 
 const filtroFechaDesde = document.getElementById("filtroFechaDesde");
 const filtroFechaHasta = document.getElementById("filtroFechaHasta");
@@ -84,6 +85,10 @@ const loadVisibilitySettings = (tenantId) => {
   } catch (error) {
     return {};
   }
+};
+
+const saveVisibilitySettings = (tenantId, settings) => {
+  localStorage.setItem(getVisibilityKey(tenantId), JSON.stringify(settings));
 };
 
 const loadOrderSettings = (tenantId) => {
@@ -362,10 +367,42 @@ const renderPagination = () => {
   paginacion.appendChild(next);
 };
 
+const renderColumnControls = () => {
+  if (!columnasPanel) return;
+  columnasPanel.innerHTML = "";
+
+  const settings = loadVisibilitySettings(state.context?.tenant_id);
+
+  state.allColumns.forEach((column) => {
+    const key = String(column);
+    const visible = settings[key] !== false;
+
+    const row = document.createElement("div");
+    row.className = "vis-row";
+    row.innerHTML = `
+      <span>${key}</span>
+      <label class="switch">
+        <input type="checkbox" data-column="${key}" ${visible ? "checked" : ""}>
+        <span class="slider"></span>
+      </label>
+    `;
+
+    row.querySelector("input")?.addEventListener("change", (event) => {
+      settings[key] = event.target.checked;
+      saveVisibilitySettings(state.context?.tenant_id, settings);
+      state.visibleColumns = state.allColumns.filter((col) => settings[col] !== false);
+      renderTable();
+    });
+
+    columnasPanel.appendChild(row);
+  });
+};
+
 const renderTable = () => {
   renderHead();
   renderBody();
   renderPagination();
+  renderColumnControls();
   setStatus(`Mostrando ${state.filteredRows.length} fila(s). Página ${state.currentPage}.`);
 };
 
