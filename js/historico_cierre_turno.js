@@ -1,8 +1,5 @@
 import { getUserContext } from "./session.js";
-import {
-  WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS,
-  WEBHOOK_HISTORICO_CIERRE_TURNO_COLUMNAS
-} from "./webhooks.js";
+import { WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS } from "./webhooks.js";
 
 const head = document.getElementById("historicoHead");
 const body = document.getElementById("historicoBody");
@@ -24,6 +21,7 @@ const btnDescargarFila = document.getElementById("descargarFila");
 
 const PAGE_SIZE = 20;
 const MAX_LOADING_MS = 5000;
+const getTimestamp = () => new Date().toISOString();
 
 let loadingSafetyTimeoutId = null;
 
@@ -371,20 +369,39 @@ const renderTable = () => {
   setStatus(`Mostrando ${state.filteredRows.length} fila(s). Página ${state.currentPage}.`);
 };
 
+const escapeHtml = (value) => (
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#039;")
+);
+
 const buildExcelBlob = (rows) => {
   const headers = ["#", ...state.visibleColumns];
-  const lines = [headers.join("\t")];
+  const headCells = headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("");
 
-  rows.forEach((row, idx) => {
+  const bodyRows = rows.map((row, idx) => {
     const rowNumber = String(idx + 1);
-    const values = state.visibleColumns.map((col) => {
-      const value = formatCellValue(row[col]).replace(/\t|\n/g, " ");
-      return value;
-    });
-    lines.push([rowNumber, ...values].join("\t"));
-  });
+    const values = state.visibleColumns.map((col) => escapeHtml(formatCellValue(row[col])));
+    const cells = [rowNumber, ...values].map((value) => `<td>${value}</td>`).join("");
+    return `<tr>${cells}</tr>`;
+  }).join("");
 
-  return new Blob([`\uFEFF${lines.join("\n")}`], {
+  const html = `
+    <html>
+      <head><meta charset="utf-8" /></head>
+      <body>
+        <table>
+          <thead><tr>${headCells}</tr></thead>
+          <tbody>${bodyRows}</tbody>
+        </table>
+      </body>
+    </html>
+  `.trim();
+
+  return new Blob([html], {
     type: "application/vnd.ms-excel;charset=utf-8;"
   });
 };
@@ -418,26 +435,19 @@ const loadInitialData = async () => {
     return;
   }
 
-  setLoading(true, "Cargando configuración de columnas...");
+  setLoading(true, "Cargando histórico...");
 
   try {
     const payload = {
       tenant_id: state.context.empresa_id,
       empresa_id: state.context.empresa_id,
       usuario_id: state.context.user?.id || state.context.user?.user_id,
-      rol: state.context.rol
+      rol: state.context.rol,
+      timestamp: getTimestamp()
     };
 
     const visibilitySettings = loadVisibilitySettings(payload.tenant_id);
     const orderSettings = loadOrderSettings(payload.tenant_id);
-
-    setStatus("Consultando columnas dinámicas...");
-    const columnsRes = await fetchWithTimeout(WEBHOOK_HISTORICO_CIERRE_TURNO_COLUMNAS, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    const columnsData = await columnsRes.json();
 
     setStatus("Consultando datos históricos...");
     const rowsRes = await fetchWithTimeout(WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS, {
@@ -447,12 +457,11 @@ const loadInitialData = async () => {
     });
     const rowsData = await rowsRes.json();
 
-    const webhookColumns = normalizeColumns(columnsData);
     const rows = normalizeRows(rowsData);
     const inferredColumns = inferColumnsFromRows(rows);
 
     state.allRows = rows;
-    state.allColumns = mergeColumns([...new Set([...webhookColumns, ...inferredColumns])], orderSettings);
+    state.allColumns = mergeColumns([...new Set(inferredColumns)], orderSettings);
     state.visibleColumns = state.allColumns.filter((column) => visibilitySettings[column] !== false);
 
     if (!state.visibleColumns.length) {

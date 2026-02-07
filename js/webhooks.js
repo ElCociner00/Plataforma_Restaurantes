@@ -77,6 +77,10 @@ export const WEBHOOK_HISTORICO_CIERRE_TURNO_COLUMNAS =
 export const WEBHOOK_CONSULTAR_GASTOS =
   "https://n8n.globalnexoshop.com/webhook/consultar_gastos";
 
+// cierre_turno/index.html (auto-carga catálogo de gastos extras para labels dinámicos)
+export const WEBHOOK_CONSULTAR_GASTOS_CATALOGO =
+  "https://n8n.globalnexoshop.com/webhook/consultar_gastos_catalogo";
+
 // configuracion/visualizacion_cierre_turno.html (webhook: "Consultar gastos" para traer gastos extras)
 export const WEBHOOK_CONSULTAR_GASTOS_VISUALIZACION =
   "https://n8n.globalnexoshop.com/webhook/consultar_gastos_visualizacion";
