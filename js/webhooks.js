@@ -67,11 +67,7 @@ export const WEBHOOK_CIERRE_INVENTARIOS_VISUALIZACION_PRODUCTOS =
 
 // cierre_turno/historico_cierre_turno.html (auto-carga histórico consolidado de cierres de turno)
 export const WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS =
-  "https://n8n.globalnexoshop.com/webhook/historico_cierre_turno_datos";
-
-// configuracion/visualizacion_cierre_turno_historico.html (auto-carga columnas disponibles del histórico)
-export const WEBHOOK_HISTORICO_CIERRE_TURNO_COLUMNAS =
-  "https://n8n.globalnexoshop.com/webhook/historico_cierre_turno_columnas";
+  "https://n8n.globalnexoshop.com/webhook/cierre_turno_historico";
 
 // cierre_turno/index.html (botón: "Consultar gastos" para traer gastos extras)
 export const WEBHOOK_CONSULTAR_GASTOS =
