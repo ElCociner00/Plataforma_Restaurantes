@@ -14,6 +14,7 @@ const statusDiv = document.getElementById("status");
 const cedulaInput = document.getElementById("cedula");
 const emailInput = document.getElementById("email");
 const rolSelect = document.getElementById("rol");
+const getTimestamp = () => new Date().toISOString();
 
 enforceNumericInput([cedulaInput]);
 
@@ -51,7 +52,10 @@ form.addEventListener("submit", async (e) => {
     password: document.getElementById("password").value,
     rol: rolSelect.value,
     empresa_id: context.empresa_id,
-    registrado_por: context.user?.id || context.user?.user_id
+    tenant_id: context.empresa_id,
+    usuario_id: context.user?.id || context.user?.user_id,
+    registrado_por: context.user?.id || context.user?.user_id,
+    timestamp: getTimestamp()
   };
 
   statusDiv.textContent = "Enviando registro...";

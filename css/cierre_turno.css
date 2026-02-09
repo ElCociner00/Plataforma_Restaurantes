@@ -7,6 +7,28 @@
   margin-bottom: 24px;
 }
 
+.turno-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.turno-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.88rem;
+}
+
+.apertura-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.88rem;
+  max-width: 240px;
+}
+
 /* Grid financiero */
 .finanzas-grid {
   display: grid;

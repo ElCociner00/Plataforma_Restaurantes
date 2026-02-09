@@ -1,10 +1,19 @@
 import { getUserContext } from "./session.js";
+import { WEBHOOK_LISTAR_RESPONSABLES } from "./webhooks.js";
 
 // ===============================
 // CONFIGURACIÓN
 // ===============================
 const DATA_ENDPOINT = "";
 const UPDATE_ENDPOINT = "";
+const DEFAULT_PAGES = [
+  "dashboard",
+  "cierre_turno",
+  "historico_cierre_turno",
+  "cierre_inventarios",
+  "configuracion"
+];
+const getPermissionsStorageKey = (tenantId) => `permisos_por_usuario_${tenantId || "global"}`;
 
 // ===============================
 // ELEMENTOS
@@ -15,6 +24,7 @@ const bulkButtons = document.querySelectorAll(".bulk-actions button");
 
 let state = { pages: [], empleados: [] };
 let userContext = null;
+const getTimestamp = () => new Date().toISOString();
 
 // ===============================
 // UTILIDADES
@@ -71,6 +81,15 @@ const setStatus = (message) => {
 };
 
 const persistPermissionChange = async ({ empleadoId, page, value }) => {
+  const storageKey = getPermissionsStorageKey(userContext?.empresa_id);
+  const stored = localStorage.getItem(storageKey);
+  const parsed = stored ? JSON.parse(stored) : {};
+  parsed[empleadoId] = {
+    ...(parsed[empleadoId] || {}),
+    [page]: value
+  };
+  localStorage.setItem(storageKey, JSON.stringify(parsed));
+
   if (!UPDATE_ENDPOINT) {
     setStatus("Configura UPDATE_ENDPOINT para guardar cambios.");
     return;
@@ -85,7 +104,10 @@ const persistPermissionChange = async ({ empleadoId, page, value }) => {
         page,
         allowed: value,
         empresa_id: userContext?.empresa_id,
-        actualizado_por: userContext?.user?.id || userContext?.user?.user_id
+        tenant_id: userContext?.empresa_id,
+        usuario_id: userContext?.user?.id || userContext?.user?.user_id,
+        actualizado_por: userContext?.user?.id || userContext?.user?.user_id,
+        timestamp: getTimestamp()
       })
     });
   } catch (err) {
@@ -150,7 +172,37 @@ const loadPermissions = async () => {
   if (window.PERMISOS_DATA) return window.PERMISOS_DATA;
 
   if (!DATA_ENDPOINT) {
-    throw new Error("Configura DATA_ENDPOINT para cargar permisos.");
+    const response = await fetch(WEBHOOK_LISTAR_RESPONSABLES, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        empresa_id: userContext?.empresa_id,
+        tenant_id: userContext?.empresa_id,
+        usuario_id: userContext?.user?.id || userContext?.user?.user_id,
+        solicitado_por: userContext?.user?.id || userContext?.user?.user_id,
+        timestamp: getTimestamp(),
+        origen: "permisos"
+      })
+    });
+
+    const data = await response.json();
+    const responsables = Array.isArray(data)
+      ? data.flatMap((item) => item.responsables || [])
+      : data.responsables || [];
+
+    const storageKey = getPermissionsStorageKey(userContext?.empresa_id);
+    const stored = localStorage.getItem(storageKey);
+    const storedPermissions = stored ? JSON.parse(stored) : {};
+
+    return {
+      pages: DEFAULT_PAGES,
+      empleados: responsables.map((item) => ({
+        id: item.id ?? item.value ?? item,
+        nombre: item.nombre ?? item.name ?? item,
+        rol: item.rol ?? item.role ?? "",
+        permisos: storedPermissions[item.id ?? item.value ?? item] || {}
+      }))
+    };
   }
 
   const response = await fetch(DATA_ENDPOINT, {
@@ -158,11 +210,25 @@ const loadPermissions = async () => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       empresa_id: userContext?.empresa_id,
-      solicitado_por: userContext?.user?.id || userContext?.user?.user_id
+      tenant_id: userContext?.empresa_id,
+      usuario_id: userContext?.user?.id || userContext?.user?.user_id,
+      solicitado_por: userContext?.user?.id || userContext?.user?.user_id,
+      timestamp: getTimestamp()
     })
   });
 
-  return response.json();
+  const data = await response.json();
+  const storageKey = getPermissionsStorageKey(userContext?.empresa_id);
+  const stored = localStorage.getItem(storageKey);
+  const storedPermissions = stored ? JSON.parse(stored) : {};
+
+  return {
+    ...data,
+    empleados: (data.empleados || []).map((empleado) => ({
+      ...empleado,
+      permisos: storedPermissions[empleado.id] || empleado.permisos || {}
+    }))
+  };
 };
 
 // ===============================

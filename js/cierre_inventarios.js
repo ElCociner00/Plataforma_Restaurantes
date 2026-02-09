@@ -50,6 +50,7 @@ const setLoading = (isLoading, message = "") => {
 };
 
 const MAX_LOADING_MS = 5000;
+const getTimestamp = () => new Date().toISOString();
 
 const fetchWithTimeout = async (url, options = {}, timeoutMs = MAX_LOADING_MS) => {
   const controller = new AbortController();
@@ -72,7 +73,8 @@ const getContextPayload = async () => {
     tenant_id: context.empresa_id,
     empresa_id: context.empresa_id,
     usuario_id: context.user?.id || context.user?.user_id,
-    rol: context.rol
+    rol: context.rol,
+    timestamp: getTimestamp()
   };
 };
 
