@@ -39,6 +39,38 @@
   gap: 10px;
 }
 
+.columnas-desplegable {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #fff;
+}
+
+.columnas-desplegable summary {
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+}
+
+.columnas-desplegable summary::-webkit-details-marker {
+  display: none;
+}
+
+.columnas-desplegable summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 8px;
+  transition: transform 0.2s ease;
+}
+
+.columnas-desplegable[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.columnas-desplegable .hint {
+  margin-top: 8px;
+}
+
 .vis-row {
   display: flex;
   align-items: center;
