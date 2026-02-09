@@ -5,7 +5,8 @@ import {
   WEBHOOK_LISTAR_RESPONSABLES,
   WEBHOOK_SUBIR_CIERRE,
   WEBHOOK_VERIFICAR_CIERRE,
-  WEBHOOK_CONSULTAR_GASTOS
+  WEBHOOK_CONSULTAR_GASTOS,
+  WEBHOOK_CONSULTAR_GASTOS_CATALOGO
 } from "./webhooks.js";
 
 // ../js/cierre_turno.js
@@ -15,6 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const responsable = document.getElementById("responsable");
   const horaInicio = document.getElementById("hora_inicio");
   const horaFin = document.getElementById("hora_fin");
+  const efectivoApertura = document.getElementById("efectivo_apertura");
   const status = document.getElementById("status");
   const extrasList = document.getElementById("extrasList");
 
@@ -93,6 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const EXTRAS_STORAGE_KEY = "cierre_turno_extras_visibilidad";
   const MAX_LOADING_MS = 5000;
   const extrasRows = new Map();
+  const getTimestamp = () => new Date().toISOString();
 
   enforceNumericInput([
     inputsFinanzas.efectivo.sistema,
@@ -107,6 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
     inputsFinanzas.transferencias.real,
     inputsFinanzas.bono_regalo.sistema,
     inputsFinanzas.bono_regalo.real,
+    efectivoApertura,
     inputsSoloVista.propina,
     inputsSoloVista.domicilios,
   ]);
@@ -136,13 +140,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (Array.isArray(raw)) {
       if (!raw.length) return [];
-      if (raw[0] && typeof raw[0] === "object") return raw;
-      return [];
+      const nested = raw.flatMap((item) => {
+        if (!item || typeof item !== "object") return [];
+        if (Array.isArray(item.Gastos)) return item.Gastos;
+        if (Array.isArray(item.gastos)) return item.gastos;
+        if (Array.isArray(item.extras)) return item.extras;
+        if (Array.isArray(item.items)) return item.items;
+        if (Array.isArray(item.data)) return item.data;
+        return [item];
+      });
+      return nested.filter((item) => item && typeof item === "object");
     }
 
     if (typeof raw !== "object") return [];
 
-    const keys = ["gastos", "extras", "items", "data"];
+    const keys = ["Gastos", "gastos", "extras", "items", "data"];
     for (const key of keys) {
       if (Array.isArray(raw[key])) return raw[key];
     }
@@ -170,7 +182,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const visibility = getExtrasVisibilitySettings();
 
     extras.forEach((item) => {
-      const id = String(item.id ?? item.codigo ?? item.key ?? "");
+      const id = String(item.id ?? item.Id ?? item.ID ?? item.codigo ?? item.key ?? "");
       if (!id) return;
 
       const nombre = item.nombre ?? item.name ?? item.descripcion ?? id;
@@ -197,6 +209,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
 
+  const buildExtrasPayload = () => (
+    Array.from(extrasRows.entries()).map(([id, row]) => ({
+      Id: id,
+      name: row.nombre,
+      valor: row.visible ? Number(row.value || 0) : 0,
+      visible: row.visible
+    }))
+  );
+
   const getContextPayload = async () => {
     const context = await getUserContext();
     if (!context) {
@@ -209,7 +230,8 @@ document.addEventListener("DOMContentLoaded", () => {
       tenant_id: context.empresa_id,
       usuario_id: context.user?.id || context.user?.user_id,
       rol: context.rol,
-      registrado_por: context.user?.id || context.user?.user_id
+      registrado_por: context.user?.id || context.user?.user_id,
+      timestamp: getTimestamp()
     };
   };
 
@@ -249,7 +271,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const contextPayload = await getContextPayload();
       if (!contextPayload) return;
 
-      const res = await fetchWithTimeout(WEBHOOK_CONSULTAR_GASTOS, {
+      const res = await fetchWithTimeout(WEBHOOK_CONSULTAR_GASTOS_CATALOGO, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(contextPayload)
@@ -411,6 +433,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     inputsSoloVista.propina.value = "";
     inputsSoloVista.domicilios.value = "";
+    if (efectivoApertura) {
+      efectivoApertura.value = "";
+    }
+    extrasRows.forEach((row) => {
+      row.value = 0;
+      if (row.input) {
+        row.input.value = "0";
+      }
+    });
     Object.values(inputsDiferencias).forEach(({ input, nota }) => {
       input.value = "";
       input.classList.remove("diff-faltante", "diff-sobrante", "diff-ok");
@@ -554,7 +585,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       extras.forEach((item) => {
-        const id = String(item.id ?? item.codigo ?? item.key ?? "");
+        const id = String(item.id ?? item.Id ?? item.ID ?? item.codigo ?? item.key ?? "");
         if (!id) return;
         const row = extrasRows.get(id);
         if (!row) return;
@@ -578,6 +609,11 @@ document.addEventListener("DOMContentLoaded", () => {
   btnVerificar.addEventListener("click", async () => {
     setStatus("Verificando...");
 
+    if (!efectivoApertura?.value) {
+      setStatus("⚠️ Completa el efectivo de apertura.");
+      return;
+    }
+
     const contextPayload = await getContextPayload();
     if (!contextPayload) return;
 
@@ -591,6 +627,7 @@ document.addEventListener("DOMContentLoaded", () => {
         fin_momento: getMomentoDia(horaFin.value)
       },
       finanzas: {
+        efectivo_apertura: efectivoApertura.value || 0,
         efectivo: {
           sistema: inputsFinanzas.efectivo.sistema.value || 0,
           real: inputsFinanzas.efectivo.real.value || 0
@@ -619,6 +656,8 @@ document.addEventListener("DOMContentLoaded", () => {
         domicilios: inputsSoloVista.domicilios.value || 0
       },
       comentarios: comentarios.value || "",
+      efectivo_apertura: efectivoApertura.value || 0,
+      gastos_extras: buildExtrasPayload(),
       ...contextPayload
     };
 
@@ -681,6 +720,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const contextPayload = await getContextPayload();
     if (!contextPayload) return null;
 
+    if (!efectivoApertura?.value) {
+      setStatus("⚠️ Completa el efectivo de apertura.");
+      return null;
+    }
+
     const fechaCompleta = formatFechaCompleta(fecha.value);
     const sistemas = {
       efectivo_sistema: inputsFinanzas.efectivo.sistema.value || 0,
@@ -719,6 +763,7 @@ document.addEventListener("DOMContentLoaded", () => {
         fecha_fin: fechaCompleta
       },
       finanzas: {
+        efectivo_apertura: efectivoApertura.value || 0,
         efectivo: {
           sistema: inputsFinanzas.efectivo.sistema.value || 0,
           real: inputsFinanzas.efectivo.real.value || 0
@@ -751,6 +796,8 @@ document.addEventListener("DOMContentLoaded", () => {
       diferencias,
       propina: inputsSoloVista.propina.value || 0,
       domicilios: inputsSoloVista.domicilios.value || 0,
+      efectivo_apertura: efectivoApertura.value || 0,
+      gastos_extras: buildExtrasPayload(),
       comentarios: comentarios.value || "",
       ...contextPayload
     };

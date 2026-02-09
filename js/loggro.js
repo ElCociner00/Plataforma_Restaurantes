@@ -5,6 +5,7 @@ const form = document.getElementById("loggroForm");
 const tokenInput = document.getElementById("loggroToken");
 const urlInput = document.getElementById("loggroUrl");
 const status = document.getElementById("status");
+const getTimestamp = () => new Date().toISOString();
 
 const setStatus = (message) => {
   status.textContent = message;
@@ -22,7 +23,10 @@ form.addEventListener("submit", async (event) => {
 
   const payload = {
     empresa_id: context.empresa_id,
+    tenant_id: context.empresa_id,
+    usuario_id: context.user?.id || context.user?.user_id,
     registrado_por: context.user?.id || context.user?.user_id,
+    timestamp: getTimestamp(),
     token: tokenInput.value.trim(),
     url: urlInput.value.trim()
   };
