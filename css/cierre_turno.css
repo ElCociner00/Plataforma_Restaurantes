@@ -24,9 +24,17 @@
 .apertura-row label {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   font-size: 0.88rem;
   max-width: 240px;
+}
+
+.apertura-row {
+  margin-top: 10px;
+}
+
+.apertura-row input {
+  width: 100%;
 }
 
 /* Grid financiero */
