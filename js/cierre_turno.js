@@ -16,6 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const responsable = document.getElementById("responsable");
   const horaInicio = document.getElementById("hora_inicio");
   const horaFin = document.getElementById("hora_fin");
+  const efectivoApertura = document.getElementById("efectivo_apertura");
   const status = document.getElementById("status");
   const extrasList = document.getElementById("extrasList");
 
@@ -109,6 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
     inputsFinanzas.transferencias.real,
     inputsFinanzas.bono_regalo.sistema,
     inputsFinanzas.bono_regalo.real,
+    efectivoApertura,
     inputsSoloVista.propina,
     inputsSoloVista.domicilios,
   ]);
@@ -431,6 +433,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     inputsSoloVista.propina.value = "";
     inputsSoloVista.domicilios.value = "";
+    if (efectivoApertura) {
+      efectivoApertura.value = "";
+    }
     extrasRows.forEach((row) => {
       row.value = 0;
       if (row.input) {
@@ -604,6 +609,11 @@ document.addEventListener("DOMContentLoaded", () => {
   btnVerificar.addEventListener("click", async () => {
     setStatus("Verificando...");
 
+    if (!efectivoApertura?.value) {
+      setStatus("⚠️ Completa el efectivo de apertura.");
+      return;
+    }
+
     const contextPayload = await getContextPayload();
     if (!contextPayload) return;
 
@@ -617,6 +627,7 @@ document.addEventListener("DOMContentLoaded", () => {
         fin_momento: getMomentoDia(horaFin.value)
       },
       finanzas: {
+        efectivo_apertura: efectivoApertura.value || 0,
         efectivo: {
           sistema: inputsFinanzas.efectivo.sistema.value || 0,
           real: inputsFinanzas.efectivo.real.value || 0
@@ -645,6 +656,7 @@ document.addEventListener("DOMContentLoaded", () => {
         domicilios: inputsSoloVista.domicilios.value || 0
       },
       comentarios: comentarios.value || "",
+      efectivo_apertura: efectivoApertura.value || 0,
       gastos_extras: buildExtrasPayload(),
       ...contextPayload
     };
@@ -708,6 +720,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const contextPayload = await getContextPayload();
     if (!contextPayload) return null;
 
+    if (!efectivoApertura?.value) {
+      setStatus("⚠️ Completa el efectivo de apertura.");
+      return null;
+    }
+
     const fechaCompleta = formatFechaCompleta(fecha.value);
     const sistemas = {
       efectivo_sistema: inputsFinanzas.efectivo.sistema.value || 0,
@@ -746,6 +763,7 @@ document.addEventListener("DOMContentLoaded", () => {
         fecha_fin: fechaCompleta
       },
       finanzas: {
+        efectivo_apertura: efectivoApertura.value || 0,
         efectivo: {
           sistema: inputsFinanzas.efectivo.sistema.value || 0,
           real: inputsFinanzas.efectivo.real.value || 0
@@ -778,6 +796,7 @@ document.addEventListener("DOMContentLoaded", () => {
       diferencias,
       propina: inputsSoloVista.propina.value || 0,
       domicilios: inputsSoloVista.domicilios.value || 0,
+      efectivo_apertura: efectivoApertura.value || 0,
       gastos_extras: buildExtrasPayload(),
       comentarios: comentarios.value || "",
       ...contextPayload
