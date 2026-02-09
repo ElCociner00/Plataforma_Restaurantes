@@ -32,8 +32,23 @@
       </select>
 
       <h4>Turno</h4>
-      <input id="hora_inicio" type="time">
-      <input id="hora_fin" type="time">
+      <div class="turno-grid">
+        <label>
+          Hora inicio
+          <input id="hora_inicio" type="time">
+        </label>
+        <label>
+          Hora fin
+          <input id="hora_fin" type="time">
+        </label>
+      </div>
+
+      <div class="apertura-row">
+        <label>
+          Efectivo Apertura
+          <input id="efectivo_apertura" type="text" inputmode="numeric" pattern="[0-9]*">
+        </label>
+      </div>
     </section>
 
     <section class="bloque">
