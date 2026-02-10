@@ -47,7 +47,7 @@ export const WEBHOOK_REGISTRO_CREDENCIALES =
 
 // cierre_inventarios/index.html (auto-carga al abrir pestaña: traer productos)
 export const WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS =
-  "https://n8n.globalnexoshop.com/webhook/consultar_inventarios_productos";
+  "https://n8n.globalnexoshop.com/webhook/consultar_inventarios_ingredientes";
 
 // cierre_inventarios/index.html (botón: "Consultar" para traer stock por producto)
 export const WEBHOOK_CIERRE_INVENTARIOS_CONSULTAR =
