@@ -21,8 +21,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const caja = document.getElementById("caja");
   const status = document.getElementById("status");
   const extrasList = document.getElementById("extrasList");
-  const efectivoRealResumenValor = document.getElementById("efectivoRealResumenValor");
-
   const btnConsultar = document.getElementById("consultarDatos");
   const btnConsultarGastos = document.getElementById("consultarGastos");
   const btnVerificar = document.getElementById("verificar");
@@ -108,9 +106,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const total = toNumberValue(bolsa?.value) + toNumberValue(caja?.value);
     inputsFinanzas.efectivo.real.value = String(total);
 
-    if (efectivoRealResumenValor) {
-      efectivoRealResumenValor.textContent = String(total);
-    }
   };
 
   enforceNumericInput([
