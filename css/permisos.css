@@ -2,31 +2,101 @@
    PERMISOS
    =============================== */
 
+.permisos-main {
+  width: min(1220px, calc(100vw - 42px));
+  max-width: none;
+  padding: 30px 24px;
+}
+
+.permisos-main h1,
+.permisos-main .helper-text {
+  text-align: left;
+}
+
 .helper-text {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   color: #6b7280;
-  font-size: 0.95rem;
+  font-size: 0.98rem;
+}
+
+.permisos-note {
+  margin-bottom: 16px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #312e81;
+}
+
+.permisos-note p {
+  margin: 0;
+  text-align: left;
+  color: inherit;
+  font-size: 0.92rem;
+}
+
+.permisos-note p + p {
+  margin-top: 6px;
+}
+
+.resumen-permisos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.resumen-item {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.resumen-label {
+  display: block;
+  color: #6b7280;
+  font-size: 0.84rem;
+  margin-bottom: 4px;
 }
 
 .bulk-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
   gap: 10px;
   margin-bottom: 16px;
 }
 
 .bulk-actions button {
-  padding: 8px 12px;
+  padding: 10px 12px;
   border-radius: 6px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
+  border: 1px solid #4338ca;
+  background: #4f46e5;
+  color: #ffffff;
   cursor: pointer;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.bulk-actions button:hover {
+  background: #4338ca;
+}
+
+.bulk-actions button[data-action="revoke"] {
+  background: #312e81;
+  border-color: #312e81;
+}
+
+.bulk-actions button[data-action="revoke"]:hover {
+  background: #1f1c63;
 }
 
 .permisos-table {
-  overflow-x: auto;
+  overflow: auto;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
+  background: #ffffff;
+  max-height: 65vh;
 }
 
 .permisos-table .empty {
@@ -37,19 +107,27 @@
 .permisos-table table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 720px;
+  min-width: 980px;
 }
 
 .permisos-table th,
 .permisos-table td {
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-bottom: 1px solid #f3f4f6;
   text-align: left;
   font-size: 0.95rem;
 }
 
 .permisos-table th {
-  background: #f9fafb;
+  background: #eef2ff;
+  color: #312e81;
+  font-weight: 700;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.permisos-table td:first-child {
   font-weight: 600;
 }
 
@@ -57,16 +135,95 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  cursor: pointer;
 }
 
 .permiso-switch input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.switch-slider {
+  width: 46px;
+  height: 25px;
+  background: #c7d2fe;
+  border-radius: 999px;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.switch-slider::before {
+  content: "";
+  position: absolute;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  top: 3px;
+  left: 3px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.permiso-switch input[type="checkbox"]:checked + .switch-slider {
+  background: #312e81;
+}
+
+.permiso-switch input[type="checkbox"]:checked + .switch-slider::before {
+  transform: translateX(21px);
+}
+
+.permiso-switch input[type="checkbox"]:focus-visible + .switch-slider {
+  outline: 2px solid #4338ca;
+  outline-offset: 2px;
+}
+
+.switch-state {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #374151;
+  min-width: 24px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .status {
   margin-top: 12px;
-  font-size: 0.9rem;
-  color: #374151;
+  font-size: 0.88rem;
+  color: #312e81;
+  text-align: left;
+}
+
+@media (max-width: 768px) {
+  .permisos-main {
+    width: calc(100vw - 20px);
+    margin: 24px auto;
+    padding: 20px 12px;
+  }
+
+  .bulk-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .permisos-table {
+    max-height: none;
+  }
+
+  .permisos-table th,
+  .permisos-table td {
+    font-size: 0.9rem;
+    padding: 10px;
+  }
 }
