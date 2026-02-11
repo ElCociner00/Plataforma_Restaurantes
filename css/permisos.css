@@ -228,32 +228,3 @@
     padding: 10px;
   }
 }
-
-@media (max-width: 768px) {
-  .permisos-main {
-    width: calc(100vw - 24px);
-    margin: 24px auto;
-    padding: 20px 14px;
-  }
-
-  .permisos-table {
-    max-height: none;
-  }
-
-  .permisos-table th,
-  .permisos-table td {
-    font-size: 0.9rem;
-    padding: 10px;
-  }
-
-  .permisos-table th:first-child,
-  .permisos-table td:first-child {
-    min-width: 160px;
-  }
-
-  .permisos-table th:nth-child(2),
-  .permisos-table td:nth-child(2) {
-    left: 160px;
-    min-width: 100px;
-  }
-}
