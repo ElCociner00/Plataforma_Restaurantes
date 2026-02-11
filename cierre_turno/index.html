@@ -43,10 +43,27 @@
         </label>
       </div>
 
-      <div class="apertura-row">
+      <div class="apertura-grid">
         <label>
           Efectivo Apertura
           <input id="efectivo_apertura" type="text" inputmode="numeric" pattern="[0-9]*">
+        </label>
+
+        <div class="apertura-note" id="efectivoRealResumen">
+          <span class="note-label">Efectivo real automático</span>
+          <strong id="efectivoRealResumenValor">Bolsa + Caja</strong>
+          <small>Se actualiza automáticamente para verificación.</small>
+        </div>
+      </div>
+
+      <div class="contables-extra-grid contables-principales-grid">
+        <label>
+          Bolsa
+          <input id="bolsa" type="text" inputmode="numeric" pattern="[0-9]*">
+        </label>
+        <label>
+          Caja
+          <input id="caja" type="text" inputmode="numeric" pattern="[0-9]*">
         </label>
       </div>
     </section>
@@ -63,7 +80,7 @@
     <div class="finanzas-row" data-field="efectivo">
       <div class="row-title">Efectivo</div>
       <input id="efectivo_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
-      <input id="efectivo_real" type="text" inputmode="numeric" pattern="[0-9]*">
+      <input id="efectivo_real" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
       <div class="diff-cell">
         <input id="efectivo_diferencia" type="text" inputmode="numeric" pattern="[0-9-]*" readonly class="diff-input">
         <div class="diff-note" id="efectivo_diferencia_nota"></div>
@@ -131,17 +148,6 @@
     </div>
   </div>
 
-  <div class="contables-extra-grid">
-    <label>
-      Bolsa
-      <input id="bolsa" type="text" inputmode="numeric" pattern="[0-9]*">
-    </label>
-    <label>
-      Caja
-      <input id="caja" type="text" inputmode="numeric" pattern="[0-9-]*" readonly>
-    </label>
-  </div>
-
   <textarea placeholder="Comentarios"></textarea>
     </section>
 
@@ -152,13 +158,8 @@
 
     <section class="bloque">
       <div class="acciones-cierre">
-        <div class="consultar-dropdown">
-          <button id="consultarToggle" type="button">Consultar ▾</button>
-          <div class="consultar-menu">
-            <button id="consultarDatos" type="button">Consultar datos</button>
-            <button id="consultarGastos" type="button">Consultar gastos</button>
-          </div>
-        </div>
+        <button id="consultarDatos" type="button">Consultar Loggro</button>
+        <button id="consultarGastos" type="button">Consultar gastos</button>
         <button id="verificar" disabled>Verificar</button>
         <button id="enviar" disabled>Subir cierre</button>
         <button id="limpiarDatos" type="button">Limpiar datos</button>

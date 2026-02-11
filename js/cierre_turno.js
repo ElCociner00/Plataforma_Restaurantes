@@ -21,8 +21,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const caja = document.getElementById("caja");
   const status = document.getElementById("status");
   const extrasList = document.getElementById("extrasList");
+  const efectivoRealResumenValor = document.getElementById("efectivoRealResumenValor");
 
-  const btnConsultarToggle = document.getElementById("consultarToggle");
   const btnConsultar = document.getElementById("consultarDatos");
   const btnConsultarGastos = document.getElementById("consultarGastos");
   const btnVerificar = document.getElementById("verificar");
@@ -98,6 +98,20 @@ document.addEventListener("DOMContentLoaded", () => {
   const MAX_LOADING_MS = 5000;
   const extrasRows = new Map();
   const getTimestamp = () => new Date().toISOString();
+
+  const toNumberValue = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const syncEfectivoRealFromCajaBolsa = () => {
+    const total = toNumberValue(bolsa?.value) + toNumberValue(caja?.value);
+    inputsFinanzas.efectivo.real.value = String(total);
+
+    if (efectivoRealResumenValor) {
+      efectivoRealResumenValor.textContent = String(total);
+    }
+  };
 
   enforceNumericInput([
     inputsFinanzas.efectivo.sistema,
@@ -461,6 +475,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (caja) {
       caja.value = "";
     }
+    syncEfectivoRealFromCajaBolsa();
     extrasRows.forEach((row) => {
       row.value = 0;
       if (row.input) {
@@ -479,22 +494,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const settingsVisibilidad = applyVisibilitySettings();
 
-  const consultarDropdown = btnConsultarToggle?.closest(".consultar-dropdown");
-
-  if (btnConsultarToggle) {
-    const dropdown = consultarDropdown;
-    btnConsultarToggle.addEventListener("click", (event) => {
-      event.stopPropagation();
-      dropdown?.classList.toggle("open");
-    });
-
-    document.addEventListener("click", () => {
-      dropdown?.classList.remove("open");
-    });
-  }
-
   toggleButtons({ consultar: true, verificar: false, enviar: false });
 
+  syncEfectivoRealFromCajaBolsa();
   actualizarEstadoHoraFin();
   cargarResponsables();
   cargarExtrasCatalogo();
@@ -507,7 +509,14 @@ document.addEventListener("DOMContentLoaded", () => {
   horaInicio.addEventListener("change", marcarComoNoVerificado);
   horaFin.addEventListener("change", marcarComoNoVerificado);
   comentarios.addEventListener("input", marcarComoNoVerificado);
-  bolsa?.addEventListener("input", marcarComoNoVerificado);
+  bolsa?.addEventListener("input", () => {
+    syncEfectivoRealFromCajaBolsa();
+    marcarComoNoVerificado();
+  });
+  caja?.addEventListener("input", () => {
+    syncEfectivoRealFromCajaBolsa();
+    marcarComoNoVerificado();
+  });
   Object.values(inputsFinanzas).forEach((grupo) => {
     grupo.real.addEventListener("input", marcarComoNoVerificado);
   });
@@ -516,12 +525,11 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   btnConsultar.addEventListener("click", async () => {
-    consultarDropdown?.classList.remove("open");
-    setStatus("Consultando datos...");
+    setStatus("Consultando Loggro...");
 
     const requiereHoraFin = !fechaEsPasada(fecha.value);
-    if (!fecha.value || !responsable.value || !horaInicio.value || (requiereHoraFin && !horaFin.value)) {
-      setStatus("⚠️ Completa todos los datos del turno.");
+    if (!fecha.value || !responsable.value || !horaInicio.value || (requiereHoraFin && !horaFin.value) || !efectivoApertura?.value) {
+      setStatus("⚠️ Completa fecha, responsable, hora inicio/fin y efectivo de apertura.");
       return;
     }
 
@@ -537,7 +545,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const data = await res.json();
 
-      inputsFinanzas.efectivo.sistema.value = data.efectivo_sistema ?? "";
+      const efectivoSistemaWebhook = toNumberValue(data.efectivo_sistema);
+      const aperturaActual = toNumberValue(efectivoApertura?.value);
+      inputsFinanzas.efectivo.sistema.value = String(efectivoSistemaWebhook + aperturaActual);
       inputsFinanzas.datafono.sistema.value = data.datafono_sistema ?? "";
       inputsFinanzas.rappi.sistema.value = data.rappi_sistema ?? "";
       inputsFinanzas.nequi.sistema.value = data.nequi_sistema ?? "";
@@ -584,7 +594,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   btnConsultarGastos?.addEventListener("click", async () => {
-    consultarDropdown?.classList.remove("open");
     setStatus("Consultando gastos...");
 
     const requiereHoraFin = !fechaEsPasada(fecha.value);
@@ -716,10 +725,6 @@ document.addEventListener("DOMContentLoaded", () => {
         inputsDiferencias[field].input.value = value ?? "";
         actualizarEstadoDiferencia(field, value);
       });
-
-      if (caja) {
-        caja.value = String(diferencias.efectivo ?? 0);
-      }
 
       setStatus(data.message || "");
       verificado = true;
