@@ -21,11 +21,13 @@
   <script type="module" src="../js/header.js"></script>
   <script type="module" src="../js/permisos.js"></script>
 
-  <div class="main">
+  <div class="main permisos-main">
     <h1>Permisos</h1>
     <p class="helper-text">
       Administra accesos por empleado y rol. Los cambios se aplican con un clic.
     </p>
+
+    <div id="resumenPermisos" class="resumen-permisos" aria-live="polite"></div>
 
     <div class="bulk-actions">
       <button type="button" data-role="operativo" data-action="grant">

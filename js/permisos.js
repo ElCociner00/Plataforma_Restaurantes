@@ -20,6 +20,7 @@ const getPermissionsStorageKey = (tenantId) => `permisos_por_usuario_${tenantId 
 // ===============================
 const tableContainer = document.getElementById("permisosTable");
 const status = document.getElementById("status");
+const summary = document.getElementById("resumenPermisos");
 const bulkButtons = document.querySelectorAll(".bulk-actions button");
 
 let state = { pages: [], empleados: [] };
@@ -32,25 +33,53 @@ const getTimestamp = () => new Date().toISOString();
 const normalizePages = (pages) =>
   pages.filter((page) => page !== "configuracion" && page !== "permisos");
 
-const renderTable = () => {
-  if (!state.empleados.length) {
-    tableContainer.innerHTML = "<p class=\"empty\">No hay empleados para mostrar.</p>";
+const formatPageLabel = (page) =>
+  page
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+
+const renderSummary = () => {
+  if (!summary) return;
+
+  if (!state.empleados.length || !state.pages.length) {
+    summary.innerHTML = "";
     return;
   }
 
-  const headers = ["Empleado", "Rol", ...state.pages];
+  summary.innerHTML = `
+    <div class="resumen-item">
+      <span class="resumen-label">Usuarios cargados</span>
+      <strong>${state.empleados.length}</strong>
+    </div>
+    <div class="resumen-item">
+      <span class="resumen-label">Módulos configurables</span>
+      <strong>${state.pages.length}</strong>
+    </div>
+  `;
+};
+
+const renderTable = () => {
+  if (!state.empleados.length) {
+    tableContainer.innerHTML = "<p class=\"empty\">No hay empleados para mostrar.</p>";
+    renderSummary();
+    return;
+  }
+
+  const headers = ["Empleado", "Rol", ...state.pages.map(formatPageLabel)];
   const rows = state.empleados.map((empleado) => {
     const switches = state.pages.map((page) => {
       const isChecked = Boolean(empleado.permisos?.[page]);
       return `
-        <label class="permiso-switch">
+        <label class="permiso-switch" title="${isChecked ? "Permiso activo" : "Permiso inactivo"}">
           <input
             type="checkbox"
             data-empleado-id="${empleado.id}"
             data-page="${page}"
             ${isChecked ? "checked" : ""}
           >
-          <span>${isChecked ? "Sí" : "No"}</span>
+          <span aria-hidden="true" class="switch-slider"></span>
+          <span class="sr-only">${isChecked ? "Permitido" : "Bloqueado"}</span>
         </label>
       `;
     });
@@ -74,6 +103,8 @@ const renderTable = () => {
       </tbody>
     </table>
   `;
+
+  renderSummary();
 };
 
 const setStatus = (message) => {
@@ -131,7 +162,6 @@ const handleToggle = (event) => {
     [page]: value
   };
 
-  target.nextElementSibling.textContent = value ? "Sí" : "No";
   persistPermissionChange({ empleadoId, page, value });
 };
 
