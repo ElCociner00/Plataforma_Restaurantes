@@ -17,6 +17,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const horaInicio = document.getElementById("hora_inicio");
   const horaFin = document.getElementById("hora_fin");
   const efectivoApertura = document.getElementById("efectivo_apertura");
+  const bolsa = document.getElementById("bolsa");
+  const caja = document.getElementById("caja");
   const status = document.getElementById("status");
   const extrasList = document.getElementById("extrasList");
 
@@ -113,6 +115,8 @@ document.addEventListener("DOMContentLoaded", () => {
     efectivoApertura,
     inputsSoloVista.propina,
     inputsSoloVista.domicilios,
+    bolsa,
+    caja,
   ]);
 
   const comentarios = document.querySelector("textarea");
@@ -218,6 +222,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }))
   );
 
+  const asNumber = (value) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const actualizarDomiciliosDesdeExtras = () => {
+    const totalDomicilios = Array.from(extrasRows.values())
+      .filter((row) => /domicilios?/i.test(String(row.nombre || "")))
+      .reduce((sum, row) => sum + asNumber(row.value), 0);
+
+    inputsSoloVista.domicilios.value = String(totalDomicilios);
+  };
+
   const getContextPayload = async () => {
     const context = await getUserContext();
     if (!context) {
@@ -313,6 +330,8 @@ document.addEventListener("DOMContentLoaded", () => {
     return {
       fecha: fecha.value,
       responsable: responsable.value,
+      bolsa: bolsa?.value || 0,
+      caja: caja?.value || 0,
       turno: {
         inicio: horaInicio.value,
         fin: horaFin.value,
@@ -436,6 +455,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (efectivoApertura) {
       efectivoApertura.value = "";
     }
+    if (bolsa) {
+      bolsa.value = "";
+    }
+    if (caja) {
+      caja.value = "";
+    }
     extrasRows.forEach((row) => {
       row.value = 0;
       if (row.input) {
@@ -482,6 +507,7 @@ document.addEventListener("DOMContentLoaded", () => {
   horaInicio.addEventListener("change", marcarComoNoVerificado);
   horaFin.addEventListener("change", marcarComoNoVerificado);
   comentarios.addEventListener("input", marcarComoNoVerificado);
+  bolsa?.addEventListener("input", marcarComoNoVerificado);
   Object.values(inputsFinanzas).forEach((grupo) => {
     grupo.real.addEventListener("input", marcarComoNoVerificado);
   });
@@ -518,7 +544,7 @@ document.addEventListener("DOMContentLoaded", () => {
       inputsFinanzas.transferencias.sistema.value = data.transferencias_sistema ?? "";
       inputsFinanzas.bono_regalo.sistema.value = data.bono_regalo_sistema ?? "";
       inputsSoloVista.propina.value = data.propina ?? "";
-      inputsSoloVista.domicilios.value = data.domicilios ?? "";
+      actualizarDomiciliosDesdeExtras();
       Object.values(inputsDiferencias).forEach(({ input, nota }) => {
         input.value = "";
         input.classList.remove("diff-faltante", "diff-sobrante", "diff-ok");
@@ -598,6 +624,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
 
+      actualizarDomiciliosDesdeExtras();
       setStatus("Gastos consultados.");
     } catch (error) {
       setStatus(error?.name === "AbortError"
@@ -608,6 +635,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   btnVerificar.addEventListener("click", async () => {
     setStatus("Verificando...");
+
+    actualizarDomiciliosDesdeExtras();
 
     if (!efectivoApertura?.value) {
       setStatus("⚠️ Completa el efectivo de apertura.");
@@ -653,9 +682,13 @@ document.addEventListener("DOMContentLoaded", () => {
           real: inputsFinanzas.bono_regalo.real.value || 0
         },
         propina: inputsSoloVista.propina.value || 0,
-        domicilios: inputsSoloVista.domicilios.value || 0
+        domicilios: inputsSoloVista.domicilios.value || 0,
+        bolsa: bolsa?.value || 0,
+        caja: caja?.value || 0
       },
       comentarios: comentarios.value || "",
+      bolsa: bolsa?.value || 0,
+      caja: caja?.value || 0,
       efectivo_apertura: efectivoApertura.value || 0,
       gastos_extras: buildExtrasPayload(),
       ...contextPayload
@@ -683,6 +716,10 @@ document.addEventListener("DOMContentLoaded", () => {
         inputsDiferencias[field].input.value = value ?? "";
         actualizarEstadoDiferencia(field, value);
       });
+
+      if (caja) {
+        caja.value = String(diferencias.efectivo ?? 0);
+      }
 
       setStatus(data.message || "");
       verificado = true;
@@ -724,6 +761,8 @@ document.addEventListener("DOMContentLoaded", () => {
       setStatus("⚠️ Completa el efectivo de apertura.");
       return null;
     }
+
+    actualizarDomiciliosDesdeExtras();
 
     const fechaCompleta = formatFechaCompleta(fecha.value);
     const sistemas = {
@@ -789,13 +828,17 @@ document.addEventListener("DOMContentLoaded", () => {
           real: inputsFinanzas.bono_regalo.real.value || 0
         },
         propina: inputsSoloVista.propina.value || 0,
-        domicilios: inputsSoloVista.domicilios.value || 0
+        domicilios: inputsSoloVista.domicilios.value || 0,
+        bolsa: bolsa?.value || 0,
+        caja: caja?.value || 0
       },
       sistemas,
       reales,
       diferencias,
       propina: inputsSoloVista.propina.value || 0,
       domicilios: inputsSoloVista.domicilios.value || 0,
+      bolsa: bolsa?.value || 0,
+      caja: caja?.value || 0,
       efectivo_apertura: efectivoApertura.value || 0,
       gastos_extras: buildExtrasPayload(),
       comentarios: comentarios.value || "",
