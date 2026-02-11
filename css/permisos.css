@@ -3,60 +3,100 @@
    =============================== */
 
 .permisos-main {
-  width: min(1320px, calc(100vw - 48px));
+  width: min(1220px, calc(100vw - 42px));
   max-width: none;
-  padding: 28px 24px;
+  padding: 30px 24px;
+}
+
+.permisos-main h1,
+.permisos-main .helper-text {
+  text-align: left;
 }
 
 .helper-text {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   color: #6b7280;
   font-size: 0.98rem;
 }
 
+.permisos-note {
+  margin-bottom: 16px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #312e81;
+}
+
+.permisos-note p {
+  margin: 0;
+  text-align: left;
+  color: inherit;
+  font-size: 0.92rem;
+}
+
+.permisos-note p + p {
+  margin-top: 6px;
+}
+
 .resumen-permisos {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
   margin-bottom: 18px;
 }
 
 .resumen-item {
-  background: #f8fafc;
+  background: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 10px 14px;
-  min-width: 180px;
 }
 
 .resumen-label {
   display: block;
   color: #6b7280;
-  font-size: 0.85rem;
+  font-size: 0.84rem;
   margin-bottom: 4px;
 }
 
 .bulk-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
   gap: 10px;
   margin-bottom: 16px;
 }
 
 .bulk-actions button {
-  padding: 8px 12px;
+  padding: 10px 12px;
   border-radius: 6px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
+  border: 1px solid #4338ca;
+  background: #4f46e5;
+  color: #ffffff;
   cursor: pointer;
-  color: #111827;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.bulk-actions button:hover {
+  background: #4338ca;
+}
+
+.bulk-actions button[data-action="revoke"] {
+  background: #312e81;
+  border-color: #312e81;
+}
+
+.bulk-actions button[data-action="revoke"]:hover {
+  background: #1f1c63;
 }
 
 .permisos-table {
   overflow: auto;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  max-height: 66vh;
+  background: #ffffff;
+  max-height: 65vh;
 }
 
 .permisos-table .empty {
@@ -67,7 +107,7 @@
 .permisos-table table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 1060px;
+  min-width: 980px;
 }
 
 .permisos-table th,
@@ -79,48 +119,23 @@
 }
 
 .permisos-table th {
-  background: #f9fafb;
+  background: #eef2ff;
+  color: #312e81;
   font-weight: 700;
   position: sticky;
   top: 0;
   z-index: 2;
 }
 
-.permisos-table th:first-child,
-.permisos-table td:first-child,
-.permisos-table th:nth-child(2),
-.permisos-table td:nth-child(2) {
-  position: sticky;
-  background: #fff;
-  z-index: 1;
-}
-
-.permisos-table th:first-child,
 .permisos-table td:first-child {
-  left: 0;
-  min-width: 220px;
-}
-
-.permisos-table th:nth-child(2),
-.permisos-table td:nth-child(2) {
-  left: 220px;
-  min-width: 120px;
-}
-
-.permisos-table th:first-child,
-.permisos-table th:nth-child(2) {
-  z-index: 3;
-  background: #f9fafb;
-}
-
-.permisos-table td {
-  min-width: 140px;
+  font-weight: 600;
 }
 
 .permiso-switch {
   position: relative;
   display: inline-flex;
   align-items: center;
+  gap: 8px;
   cursor: pointer;
 }
 
@@ -132,11 +147,10 @@
 }
 
 .switch-slider {
-  width: 52px;
-  height: 28px;
-  background: #d1d5db;
+  width: 46px;
+  height: 25px;
+  background: #c7d2fe;
   border-radius: 999px;
-  display: inline-block;
   position: relative;
   transition: all 0.2s ease;
 }
@@ -144,8 +158,8 @@
 .switch-slider::before {
   content: "";
   position: absolute;
-  width: 22px;
-  height: 22px;
+  width: 19px;
+  height: 19px;
   border-radius: 50%;
   top: 3px;
   left: 3px;
@@ -155,16 +169,23 @@
 }
 
 .permiso-switch input[type="checkbox"]:checked + .switch-slider {
-  background: #4f46e5;
+  background: #312e81;
 }
 
 .permiso-switch input[type="checkbox"]:checked + .switch-slider::before {
-  transform: translateX(24px);
+  transform: translateX(21px);
 }
 
 .permiso-switch input[type="checkbox"]:focus-visible + .switch-slider {
   outline: 2px solid #4338ca;
   outline-offset: 2px;
+}
+
+.switch-state {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #374151;
+  min-width: 24px;
 }
 
 .sr-only {
@@ -181,8 +202,31 @@
 
 .status {
   margin-top: 12px;
-  font-size: 0.9rem;
-  color: #374151;
+  font-size: 0.88rem;
+  color: #312e81;
+  text-align: left;
+}
+
+@media (max-width: 768px) {
+  .permisos-main {
+    width: calc(100vw - 20px);
+    margin: 24px auto;
+    padding: 20px 12px;
+  }
+
+  .bulk-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .permisos-table {
+    max-height: none;
+  }
+
+  .permisos-table th,
+  .permisos-table td {
+    font-size: 0.9rem;
+    padding: 10px;
+  }
 }
 
 @media (max-width: 768px) {

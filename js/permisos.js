@@ -5,7 +5,6 @@ import { WEBHOOK_LISTAR_RESPONSABLES } from "./webhooks.js";
 // CONFIGURACIÓN
 // ===============================
 const DATA_ENDPOINT = "";
-const UPDATE_ENDPOINT = "";
 const DEFAULT_PAGES = [
   "dashboard",
   "cierre_turno",
@@ -39,6 +38,8 @@ const formatPageLabel = (page) =>
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 
+const isBlockedPermission = (empleado, page) => empleado.permisos?.[page] === false;
+
 const renderSummary = () => {
   if (!summary) return;
 
@@ -46,6 +47,15 @@ const renderSummary = () => {
     summary.innerHTML = "";
     return;
   }
+
+  const blockedCount = state.empleados.reduce((acc, empleado) => {
+    const blockedByUser = state.pages.reduce((accPages, page) => {
+      if (isBlockedPermission(empleado, page)) return accPages + 1;
+      return accPages;
+    }, 0);
+
+    return acc + blockedByUser;
+  }, 0);
 
   summary.innerHTML = `
     <div class="resumen-item">
@@ -55,6 +65,10 @@ const renderSummary = () => {
     <div class="resumen-item">
       <span class="resumen-label">Módulos configurables</span>
       <strong>${state.pages.length}</strong>
+    </div>
+    <div class="resumen-item">
+      <span class="resumen-label">Bloqueos activos (switch encendido)</span>
+      <strong>${blockedCount}</strong>
     </div>
   `;
 };
@@ -69,17 +83,18 @@ const renderTable = () => {
   const headers = ["Empleado", "Rol", ...state.pages.map(formatPageLabel)];
   const rows = state.empleados.map((empleado) => {
     const switches = state.pages.map((page) => {
-      const isChecked = Boolean(empleado.permisos?.[page]);
+      const isBlocked = isBlockedPermission(empleado, page);
       return `
-        <label class="permiso-switch" title="${isChecked ? "Permiso activo" : "Permiso inactivo"}">
+        <label class="permiso-switch" title="${isBlocked ? "Bloqueado (NO)" : "Permitido (SÍ)"}">
           <input
             type="checkbox"
             data-empleado-id="${empleado.id}"
             data-page="${page}"
-            ${isChecked ? "checked" : ""}
+            ${isBlocked ? "checked" : ""}
           >
           <span aria-hidden="true" class="switch-slider"></span>
-          <span class="sr-only">${isChecked ? "Permitido" : "Bloqueado"}</span>
+          <span class="switch-state">${isBlocked ? "NO" : "SÍ"}</span>
+          <span class="sr-only">${isBlocked ? "Bloqueado" : "Permitido"}</span>
         </label>
       `;
     });
@@ -111,7 +126,7 @@ const setStatus = (message) => {
   status.textContent = message;
 };
 
-const persistPermissionChange = async ({ empleadoId, page, value }) => {
+const persistPermissionChange = ({ empleadoId, page, value }) => {
   const storageKey = getPermissionsStorageKey(userContext?.empresa_id);
   const stored = localStorage.getItem(storageKey);
   const parsed = stored ? JSON.parse(stored) : {};
@@ -121,29 +136,7 @@ const persistPermissionChange = async ({ empleadoId, page, value }) => {
   };
   localStorage.setItem(storageKey, JSON.stringify(parsed));
 
-  if (!UPDATE_ENDPOINT) {
-    setStatus("Configura UPDATE_ENDPOINT para guardar cambios.");
-    return;
-  }
-
-  try {
-    await fetch(UPDATE_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        empleado_id: empleadoId,
-        page,
-        allowed: value,
-        empresa_id: userContext?.empresa_id,
-        tenant_id: userContext?.empresa_id,
-        usuario_id: userContext?.user?.id || userContext?.user?.user_id,
-        actualizado_por: userContext?.user?.id || userContext?.user?.user_id,
-        timestamp: getTimestamp()
-      })
-    });
-  } catch (err) {
-    setStatus("Error al guardar el permiso.");
-  }
+  setStatus("Cambios de permisos guardados.");
 };
 
 const handleToggle = (event) => {
@@ -152,7 +145,7 @@ const handleToggle = (event) => {
 
   const empleadoId = target.dataset.empleadoId;
   const page = target.dataset.page;
-  const value = target.checked;
+  const value = !target.checked;
 
   const empleado = state.empleados.find((item) => String(item.id) === String(empleadoId));
   if (!empleado) return;
@@ -162,7 +155,13 @@ const handleToggle = (event) => {
     [page]: value
   };
 
+  const switchState = target.parentElement.querySelector(".switch-state");
+  if (switchState) {
+    switchState.textContent = value ? "SÍ" : "NO";
+  }
+
   persistPermissionChange({ empleadoId, page, value });
+  renderSummary();
 };
 
 const handleBulkAction = (event) => {
@@ -179,17 +178,25 @@ const handleBulkAction = (event) => {
       return acc;
     }, {});
 
-    return {
+    const updatedEmpleado = {
       ...empleado,
       permisos: {
         ...empleado.permisos,
         ...permisosActualizados
       }
     };
+
+    const empleadoId = updatedEmpleado.id;
+    state.pages.forEach((page) => {
+      persistPermissionChange({ empleadoId, page, value });
+    });
+
+    return updatedEmpleado;
   });
 
   renderTable();
   attachTableHandlers();
+  setStatus(`Acción masiva aplicada para rol ${role}.`);
 };
 
 const attachTableHandlers = () => {
@@ -281,7 +288,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     renderTable();
     attachTableHandlers();
-    setStatus("");
+    setStatus("Permisos cargados correctamente.");
   } catch (err) {
     setStatus(err.message || "No se pudo cargar la información.");
   }
