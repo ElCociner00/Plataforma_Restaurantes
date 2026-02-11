@@ -3,6 +3,14 @@ import { PERMISSIONS } from "./permissions.js";
 
 const LOGIN_URL = "/Plataforma_Restaurantes/index.html";
 
+const getForbiddenRedirect = (context) => {
+  if (context?.rol === "operativo") {
+    return "/Plataforma_Restaurantes/cierre_turno/";
+  }
+
+  return "/Plataforma_Restaurantes/dashboard/";
+};
+
 export async function guardPage(pageKey) {
   const context = await getUserContext();
 
@@ -24,7 +32,7 @@ export async function guardPage(pageKey) {
       if (userPermissions && Object.prototype.hasOwnProperty.call(userPermissions, pageKey)) {
         if (!userPermissions[pageKey]) {
           alert("No tienes permisos para acceder a este módulo");
-          window.location.href = "/Plataforma_Restaurantes/dashboard/";
+          window.location.href = getForbiddenRedirect(context);
           return;
         }
         return;
@@ -38,6 +46,6 @@ export async function guardPage(pageKey) {
 
   if (!allowedRoles || !allowedRoles.includes(context.rol)) {
     alert("No tienes permisos para acceder a este módulo");
-    window.location.href = "/Plataforma_Restaurantes/dashboard/";
+    window.location.href = getForbiddenRedirect(context);
   }
 }

@@ -21,30 +21,36 @@
   <script type="module" src="../js/header.js"></script>
   <script type="module" src="../js/permisos.js"></script>
 
-  <div class="main">
+  <div class="main permisos-main">
     <h1>Permisos</h1>
     <p class="helper-text">
-      Administra accesos por empleado y rol. Los cambios se aplican con un clic.
+      Administra accesos por empleado y rol. Los cambios se aplican al instante.
     </p>
+
+    <div class="permisos-note" role="note" aria-live="polite">
+      <p><strong>Cómo leer el switch:</strong> <strong>activado = NO</strong> (bloquea el acceso), <strong>desactivado = SÍ</strong> (permite acceso por rol/base).</p>
+    </div>
+
+    <div id="resumenPermisos" class="resumen-permisos" aria-live="polite"></div>
 
     <div class="bulk-actions">
       <button type="button" data-role="operativo" data-action="grant">
-        Dar permiso a todos los operativos
+        Permitir todos los módulos a operativos
       </button>
       <button type="button" data-role="operativo" data-action="revoke">
-        Quitar permiso a todos los operativos
+        Bloquear todos los módulos a operativos
       </button>
       <button type="button" data-role="revisor" data-action="grant">
-        Dar permiso a todos los revisores
+        Permitir todos los módulos a revisores
       </button>
       <button type="button" data-role="revisor" data-action="revoke">
-        Quitar permiso a todos los revisores
+        Bloquear todos los módulos a revisores
       </button>
       <button type="button" data-role="admin" data-action="grant">
-        Dar permiso a todos los admins
+        Permitir todos los módulos a admins
       </button>
       <button type="button" data-role="admin" data-action="revoke">
-        Quitar permiso a todos los admins
+        Bloquear todos los módulos a admins
       </button>
     </div>
 
