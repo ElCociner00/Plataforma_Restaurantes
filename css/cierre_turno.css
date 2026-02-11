@@ -21,21 +21,43 @@
   font-size: 0.88rem;
 }
 
-.apertura-row label {
+.apertura-grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: minmax(220px, 260px) 1fr;
+  gap: 12px;
+  align-items: stretch;
+  margin-bottom: 12px;
+}
+
+.apertura-grid label {
   display: flex;
   flex-direction: column;
   gap: 8px;
   font-size: 0.88rem;
-  max-width: 240px;
 }
 
-.apertura-row {
-  margin-top: 10px;
-}
-
-.apertura-row input {
+.apertura-grid input {
   width: 100%;
 }
+
+ .apertura-note {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+}
+
+.apertura-note p {
+  margin: 0;
+  color: #3730a3;
+  font-size: 0.82rem;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
 
 /* Grid financiero */
 .finanzas-grid {
@@ -92,6 +114,10 @@
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
   margin-bottom: 14px;
+}
+
+.contables-principales-grid {
+  margin-bottom: 2px;
 }
 
 .contables-extra-grid label {
@@ -162,7 +188,6 @@ input[readonly] {
   background: #f3f4f6;
 }
 
-
 .extras-list {
   display: grid;
   gap: 10px;
@@ -189,31 +214,8 @@ input[readonly] {
   text-align: right;
 }
 
-.consultar-dropdown {
-  position: relative;
-}
-
-.consultar-dropdown .consultar-menu {
-  display: none;
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 6px;
-  min-width: 180px;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
-  z-index: 10;
-}
-
-.consultar-dropdown.open .consultar-menu {
-  display: grid;
-  gap: 6px;
-}
-
-.consultar-dropdown .consultar-menu button {
-  width: 100%;
-  padding: 8px 10px;
-  font-size: 0.9rem;
+@media (max-width: 768px) {
+  .apertura-grid {
+    grid-template-columns: 1fr;
+  }
 }
