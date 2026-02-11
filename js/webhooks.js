@@ -63,7 +63,7 @@ export const WEBHOOK_CIERRE_INVENTARIOS_SUBIR =
 
 // configuracion/visualizacion_cierre_inventarios.html (auto-carga productos para switches de visualización)
 export const WEBHOOK_CIERRE_INVENTARIOS_VISUALIZACION_PRODUCTOS =
-  "https://n8n.globalnexoshop.com/webhook/consultar_inventarios_productos";
+  "https://n8n.globalnexoshop.com/webhook/consultar_inventarios_ingredientes";
 
 // cierre_turno/historico_cierre_turno.html (auto-carga histórico consolidado de cierres de turno)
 export const WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS =
