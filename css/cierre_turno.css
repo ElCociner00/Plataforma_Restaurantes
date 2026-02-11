@@ -45,7 +45,8 @@
   background: #eef2ff;
   border: 1px solid #c7d2fe;
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 6px 10px;
+  min-height: 40px;
   display: flex;
   align-items: center;
 }
@@ -53,9 +54,9 @@
 .apertura-note p {
   margin: 0;
   color: #3730a3;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 400;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 
 
