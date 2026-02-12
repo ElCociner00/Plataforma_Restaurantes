@@ -53,10 +53,6 @@ export const WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS =
 export const WEBHOOK_CIERRE_INVENTARIOS_CONSULTAR =
   "https://n8n.globalnexoshop.com/webhook/consultar_inventarios";
 
-// cierre_inventarios/index.html (botón: "Verificar" para calcular/traer restante por producto)
-export const WEBHOOK_CIERRE_INVENTARIOS_VERIFICAR =
-  "https://n8n.globalnexoshop.com/webhook/cierre_inventarios_verificar";
-
 // cierre_inventarios/index.html (botón: "Subir datos" para persistir cierre de inventarios)
 export const WEBHOOK_CIERRE_INVENTARIOS_SUBIR =
   "https://n8n.globalnexoshop.com/webhook/cierre_inventarios_subir";
