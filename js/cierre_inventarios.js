@@ -3,7 +3,6 @@ import { getUserContext } from "../js/session.js";
 import {
   WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS,
   WEBHOOK_CIERRE_INVENTARIOS_CONSULTAR,
-  WEBHOOK_CIERRE_INVENTARIOS_VERIFICAR,
   WEBHOOK_CIERRE_INVENTARIOS_SUBIR,
   WEBHOOK_LISTAR_RESPONSABLES
 } from "../js/webhooks.js";
@@ -498,49 +497,35 @@ btnConsultar.addEventListener("click", async () => {
   }
 });
 
-btnVerificar.addEventListener("click", async () => {
+btnVerificar.addEventListener("click", () => {
   if (!validateRequiredFields()) return;
 
-  const payload = await buildBasePayload();
-  if (!payload) {
-    setStatus("No se pudo validar la sesión.");
+  let hasInvalidValue = false;
+
+  productRows.forEach((rowData) => {
+    const stockValue = Number(rowData.stockInput.value || 0);
+    const gastadoRaw = rowData.gastadoInput.value.trim();
+    const gastadoValue = gastadoRaw === "" ? 0 : Number(gastadoRaw);
+
+    if (Number.isNaN(stockValue) || Number.isNaN(gastadoValue)) {
+      hasInvalidValue = true;
+      return;
+    }
+
+    const restante = stockValue - gastadoValue;
+    rowData.restanteInput.value = String(restante);
+  });
+
+  if (hasInvalidValue) {
+    verified = false;
+    setButtonState({ subir: false });
+    setStatus("⚠️ Hay valores inválidos en stock o stock gastado.");
     return;
   }
 
-  setStatus("Verificando restante...");
-
-  try {
-    const res = await fetch(WEBHOOK_CIERRE_INVENTARIOS_VERIFICAR, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...payload,
-        items: readRowsForWebhook()
-      })
-    });
-
-    const data = await res.json();
-    const restantes = normalizeList(data, ["restantes", "productos", "items"]);
-    const rowIndex = buildRowIndex();
-
-    restantes.forEach((item) => {
-      const productId = getProductId(item);
-      const productName = getProductName(item);
-      const row = rowIndex.byId.get(productId) ?? rowIndex.byName.get(productName);
-      if (!row) return;
-
-      const restanteValue =
-        item.restante ?? item.stock_restante ?? item.stock_restante_calculado ?? item.value ?? "";
-
-      row.restanteInput.value = restanteValue === "" ? "" : String(restanteValue);
-    });
-
-    verified = data.ok !== false;
-    setButtonState({ subir: verified });
-    setStatus(verified ? "Verificación completada." : "Verificación reportó errores.");
-  } catch (error) {
-    setStatus("Error verificando restante.");
-  }
+  verified = true;
+  setButtonState({ subir: true });
+  setStatus("Verificación completada en navegador.");
 });
 
 btnSubir.addEventListener("click", async () => {
