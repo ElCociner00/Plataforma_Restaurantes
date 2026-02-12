@@ -765,22 +765,6 @@ document.addEventListener("DOMContentLoaded", () => {
     actualizarDomiciliosDesdeExtras();
 
     const fechaCompleta = formatFechaCompleta(fecha.value);
-    const sistemas = {
-      efectivo_sistema: inputsFinanzas.efectivo.sistema.value || 0,
-      datafono_sistema: inputsFinanzas.datafono.sistema.value || 0,
-      rappi_sistema: inputsFinanzas.rappi.sistema.value || 0,
-      nequi_sistema: inputsFinanzas.nequi.sistema.value || 0,
-      transferencias_sistema: inputsFinanzas.transferencias.sistema.value || 0,
-      bono_regalo_sistema: inputsFinanzas.bono_regalo.sistema.value || 0
-    };
-    const reales = {
-      efectivo_real: inputsFinanzas.efectivo.real.value || 0,
-      datafono_real: inputsFinanzas.datafono.real.value || 0,
-      rappi_real: inputsFinanzas.rappi.real.value || 0,
-      nequi_real: inputsFinanzas.nequi.real.value || 0,
-      transferencias_real: inputsFinanzas.transferencias.real.value || 0,
-      bono_regalo_real: inputsFinanzas.bono_regalo.real.value || 0
-    };
     const diferencias = {
       efectivo_diferencia: inputsDiferencias.efectivo.input.value || 0,
       datafono_diferencia: inputsDiferencias.datafono.input.value || 0,
@@ -790,59 +774,104 @@ document.addEventListener("DOMContentLoaded", () => {
       bono_de_regalo_diferencia: inputsDiferencias.bono_regalo.input.value || 0
     };
 
+    const mediosPago = ["efectivo", "datafono", "rappi", "nequi", "transferencias", "bono_regalo"];
+
+    const obtenerCategoriaGasto = (nombre) => {
+      const label = String(nombre || "").toLowerCase();
+      if (label.includes("domicilios") && label.includes("operativ")) return "operativo";
+      if (label.includes("domicilios") && label.includes("cliente")) return "cliente";
+      if (label.includes("insumo")) return "insumos";
+      if (label.includes("arriendo")) return "arriendo";
+      if (label.includes("aseo") || label.includes("limpieza")) return "aseo";
+      if (label.includes("plástico") || label.includes("plastico") || label.includes("desechable")) return "desechables";
+      if (label.includes("prote") || label.includes("té") || label.includes("te")) return "insumos_especiales";
+      return "general";
+    };
+
+    const itemsFinanzas = mediosPago.flatMap((medio) => {
+      const valorSistema = inputsFinanzas[medio]?.sistema?.value || 0;
+      const valorReal = inputsFinanzas[medio]?.real?.value || 0;
+      const diferenciaRaw = diferencias[`${medio}_diferencia`] ?? (Number(valorReal) - Number(valorSistema));
+      const diferenciaNum = Number(diferenciaRaw);
+      const tieneDiferencia = Number.isFinite(diferenciaNum) ? diferenciaNum !== 0 : false;
+
+      return [
+        {
+          tipo: medio,
+          categoria: "sistema",
+          valor: String(valorSistema),
+          id_referencia: null,
+          tiene_diferencia: false
+        },
+        {
+          tipo: medio,
+          categoria: "real",
+          valor: String(valorReal),
+          id_referencia: null,
+          tiene_diferencia: tieneDiferencia,
+          ...(tieneDiferencia ? { diferencia: String(diferenciaRaw) } : {})
+        }
+      ];
+    });
+
+    const gastosExtras = buildExtrasPayload();
+    const itemsGastos = gastosExtras.map((gasto) => ({
+      tipo: "gasto_extra",
+      categoria: obtenerCategoriaGasto(gasto.name),
+      nombre: gasto.name,
+      valor: Number(gasto.valor || 0),
+      id_referencia: gasto.Id || null,
+      visible: Boolean(gasto.visible)
+    }));
+
+    const totalSistema = mediosPago.reduce((acc, medio) => acc + Number(inputsFinanzas[medio]?.sistema?.value || 0), 0);
+    const totalReal = mediosPago.reduce((acc, medio) => acc + Number(inputsFinanzas[medio]?.real?.value || 0), 0);
+    const diferenciaTotal = Object.values(diferencias).reduce((acc, value) => acc + Number(value || 0), 0);
+    const totalGastosExtras = gastosExtras.reduce((acc, gasto) => acc + Number(gasto.valor || 0), 0);
+    const totalDomiciliosOperativos = itemsGastos
+      .filter((item) => item.categoria === "operativo")
+      .reduce((acc, item) => acc + Number(item.valor || 0), 0);
+    const totalDomiciliosClientes = itemsGastos
+      .filter((item) => item.categoria === "cliente")
+      .reduce((acc, item) => acc + Number(item.valor || 0), 0);
+
     return {
-      fecha: fecha.value,
-      responsable: responsable.value,
-      turno: {
-        inicio: horaInicio.value,
-        fin: horaFin.value,
-        inicio_momento: getMomentoDia(horaInicio.value),
-        fin_momento: getMomentoDia(horaFin.value),
-        fecha_inicio: fechaCompleta,
-        fecha_fin: fechaCompleta
-      },
-      finanzas: {
+      global: {
+        fecha: fecha.value,
+        empresa_id: contextPayload.empresa_id,
+        tenant_id: contextPayload.tenant_id,
+        usuario_id: contextPayload.usuario_id,
+        responsable_id: responsable.value,
+        registrado_por: contextPayload.registrado_por,
+        rol: contextPayload.rol,
+        timestamp: contextPayload.timestamp,
+        comentarios: comentarios.value || "",
+        turno: {
+          inicio: horaInicio.value,
+          fin: horaFin.value,
+          inicio_momento: getMomentoDia(horaInicio.value),
+          fin_momento: getMomentoDia(horaFin.value),
+          fecha_inicio: fechaCompleta,
+          fecha_fin: fechaCompleta
+        },
         efectivo_apertura: efectivoApertura.value || 0,
-        efectivo: {
-          sistema: inputsFinanzas.efectivo.sistema.value || 0,
-          real: inputsFinanzas.efectivo.real.value || 0
-        },
-        datafono: {
-          sistema: inputsFinanzas.datafono.sistema.value || 0,
-          real: inputsFinanzas.datafono.real.value || 0
-        },
-        rappi: {
-          sistema: inputsFinanzas.rappi.sistema.value || 0,
-          real: inputsFinanzas.rappi.real.value || 0
-        },
-        nequi: {
-          sistema: inputsFinanzas.nequi.sistema.value || 0,
-          real: inputsFinanzas.nequi.real.value || 0
-        },
-        transferencias: {
-          sistema: inputsFinanzas.transferencias.sistema.value || 0,
-          real: inputsFinanzas.transferencias.real.value || 0
-        },
-        bono_regalo: {
-          sistema: inputsFinanzas.bono_regalo.sistema.value || 0,
-          real: inputsFinanzas.bono_regalo.real.value || 0
-        },
-        propina: inputsSoloVista.propina.value || 0,
-        domicilios: inputsSoloVista.domicilios.value || 0,
-        bolsa: bolsa?.value || 0,
-        caja: caja?.value || 0
+        propina_global: inputsSoloVista.propina.value || 0,
+        domicilios_global: inputsSoloVista.domicilios.value || 0,
+        bolsa_global: bolsa?.value || 0,
+        caja_global: caja?.value || 0
       },
-      sistemas,
-      reales,
-      diferencias,
-      propina: inputsSoloVista.propina.value || 0,
-      domicilios: inputsSoloVista.domicilios.value || 0,
-      bolsa: bolsa?.value || 0,
-      caja: caja?.value || 0,
-      efectivo_apertura: efectivoApertura.value || 0,
-      gastos_extras: buildExtrasPayload(),
-      comentarios: comentarios.value || "",
-      ...contextPayload
+      items: [...itemsFinanzas, ...itemsGastos],
+      resumen: {
+        total_sistema: totalSistema,
+        total_real: totalReal,
+        diferencia_total: diferenciaTotal,
+        total_gastos_extras: totalGastosExtras,
+        total_domicilios_operativos: totalDomiciliosOperativos,
+        total_domicilios_clientes: totalDomiciliosClientes,
+        total_propinas: Number(inputsSoloVista.propina.value || 0),
+        total_bolsa: Number(bolsa?.value || 0),
+        caja_final: Number(caja?.value || 0)
+      }
     };
   };
 
