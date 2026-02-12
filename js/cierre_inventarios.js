@@ -525,7 +525,7 @@ btnVerificar.addEventListener("click", () => {
 
   verified = true;
   setButtonState({ subir: true });
-  setStatus("Verificación completada en navegador.");
+  setStatus("Verificación completada.");
 });
 
 btnSubir.addEventListener("click", async () => {
