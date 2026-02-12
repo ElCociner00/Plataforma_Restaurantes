@@ -199,8 +199,21 @@ const normalizeList = (raw, keys = []) => {
 
 const normalizeIdentifier = (value) => String(value ?? "").trim();
 
+const normalizeProductId = (value) => {
+  const raw = normalizeIdentifier(value);
+  if (!raw) return "";
+
+  const objectIdMatch = raw.match(/^ObjectId\((?:"|')?([a-fA-F0-9]{24})(?:"|')?\)$/);
+  if (objectIdMatch) return objectIdMatch[1].toLowerCase();
+
+  const plainHexMatch = raw.match(/^[a-fA-F0-9]{24}$/);
+  if (plainHexMatch) return raw.toLowerCase();
+
+  return raw;
+};
+
 const getProductId = (item = {}) =>
-  normalizeIdentifier(
+  normalizeProductId(
     item.producto_id ??
       item.productoId ??
       item.product_id ??
@@ -210,14 +223,14 @@ const getProductId = (item = {}) =>
   );
 
 const getProductName = (item = {}) =>
-  normalizeIdentifier(item.producto_nombre ?? item.nombre ?? item.name ?? item.descripcion);
+  normalizeIdentifier(item.producto_nombre ?? item.nombre ?? item.name ?? item.descripcion).toLowerCase();
 
 const buildRowIndex = () => {
   const byId = new Map();
   const byName = new Map();
 
   productRows.forEach((row, productId) => {
-    byId.set(normalizeIdentifier(productId), row);
+    byId.set(normalizeProductId(productId), row);
     byName.set(getProductName(row), row);
   });
 
@@ -372,7 +385,7 @@ const renderProductRows = (productos) => {
     restanteInput.type = "text";
     restanteInput.className = "restante";
     restanteInput.readOnly = true;
-    restanteInput.value = "0";
+    restanteInput.value = "";
     restanteCell.appendChild(restanteInput);
     tr.appendChild(restanteCell);
 
@@ -463,6 +476,11 @@ btnConsultar.addEventListener("click", async () => {
     const stocks = normalizeList(data, ["stocks", "productos", "items"]);
     const rowIndex = buildRowIndex();
 
+    // El restante solo se debe poblar tras "Verificar".
+    productRows.forEach((rowData) => {
+      rowData.restanteInput.value = "";
+    });
+
     stocks.forEach((item) => {
       const productId = getProductId(item);
       const productName = getProductName(item);
@@ -510,9 +528,11 @@ btnVerificar.addEventListener("click", async () => {
       const productName = getProductName(item);
       const row = rowIndex.byId.get(productId) ?? rowIndex.byName.get(productName);
       if (!row) return;
+
       const restanteValue =
-        item.restante ?? item.stock_restante ?? item.stock_restante_calculado ?? item.value ?? 0;
-      row.restanteInput.value = String(restanteValue);
+        item.restante ?? item.stock_restante ?? item.stock_restante_calculado ?? item.value ?? "";
+
+      row.restanteInput.value = restanteValue === "" ? "" : String(restanteValue);
     });
 
     verified = data.ok !== false;
@@ -558,7 +578,7 @@ btnLimpiar.addEventListener("click", () => {
   productRows.forEach((rowData) => {
     rowData.stockInput.value = "0";
     rowData.gastadoInput.value = "";
-    rowData.restanteInput.value = "0";
+    rowData.restanteInput.value = "";
   });
   resetVerification();
   setButtonState({ verificar: false });
