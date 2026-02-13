@@ -62,13 +62,40 @@ const buildContextPayload = () => ({
   timestamp: getTimestamp()
 });
 
-const fetchJson = async (url, payload) => {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+const fetchJson = async (url, payload, method = "POST") => {
+  const requestUrl = method === "GET" && payload
+    ? `${url}?${new URLSearchParams(payload).toString()}`
+    : url;
+
+  const res = await fetch(requestUrl, {
+    method,
+    headers: method === "POST" ? { "Content-Type": "application/json" } : undefined,
+    body: method === "POST" ? JSON.stringify(payload) : undefined
   });
-  return res.json();
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) return res.json();
+
+  const text = await res.text();
+  if (!text) return [];
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text };
+  }
+};
+
+const fetchWebhookWithFallback = async (url, payload) => {
+  try {
+    return await fetchJson(url, payload, "POST");
+  } catch {
+    return fetchJson(url, payload, "GET");
+  }
 };
 
 const invoiceId = (row, idx) => `${row.numero_factura || "sin-numero"}-${idx}`;
@@ -335,7 +362,7 @@ const loadResponsables = async () => {
 
 const loadFacturas = async () => {
   setStatus("Consultando facturas del correo...");
-  const data = await fetchJson(WEBHOOK_CARGAR_FACTURAS_CORREO, buildContextPayload());
+  const data = await fetchWebhookWithFallback(WEBHOOK_CARGAR_FACTURAS_CORREO, buildContextPayload());
   const rows = normalizeRows(data).map((row, idx) => ({
     ...row,
     __id: invoiceId(row, idx),
