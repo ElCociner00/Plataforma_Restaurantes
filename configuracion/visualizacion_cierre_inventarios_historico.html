@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Visualización histórico cierre inventarios</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/visualizacion_cierre_turno_historico.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../js/auth_guard.js"></script>
+  <script type="module">
+    import { guardPage } from "../js/guard_page.js";
+    guardPage("visualizacion_cierre_inventarios_historico");
+  </script>
+  <script type="module" src="../js/header.js"></script>
+
+  <div class="main">
+    <h1>Visualización histórico cierre inventarios</h1>
+    <p class="descripcion">Oculta/muestra columnas, filas de detalle y productos completos. También puedes reordenar listas (drag & drop).</p>
+
+    <section class="panel">
+      <h2>Columnas generales</h2>
+      <div id="columnasGeneralesPanel" class="panel-grid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Columnas detalle productos</h2>
+      <div id="columnasDetallePanel" class="panel-grid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Productos (oculta todas sus filas)</h2>
+      <div id="productosPanel" class="panel-grid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Filas de detalle (producto + turno)</h2>
+      <div id="filasDetallePanel" class="panel-grid"></div>
+    </section>
+
+    <div id="status" class="status"></div>
+  </div>
+
+  <script type="module" src="../js/visualizacion_cierre_inventarios_historico.js"></script>
+</body>
+</html>

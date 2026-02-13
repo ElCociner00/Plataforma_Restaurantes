@@ -25,7 +25,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     </div>
   `;
 
-  menu += `<a href="/Plataforma_Restaurantes/cierre_inventarios/">Cierre inventarios</a>`;
+  menu += `
+    <div class="nav-dropdown">
+      <button type="button" class="nav-dropdown-toggle">Cierre Inventarios ▾</button>
+      <div class="nav-dropdown-menu">
+        <a href="/Plataforma_Restaurantes/cierre_inventarios/">Cierre inventarios</a>
+        <a href="/Plataforma_Restaurantes/cierre_inventarios/historico_cierre_inventarios.html">Histórico cierre inventarios</a>
+      </div>
+    </div>
+  `;
 
   if (context.rol === "admin_root" || context.rol === "admin") {
     menu += `<a href="/Plataforma_Restaurantes/configuracion/">Configuración</a>`;
