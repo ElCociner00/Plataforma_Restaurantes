@@ -6,7 +6,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   const context = await getUserContext();
   if (!context) return;
 
-  const activeEnvironment = getActiveEnvironment() || ENV_LOGGRO;
+  const activeEnvironment = getActiveEnvironment();
+  if (!activeEnvironment) {
+    window.location.href = "/Plataforma_Restaurantes/entorno/";
+    return;
+  }
   const header = document.createElement("header");
   header.className = "app-header";
 

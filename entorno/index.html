@@ -4,19 +4,19 @@
   <meta charset="UTF-8">
   <title>Seleccionar entorno</title>
   <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/entorno.css">
 </head>
 <body style="display:none">
   <script type="module" src="../js/auth_guard.js"></script>
-  <script type="module" src="../js/header.js"></script>
 
-  <div class="main">
+  <div class="main entorno-main">
     <h1>Selecciona tu entorno</h1>
-    <p>Elige a cuál entorno deseas ingresar.</p>
-    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:12px;">
+    <p>Elige a cuál entorno deseas ingresar para continuar.</p>
+    <div class="entorno-actions">
       <button id="btnEntornoLoggro" type="button">Entrar a Loggro</button>
       <button id="btnEntornoSiigo" type="button">Entrar a Siigo</button>
     </div>
-    <div id="status" style="margin-top:10px;color:#4b5563;"></div>
+    <div id="status"></div>
   </div>
 
   <script type="module" src="../js/entorno_selector.js"></script>
