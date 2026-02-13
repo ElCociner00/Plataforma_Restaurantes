@@ -12,6 +12,7 @@ export const PERMISSIONS = {
   visualizacion_cierre_inventarios: ["admin_root", "admin"],
   visualizacion_cierre_inventarios_historico: ["admin_root", "admin"],
   inventarios: ["admin_root", "admin", "operativo", "revisor"],
+  dashboard_siigo: ["admin_root", "admin", "operativo", "revisor"],
   subir_facturas_siigo: ["admin_root", "admin", "operativo", "revisor"],
   configuracion_siigo: ["admin_root", "admin"],
   nomina: ["admin_root", "admin"],
@@ -31,6 +32,7 @@ export const PAGE_ENVIRONMENT = {
   visualizacion_cierre_inventarios: "loggro",
   visualizacion_cierre_inventarios_historico: "loggro",
   inventarios: "loggro",
+  dashboard_siigo: "siigo",
   subir_facturas_siigo: "siigo",
   configuracion_siigo: "siigo"
 };
