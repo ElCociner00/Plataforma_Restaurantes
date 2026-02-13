@@ -9,6 +9,7 @@ const head = document.getElementById("facturasHead");
 const body = document.getElementById("facturasBody");
 const detalleFactura = document.getElementById("detalleFactura");
 const status = document.getElementById("status");
+const paginacion = document.getElementById("facturasPaginacion");
 
 const responsable = document.getElementById("responsable");
 const filtroFechaDesde = document.getElementById("filtroFechaDesde");
@@ -24,12 +25,14 @@ const btnDescargarFacturas = document.getElementById("descargarFacturas");
 
 const getTimestamp = () => new Date().toISOString();
 const DETAILS_ORDER_KEY = "siigo_facturas_detalle_order";
+const PAGE_SIZE = 30;
 
 const state = {
   context: null,
   allRows: [],
   filteredRows: [],
   selectedId: null,
+  currentPage: 1,
   generalColumns: [
     "numero_factura", "fecha_iso", "proveedor", "nit", "estado", "tipo_factura", "debitos", "creditos", "balance"
   ],
@@ -73,9 +76,7 @@ const fetchJson = async (url, payload, method = "POST") => {
     body: method === "POST" ? JSON.stringify(payload) : undefined
   });
 
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}`);
-  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
   const contentType = res.headers.get("content-type") || "";
   if (contentType.includes("application/json")) return res.json();
@@ -110,17 +111,18 @@ const detailRowWeight = (item) => {
 
 const baseSortDetails = (items = []) => [...items].sort((a, b) => detailRowWeight(a) - detailRowWeight(b));
 
-const getDetailsForSelected = () => {
-  const selected = state.allRows.find((row) => row.__id === state.selectedId);
-  if (!selected) return [];
+const getPaginatedRows = () => {
+  const start = (state.currentPage - 1) * PAGE_SIZE;
+  return state.filteredRows.slice(start, start + PAGE_SIZE);
+};
 
-  const base = baseSortDetails(Array.isArray(selected.items) ? selected.items : []);
-  const saved = state.detailOrderByInvoice[selected.__id];
+const getDetailsByInvoice = (invoice) => {
+  const base = baseSortDetails(Array.isArray(invoice?.items) ? invoice.items : []);
+  const saved = state.detailOrderByInvoice[invoice?.__id];
   if (!Array.isArray(saved) || !saved.length) return base;
 
   const map = new Map(base.map((item, index) => [String(item.id_unico || `${item.producto}-${index}`), item]));
   const ordered = [];
-
   saved.forEach((id) => {
     if (map.has(id)) {
       ordered.push(map.get(id));
@@ -131,32 +133,28 @@ const getDetailsForSelected = () => {
   return ordered;
 };
 
-const renderDetail = () => {
-  const selected = state.allRows.find((row) => row.__id === state.selectedId);
-  if (!selected) {
-    detalleFactura.textContent = "Selecciona una factura para ver items.";
-    return;
-  }
+const getDetailsByInvoiceId = (id) => {
+  const invoice = state.allRows.find((row) => row.__id === id);
+  if (!invoice) return [];
+  return getDetailsByInvoice(invoice);
+};
 
-  const items = getDetailsForSelected();
-  const detailHead = ["↕", ...state.detailColumns].map((col) => `<th>${col}</th>`).join("");
-  const detailRows = items.map((item, idx) => {
-    const key = String(item.id_unico || `${item.producto}-${idx}`);
-    const cols = state.detailColumns.map((col) => `<td>${format(item[col])}</td>`).join("");
-    return `<tr draggable="true" data-detail-key="${key}"><td class="drag-col">⋮⋮</td>${cols}</tr>`;
-  }).join("");
+const createDetailInlineRow = (row) => {
+  const detailTr = document.createElement("tr");
+  detailTr.className = "detail-inline-row";
 
-  detalleFactura.innerHTML = `
-    <div class="tabla-wrap">
-      <table>
-        <thead><tr>${detailHead}</tr></thead>
-        <tbody id="detalleBodyRows">${detailRows || `<tr><td colspan="${state.detailColumns.length + 1}">Sin items.</td></tr>`}</tbody>
-      </table>
-    </div>
-  `;
+  const detailTd = document.createElement("td");
+  detailTd.colSpan = state.generalColumns.length + 1;
+  detailTd.innerHTML = buildDetailTableHtml(row.__id);
 
+  detailTr.appendChild(detailTd);
+  return detailTr;
+};
+
+const bindInlineDetailDrag = () => {
   let draggingKey = null;
-  detalleFactura.querySelectorAll("tr[data-detail-key]").forEach((tr) => {
+  const rows = body.querySelectorAll("tr[data-detail-key]");
+  rows.forEach((tr) => {
     tr.addEventListener("dragstart", () => {
       draggingKey = tr.dataset.detailKey;
       tr.classList.add("dragging");
@@ -166,17 +164,58 @@ const renderDetail = () => {
     tr.addEventListener("drop", () => {
       const targetKey = tr.dataset.detailKey;
       if (!draggingKey || !targetKey || draggingKey === targetKey) return;
-      const current = getDetailsForSelected().map((item, idx) => String(item.id_unico || `${item.producto}-${idx}`));
+      const current = getDetailsByInvoiceId(state.selectedId)
+        .map((item, idx) => String(item.id_unico || `${item.producto}-${idx}`));
       const from = current.indexOf(draggingKey);
       const to = current.indexOf(targetKey);
       if (from < 0 || to < 0) return;
+
       const next = [...current];
       next.splice(to, 0, next.splice(from, 1)[0]);
       state.detailOrderByInvoice[state.selectedId] = next;
       localStorage.setItem(DETAILS_ORDER_KEY, JSON.stringify(state.detailOrderByInvoice));
-      renderDetail();
+      renderTable();
+      updateDetailStatusText();
     });
   });
+};
+
+const buildDetailTableHtml = (invoiceIdValue) => {
+  const items = getDetailsByInvoiceId(invoiceIdValue);
+  const detailHead = ["↕", ...state.detailColumns].map((col) => `<th>${col}</th>`).join("");
+
+  if (!items.length) {
+    return `
+      <div class="inline-detail-wrap">
+        <table class="inline-detail-table">
+          <thead><tr>${detailHead}</tr></thead>
+          <tbody><tr><td colspan="${state.detailColumns.length + 1}">Sin items.</td></tr></tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  const detailRows = items.map((item, idx) => {
+    const key = String(item.id_unico || `${item.producto}-${idx}`);
+    const cols = state.detailColumns.map((col) => `<td>${format(item[col])}</td>`).join("");
+    return `<tr draggable="true" data-detail-key="${key}"><td class="drag-col">⋮⋮</td>${cols}</tr>`;
+  }).join("");
+
+  return `
+    <div class="inline-detail-wrap">
+      <table class="inline-detail-table">
+        <thead><tr>${detailHead}</tr></thead>
+        <tbody>${detailRows}</tbody>
+      </table>
+    </div>
+  `;
+};
+
+const updateDetailStatusText = () => {
+  const selected = state.allRows.find((row) => row.__id === state.selectedId);
+  detalleFactura.textContent = selected
+    ? `Detalle de ${format(selected.numero_factura)} visible debajo de la fila seleccionada.`
+    : "Selecciona una factura para ver items debajo de su fila.";
 };
 
 const bindColumnDrag = () => {
@@ -200,12 +239,37 @@ const bindColumnDrag = () => {
   });
 };
 
+const renderPagination = () => {
+  if (!paginacion) return;
+  paginacion.innerHTML = "";
+
+  const totalPages = Math.max(1, Math.ceil(state.filteredRows.length / PAGE_SIZE));
+  for (let page = 1; page <= totalPages; page += 1) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = String(page);
+    if (page === state.currentPage) button.classList.add("active");
+
+    button.addEventListener("click", () => {
+      state.currentPage = page;
+      renderTable();
+    });
+    paginacion.appendChild(button);
+  }
+};
+
 const renderTable = () => {
   const headers = ["subir_siigo", ...state.generalColumns];
-  head.innerHTML = `<tr>${headers.map((col) => col === "subir_siigo" ? "<th>Siigo</th>" : `<th data-column="${col}">${col}</th>`).join("")}</tr>`;
+  head.innerHTML = `<tr>${headers.map((col) => {
+    if (col === "subir_siigo") return "<th>Siigo</th>";
+    const className = col === "fecha_iso" ? " class=\"fecha-col\"" : "";
+    return `<th data-column="${col}"${className}>${col}</th>`;
+  }).join("")}</tr>`;
 
   body.innerHTML = "";
-  state.filteredRows.forEach((row) => {
+  const rows = getPaginatedRows();
+
+  rows.forEach((row) => {
     const tr = document.createElement("tr");
     tr.classList.toggle("selected", row.__id === state.selectedId);
 
@@ -231,7 +295,7 @@ const renderTable = () => {
         const data = await fetchJson(WEBHOOK_SUBIR_SIIGO, payload);
         row.siigo_subido = checked;
         setStatus(data?.message || (checked ? "La factura se ha registrado en Siigo." : "Factura marcada para reversión en Siigo."));
-      } catch (error) {
+      } catch {
         event.target.checked = !checked;
         setStatus("Error enviando estado de factura a Siigo.");
       } finally {
@@ -244,19 +308,26 @@ const renderTable = () => {
     state.generalColumns.forEach((col) => {
       const td = document.createElement("td");
       td.textContent = format(row[col]);
+      if (col === "fecha_iso") td.classList.add("fecha-col");
       tr.appendChild(td);
     });
 
     tr.addEventListener("click", () => {
       state.selectedId = row.__id;
       renderTable();
-      renderDetail();
+      updateDetailStatusText();
     });
 
     body.appendChild(tr);
+
+    if (row.__id === state.selectedId) {
+      body.appendChild(createDetailInlineRow(row));
+    }
   });
 
   bindColumnDrag();
+  bindInlineDetailDrag();
+  renderPagination();
 };
 
 const applyFilters = () => {
@@ -280,8 +351,9 @@ const applyFilters = () => {
     state.selectedId = state.filteredRows[0]?.__id || null;
   }
 
+  state.currentPage = 1;
   renderTable();
-  renderDetail();
+  updateDetailStatusText();
 };
 
 const downloadFile = (content, filename, mimeType) => {
@@ -312,8 +384,32 @@ const buildExportRows = (rows) => rows.map((row) => ({
   siigo_subido: row.siigo_subido ? "true" : "false"
 }));
 
+const buildUnifiedRows = (rows) => {
+  const invoiceRows = buildExportRows(rows);
+  return rows.flatMap((row, index) => {
+    const invoiceData = invoiceRows[index];
+    const details = getDetailsByInvoice(row);
+    if (!details.length) {
+      return [{ ...invoiceData }];
+    }
+
+    return details.map((item) => ({
+      ...invoiceData,
+      detalle_producto: item.producto,
+      detalle_cantidad: item.cantidad,
+      detalle_valor_unitario: item.valor_unitario,
+      detalle_subtotal: item.subtotal,
+      detalle_porcentaje_impuesto: item.porcentaje_impuesto,
+      detalle_codigo_contable: item.codigo_contable,
+      detalle_valor_debito: item.valor_debito,
+      detalle_valor_credito: item.valor_credito,
+      detalle_descripcion: item.descripcion
+    }));
+  });
+};
+
 const exportCsv = (rows) => {
-  const mapped = buildExportRows(rows);
+  const mapped = buildUnifiedRows(rows);
   if (!mapped.length) return setStatus("No hay facturas para descargar.");
   const headers = Object.keys(mapped[0]);
   const lines = [headers.join(",")];
@@ -323,22 +419,62 @@ const exportCsv = (rows) => {
   downloadFile(lines.join("\n"), `facturas_siigo_${Date.now()}.csv`, "text/csv;charset=utf-8;");
 };
 
-const exportExcel = (rows) => {
-  const mapped = buildExportRows(rows);
+const exportExcelUnified = (rows) => {
+  const mapped = buildUnifiedRows(rows);
   if (!mapped.length) return setStatus("No hay facturas para descargar.");
   const headers = Object.keys(mapped[0]);
-  const bodyRows = mapped.map((row) => `<tr>${headers.map((key) => `<td>${format(row[key])}</td>`).join("")}</tr>`).join("");
+  const bodyRows = mapped
+    .map((row) => `<tr>${headers.map((key) => `<td>${format(row[key])}</td>`).join("")}</tr>`)
+    .join("");
+
   const html = `<table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${bodyRows}</tbody></table>`;
-  downloadFile(html, `facturas_siigo_${Date.now()}.xls`, "application/vnd.ms-excel;charset=utf-8;");
+  downloadFile(html, `facturas_siigo_unificadas_${Date.now()}.xls`, "application/vnd.ms-excel;charset=utf-8;");
+};
+
+const exportExcelSeparated = (rows) => {
+  if (!rows.length) return setStatus("No hay facturas para descargar.");
+
+  const generalHeaders = Object.keys(buildExportRows(rows)[0] || {});
+  const detailHeaders = state.detailColumns;
+
+  const blocks = rows.map((row, index) => {
+    const general = buildExportRows([row])[0];
+    const details = getDetailsByInvoice(row);
+    const spacerCols = "<td></td><td></td>";
+
+    const generalHeader = `<tr>${spacerCols}${generalHeaders.map((h) => `<th>${h}</th>`).join("")}</tr>`;
+    const generalValues = `<tr>${spacerCols}${generalHeaders.map((h) => `<td>${format(general[h])}</td>`).join("")}</tr>`;
+
+    const detailHeader = `<tr>${spacerCols}${detailHeaders.map((h) => `<th>${h}</th>`).join("")}</tr>`;
+    const detailRows = details.length
+      ? details.map((item) => `<tr>${spacerCols}${detailHeaders.map((h) => `<td>${format(item[h])}</td>`).join("")}</tr>`).join("")
+      : `<tr>${spacerCols}<td colspan="${detailHeaders.length}">Sin items.</td></tr>`;
+
+    return `
+      <tr>${spacerCols}<td colspan="${Math.max(generalHeaders.length, detailHeaders.length)}"><strong>Factura ${index + 1}: ${format(row.numero_factura)}</strong></td></tr>
+      ${generalHeader}
+      ${generalValues}
+      <tr><td></td><td></td></tr>
+      ${detailHeader}
+      ${detailRows}
+      <tr><td></td><td></td></tr>
+      <tr><td></td><td></td></tr>
+    `;
+  }).join("");
+
+  const html = `<table>${blocks}</table>`;
+  downloadFile(html, `facturas_siigo_cuadros_${Date.now()}.xls`, "application/vnd.ms-excel;charset=utf-8;");
 };
 
 const handleDownload = () => {
-  const selected = state.allRows.find((row) => row.__id === state.selectedId);
-  const mode = modoDescarga?.value || "excel_filtradas";
-  const rows = mode.includes("seleccionada") ? (selected ? [selected] : []) : state.filteredRows;
+  const mode = modoDescarga?.value || "excel_unificada_filtradas";
+  const rows = state.filteredRows;
   if (!rows.length) return setStatus("No hay facturas para descargar con este modo.");
-  if (mode.startsWith("csv")) exportCsv(rows);
-  else exportExcel(rows);
+
+  if (mode === "csv_filtradas") exportCsv(rows);
+  else if (mode === "excel_cuadros_filtradas") exportExcelSeparated(rows);
+  else exportExcelUnified(rows);
+
   setStatus(`Descarga generada (${rows.length} factura(s)).`);
 };
 
@@ -372,9 +508,10 @@ const loadFacturas = async () => {
   state.allRows = rows;
   state.filteredRows = rows;
   state.selectedId = rows[0]?.__id || null;
+  state.currentPage = 1;
 
   renderTable();
-  renderDetail();
+  updateDetailStatusText();
   setStatus(rows.length ? `Facturas cargadas: ${rows.length}` : "No hay facturas para mostrar.");
 };
 
