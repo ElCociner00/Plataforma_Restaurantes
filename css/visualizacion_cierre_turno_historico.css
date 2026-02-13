@@ -1,5 +1,5 @@
 .main {
-  max-width: 760px;
+  max-width: 960px;
 }
 
 .descripcion {
@@ -13,8 +13,18 @@
   border-radius: 10px;
   padding: 20px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  margin-bottom: 14px;
+}
+
+.panel h2 {
+  margin-top: 0;
+  font-size: 1rem;
+}
+
+.panel-grid {
   display: grid;
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 10px;
 }
 
 .vis-row {
@@ -23,8 +33,9 @@
   align-items: center;
   font-size: 0.95rem;
   color: #1f2937;
-  border-bottom: 1px solid #f3f4f6;
-  padding-bottom: 8px;
+  border: 1px solid #f3f4f6;
+  border-radius: 8px;
+  padding: 10px;
 }
 
 .switch {
@@ -43,10 +54,7 @@
 .slider {
   position: absolute;
   cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background-color: #cbd5f5;
   transition: 0.2s;
   border-radius: 999px;

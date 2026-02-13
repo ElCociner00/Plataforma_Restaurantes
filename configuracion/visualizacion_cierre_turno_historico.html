@@ -18,9 +18,24 @@
 
   <div class="main">
     <h1>Visualización histórico cierre turno</h1>
-    <p class="descripcion">Activa o desactiva las columnas visibles en el histórico de cierres de turno.</p>
+    <p class="descripcion">Administra qué campos generales y qué campos de detalle se muestran en el histórico.</p>
 
-    <div id="columnasPanel" class="panel"></div>
+    <section class="panel">
+      <h2>Campos generales</h2>
+      <div id="columnasGeneralesPanel" class="panel-grid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Campos de detalle</h2>
+      <div id="columnasDetallePanel" class="panel-grid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Items de detalle (filas)</h2>
+      <p class="descripcion">Por defecto se muestran categorías <strong>real</strong> y <strong>sistema</strong>; gastos vienen ocultos.</p>
+      <div id="itemsDetallePanel" class="panel-grid"></div>
+    </section>
+
     <div id="status" class="status"></div>
   </div>
 
