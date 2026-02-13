@@ -100,6 +100,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const extrasRows = new Map();
   const getTimestamp = () => new Date().toISOString();
   let modoEfectivoSistema = "bruto";
+  let efectivoSistemaLoggro = 0;
 
   const toNumberValue = (value) => {
     const parsed = Number(value);
@@ -116,7 +117,7 @@ document.addEventListener("DOMContentLoaded", () => {
     .reduce((sum, row) => sum + asNumber(row.value), 0);
 
   const getEfectivoSistemaBruto = () => (
-    toNumberValue(efectivoApertura?.value) + toNumberValue(bolsa?.value) + toNumberValue(caja?.value)
+    toNumberValue(efectivoApertura?.value) + toNumberValue(efectivoSistemaLoggro)
   );
 
   const getEfectivoSistemaNeto = () => getEfectivoSistemaBruto() - getTotalGastosExtras();
@@ -512,6 +513,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (caja) {
       caja.value = "";
     }
+    efectivoSistemaLoggro = 0;
     modoEfectivoSistema = "bruto";
     syncEfectivoRealFromCajaBolsa();
     syncEfectivoSistemaDisplay();
@@ -594,6 +596,14 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       const data = await res.json();
+
+      const efectivoSistemaDesdeLoggro =
+        data.efectivo_sistema
+        ?? data.efectivo
+        ?? data.ventas_efectivo
+        ?? data.total_efectivo
+        ?? 0;
+      efectivoSistemaLoggro = toNumberValue(efectivoSistemaDesdeLoggro);
 
       syncEfectivoSistemaDisplay();
       inputsFinanzas.datafono.sistema.value = data.datafono_sistema ?? "";
@@ -715,7 +725,7 @@ document.addEventListener("DOMContentLoaded", () => {
       finanzas: {
         efectivo_apertura: efectivoApertura.value || 0,
         efectivo: {
-          sistema: String(getEfectivoSistemaBruto()),
+          sistema: String(getEfectivoSistemaNeto()),
           real: inputsFinanzas.efectivo.real.value || 0
         },
         datafono: {
@@ -759,8 +769,9 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       const data = await res.json();
+      const diferenciaEfectivoCalculada = getEfectivoSistemaNeto() - toNumberValue(inputsFinanzas.efectivo.real.value);
       const diferencias = {
-        efectivo: data.efectivo_diferencia,
+        efectivo: diferenciaEfectivoCalculada,
         datafono: data.datafono_diferencia,
         rappi: data.rappi_diferencia,
         nequi: data.nequi_diferencia,
