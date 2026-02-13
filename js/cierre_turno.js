@@ -381,8 +381,6 @@ document.addEventListener("DOMContentLoaded", () => {
     return {
       fecha: fecha.value,
       responsable: responsable.value,
-      bolsa: bolsa?.value || 0,
-      caja: caja?.value || 0,
       turno: {
         inicio: horaInicio.value,
         fin: horaFin.value,
@@ -449,6 +447,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const efectivoSistemaNeto = getEfectivoSistemaNeto();
     const efectivoReal = toNumberValue(inputsFinanzas.efectivo.real.value);
     return efectivoSistemaNeto - efectivoReal;
+  };
+
+  const syncDiferenciaEfectivo = () => {
+    const diferencia = calcularDiferenciaEfectivoLocal();
+    if (!inputsDiferencias.efectivo) return diferencia;
+    inputsDiferencias.efectivo.input.value = String(diferencia);
+    actualizarEstadoDiferencia("efectivo", diferencia);
+    return diferencia;
   };
 
   const applyVisibilitySettings = () => {
@@ -523,6 +529,7 @@ document.addEventListener("DOMContentLoaded", () => {
     modoEfectivoSistema = "bruto";
     syncEfectivoRealFromCajaBolsa();
     syncEfectivoSistemaDisplay();
+    syncDiferenciaEfectivo();
     extrasRows.forEach((row) => {
       row.value = 0;
       if (row.input) {
@@ -556,16 +563,17 @@ document.addEventListener("DOMContentLoaded", () => {
   comentarios.addEventListener("input", marcarComoNoVerificado);
   bolsa?.addEventListener("input", () => {
     syncEfectivoRealFromCajaBolsa();
-    syncEfectivoSistemaDisplay();
+    syncDiferenciaEfectivo();
     marcarComoNoVerificado();
   });
   caja?.addEventListener("input", () => {
     syncEfectivoRealFromCajaBolsa();
-    syncEfectivoSistemaDisplay();
+    syncDiferenciaEfectivo();
     marcarComoNoVerificado();
   });
   efectivoApertura?.addEventListener("input", () => {
     syncEfectivoSistemaDisplay();
+    syncDiferenciaEfectivo();
     marcarComoNoVerificado();
   });
 
@@ -574,6 +582,7 @@ document.addEventListener("DOMContentLoaded", () => {
     btnToggleEfectivoSistema.classList.add("rotating");
     setTimeout(() => btnToggleEfectivoSistema.classList.remove("rotating"), 360);
     syncEfectivoSistemaDisplay();
+    syncDiferenciaEfectivo();
   });
   Object.values(inputsFinanzas).forEach((grupo) => {
     grupo.real.addEventListener("input", marcarComoNoVerificado);
@@ -709,9 +718,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // Siempre limpiar antes de un nuevo ciclo de verificación
     limpiarDiferencias();
 
-    // Siempre limpiar antes de un nuevo ciclo de verificación
-    limpiarDiferencias();
-
     actualizarDomiciliosDesdeExtras();
 
     if (!efectivoApertura?.value) {
@@ -780,7 +786,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       const data = await res.json();
-      const diferenciaEfectivoCalculada = getEfectivoSistemaNeto() - toNumberValue(inputsFinanzas.efectivo.real.value);
+      const diferenciaEfectivoCalculada = syncDiferenciaEfectivo();
       const diferencias = {
         efectivo: diferenciaEfectivoCalculada,
         datafono: data.datafono_diferencia,
@@ -857,8 +863,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const obtenerCategoriaGasto = (nombre) => {
       const label = String(nombre || "").toLowerCase();
-      if (label.includes("domicilios") && label.includes("operativ")) return "operativo";
-      if (label.includes("domicilios") && label.includes("cliente")) return "cliente";
+      if (label.includes("domicilios") && label.includes("operativ")) return "domicilios_operativos";
+      if (label.includes("domicilios") && label.includes("cliente")) return "domicilios_clientes";
       if (label.includes("insumo")) return "insumos";
       if (label.includes("arriendo")) return "arriendo";
       if (label.includes("aseo") || label.includes("limpieza")) return "aseo";
@@ -899,10 +905,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const itemsGastos = gastosExtras.map((gasto) => ({
       tipo: "gasto_extra",
       categoria: obtenerCategoriaGasto(gasto.name),
-      nombre: gasto.name,
-      valor: Number(gasto.valor || 0),
+      valor: String(Number(gasto.valor || 0)),
       id_referencia: gasto.Id || null,
-      visible: Boolean(gasto.visible)
+      tiene_diferencia: false
     }));
 
     const totalSistema = mediosPago.reduce((acc, medio) => acc + Number(inputsFinanzas[medio]?.sistema?.value || 0), 0);
@@ -910,10 +915,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const diferenciaTotal = Object.values(diferencias).reduce((acc, value) => acc + Number(value || 0), 0);
     const totalGastosExtras = gastosExtras.reduce((acc, gasto) => acc + Number(gasto.valor || 0), 0);
     const totalDomiciliosOperativos = itemsGastos
-      .filter((item) => item.categoria === "operativo")
+      .filter((item) => item.categoria === "domicilios_operativos")
       .reduce((acc, item) => acc + Number(item.valor || 0), 0);
     const totalDomiciliosClientes = itemsGastos
-      .filter((item) => item.categoria === "cliente")
+      .filter((item) => item.categoria === "domicilios_clientes")
       .reduce((acc, item) => acc + Number(item.valor || 0), 0);
 
     return {
