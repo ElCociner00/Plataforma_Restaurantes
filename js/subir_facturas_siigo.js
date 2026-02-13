@@ -17,9 +17,10 @@ const filtroNumero = document.getElementById("filtroNumero");
 const filtroProveedor = document.getElementById("filtroProveedor");
 const filtroNit = document.getElementById("filtroNit");
 
-const btnConsultar = document.getElementById("consultarFacturas");
 const btnAplicarFiltros = document.getElementById("aplicarFiltros");
 const btnLimpiarFiltros = document.getElementById("limpiarFiltros");
+const modoDescarga = document.getElementById("modoDescarga");
+const btnDescargarFacturas = document.getElementById("descargarFacturas");
 
 const getTimestamp = () => new Date().toISOString();
 const DETAILS_ORDER_KEY = "siigo_facturas_detalle_order";
@@ -40,6 +41,68 @@ const state = {
 
 const setStatus = (message) => { status.textContent = message; };
 const format = (v) => (v === null || v === undefined || v === "" ? "-" : String(v));
+
+
+const escapeCsv = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+
+const downloadFile = (content, filename, mime) => {
+  const blob = new Blob([content], { type: mime });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(link.href);
+};
+
+const buildExportRows = (rows) => rows.map((row) => ({
+  numero_factura: row.numero_factura,
+  prefijo_factura: row.prefijo_factura,
+  consecutivo_factura: row.consecutivo_factura,
+  fecha_iso: row.fecha_iso,
+  proveedor: row.proveedor,
+  nit: row.nit,
+  direccion: row.direccion,
+  telefono: row.telefono,
+  correo_empresa: row.correo_empresa,
+  estado: row.estado,
+  tipo_factura: row.tipo_factura,
+  debitos: row.debitos,
+  creditos: row.creditos,
+  balance: row.balance,
+  total_items: row.total_items,
+  siigo_subido: row.siigo_subido ? "true" : "false"
+}));
+
+const exportCsv = (rows) => {
+  const mapped = buildExportRows(rows);
+  if (!mapped.length) return setStatus("No hay facturas para descargar.");
+  const headers = Object.keys(mapped[0]);
+  const lines = [headers.join(",")];
+  mapped.forEach((row) => {
+    lines.push(headers.map((key) => escapeCsv(row[key])).join(","));
+  });
+  downloadFile(lines.join("
+"), `facturas_siigo_${Date.now()}.csv`, "text/csv;charset=utf-8;");
+};
+
+const exportExcel = (rows) => {
+  const mapped = buildExportRows(rows);
+  if (!mapped.length) return setStatus("No hay facturas para descargar.");
+  const headers = Object.keys(mapped[0]);
+  const bodyRows = mapped.map((row) => `<tr>${headers.map((key) => `<td>${format(row[key])}</td>`).join("")}</tr>`).join("");
+  const html = `<table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${bodyRows}</tbody></table>`;
+  downloadFile(html, `facturas_siigo_${Date.now()}.xls`, "application/vnd.ms-excel;charset=utf-8;");
+};
+
+const handleDownload = () => {
+  const selected = state.allRows.find((row) => row.__id === state.selectedId);
+  const mode = modoDescarga?.value || "excel_filtradas";
+  const rows = mode.includes("seleccionada") ? (selected ? [selected] : []) : state.filteredRows;
+  if (!rows.length) return setStatus("No hay facturas para descargar con este modo.");
+  if (mode.startsWith("csv")) exportCsv(rows);
+  else exportExcel(rows);
+  setStatus(`Descarga generada (${rows.length} factura(s)).`);
+};
 
 const normalizeRows = (raw) => {
   if (Array.isArray(raw)) return raw;
@@ -285,6 +348,10 @@ const loadFacturas = async () => {
 
 const init = async () => {
   state.context = await getUserContext();
+  if (!WEBHOOK_CARGAR_FACTURAS_CORREO || !WEBHOOK_SUBIR_SIIGO) {
+    setStatus("Configuración de webhooks incompleta.");
+    return;
+  }
   if (!state.context) {
     setStatus("No se pudo validar la sesión.");
     return;
@@ -300,11 +367,12 @@ const init = async () => {
   }
 };
 
-btnConsultar.addEventListener("click", loadFacturas);
 btnAplicarFiltros.addEventListener("click", applyFilters);
 btnLimpiarFiltros.addEventListener("click", () => {
   [filtroFechaDesde, filtroFechaHasta, filtroNumero, filtroProveedor, filtroNit].forEach((el) => { el.value = ""; });
   applyFilters();
 });
+
+btnDescargarFacturas?.addEventListener("click", handleDownload);
 
 init();

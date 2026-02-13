@@ -86,3 +86,16 @@ tr.selected { background: #f5f3ff; }
 
 .drag-col { width: 30px; text-align: center; color: #9ca3af; }
 .status { margin-top: 10px; color: #374151; }
+
+.descarga-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: #4b5563;
+  min-width: 220px;
+}
+
+.descarga-label select {
+  background: #fff;
+}

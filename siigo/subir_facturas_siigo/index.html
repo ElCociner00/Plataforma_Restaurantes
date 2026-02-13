@@ -30,9 +30,17 @@
         <label>NIT<input type="text" id="filtroNit" placeholder="NIT"></label>
       </div>
       <div class="filtros-actions">
-        <button id="consultarFacturas" type="button">Ver o subir facturas correo</button>
         <button id="aplicarFiltros" type="button">Aplicar filtros</button>
         <button id="limpiarFiltros" type="button">Limpiar filtros</button>
+        <label class="descarga-label">Modo descarga
+          <select id="modoDescarga">
+            <option value="excel_filtradas">Excel (filtradas)</option>
+            <option value="csv_filtradas">CSV (filtradas)</option>
+            <option value="excel_seleccionada">Excel (seleccionada)</option>
+            <option value="csv_seleccionada">CSV (seleccionada)</option>
+          </select>
+        </label>
+        <button id="descargarFacturas" type="button">Descargar</button>
       </div>
     </section>
 
@@ -49,8 +57,7 @@
 
     <section class="bloque">
       <h2>Detalle de factura seleccionada</h2>
-      <p class="hint">Las filas arrancan ordenadas por: productos, IMPUESTO (penúltimo), crédito (último). Puedes reordenarlas manualmente.</p>
-      <div id="detalleFactura" class="detalle-box">Selecciona una factura para ver items.</div>
+            <div id="detalleFactura" class="detalle-box">Selecciona una factura para ver items.</div>
       <div id="status" class="status"></div>
     </section>
   </div>
