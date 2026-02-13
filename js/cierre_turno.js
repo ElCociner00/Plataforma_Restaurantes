@@ -30,6 +30,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const mensajeEnvio = document.getElementById("mensajeEnvio");
   const btnConfirmarEnvio = document.getElementById("confirmarEnvio");
   const btnCancelarEnvio = document.getElementById("cancelarEnvio");
+  const btnToggleEfectivoSistema = document.getElementById("toggleEfectivoSistema");
+  const efectivoSistemaModo = document.getElementById("efectivoSistemaModo");
+  const totalGastosExtrasEl = document.getElementById("totalGastosExtras");
 
   const inputsFinanzas = {
     efectivo: {
@@ -96,6 +99,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const MAX_LOADING_MS = 5000;
   const extrasRows = new Map();
   const getTimestamp = () => new Date().toISOString();
+  let modoEfectivoSistema = "bruto";
 
   const toNumberValue = (value) => {
     const parsed = Number(value);
@@ -105,7 +109,35 @@ document.addEventListener("DOMContentLoaded", () => {
   const syncEfectivoRealFromCajaBolsa = () => {
     const total = toNumberValue(bolsa?.value) + toNumberValue(caja?.value);
     inputsFinanzas.efectivo.real.value = String(total);
+  };
 
+  const getTotalGastosExtras = () => Array.from(extrasRows.values())
+    .filter((row) => row.visible)
+    .reduce((sum, row) => sum + asNumber(row.value), 0);
+
+  const getEfectivoSistemaBruto = () => (
+    toNumberValue(efectivoApertura?.value) + toNumberValue(bolsa?.value) + toNumberValue(caja?.value)
+  );
+
+  const getEfectivoSistemaNeto = () => getEfectivoSistemaBruto() - getTotalGastosExtras();
+
+  const syncEfectivoSistemaDisplay = () => {
+    const bruto = getEfectivoSistemaBruto();
+    const neto = getEfectivoSistemaNeto();
+    const valor = modoEfectivoSistema === "neto" ? neto : bruto;
+    inputsFinanzas.efectivo.sistema.value = String(valor);
+    if (efectivoSistemaModo) {
+      efectivoSistemaModo.textContent = modoEfectivoSistema === "neto"
+        ? "efectivo despues de gastos"
+        : "efectivo bruto";
+    }
+  };
+
+  const syncTotalesExtras = () => {
+    if (totalGastosExtrasEl) {
+      totalGastosExtrasEl.textContent = String(getTotalGastosExtras());
+    }
+    syncEfectivoSistemaDisplay();
   };
 
   enforceNumericInput([
@@ -242,6 +274,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .reduce((sum, row) => sum + asNumber(row.value), 0);
 
     inputsSoloVista.domicilios.value = String(totalDomicilios);
+    syncTotalesExtras();
   };
 
   const getContextPayload = async () => {
@@ -470,7 +503,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (caja) {
       caja.value = "";
     }
+    modoEfectivoSistema = "bruto";
     syncEfectivoRealFromCajaBolsa();
+    syncEfectivoSistemaDisplay();
     extrasRows.forEach((row) => {
       row.value = 0;
       if (row.input) {
@@ -492,6 +527,8 @@ document.addEventListener("DOMContentLoaded", () => {
   toggleButtons({ consultar: true, verificar: false, enviar: false });
 
   syncEfectivoRealFromCajaBolsa();
+  syncEfectivoSistemaDisplay();
+  syncTotalesExtras();
   actualizarEstadoHoraFin();
   cargarResponsables();
   cargarExtrasCatalogo();
@@ -506,11 +543,24 @@ document.addEventListener("DOMContentLoaded", () => {
   comentarios.addEventListener("input", marcarComoNoVerificado);
   bolsa?.addEventListener("input", () => {
     syncEfectivoRealFromCajaBolsa();
+    syncEfectivoSistemaDisplay();
     marcarComoNoVerificado();
   });
   caja?.addEventListener("input", () => {
     syncEfectivoRealFromCajaBolsa();
+    syncEfectivoSistemaDisplay();
     marcarComoNoVerificado();
+  });
+  efectivoApertura?.addEventListener("input", () => {
+    syncEfectivoSistemaDisplay();
+    marcarComoNoVerificado();
+  });
+
+  btnToggleEfectivoSistema?.addEventListener("click", () => {
+    modoEfectivoSistema = modoEfectivoSistema === "bruto" ? "neto" : "bruto";
+    btnToggleEfectivoSistema.classList.add("rotating");
+    setTimeout(() => btnToggleEfectivoSistema.classList.remove("rotating"), 360);
+    syncEfectivoSistemaDisplay();
   });
   Object.values(inputsFinanzas).forEach((grupo) => {
     grupo.real.addEventListener("input", marcarComoNoVerificado);
@@ -540,9 +590,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const data = await res.json();
 
-      const efectivoSistemaWebhook = toNumberValue(data.efectivo_sistema);
-      const aperturaActual = toNumberValue(efectivoApertura?.value);
-      inputsFinanzas.efectivo.sistema.value = String(efectivoSistemaWebhook + aperturaActual);
+      syncEfectivoSistemaDisplay();
       inputsFinanzas.datafono.sistema.value = data.datafono_sistema ?? "";
       inputsFinanzas.rappi.sistema.value = data.rappi_sistema ?? "";
       inputsFinanzas.nequi.sistema.value = data.nequi_sistema ?? "";
@@ -662,7 +710,7 @@ document.addEventListener("DOMContentLoaded", () => {
       finanzas: {
         efectivo_apertura: efectivoApertura.value || 0,
         efectivo: {
-          sistema: inputsFinanzas.efectivo.sistema.value || 0,
+          sistema: String(getEfectivoSistemaBruto()),
           real: inputsFinanzas.efectivo.real.value || 0
         },
         datafono: {
@@ -789,7 +837,9 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const itemsFinanzas = mediosPago.flatMap((medio) => {
-      const valorSistema = inputsFinanzas[medio]?.sistema?.value || 0;
+      const valorSistema = medio === "efectivo"
+        ? String(getEfectivoSistemaNeto())
+        : (inputsFinanzas[medio]?.sistema?.value || 0);
       const valorReal = inputsFinanzas[medio]?.real?.value || 0;
       const diferenciaRaw = diferencias[`${medio}_diferencia`] ?? (Number(valorReal) - Number(valorSistema));
       const diferenciaNum = Number(diferenciaRaw);
