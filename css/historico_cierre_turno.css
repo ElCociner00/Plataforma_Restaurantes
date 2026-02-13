@@ -1,5 +1,5 @@
 .main {
-  max-width: 1200px;
+  max-width: 1250px;
 }
 
 .bloque {
@@ -12,7 +12,8 @@
   gap: 10px;
 }
 
-.filtros-grid label {
+.filtros-grid label,
+.acciones-descarga label {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -25,12 +26,19 @@
   gap: 10px;
   margin-top: 12px;
   flex-wrap: wrap;
+  align-items: end;
 }
 
 .hint {
   text-align: left;
   margin: 0 0 8px;
   color: #6b7280;
+}
+
+.vis-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
 .columnas-panel {
@@ -69,6 +77,11 @@
 
 .columnas-desplegable .hint {
   margin-top: 8px;
+}
+
+.link-config {
+  display: inline-block;
+  margin-top: 10px;
 }
 
 .vis-row {
@@ -148,6 +161,10 @@ th {
   user-select: none;
 }
 
+tr.selected {
+  background: #eef2ff;
+}
+
 th.dragging {
   opacity: 0.4;
 }
@@ -168,6 +185,33 @@ th.dragging {
   background: #312e81;
 }
 
+.detalle-turno {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  padding: 12px;
+}
+
+.kv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.kv {
+  background: #f9fafb;
+  padding: 8px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detalle-wrap table {
+  min-width: 450px;
+}
+
 .status {
   margin-top: 12px;
 }
@@ -186,4 +230,10 @@ th.dragging {
 
 .loading-overlay.is-hidden {
   display: none;
+}
+
+@media (max-width: 900px) {
+  .vis-grid-2 {
+    grid-template-columns: 1fr;
+  }
 }

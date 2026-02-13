@@ -52,22 +52,40 @@
     </section>
 
     <section class="bloque acciones-descarga">
-      <button id="descargarPagina" type="button">Descargar página (Excel)</button>
-      <button id="descargarFiltrado" type="button">Descargar filtrado (Excel)</button>
-      <button id="descargarFila" type="button">Descargar fila exacta (Excel)</button>
+      <label>
+        Tipo de descarga
+        <select id="tipoDescarga">
+          <option value="turno_seleccionado">Turno abierto (Excel)</option>
+          <option value="turnos_marcados">Turnos marcados (Excel)</option>
+          <option value="turnos_filtrados">Turnos filtrados (Excel)</option>
+          <option value="turnos_pagina">Turnos de la página (Excel)</option>
+          <option value="turnos_filtrados_csv">Turnos filtrados (CSV)</option>
+        </select>
+      </label>
+      <button id="descargarDatos" type="button">Descargar</button>
     </section>
 
     <section class="bloque columnas-visibles">
       <details class="columnas-desplegable">
-        <summary>Columnas visibles</summary>
-        <p class="hint">Oculta columnas para no incluirlas en la descarga.</p>
-        <div id="columnasPanel" class="columnas-panel"></div>
+        <summary>Campos visibles</summary>
+        <p class="hint">Solo los campos visibles se mostrarán y descargarán.</p>
+        <div class="vis-grid-2">
+          <div>
+            <h3>Campos generales</h3>
+            <div id="columnasPanel" class="columnas-panel"></div>
+          </div>
+          <div>
+            <h3>Campos de detalle</h3>
+            <div id="detallesPanel" class="columnas-panel"></div>
+          </div>
+        </div>
+        <a class="link-config" href="../configuracion/visualizacion_cierre_turno_historico.html">Configurar visualización avanzada</a>
       </details>
     </section>
 
     <section class="bloque">
-      <h2>Tabla histórica</h2>
-      <p class="hint">Puedes reordenar columnas arrastrando el encabezado.</p>
+      <h2>Tabla histórica (resumen general)</h2>
+      <p class="hint">Puedes reordenar columnas generales arrastrando el encabezado.</p>
       <div class="tabla-wrap">
         <table>
           <thead id="historicoHead"></thead>
@@ -75,6 +93,11 @@
         </table>
       </div>
       <div id="paginacion" class="paginacion"></div>
+    </section>
+
+    <section class="bloque">
+      <h2>Detalle del cierre seleccionado</h2>
+      <div id="detalleTurno" class="detalle-turno">Selecciona un turno para ver su detalle.</div>
       <div id="status" class="status"></div>
     </section>
   </div>
