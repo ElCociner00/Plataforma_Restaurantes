@@ -24,13 +24,26 @@
 
     <section class="bloque">
       <h2>Información del turno</h2>
-      <input id="fecha" type="date">
-      <select id="responsable">
-        <option value="">Seleccione responsable</option>
-      </select>
-      <h4>Turno</h4>
-      <input id="hora_inicio" type="time">
-      <input id="hora_fin" type="time">
+      <div class="turno-info-grid">
+        <label>
+          Fecha
+          <input id="fecha" type="date">
+        </label>
+        <label>
+          Responsable
+          <select id="responsable">
+            <option value="">Seleccione responsable</option>
+          </select>
+        </label>
+        <label>
+          Hora inicio
+          <input id="hora_inicio" type="time">
+        </label>
+        <label>
+          Hora fin
+          <input id="hora_fin" type="time">
+        </label>
+      </div>
     </section>
 
     <section class="bloque">
@@ -51,7 +64,7 @@
     </section>
 
     <section class="bloque acciones-cierre">
-      <button id="consultar">Consultar</button>
+      <button id="consultar">Consultar Loggro</button>
       <button id="verificar" disabled>Verificar</button>
       <button id="subir" disabled>Subir datos</button>
       <button id="limpiar" type="button">Limpiar datos</button>
