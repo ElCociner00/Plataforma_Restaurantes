@@ -27,8 +27,6 @@ const EXCLUDED_GENERAL_FIELDS = new Set(["registrado_por", "total_variables", "d
 const EXCLUDED_DETAIL_FIELDS = new Set(["id"]);
 const getTimestamp = () => new Date().toISOString();
 
-let loadingSafetyTimeoutId = null;
-
 const state = {
   context: null,
   allRows: [],
@@ -37,10 +35,15 @@ const state = {
   visibleGeneralColumns: [],
   allDetailColumns: [],
   visibleDetailColumns: [],
+  allDetailItemKeys: [],
+  visibleDetailItemKeys: [],
+  detailOrderByRowId: {},
   currentPage: 1,
   selectedRowIds: new Set(),
   expandedRowId: null
 };
+
+let loadingSafetyTimeoutId = null;
 
 const setStatus = (message) => {
   status.textContent = message;
@@ -52,16 +55,14 @@ const setLoading = (isLoading, message = "") => {
     loadingSafetyTimeoutId = null;
   }
 
-  if (loadingOverlay) {
-    loadingOverlay.classList.toggle("is-hidden", !isLoading);
+  loadingOverlay?.classList.toggle("is-hidden", !isLoading);
 
-    if (isLoading) {
-      loadingSafetyTimeoutId = setTimeout(() => {
-        loadingOverlay.classList.add("is-hidden");
-        setStatus("Carga finalizada por límite de 5 segundos.");
-        loadingSafetyTimeoutId = null;
-      }, MAX_LOADING_MS);
-    }
+  if (isLoading) {
+    loadingSafetyTimeoutId = setTimeout(() => {
+      loadingOverlay?.classList.add("is-hidden");
+      setStatus("Carga finalizada por límite de 5 segundos.");
+      loadingSafetyTimeoutId = null;
+    }, MAX_LOADING_MS);
   }
 
   if (message) setStatus(message);
@@ -70,12 +71,8 @@ const setLoading = (isLoading, message = "") => {
 const fetchWithTimeout = async (url, options = {}, timeoutMs = MAX_LOADING_MS) => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
   try {
-    return await fetch(url, {
-      ...options,
-      signal: controller.signal
-    });
+    return await fetch(url, { ...options, signal: controller.signal });
   } finally {
     clearTimeout(timeoutId);
   }
@@ -84,6 +81,7 @@ const fetchWithTimeout = async (url, options = {}, timeoutMs = MAX_LOADING_MS) =
 const getGeneralVisibilityKey = (tenantId) => `historico_cierre_turno_visibilidad_${tenantId || "global"}`;
 const getGeneralOrderKey = (tenantId) => `historico_cierre_turno_orden_${tenantId || "global"}`;
 const getDetailVisibilityKey = (tenantId) => `historico_cierre_turno_detalle_visibilidad_${tenantId || "global"}`;
+const getDetailItemVisibilityKey = (tenantId) => `historico_cierre_turno_detalle_items_visibilidad_${tenantId || "global"}`;
 
 const loadJson = (key, fallback) => {
   const stored = localStorage.getItem(key);
@@ -95,27 +93,20 @@ const loadJson = (key, fallback) => {
   }
 };
 
-const saveJson = (key, value) => {
-  localStorage.setItem(key, JSON.stringify(value));
-};
+const saveJson = (key, value) => localStorage.setItem(key, JSON.stringify(value));
 
 const normalizeRows = (raw) => {
   if (!raw) return [];
-
   if (Array.isArray(raw)) {
-    if (!raw.length) return [];
-
     const keys = ["rows", "data", "items", "historico", "registros", "cierres"];
     for (const key of keys) {
       const nested = raw.flatMap((item) => (Array.isArray(item?.[key]) ? item[key] : []));
       if (nested.length) return nested;
     }
-
     return raw.filter((item) => item && typeof item === "object");
   }
 
   if (typeof raw !== "object") return [];
-
   const keys = ["rows", "data", "items", "historico", "registros", "cierres"];
   for (const key of keys) {
     if (Array.isArray(raw[key])) return raw[key];
@@ -123,7 +114,7 @@ const normalizeRows = (raw) => {
 
   return Object.entries(raw)
     .filter(([key]) => key !== "ok" && key !== "message")
-    .map(([, item]) => item)
+    .map(([, value]) => value)
     .filter((item) => item && typeof item === "object");
 };
 
@@ -136,6 +127,29 @@ const formatCellValue = (value) => {
 
 const getRowId = (row, index) => String(row.turno_nombre || `${row.fecha_turno || "sin_fecha"}-${row.numero_turno || "sin_turno"}-${index}`);
 
+const getDetailItemKey = (detail) => `${String(detail.variable || "")}|${String(detail.categoria || "")}`;
+
+const detailCategoryWeight = (categoria) => {
+  const c = String(categoria || "").toLowerCase();
+  if (c === "sistema") return 1;
+  if (c === "real") return 2;
+  return 3;
+};
+
+const isGasto = (detail) => String(detail.variable || "").toLowerCase().includes("gasto");
+
+const sortDetailsBase = (details) => [...details].sort((a, b) => {
+  const gastoA = isGasto(a);
+  const gastoB = isGasto(b);
+  if (gastoA !== gastoB) return gastoA ? 1 : -1;
+
+  const varA = String(a.variable || "").toLowerCase();
+  const varB = String(b.variable || "").toLowerCase();
+  if (varA !== varB) return varA.localeCompare(varB);
+
+  return detailCategoryWeight(a.categoria) - detailCategoryWeight(b.categoria);
+});
+
 const sanitizeRow = (rawRow, index) => {
   const general = {};
   Object.entries(rawRow || {}).forEach(([key, value]) => {
@@ -143,54 +157,71 @@ const sanitizeRow = (rawRow, index) => {
   });
 
   const detailsRaw = Array.isArray(rawRow?.variables_detalle) ? rawRow.variables_detalle : [];
-  const details = detailsRaw.map((item) => {
+  const details = sortDetailsBase(detailsRaw.map((item) => {
     const clean = {};
     Object.entries(item || {}).forEach(([key, value]) => {
       if (!EXCLUDED_DETAIL_FIELDS.has(key)) clean[key] = value;
     });
     return clean;
-  });
+  }));
 
   return {
     id: getRowId(rawRow, index),
     general,
-    details,
-    raw: rawRow
+    details
   };
 };
 
-const inferColumns = (rows, pick) => {
-  const keys = new Set();
-  rows.forEach((row) => {
-    pick(row).forEach((key) => keys.add(key));
-  });
-  return Array.from(keys);
+const inferColumns = (rows, picker) => {
+  const set = new Set();
+  rows.forEach((row) => picker(row).forEach((key) => set.add(key)));
+  return Array.from(set);
+};
+
+const mergeColumns = (baseColumns, orderColumns) => {
+  const available = baseColumns.filter(Boolean);
+  const ordered = orderColumns.filter((col) => available.includes(col));
+  const missing = available.filter((col) => !ordered.includes(col));
+  return [...ordered, ...missing];
 };
 
 const getCandidateColumn = (columns, candidates) => {
-  const lower = columns.map((col) => ({
+  const normalized = columns.map((col) => ({
     raw: col,
-    normalized: String(col).toLowerCase().replace(/\s+/g, "_")
+    val: String(col).toLowerCase().replace(/\s+/g, "_")
   }));
 
   for (const candidate of candidates) {
-    const found = lower.find((item) => item.normalized.includes(candidate.toLowerCase()));
+    const found = normalized.find((item) => item.val.includes(candidate.toLowerCase()));
     if (found) return found.raw;
   }
-
   return null;
 };
 
 const toDateValue = (value) => {
   if (!value) return null;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date;
+  return Number.isNaN(date.getTime()) ? null : date;
 };
 
 const getPaginatedRows = () => {
   const start = (state.currentPage - 1) * PAGE_SIZE;
   return state.filteredRows.slice(start, start + PAGE_SIZE);
+};
+
+const getDetailRowsFor = (row) => {
+  const base = row.details.filter((detail) => state.visibleDetailItemKeys.includes(getDetailItemKey(detail)));
+  const orderKeys = state.detailOrderByRowId[row.id] || base.map(getDetailItemKey);
+  const map = new Map(base.map((detail) => [getDetailItemKey(detail), detail]));
+  const ordered = [];
+
+  orderKeys.forEach((key) => {
+    if (map.has(key)) ordered.push(map.get(key));
+    map.delete(key);
+  });
+
+  map.forEach((detail) => ordered.push(detail));
+  return ordered;
 };
 
 const renderDetailSection = () => {
@@ -204,24 +235,51 @@ const renderDetailSection = () => {
     .map((key) => `<div class="kv"><strong>${key}</strong><span>${formatCellValue(selected.general[key])}</span></div>`)
     .join("");
 
-  const detailHead = state.visibleDetailColumns.map((col) => `<th>${col}</th>`).join("");
-  const detailRows = (selected.details.length ? selected.details : [{}])
-    .map((detail) => {
-      const cells = state.visibleDetailColumns.map((col) => `<td>${formatCellValue(detail[col])}</td>`).join("");
-      return `<tr>${cells}</tr>`;
-    })
-    .join("");
+  const detailRows = getDetailRowsFor(selected);
+
+  const detailHead = ["↕", ...state.visibleDetailColumns].map((col) => `<th>${col}</th>`).join("");
+  const detailBody = detailRows.map((detail) => {
+    const detailKey = getDetailItemKey(detail);
+    const cells = state.visibleDetailColumns.map((col) => `<td>${formatCellValue(detail[col])}</td>`).join("");
+    return `<tr draggable="true" data-detail-key="${detailKey}"><td class="drag-col">⋮⋮</td>${cells}</tr>`;
+  }).join("");
 
   detalleTurno.innerHTML = `
     <h3>${formatCellValue(selected.general.turno_nombre || selected.id)}</h3>
     <div class="kv-grid">${generalHtml || "<p>Sin datos generales visibles.</p>"}</div>
     <div class="tabla-wrap detalle-wrap">
       <table>
-        <thead><tr>${detailHead || "<th>Sin campos visibles</th>"}</tr></thead>
-        <tbody>${detailRows}</tbody>
+        <thead><tr>${detailHead}</tr></thead>
+        <tbody id="detalleBodyRows">${detailBody || "<tr><td colspan='10'>Sin detalle visible.</td></tr>"}</tbody>
       </table>
     </div>
   `;
+
+  let draggingKey = null;
+  detalleTurno.querySelectorAll("tr[data-detail-key]").forEach((tr) => {
+    tr.addEventListener("dragstart", () => {
+      draggingKey = tr.dataset.detailKey;
+      tr.classList.add("dragging");
+    });
+    tr.addEventListener("dragend", () => {
+      tr.classList.remove("dragging");
+      draggingKey = null;
+    });
+    tr.addEventListener("dragover", (event) => event.preventDefault());
+    tr.addEventListener("drop", () => {
+      const targetKey = tr.dataset.detailKey;
+      if (!draggingKey || !targetKey || draggingKey === targetKey) return;
+      const current = getDetailRowsFor(selected).map(getDetailItemKey);
+      const from = current.indexOf(draggingKey);
+      const to = current.indexOf(targetKey);
+      if (from < 0 || to < 0) return;
+      const next = [...current];
+      const [picked] = next.splice(from, 1);
+      next.splice(to, 0, picked);
+      state.detailOrderByRowId[selected.id] = next;
+      renderDetailSection();
+    });
+  });
 };
 
 const moveColumn = (source, target) => {
@@ -234,13 +292,12 @@ const moveColumn = (source, target) => {
   next.splice(targetIndex, 0, picked);
   state.visibleGeneralColumns = next;
 
-  saveJson(getGeneralOrderKey(state.context?.tenant_id), state.visibleGeneralColumns);
+  saveJson(getGeneralOrderKey(state.context?.tenant_id), next);
   renderTable();
 };
 
 const renderHead = () => {
   head.innerHTML = "";
-
   const tr = document.createElement("tr");
   tr.innerHTML = "<th>#</th><th>✔</th>";
 
@@ -248,22 +305,13 @@ const renderHead = () => {
     const th = document.createElement("th");
     th.textContent = column;
     th.draggable = true;
-
-    th.addEventListener("dragstart", () => {
-      th.classList.add("dragging");
-    });
-
-    th.addEventListener("dragend", () => {
-      th.classList.remove("dragging");
-    });
-
+    th.addEventListener("dragstart", () => th.classList.add("dragging"));
+    th.addEventListener("dragend", () => th.classList.remove("dragging"));
     th.addEventListener("dragover", (event) => event.preventDefault());
-
     th.addEventListener("drop", () => {
       const source = head.querySelector("th.dragging")?.textContent;
       if (source) moveColumn(source, column);
     });
-
     tr.appendChild(th);
   });
 
@@ -283,7 +331,7 @@ const renderBody = () => {
     numberCell.textContent = String(start + index + 1);
     tr.appendChild(numberCell);
 
-    const selectedCell = document.createElement("td");
+    const selectCell = document.createElement("td");
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = state.selectedRowIds.has(row.id);
@@ -292,8 +340,8 @@ const renderBody = () => {
       if (checkbox.checked) state.selectedRowIds.add(row.id);
       else state.selectedRowIds.delete(row.id);
     });
-    selectedCell.appendChild(checkbox);
-    tr.appendChild(selectedCell);
+    selectCell.appendChild(checkbox);
+    tr.appendChild(selectCell);
 
     state.visibleGeneralColumns.forEach((column) => {
       const td = document.createElement("td");
@@ -316,14 +364,14 @@ const renderPagination = () => {
   const totalPages = Math.max(1, Math.ceil(state.filteredRows.length / PAGE_SIZE));
   if (state.currentPage > totalPages) state.currentPage = totalPages;
 
-  const addButton = (label, action, disabled = false, active = false) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.textContent = label;
-    btn.disabled = disabled;
-    btn.classList.toggle("active", active);
-    btn.addEventListener("click", action);
-    paginacion.appendChild(btn);
+  const addButton = (label, onClick, disabled = false, active = false) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.disabled = disabled;
+    button.classList.toggle("active", active);
+    button.addEventListener("click", onClick);
+    paginacion.appendChild(button);
   };
 
   addButton("← Anterior", () => {
@@ -344,36 +392,28 @@ const renderPagination = () => {
   }, state.currentPage >= totalPages);
 };
 
-const renderVisibilityPanel = (container, columns, visibleColumns, onToggle) => {
+const renderSwitches = (container, columns, visibleColumns, onToggle) => {
   container.innerHTML = "";
-
   columns.forEach((column) => {
-    const key = String(column);
-    const visible = visibleColumns.includes(column);
-
     const row = document.createElement("div");
     row.className = "vis-row";
     row.innerHTML = `
-      <span>${key}</span>
+      <span>${column}</span>
       <label class="switch">
-        <input type="checkbox" ${visible ? "checked" : ""}>
+        <input type="checkbox" ${visibleColumns.includes(column) ? "checked" : ""}>
         <span class="slider"></span>
       </label>
     `;
-
-    row.querySelector("input")?.addEventListener("change", (event) => {
-      onToggle(key, event.target.checked);
-    });
-
+    row.querySelector("input")?.addEventListener("change", (event) => onToggle(column, event.target.checked));
     container.appendChild(row);
   });
 };
 
 const renderColumnControls = () => {
   const generalSettings = loadJson(getGeneralVisibilityKey(state.context?.tenant_id), {});
-  const detailSettings = loadJson(getDetailVisibilityKey(state.context?.tenant_id), {});
+  const detailItemSettings = loadJson(getDetailItemVisibilityKey(state.context?.tenant_id), {});
 
-  renderVisibilityPanel(columnasPanel, state.allGeneralColumns, state.visibleGeneralColumns, (key, checked) => {
+  renderSwitches(columnasPanel, state.allGeneralColumns, state.visibleGeneralColumns, (key, checked) => {
     generalSettings[key] = checked;
     saveJson(getGeneralVisibilityKey(state.context?.tenant_id), generalSettings);
     state.visibleGeneralColumns = state.allGeneralColumns.filter((col) => generalSettings[col] !== false);
@@ -381,11 +421,11 @@ const renderColumnControls = () => {
     renderTable();
   });
 
-  renderVisibilityPanel(detallesPanel, state.allDetailColumns, state.visibleDetailColumns, (key, checked) => {
-    detailSettings[key] = checked;
-    saveJson(getDetailVisibilityKey(state.context?.tenant_id), detailSettings);
-    state.visibleDetailColumns = state.allDetailColumns.filter((col) => detailSettings[col] !== false);
-    if (!state.visibleDetailColumns.length) state.visibleDetailColumns = [...state.allDetailColumns];
+  renderSwitches(detallesPanel, state.allDetailItemKeys, state.visibleDetailItemKeys, (key, checked) => {
+    detailItemSettings[key] = checked;
+    saveJson(getDetailItemVisibilityKey(state.context?.tenant_id), detailItemSettings);
+    state.visibleDetailItemKeys = state.allDetailItemKeys.filter((itemKey) => detailItemSettings[itemKey] !== false);
+    if (!state.visibleDetailItemKeys.length) state.visibleDetailItemKeys = [...state.allDetailItemKeys];
     renderDetailSection();
   });
 };
@@ -444,43 +484,52 @@ const applyFilters = () => {
   renderTable();
 };
 
+const escapeHtml = (value) => String(value)
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/\"/g, "&quot;")
+  .replace(/'/g, "&#039;");
+
 const escapeCsv = (value) => {
   const str = String(value ?? "");
-  if (/[,"\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
-  return str;
+  return /[,"\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
 };
 
-const buildFlatRowsForExport = (rows) => {
-  const general = state.visibleGeneralColumns;
-  const detail = state.visibleDetailColumns;
-  const headers = [...general, ...detail];
-
-  const data = rows.flatMap((row) => {
-    const details = row.details.length ? row.details : [{}];
-    return details.map((item) => {
-      const result = {};
-      general.forEach((col) => { result[col] = row.general[col]; });
-      detail.forEach((col) => { result[col] = item[col] ?? ""; });
-      return result;
-    });
-  });
-
-  return { headers, data };
-};
+const buildRowsForExport = (rows) => rows.map((row) => {
+  const details = getDetailRowsFor(row);
+  return {
+    turno: row,
+    details: details.length ? details : [{}]
+  };
+});
 
 const downloadExcel = (rows, fileName) => {
   if (!rows.length) return setStatus("No hay turnos para descargar con esos criterios.");
 
-  const { headers, data } = buildFlatRowsForExport(rows);
-  const head = headers.map((h) => `<th>${h}</th>`).join("");
-  const bodyRows = data.map((line) => `<tr>${headers.map((h) => `<td>${formatCellValue(line[h])}</td>`).join("")}</tr>`).join("");
+  const exports = buildRowsForExport(rows);
+  const blocks = exports.map(({ turno, details }, index) => {
+    const headers = [...state.visibleGeneralColumns, ...state.visibleDetailColumns];
+    const headRow = headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("");
+    const bodyRows = details.map((detail) => {
+      const generalCells = state.visibleGeneralColumns.map((col) => `<td>${escapeHtml(formatCellValue(turno.general[col]))}</td>`).join("");
+      const detailCells = state.visibleDetailColumns.map((col) => `<td>${escapeHtml(formatCellValue(detail[col]))}</td>`).join("");
+      return `<tr>${generalCells}${detailCells}</tr>`;
+    }).join("");
 
-  const html = `
-    <html><head><meta charset="utf-8"/></head><body>
-    <table><thead><tr>${head}</tr></thead><tbody>${bodyRows}</tbody></table>
-    </body></html>
-  `;
+    const spacer = index < exports.length - 1
+      ? `<tr><td colspan="${headers.length}">&nbsp;</td></tr><tr><td colspan="${headers.length}">&nbsp;</td></tr>`
+      : "";
 
+    return `
+      <tr><td colspan="${headers.length}"><strong>${escapeHtml(formatCellValue(turno.general.turno_nombre || turno.id))}</strong></td></tr>
+      <tr>${headRow}</tr>
+      ${bodyRows}
+      ${spacer}
+    `;
+  }).join("");
+
+  const html = `<html><head><meta charset="utf-8"/></head><body><table>${blocks}</table></body></html>`;
   const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -493,13 +542,18 @@ const downloadExcel = (rows, fileName) => {
 const downloadCsv = (rows, fileName) => {
   if (!rows.length) return setStatus("No hay turnos para descargar con esos criterios.");
 
-  const { headers, data } = buildFlatRowsForExport(rows);
-  const csv = [
-    headers.map(escapeCsv).join(","),
-    ...data.map((line) => headers.map((h) => escapeCsv(line[h])).join(","))
-  ].join("\n");
+  const headers = [...state.visibleGeneralColumns, ...state.visibleDetailColumns];
+  const lines = [headers.map(escapeCsv).join(",")];
 
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  buildRowsForExport(rows).forEach(({ turno, details }) => {
+    details.forEach((detail) => {
+      const general = state.visibleGeneralColumns.map((col) => escapeCsv(formatCellValue(turno.general[col])));
+      const detailVals = state.visibleDetailColumns.map((col) => escapeCsv(formatCellValue(detail[col])));
+      lines.push([...general, ...detailVals].join(","));
+    });
+  });
+
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -508,19 +562,11 @@ const downloadCsv = (rows, fileName) => {
   URL.revokeObjectURL(url);
 };
 
-const mergeColumns = (baseColumns, orderColumns) => {
-  const available = baseColumns.filter(Boolean);
-  const ordered = orderColumns.filter((col) => available.includes(col));
-  const missing = available.filter((col) => !ordered.includes(col));
-  return [...ordered, ...missing];
-};
-
 const loadInitialData = async () => {
   state.context = await getUserContext();
   if (!state.context) return setStatus("No se pudo validar la sesión.");
 
   setLoading(true, "Cargando histórico...");
-
   try {
     const payload = {
       tenant_id: state.context.empresa_id,
@@ -532,6 +578,7 @@ const loadInitialData = async () => {
 
     const generalSettings = loadJson(getGeneralVisibilityKey(payload.tenant_id), {});
     const detailSettings = loadJson(getDetailVisibilityKey(payload.tenant_id), {});
+    const detailItemSettings = loadJson(getDetailItemVisibilityKey(payload.tenant_id), {});
     const orderSettings = loadJson(getGeneralOrderKey(payload.tenant_id), []);
 
     const rowsRes = await fetchWithTimeout(WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS, {
@@ -545,16 +592,24 @@ const loadInitialData = async () => {
     state.filteredRows = [...state.allRows];
 
     const inferredGeneral = inferColumns(state.allRows, (row) => Object.keys(row.general));
-    const inferredDetail = inferColumns(state.allRows, (row) => row.details.flatMap((item) => Object.keys(item)));
+    const inferredDetailColumns = inferColumns(state.allRows, (row) => row.details.flatMap((detail) => Object.keys(detail)));
+    const inferredDetailItems = inferColumns(state.allRows, (row) => row.details.map((detail) => getDetailItemKey(detail)));
 
     state.allGeneralColumns = mergeColumns([...new Set(inferredGeneral)], orderSettings);
-    state.allDetailColumns = [...new Set(inferredDetail)];
+    state.allDetailColumns = [...new Set(inferredDetailColumns)];
+    state.allDetailItemKeys = [...new Set(inferredDetailItems)];
 
     state.visibleGeneralColumns = state.allGeneralColumns.filter((col) => generalSettings[col] !== false);
     state.visibleDetailColumns = state.allDetailColumns.filter((col) => detailSettings[col] !== false);
+    state.visibleDetailItemKeys = state.allDetailItemKeys.filter((key) => {
+      if (key in detailItemSettings) return detailItemSettings[key] !== false;
+      const categoria = (key.split("|")[1] || "").toLowerCase();
+      return categoria === "real" || categoria === "sistema";
+    });
 
     if (!state.visibleGeneralColumns.length) state.visibleGeneralColumns = [...state.allGeneralColumns];
     if (!state.visibleDetailColumns.length) state.visibleDetailColumns = [...state.allDetailColumns];
+    if (!state.visibleDetailItemKeys.length) state.visibleDetailItemKeys = [...state.allDetailItemKeys];
 
     state.expandedRowId = state.filteredRows[0]?.id || null;
     state.currentPage = 1;
@@ -563,7 +618,6 @@ const loadInitialData = async () => {
     setStatus(state.allRows.length ? "Histórico cargado." : "No se recibieron cierres.");
   } catch (error) {
     setStatus(error?.name === "AbortError" ? "La carga tardó más de 5 segundos." : "Error cargando histórico.");
-    console.error("Error cargando histórico de cierre de turno:", error);
   } finally {
     setLoading(false);
   }

@@ -3,6 +3,7 @@ import { WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS } from "./webhooks.js";
 
 const panelGeneral = document.getElementById("columnasGeneralesPanel");
 const panelDetalle = document.getElementById("columnasDetallePanel");
+const panelItems = document.getElementById("itemsDetallePanel");
 const status = document.getElementById("status");
 
 const MAX_LOADING_MS = 5000;
@@ -16,6 +17,7 @@ const setStatus = (message) => {
 
 const getGeneralVisibilityKey = (tenantId) => `historico_cierre_turno_visibilidad_${tenantId || "global"}`;
 const getDetailVisibilityKey = (tenantId) => `historico_cierre_turno_detalle_visibilidad_${tenantId || "global"}`;
+const getDetailItemVisibilityKey = (tenantId) => `historico_cierre_turno_detalle_items_visibilidad_${tenantId || "global"}`;
 
 const loadSettings = (key) => {
   const stored = localStorage.getItem(key);
@@ -35,12 +37,8 @@ const saveSettings = (key, settings) => {
 const fetchWithTimeout = async (url, options = {}, timeoutMs = MAX_LOADING_MS) => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
   try {
-    return await fetch(url, {
-      ...options,
-      signal: controller.signal
-    });
+    return await fetch(url, { ...options, signal: controller.signal });
   } finally {
     clearTimeout(timeoutId);
   }
@@ -49,8 +47,8 @@ const fetchWithTimeout = async (url, options = {}, timeoutMs = MAX_LOADING_MS) =
 const normalizeRows = (raw) => {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw.filter((item) => item && typeof item === "object");
-
   if (typeof raw !== "object") return [];
+
   const keys = ["rows", "data", "items", "historico", "registros", "cierres"];
   for (const key of keys) {
     if (Array.isArray(raw[key])) return raw[key];
@@ -58,9 +56,12 @@ const normalizeRows = (raw) => {
   return [];
 };
 
+const getDetailItemKey = (detail) => `${String(detail.variable || "")}|${String(detail.categoria || "")}`;
+
 const buildColumns = (rows) => {
   const generalSet = new Set();
   const detailSet = new Set();
+  const detailItemsSet = new Set();
 
   rows.forEach((row) => {
     Object.keys(row || {}).forEach((key) => {
@@ -72,21 +73,23 @@ const buildColumns = (rows) => {
       Object.keys(item || {}).forEach((key) => {
         if (!EXCLUDED_DETAIL_FIELDS.has(key)) detailSet.add(key);
       });
+      detailItemsSet.add(getDetailItemKey(item || {}));
     });
   });
 
   return {
     generales: Array.from(generalSet),
-    detalles: Array.from(detailSet)
+    detalles: Array.from(detailSet),
+    detalleItems: Array.from(detailItemsSet)
   };
 };
 
-const renderSwitches = (container, columns, settings, onSave) => {
+const renderSwitches = (container, columns, settings, onSave, defaultVisible) => {
   container.innerHTML = "";
 
-  columns.forEach((columna) => {
-    const key = String(columna);
-    const visible = settings[key] !== false;
+  columns.forEach((column) => {
+    const key = String(column);
+    const visible = key in settings ? settings[key] !== false : defaultVisible(key);
 
     const row = document.createElement("div");
     row.className = "vis-row";
@@ -98,8 +101,7 @@ const renderSwitches = (container, columns, settings, onSave) => {
       </label>
     `;
 
-    const input = row.querySelector("input");
-    input?.addEventListener("change", (event) => {
+    row.querySelector("input")?.addEventListener("change", (event) => {
       settings[key] = event.target.checked;
       onSave();
     });
@@ -127,17 +129,23 @@ const loadColumns = async () => {
       })
     });
 
-    const data = await res.json();
-    const rows = normalizeRows(data);
+    const rows = normalizeRows(await res.json());
     const columnas = buildColumns(rows);
 
     const generalKey = getGeneralVisibilityKey(context.empresa_id);
     const detailKey = getDetailVisibilityKey(context.empresa_id);
+    const detailItemsKey = getDetailItemVisibilityKey(context.empresa_id);
+
     const generalSettings = loadSettings(generalKey);
     const detailSettings = loadSettings(detailKey);
+    const detailItemsSettings = loadSettings(detailItemsKey);
 
-    renderSwitches(panelGeneral, columnas.generales, generalSettings, () => saveSettings(generalKey, generalSettings));
-    renderSwitches(panelDetalle, columnas.detalles, detailSettings, () => saveSettings(detailKey, detailSettings));
+    renderSwitches(panelGeneral, columnas.generales, generalSettings, () => saveSettings(generalKey, generalSettings), () => true);
+    renderSwitches(panelDetalle, columnas.detalles, detailSettings, () => saveSettings(detailKey, detailSettings), () => true);
+    renderSwitches(panelItems, columnas.detalleItems, detailItemsSettings, () => saveSettings(detailItemsKey, detailItemsSettings), (key) => {
+      const categoria = (key.split("|")[1] || "").toLowerCase();
+      return categoria === "real" || categoria === "sistema";
+    });
 
     setStatus("Campos cargados.");
   } catch (error) {

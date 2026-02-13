@@ -77,8 +77,15 @@
 
     <div class="finanzas-row" data-field="efectivo">
       <div class="row-title">Efectivo</div>
-      <input id="efectivo_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
-      <input id="efectivo_real" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+      <div class="efectivo-sistema-wrap">
+        <input id="efectivo_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+        <button id="toggleEfectivoSistema" class="icon-btn" type="button" title="Cambiar valor visible" aria-label="Cambiar valor visible de efectivo sistema">↻</button>
+        <small id="efectivoSistemaModo" class="field-note">efectivo bruto</small>
+      </div>
+      <div class="input-with-hint">
+        <input id="efectivo_real" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+        <span class="hint-icon" title="Este valor proviene de la suma entre bolsa y caja.">🔍</span>
+      </div>
       <div class="diff-cell">
         <input id="efectivo_diferencia" type="text" inputmode="numeric" pattern="[0-9-]*" readonly class="diff-input">
         <div class="diff-note" id="efectivo_diferencia_nota"></div>
@@ -152,6 +159,10 @@
     <section class="bloque">
       <h2>Gastos (extras)</h2>
       <div id="extrasList" class="extras-list"></div>
+      <div class="extra-total-row">
+        <strong>Total gastos extras</strong>
+        <span id="totalGastosExtras">0</span>
+      </div>
     </section>
 
     <section class="bloque">

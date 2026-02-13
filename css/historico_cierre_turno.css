@@ -212,6 +212,17 @@ th.dragging {
   min-width: 450px;
 }
 
+.drag-col {
+  width: 40px;
+  color: #6b7280;
+  text-align: center;
+  cursor: grab;
+}
+
+.detalle-wrap tr.dragging {
+  opacity: 0.45;
+}
+
 .status {
   margin-top: 12px;
 }
