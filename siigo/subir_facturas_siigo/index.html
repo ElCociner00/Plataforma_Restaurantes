@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Ver o subir facturas correo</title>
+  <link rel="stylesheet" href="../../css/main.css">
+  <link rel="stylesheet" href="../../css/subir_facturas_siigo.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../../js/auth_guard.js"></script>
+  <script type="module">
+    import { guardPage } from "../../js/guard_page.js";
+    guardPage("subir_facturas_siigo");
+  </script>
+  <script type="module" src="../../js/header.js"></script>
+
+  <div class="main siigo-main">
+    <h1>Ver o subir facturas correo</h1>
+    <p class="siigo-hint"><span aria-hidden="true">🔍</span> Si no ves facturas, registra el correo receptor en Configuración.</p>
+
+    <section class="bloque filtros-bloque">
+      <div class="filtros-grid">
+        <label>Responsable
+          <select id="responsable"><option value="">Todos</option></select>
+        </label>
+        <label>Fecha desde<input type="date" id="filtroFechaDesde"></label>
+        <label>Fecha hasta<input type="date" id="filtroFechaHasta"></label>
+        <label>Número factura<input type="text" id="filtroNumero" placeholder="SER197"></label>
+        <label>Proveedor<input type="text" id="filtroProveedor" placeholder="Nombre proveedor"></label>
+        <label>NIT<input type="text" id="filtroNit" placeholder="NIT"></label>
+      </div>
+      <div class="filtros-actions">
+        <button id="aplicarFiltros" type="button">Aplicar filtros</button>
+        <button id="limpiarFiltros" type="button">Limpiar filtros</button>
+        <label class="descarga-label">Modo descarga
+          <select id="modoDescarga">
+            <option value="excel_filtradas">Excel (filtradas)</option>
+            <option value="csv_filtradas">CSV (filtradas)</option>
+            <option value="excel_seleccionada">Excel (seleccionada)</option>
+            <option value="csv_seleccionada">CSV (seleccionada)</option>
+          </select>
+        </label>
+        <button id="descargarFacturas" type="button">Descargar</button>
+      </div>
+    </section>
+
+    <section class="bloque">
+      <h2>Facturas</h2>
+      <p class="hint">Arrastra encabezados para reordenar columnas. Usa el switch para subir/quitar en Siigo.</p>
+      <div class="tabla-wrap">
+        <table>
+          <thead id="facturasHead"></thead>
+          <tbody id="facturasBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="bloque">
+      <h2>Detalle de factura seleccionada</h2>
+            <div id="detalleFactura" class="detalle-box">Selecciona una factura para ver items.</div>
+      <div id="status" class="status"></div>
+    </section>
+  </div>
+
+  <script type="module" src="../../js/subir_facturas_siigo.js"></script>
+</body>
+</html>

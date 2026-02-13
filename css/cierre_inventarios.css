@@ -6,6 +6,27 @@
   margin-bottom: 24px;
 }
 
+.turno-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.turno-info-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.turno-info-grid input,
+.turno-info-grid select {
+  text-align: center;
+}
+
 .tabla-wrap {
   overflow-x: auto;
 }
@@ -33,7 +54,8 @@ td input {
 }
 
 input[readonly] {
-  background: #f3f4f6;
+  background: #f1efff;
+  border-color: #d8d2ff;
 }
 
 .acciones-cierre {
@@ -44,7 +66,8 @@ input[readonly] {
 }
 
 .acciones-cierre button {
-  flex: 0 1 160px;
+  flex: 1 1 180px;
+  max-width: 220px;
 }
 
 .acciones-cierre button:disabled {

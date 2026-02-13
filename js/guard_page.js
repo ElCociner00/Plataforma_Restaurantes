@@ -1,9 +1,15 @@
 import { getUserContext } from "./session.js";
-import { PERMISSIONS } from "./permissions.js";
+import { PERMISSIONS, PAGE_ENVIRONMENT } from "./permissions.js";
 
 const LOGIN_URL = "/Plataforma_Restaurantes/index.html";
+const SELECTOR_URL = "/Plataforma_Restaurantes/entorno/";
 
 const getForbiddenRedirect = (context) => {
+  const env = localStorage.getItem("app_entorno_activo") || "loggro";
+  if (env === "siigo") {
+    return "/Plataforma_Restaurantes/siigo/subir_facturas_siigo/";
+  }
+
   if (context?.rol === "operativo") {
     return "/Plataforma_Restaurantes/cierre_turno/";
   }
@@ -19,8 +25,19 @@ export async function guardPage(pageKey) {
     return;
   }
 
-  // ✅ admin_root entra SIEMPRE
-  if (context.rol === "admin_root") return;
+  const expectedEnvironment = PAGE_ENVIRONMENT[pageKey];
+  const activeEnvironment = localStorage.getItem("app_entorno_activo");
+
+  if (expectedEnvironment && !activeEnvironment) {
+    window.location.href = SELECTOR_URL;
+    return;
+  }
+
+  if (expectedEnvironment && activeEnvironment && expectedEnvironment !== activeEnvironment) {
+    alert("Este módulo pertenece a otro entorno.");
+    window.location.href = SELECTOR_URL;
+    return;
+  }
 
   const storageKey = `permisos_por_usuario_${context.empresa_id || "global"}`;
   const stored = localStorage.getItem(storageKey);
@@ -42,8 +59,9 @@ export async function guardPage(pageKey) {
     }
   }
 
-  const allowedRoles = PERMISSIONS[pageKey];
+  if (context.rol === "admin_root") return;
 
+  const allowedRoles = PERMISSIONS[pageKey];
   if (!allowedRoles || !allowedRoles.includes(context.rol)) {
     alert("No tienes permisos para acceder a este módulo");
     window.location.href = getForbiddenRedirect(context);
