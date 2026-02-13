@@ -29,6 +29,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
 
+
+
+      const isSelectorPage = window.location.pathname.includes("/entorno/");
+      const entornoActivo = localStorage.getItem("app_entorno_activo");
+      if (!isSelectorPage && !entornoActivo) {
+        window.location.replace("/Plataforma_Restaurantes/entorno/");
+        return;
+      }
+
       // ✅ Sesión válida
       document.body.style.display = "block";
       protectInteractions();
