@@ -1,9 +1,14 @@
 import { getUserContext } from "./session.js";
-import { PERMISSIONS } from "./permissions.js";
+import { PERMISSIONS, PAGE_ENVIRONMENT } from "./permissions.js";
 
 const LOGIN_URL = "/Plataforma_Restaurantes/index.html";
 
 const getForbiddenRedirect = (context) => {
+  const env = localStorage.getItem("app_entorno_activo") || "loggro";
+  if (env === "siigo") {
+    return "/Plataforma_Restaurantes/siigo/subir_facturas_siigo/";
+  }
+
   if (context?.rol === "operativo") {
     return "/Plataforma_Restaurantes/cierre_turno/";
   }
@@ -42,7 +47,16 @@ export async function guardPage(pageKey) {
     }
   }
 
-  const allowedRoles = PERMISSIONS[pageKey];
+
+  const expectedEnvironment = PAGE_ENVIRONMENT[pageKey];
+  const activeEnvironment = localStorage.getItem("app_entorno_activo");
+  if (expectedEnvironment && activeEnvironment && expectedEnvironment !== activeEnvironment) {
+    alert("Este módulo pertenece a otro entorno.");
+    window.location.href = "/Plataforma_Restaurantes/entorno/";
+    return;
+  }
+
+    const allowedRoles = PERMISSIONS[pageKey];
 
   if (!allowedRoles || !allowedRoles.includes(context.rol)) {
     alert("No tienes permisos para acceder a este módulo");

@@ -47,16 +47,9 @@ form.addEventListener("submit", async (e) => {
       return;
     }
 
-    // 3. Redirigir según rol
+    // 3. Redirigir al selector de entorno
     console.log("Rol del usuario:", context.rol);
-    
-    if (context.rol === "operativo") {
-      console.log("Redirigiendo a cierre_turno...");
-      window.location.href = "/Plataforma_Restaurantes/cierre_turno/";
-    } else {
-      console.log("Redirigiendo a dashboard...");
-      window.location.href = "/Plataforma_Restaurantes/dashboard/";
-    }
+    window.location.href = "/Plataforma_Restaurantes/entorno/";
 
   } catch (catchError) {
     console.error("Error inesperado en el flujo:", catchError);
