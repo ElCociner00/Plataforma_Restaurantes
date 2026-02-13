@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Histórico cierre inventarios</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/historico_cierre_inventarios.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../js/auth_guard.js"></script>
+  <script type="module">
+    import { guardPage } from "../js/guard_page.js";
+    guardPage("historico_cierre_inventarios");
+  </script>
+  <script type="module" src="../js/header.js"></script>
+
+  <div class="main">
+    <h1>Histórico cierre inventarios</h1>
+
+    <section class="bloque filtros">
+      <h2>Filtros</h2>
+      <div class="filtros-grid">
+        <label>Fecha desde<input type="date" id="filtroFechaDesde"></label>
+        <label>Fecha hasta<input type="date" id="filtroFechaHasta"></label>
+        <label>Hora inicio<input type="time" id="filtroHoraInicio"></label>
+        <label>Hora fin<input type="time" id="filtroHoraFin"></label>
+        <label>Producto<input type="text" id="filtroProducto" placeholder="Nombre del producto"></label>
+      </div>
+      <div class="acciones-filtros">
+        <button id="aplicarFiltros" type="button">Aplicar filtros</button>
+        <button id="limpiarFiltros" type="button">Limpiar filtros</button>
+      </div>
+    </section>
+
+    <section class="bloque acciones-descarga">
+      <label>Tipo de descarga
+        <select id="tipoDescarga">
+          <option value="turno_abierto_excel">Turno abierto (Excel)</option>
+          <option value="turnos_marcados_excel">Turnos marcados (Excel)</option>
+          <option value="turnos_filtrados_excel">Turnos filtrados (Excel)</option>
+          <option value="turnos_pagina_excel">Turnos de la página (Excel)</option>
+          <option value="turnos_filtrados_csv">Turnos filtrados (CSV)</option>
+        </select>
+      </label>
+      <button id="descargarDatos" type="button">Descargar</button>
+    </section>
+
+    <section class="bloque">
+      <h2>Tabla histórica</h2>
+      <p class="hint">Arrastra encabezados para reordenar columnas. Marca filas para descarga múltiple.</p>
+      <div class="tabla-wrap">
+        <table>
+          <thead id="historicoHead"></thead>
+          <tbody id="historicoBody"></tbody>
+        </table>
+      </div>
+      <div id="paginacion" class="paginacion"></div>
+    </section>
+
+    <section class="bloque">
+      <h2>Detalle inventario seleccionado</h2>
+      <div id="detalleInventario" class="detalle-turno">Selecciona un cierre para ver productos.</div>
+      <div id="status" class="status"></div>
+    </section>
+  </div>
+
+  <script type="module" src="../js/historico_cierre_inventarios.js"></script>
+</body>
+</html>
