@@ -277,6 +277,14 @@ document.addEventListener("DOMContentLoaded", () => {
     syncTotalesExtras();
   };
 
+  const limpiarDiferencias = () => {
+    Object.values(inputsDiferencias).forEach(({ input, nota }) => {
+      input.value = "";
+      input.classList.remove("diff-faltante", "diff-sobrante", "diff-ok");
+      nota.textContent = "";
+    });
+  };
+
   const getContextPayload = async () => {
     const context = await getUserContext();
     if (!context) {
@@ -481,6 +489,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let verificado = false;
 
   const marcarComoNoVerificado = () => {
+    limpiarDiferencias();
     if (!verificado) return;
     verificado = false;
     toggleButtons({ enviar: false });
@@ -512,11 +521,7 @@ document.addEventListener("DOMContentLoaded", () => {
         row.input.value = "0";
       }
     });
-    Object.values(inputsDiferencias).forEach(({ input, nota }) => {
-      input.value = "";
-      input.classList.remove("diff-faltante", "diff-sobrante", "diff-ok");
-      nota.textContent = "";
-    });
+    limpiarDiferencias();
     comentarios.value = "";
     marcarComoNoVerificado();
     applyVisibilitySettings();
@@ -598,11 +603,7 @@ document.addEventListener("DOMContentLoaded", () => {
       inputsFinanzas.bono_regalo.sistema.value = data.bono_regalo_sistema ?? "";
       inputsSoloVista.propina.value = data.propina ?? "";
       actualizarDomiciliosDesdeExtras();
-      Object.values(inputsDiferencias).forEach(({ input, nota }) => {
-        input.value = "";
-        input.classList.remove("diff-faltante", "diff-sobrante", "diff-ok");
-        nota.textContent = "";
-      });
+      limpiarDiferencias();
 
       if (settingsVisibilidad.efectivo === false) {
         inputsFinanzas.efectivo.sistema.value = "0";
@@ -687,6 +688,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   btnVerificar.addEventListener("click", async () => {
     setStatus("Verificando...");
+    btnVerificar.disabled = true;
+
+    // Siempre limpiar antes de un nuevo ciclo de verificación
+    limpiarDiferencias();
 
     actualizarDomiciliosDesdeExtras();
 
@@ -747,7 +752,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     try {
-      const res = await fetch(WEBHOOK_VERIFICAR_CIERRE, {
+      const res = await fetchWithTimeout(WEBHOOK_VERIFICAR_CIERRE, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -773,7 +778,11 @@ document.addEventListener("DOMContentLoaded", () => {
       verificado = true;
       toggleButtons({ enviar: true });
     } catch (err) {
-      setStatus("Error de conexión al verificar.");
+      setStatus(err?.name === "AbortError"
+        ? "La verificación tardó más de 5 segundos."
+        : "Error de conexión al verificar.");
+    } finally {
+      btnVerificar.disabled = false;
     }
   });
 
