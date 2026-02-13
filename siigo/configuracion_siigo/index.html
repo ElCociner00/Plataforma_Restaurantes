@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Configuración Siigo</title>
+  <link rel="stylesheet" href="../../css/main.css">
+  <link rel="stylesheet" href="../../css/configuracion.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../../js/auth_guard.js"></script>
+  <script type="module">
+    import { guardPage } from "../../js/guard_page.js";
+    guardPage("configuracion_siigo");
+  </script>
+  <script type="module" src="../../js/header.js"></script>
+
+  <div class="main">
+    <h1>Configuración Siigo</h1>
+    <div class="config-section">
+      <button class="accordion-toggle">🔌 API's e Integraciones</button>
+      <div class="accordion-content">
+        <ul class="config-list">
+          <li><a href="api_integraciones_siigo.html">Siigo</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.querySelectorAll(".accordion-toggle").forEach(button => {
+      button.addEventListener("click", () => {
+        button.classList.toggle("active");
+        const content = button.nextElementSibling;
+        content.style.display = content.style.display === "block" ? "none" : "block";
+      });
+    });
+  </script>
+</body>
+</html>

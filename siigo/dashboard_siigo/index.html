@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Siigo</title>
+  <link rel="stylesheet" href="../../css/main.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../../js/auth_guard.js"></script>
+  <script type="module">
+    import { guardPage } from "../../js/guard_page.js";
+    guardPage("dashboard_siigo");
+  </script>
+  <script type="module" src="../../js/header.js"></script>
+
+  <div class="main" style="max-width: 900px;">
+    <h1>Dashboard Siigo</h1>
+    <p>Este panel será la base de métricas y automatizaciones del entorno Siigo.</p>
+  </div>
+</body>
+</html>

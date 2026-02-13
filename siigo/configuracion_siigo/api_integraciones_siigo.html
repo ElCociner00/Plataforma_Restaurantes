@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>API's e Integraciones Siigo</title>
+  <link rel="stylesheet" href="../../css/main.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../../js/auth_guard.js"></script>
+  <script type="module">
+    import { guardPage } from "../../js/guard_page.js";
+    guardPage("configuracion_siigo");
+  </script>
+  <script type="module" src="../../js/header.js"></script>
+
+  <div class="main" style="max-width:720px;">
+    <h1>API's e Integraciones - Siigo</h1>
+    <p style="font-size:.9rem;color:#6b7280;">Este módulo es obligatorio para usar el entorno Siigo.</p>
+
+    <section class="bloque" style="display:grid;gap:10px;">
+      <label>Client ID<input id="client_id" type="text"></label>
+      <label>Project ID<input id="project_id" type="text"></label>
+      <label>Auth URL<input id="auth_url" type="text"></label>
+      <label>Token URL<input id="token_url" type="text"></label>
+      <label>Client Secret<input id="client_secret" type="password"></label>
+      <button type="button" disabled title="Próximamente">Guardar (próximamente)</button>
+    </section>
+  </div>
+</body>
+</html>

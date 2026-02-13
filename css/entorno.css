@@ -1,0 +1,21 @@
+.main.entorno-main {
+  max-width: 640px;
+  margin: 80px auto;
+  padding: 34px;
+}
+
+.entorno-main p {
+  margin-bottom: 24px;
+}
+
+.entorno-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.entorno-actions button {
+  width: 100%;
+  font-size: 1rem;
+  padding: 14px;
+}

@@ -199,3 +199,43 @@ button:hover {
   background: rgba(255, 255, 255, 0.1);
   text-decoration: none;
 }
+
+.app-header .user-menu-toggle {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 56px;
+}
+
+.app-header .user-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: #c4b5fd;
+  color: #312e81;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.app-header .user-name {
+  font-size: 0.72rem;
+  color: #ddd6fe;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-header .user-dropdown-menu {
+  min-width: 230px;
+}
+
+.app-header .menu-group-title {
+  font-size: 0.72rem;
+  color: #9ca3af;
+  padding: 6px 8px 0;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
