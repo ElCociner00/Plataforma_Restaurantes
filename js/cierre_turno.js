@@ -381,8 +381,6 @@ document.addEventListener("DOMContentLoaded", () => {
     return {
       fecha: fecha.value,
       responsable: responsable.value,
-      bolsa: bolsa?.value || 0,
-      caja: caja?.value || 0,
       turno: {
         inicio: horaInicio.value,
         fin: horaFin.value,
