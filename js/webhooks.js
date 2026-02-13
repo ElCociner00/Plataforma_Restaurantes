@@ -80,3 +80,12 @@ export const WEBHOOK_CONSULTAR_GASTOS_VISUALIZACION =
 // cierre_inventarios/historico_cierre_inventarios.html (auto-carga histórico de cierres de inventarios)
 export const WEBHOOK_HISTORICO_CIERRE_INVENTARIOS_DATOS =
   "https://n8n.globalnexoshop.com/webhook/cierre_inventarios_historico";
+
+
+// siigo/subir_facturas_siigo/index.html (consultar facturas desde correo)
+export const WEBHOOK_CARGAR_FACTURAS_CORREO =
+  "https://n8n.globalnexoshop.com/webhook/cargar_facturas_correo";
+
+// siigo/subir_facturas_siigo/index.html (subir/revertir factura en Siigo)
+export const WEBHOOK_SUBIR_SIIGO =
+  "https://n8n.globalnexoshop.com/webhook/subir_siigo";
