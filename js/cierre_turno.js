@@ -445,6 +445,12 @@ document.addEventListener("DOMContentLoaded", () => {
     nota.textContent = "Muy bien, todo en orden";
   }
 
+  const calcularDiferenciaEfectivoLocal = () => {
+    const efectivoSistemaNeto = getEfectivoSistemaNeto();
+    const efectivoReal = toNumberValue(inputsFinanzas.efectivo.real.value);
+    return efectivoSistemaNeto - efectivoReal;
+  };
+
   const applyVisibilitySettings = () => {
     const settings = getVisibilitySettings();
     filasFinanzas.forEach((row) => {
@@ -703,6 +709,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // Siempre limpiar antes de un nuevo ciclo de verificación
     limpiarDiferencias();
 
+    // Siempre limpiar antes de un nuevo ciclo de verificación
+    limpiarDiferencias();
+
     actualizarDomiciliosDesdeExtras();
 
     if (!efectivoApertura?.value) {
@@ -712,6 +721,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const contextPayload = await getContextPayload();
     if (!contextPayload) return;
+
+    btnVerificar.disabled = true;
 
     const payload = {
       fecha: fecha.value,
