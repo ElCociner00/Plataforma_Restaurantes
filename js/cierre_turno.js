@@ -451,6 +451,14 @@ document.addEventListener("DOMContentLoaded", () => {
     return efectivoSistemaNeto - efectivoReal;
   };
 
+  const syncDiferenciaEfectivo = () => {
+    const diferencia = calcularDiferenciaEfectivoLocal();
+    if (!inputsDiferencias.efectivo) return diferencia;
+    inputsDiferencias.efectivo.input.value = String(diferencia);
+    actualizarEstadoDiferencia("efectivo", diferencia);
+    return diferencia;
+  };
+
   const applyVisibilitySettings = () => {
     const settings = getVisibilitySettings();
     filasFinanzas.forEach((row) => {
@@ -523,6 +531,7 @@ document.addEventListener("DOMContentLoaded", () => {
     modoEfectivoSistema = "bruto";
     syncEfectivoRealFromCajaBolsa();
     syncEfectivoSistemaDisplay();
+    syncDiferenciaEfectivo();
     extrasRows.forEach((row) => {
       row.value = 0;
       if (row.input) {
@@ -556,16 +565,17 @@ document.addEventListener("DOMContentLoaded", () => {
   comentarios.addEventListener("input", marcarComoNoVerificado);
   bolsa?.addEventListener("input", () => {
     syncEfectivoRealFromCajaBolsa();
-    syncEfectivoSistemaDisplay();
+    syncDiferenciaEfectivo();
     marcarComoNoVerificado();
   });
   caja?.addEventListener("input", () => {
     syncEfectivoRealFromCajaBolsa();
-    syncEfectivoSistemaDisplay();
+    syncDiferenciaEfectivo();
     marcarComoNoVerificado();
   });
   efectivoApertura?.addEventListener("input", () => {
     syncEfectivoSistemaDisplay();
+    syncDiferenciaEfectivo();
     marcarComoNoVerificado();
   });
 
@@ -574,6 +584,7 @@ document.addEventListener("DOMContentLoaded", () => {
     btnToggleEfectivoSistema.classList.add("rotating");
     setTimeout(() => btnToggleEfectivoSistema.classList.remove("rotating"), 360);
     syncEfectivoSistemaDisplay();
+    syncDiferenciaEfectivo();
   });
   Object.values(inputsFinanzas).forEach((grupo) => {
     grupo.real.addEventListener("input", marcarComoNoVerificado);
@@ -709,9 +720,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // Siempre limpiar antes de un nuevo ciclo de verificación
     limpiarDiferencias();
 
-    // Siempre limpiar antes de un nuevo ciclo de verificación
-    limpiarDiferencias();
-
     actualizarDomiciliosDesdeExtras();
 
     if (!efectivoApertura?.value) {
@@ -780,7 +788,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       const data = await res.json();
-      const diferenciaEfectivoCalculada = getEfectivoSistemaNeto() - toNumberValue(inputsFinanzas.efectivo.real.value);
+      const diferenciaEfectivoCalculada = syncDiferenciaEfectivo();
       const diferencias = {
         efectivo: diferenciaEfectivoCalculada,
         datafono: data.datafono_diferencia,
