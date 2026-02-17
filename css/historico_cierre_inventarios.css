@@ -22,3 +22,11 @@ tr.selected { background:#f5f3ff; }
 .status { margin-top:10px; color:#374151; }
 .drag-col { width:32px; color:#9ca3af; text-align:center; }
 input[readonly] { background:#f1efff; border-color:#d8d2ff; }
+
+
+.tabla-wrap td,
+.tabla-wrap th {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}

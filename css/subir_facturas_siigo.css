@@ -213,3 +213,13 @@ tr.selected {
 .paginacion button.active {
   background: #312e81;
 }
+
+
+.tabla-wrap td,
+.tabla-wrap th,
+.inline-detail-table td,
+.inline-detail-table th {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}

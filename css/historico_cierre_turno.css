@@ -254,3 +254,11 @@ th.dragging {
     grid-template-columns: 1fr;
   }
 }
+
+
+.tabla-wrap td,
+.tabla-wrap th {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
