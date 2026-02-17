@@ -58,8 +58,17 @@
 
 #descargarFacturas,
 #aplicarFiltros,
-#limpiarFiltros {
+#limpiarFiltros,
+#cargarTodasFacturas {
   flex: 0 0 auto;
+}
+
+#cargarTodasFacturas {
+  background: #6d28d9;
+}
+
+#cargarTodasFacturas:hover {
+  background: #5b21b6;
 }
 
 .tabla-wrap {

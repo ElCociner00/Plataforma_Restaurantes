@@ -1,7 +1,6 @@
 import { getUserContext } from "./session.js";
 import {
   WEBHOOK_CARGAR_FACTURAS_CORREO,
-  WEBHOOK_LISTAR_RESPONSABLES,
   WEBHOOK_SUBIR_SIIGO
 } from "./webhooks.js";
 
@@ -11,7 +10,6 @@ const detalleFactura = document.getElementById("detalleFactura");
 const status = document.getElementById("status");
 const paginacion = document.getElementById("facturasPaginacion");
 
-const responsable = document.getElementById("responsable");
 const filtroFechaDesde = document.getElementById("filtroFechaDesde");
 const filtroFechaHasta = document.getElementById("filtroFechaHasta");
 const filtroNumero = document.getElementById("filtroNumero");
@@ -22,10 +20,14 @@ const btnAplicarFiltros = document.getElementById("aplicarFiltros");
 const btnLimpiarFiltros = document.getElementById("limpiarFiltros");
 const modoDescarga = document.getElementById("modoDescarga");
 const btnDescargarFacturas = document.getElementById("descargarFacturas");
+const btnCargarTodasFacturas = document.getElementById("cargarTodasFacturas");
 
 const getTimestamp = () => new Date().toISOString();
 const DETAILS_ORDER_KEY = "siigo_facturas_detalle_order";
 const PAGE_SIZE = 30;
+const SWITCH_DELAY_MS = 1000;
+const FUZZY_THRESHOLD_NUMERO = 0.9;
+const FUZZY_THRESHOLD_NIT = 0.85;
 
 const state = {
   context: null,
@@ -39,7 +41,9 @@ const state = {
   detailColumns: [
     "producto", "cantidad", "valor_unitario", "subtotal", "porcentaje_impuesto", "codigo_contable", "valor_debito", "valor_credito", "descripcion"
   ],
-  detailOrderByInvoice: {}
+  detailOrderByInvoice: {},
+  switchQueue: Promise.resolve(),
+  switchQueueCount: 0
 };
 
 const setStatus = (message) => { status.textContent = message; };
@@ -56,14 +60,73 @@ const normalizeRows = (raw) => {
   return [];
 };
 
+const normalizeText = (value) => String(value || "").toUpperCase().trim();
+
+const levenshteinDistance = (a, b) => {
+  const first = normalizeText(a);
+  const second = normalizeText(b);
+
+  if (!first.length) return second.length;
+  if (!second.length) return first.length;
+
+  const matrix = Array.from({ length: first.length + 1 }, () => new Array(second.length + 1).fill(0));
+
+  for (let i = 0; i <= first.length; i += 1) matrix[i][0] = i;
+  for (let j = 0; j <= second.length; j += 1) matrix[0][j] = j;
+
+  for (let i = 1; i <= first.length; i += 1) {
+    for (let j = 1; j <= second.length; j += 1) {
+      const cost = first[i - 1] === second[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+
+  return matrix[first.length][second.length];
+};
+
+const similarityScore = (query, candidate) => {
+  const q = normalizeText(query);
+  const c = normalizeText(candidate);
+  if (!q && !c) return 1;
+  if (!q || !c) return 0;
+  if (c.includes(q)) return 1;
+
+  const distance = levenshteinDistance(q, c);
+  const maxLen = Math.max(q.length, c.length);
+  return maxLen ? 1 - distance / maxLen : 0;
+};
+
+const parseInvoiceCode = (value) => {
+  const match = normalizeText(value).match(/^([A-Z]+)(\d+)$/);
+  if (!match) return null;
+  return { prefix: match[1], number: Number(match[2]) };
+};
+
+const invoiceSimilarityScore = (query, candidate) => {
+  const base = similarityScore(query, candidate);
+  const qCode = parseInvoiceCode(query);
+  const cCode = parseInvoiceCode(candidate);
+
+  if (!qCode || !cCode || qCode.prefix !== cCode.prefix) return base;
+
+  const diff = Math.abs(qCode.number - cCode.number);
+  const neighborScore = Math.max(0, 1 - diff / 100);
+  return Math.max(base, neighborScore);
+};
+
 const buildContextPayload = () => ({
   tenant_id: state.context?.empresa_id,
   empresa_id: state.context?.empresa_id,
   usuario_id: state.context?.user?.id || state.context?.user?.user_id,
   rol: state.context?.rol,
-  responsable_id: responsable.value || "",
   timestamp: getTimestamp()
 });
+
+const getResponsableId = () => state.context?.user?.id || state.context?.user?.user_id || "";
 
 const fetchJson = async (url, payload, method = "POST") => {
   const requestUrl = method === "GET" && payload
@@ -99,6 +162,7 @@ const fetchWebhookWithFallback = async (url, payload) => {
   }
 };
 
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const invoiceId = (row, idx) => `${row.numero_factura || "sin-numero"}-${idx}`;
 
 const detailRowWeight = (item) => {
@@ -258,6 +322,52 @@ const renderPagination = () => {
   }
 };
 
+const setSwitchBusyState = (disabled) => {
+  body.querySelectorAll('.switch input').forEach((checkbox) => {
+    checkbox.disabled = disabled;
+  });
+};
+
+const runSwitchUpdate = async (row, checked) => {
+  const payload = {
+    tenant_id: state.context?.empresa_id,
+    numero_factura: row.numero_factura,
+    timestampwithtimezone: getTimestamp(),
+    responsable_id: getResponsableId(),
+    accion_subir_siigo: checked,
+    subir_siigo: checked
+  };
+
+  const data = await fetchJson(WEBHOOK_SUBIR_SIIGO, payload);
+  row.siigo_subido = checked;
+  return data;
+};
+
+const enqueueSwitchUpdate = (row, checked) => {
+  state.switchQueueCount += 1;
+  const position = state.switchQueueCount;
+
+  const task = async () => {
+    setStatus(`Procesando factura ${format(row.numero_factura)} (${position} en cola)...`);
+    setSwitchBusyState(true);
+
+    try {
+      const data = await runSwitchUpdate(row, checked);
+      await wait(SWITCH_DELAY_MS);
+      return data;
+    } finally {
+      state.switchQueueCount = Math.max(0, state.switchQueueCount - 1);
+      if (state.switchQueueCount === 0) setSwitchBusyState(false);
+    }
+  };
+
+  state.switchQueue = state.switchQueue
+    .then(task)
+    .catch(async () => task());
+
+  return state.switchQueue;
+};
+
 const renderTable = () => {
   const headers = ["subir_siigo", ...state.generalColumns];
   head.innerHTML = `<tr>${headers.map((col) => {
@@ -284,22 +394,18 @@ const renderTable = () => {
     tdSwitch.querySelector("input")?.addEventListener("change", async (event) => {
       const checked = event.target.checked;
       event.target.disabled = true;
-      setStatus(checked ? "Subiendo factura a Siigo..." : "Revirtiendo factura en Siigo...");
+      setStatus(checked ? "Subiendo factura a Siigo..." : "Quitando factura de Siigo...");
 
       try {
-        const payload = {
-          ...buildContextPayload(),
-          accion_subir_siigo: checked,
-          factura: row
-        };
-        const data = await fetchJson(WEBHOOK_SUBIR_SIIGO, payload);
-        row.siigo_subido = checked;
+        const data = await enqueueSwitchUpdate(row, checked);
         setStatus(data?.message || (checked ? "La factura se ha registrado en Siigo." : "Factura marcada para reversión en Siigo."));
       } catch {
+        row.siigo_subido = !checked;
         event.target.checked = !checked;
         setStatus("Error enviando estado de factura a Siigo.");
       } finally {
         event.target.disabled = false;
+        renderTable();
       }
     });
 
@@ -330,22 +436,43 @@ const renderTable = () => {
   renderPagination();
 };
 
+const getFuzzyScore = (query, candidate, threshold, matcher = similarityScore) => {
+  if (!query) return 1;
+  const score = matcher(query, candidate);
+  return score >= threshold ? score : 0;
+};
+
 const applyFilters = () => {
   const desde = filtroFechaDesde.value;
   const hasta = filtroFechaHasta.value;
-  const numero = filtroNumero.value.trim().toLowerCase();
+  const numero = filtroNumero.value.trim();
   const proveedor = filtroProveedor.value.trim().toLowerCase();
-  const nit = filtroNit.value.trim().toLowerCase();
+  const nit = filtroNit.value.trim();
 
-  state.filteredRows = state.allRows.filter((row) => {
+  const scoredRows = state.allRows.map((row) => {
     const fecha = String(row.fecha_iso || "");
-    if (desde && fecha < desde) return false;
-    if (hasta && fecha > hasta) return false;
-    if (numero && !String(row.numero_factura || "").toLowerCase().includes(numero)) return false;
-    if (proveedor && !String(row.proveedor || "").toLowerCase().includes(proveedor)) return false;
-    if (nit && !String(row.nit || "").toLowerCase().includes(nit)) return false;
-    return true;
-  });
+    if (desde && fecha < desde) return null;
+    if (hasta && fecha > hasta) return null;
+    if (proveedor && !String(row.proveedor || "").toLowerCase().includes(proveedor)) return null;
+
+    const numeroScore = getFuzzyScore(numero, row.numero_factura, FUZZY_THRESHOLD_NUMERO, invoiceSimilarityScore);
+    const nitScore = getFuzzyScore(nit, row.nit, FUZZY_THRESHOLD_NIT);
+
+    if (numero && numeroScore === 0) return null;
+    if (nit && nitScore === 0) return null;
+
+    return {
+      row,
+      rank: (numero ? numeroScore : 0) + (nit ? nitScore : 0)
+    };
+  }).filter(Boolean);
+
+  const shouldSortBySimilarity = Boolean(numero || nit);
+  if (shouldSortBySimilarity) {
+    scoredRows.sort((a, b) => b.rank - a.rank);
+  }
+
+  state.filteredRows = scoredRows.map((item) => item.row);
 
   if (!state.filteredRows.find((row) => row.__id === state.selectedId)) {
     state.selectedId = state.filteredRows[0]?.__id || null;
@@ -478,22 +605,23 @@ const handleDownload = () => {
   setStatus(`Descarga generada (${rows.length} factura(s)).`);
 };
 
-const loadResponsables = async () => {
-  try {
-    const data = await fetchJson(WEBHOOK_LISTAR_RESPONSABLES, buildContextPayload());
-    const list = Array.isArray(data)
-      ? data.flatMap((item) => item?.responsables || [])
-      : (data?.responsables || []);
-
-    list.forEach((item) => {
-      const option = document.createElement("option");
-      option.value = item.id ?? item.value ?? item.nombre ?? item.name ?? "";
-      option.textContent = item.nombre ?? item.name ?? item.label ?? option.value;
-      responsable.appendChild(option);
-    });
-  } catch {
-    setStatus("No se pudieron cargar responsables, continuando...");
+const handleBulkLoad = async () => {
+  const pendingRows = state.filteredRows.filter((row) => !row.siigo_subido);
+  if (!pendingRows.length) {
+    setStatus("Todas las facturas filtradas ya están cargadas en Siigo.");
+    return;
   }
+
+  setStatus(`Encolando ${pendingRows.length} factura(s) para cargar en Siigo...`);
+
+  for (const row of pendingRows) {
+    // cola secuencial de 1 segundo por factura
+    // eslint-disable-next-line no-await-in-loop
+    await enqueueSwitchUpdate(row, true).catch(() => null);
+  }
+
+  renderTable();
+  setStatus(`Carga masiva finalizada. Facturas procesadas: ${pendingRows.length}.`);
 };
 
 const loadFacturas = async () => {
@@ -529,8 +657,6 @@ const init = async () => {
 
   state.detailOrderByInvoice = JSON.parse(localStorage.getItem(DETAILS_ORDER_KEY) || "{}");
 
-  await loadResponsables();
-
   try {
     await loadFacturas();
   } catch {
@@ -546,5 +672,6 @@ btnLimpiarFiltros.addEventListener("click", () => {
   applyFilters();
 });
 btnDescargarFacturas?.addEventListener("click", handleDownload);
+btnCargarTodasFacturas?.addEventListener("click", handleBulkLoad);
 
 init();

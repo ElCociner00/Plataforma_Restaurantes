@@ -20,9 +20,6 @@
 
     <section class="bloque filtros-bloque">
       <div class="filtros-grid">
-        <label>Responsable
-          <select id="responsable"><option value="">Todos</option></select>
-        </label>
         <label>Fecha desde<input type="date" id="filtroFechaDesde"></label>
         <label>Fecha hasta<input type="date" id="filtroFechaHasta"></label>
         <label>Número factura<input type="text" id="filtroNumero" placeholder="SER197"></label>
@@ -32,6 +29,7 @@
       <div class="filtros-actions">
         <button id="aplicarFiltros" type="button">Aplicar filtros</button>
         <button id="limpiarFiltros" type="button">Limpiar filtros</button>
+        <button id="cargarTodasFacturas" type="button">Cargar todas en Siigo</button>
         <label class="descarga-label">Modo descarga
           <select id="modoDescarga">
             <option value="excel_unificada_filtradas">Excel unificado (filtradas)</option>
