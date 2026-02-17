@@ -46,7 +46,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   if (activeEnvironment === ENV_SIIGO) {
-    menu += `<a href="/Plataforma_Restaurantes/siigo/dashboard_siigo/">Dashboard Siigo</a>`;
+    menu += `<a href="/Plataforma_Restaurantes/siigo/dashboard_siigo/">Dashboard</a>`;
     menu += `<a href="/Plataforma_Restaurantes/siigo/subir_facturas_siigo/">Ver o subir facturas correo</a>`;
   }
 
