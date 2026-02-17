@@ -322,11 +322,6 @@ const renderPagination = () => {
   }
 };
 
-const setSwitchBusyState = (disabled) => {
-  body.querySelectorAll('.switch input').forEach((checkbox) => {
-    checkbox.disabled = disabled;
-  });
-};
 
 const runSwitchUpdate = async (row, checked) => {
   const payload = {
@@ -349,7 +344,6 @@ const enqueueSwitchUpdate = (row, checked) => {
 
   const task = async () => {
     setStatus(`Procesando factura ${format(row.numero_factura)} (${position} en cola)...`);
-    setSwitchBusyState(true);
 
     try {
       const data = await runSwitchUpdate(row, checked);
@@ -357,13 +351,12 @@ const enqueueSwitchUpdate = (row, checked) => {
       return data;
     } finally {
       state.switchQueueCount = Math.max(0, state.switchQueueCount - 1);
-      if (state.switchQueueCount === 0) setSwitchBusyState(false);
     }
   };
 
   state.switchQueue = state.switchQueue
-    .then(task)
-    .catch(async () => task());
+    .catch(() => null)
+    .then(task);
 
   return state.switchQueue;
 };
@@ -391,7 +384,13 @@ const renderTable = () => {
       </label>
     `;
 
-    tdSwitch.querySelector("input")?.addEventListener("change", async (event) => {
+    const switchInput = tdSwitch.querySelector("input");
+    switchInput?.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+
+    switchInput?.addEventListener("change", async (event) => {
+      event.stopPropagation();
       const checked = event.target.checked;
       event.target.disabled = true;
       setStatus(checked ? "Subiendo factura a Siigo..." : "Quitando factura de Siigo...");
@@ -614,10 +613,19 @@ const handleBulkLoad = async () => {
 
   setStatus(`Encolando ${pendingRows.length} factura(s) para cargar en Siigo...`);
 
-  for (const row of pendingRows) {
-    // cola secuencial de 1 segundo por factura
-    // eslint-disable-next-line no-await-in-loop
-    await enqueueSwitchUpdate(row, true).catch(() => null);
+  btnCargarTodasFacturas.disabled = true;
+
+  try {
+    for (const row of pendingRows) {
+      // cola secuencial de 1 segundo por factura
+      // eslint-disable-next-line no-await-in-loop
+      await enqueueSwitchUpdate(row, true).catch(() => null);
+    }
+
+    renderTable();
+    setStatus(`Carga masiva finalizada. Facturas procesadas: ${pendingRows.length}.`);
+  } finally {
+    btnCargarTodasFacturas.disabled = false;
   }
 
   renderTable();
@@ -630,7 +638,7 @@ const loadFacturas = async () => {
   const rows = normalizeRows(data).map((row, idx) => ({
     ...row,
     __id: invoiceId(row, idx),
-    siigo_subido: Boolean(row.siigo_subido)
+    siigo_subido: false
   }));
 
   state.allRows = rows;
