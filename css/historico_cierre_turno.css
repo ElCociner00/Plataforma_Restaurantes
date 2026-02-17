@@ -1,9 +1,13 @@
 .main {
-  max-width: 1250px;
+  max-width: 1280px;
 }
 
 .bloque {
   margin-bottom: 20px;
+  border: 1px solid #e2ddff;
+  border-radius: 12px;
+  background: #fff;
+  padding: 14px;
 }
 
 .filtros-grid {
@@ -139,6 +143,8 @@
 
 .tabla-wrap {
   overflow-x: auto;
+  border: 1px solid #ddd6fe;
+  border-radius: 10px;
 }
 
 table {
@@ -149,14 +155,14 @@ table {
 
 th,
 td {
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #ece9ff;
   padding: 10px;
   text-align: left;
   font-size: 0.9rem;
 }
 
 th {
-  background: #f9fafb;
+  background: #f7f5ff;
   cursor: grab;
   user-select: none;
 }
@@ -186,9 +192,9 @@ th.dragging {
 }
 
 .detalle-turno {
-  border: 1px solid #e5e7eb;
+  border: 1px solid #ddd6fe;
   border-radius: 10px;
-  background: #fff;
+  background: #f9f8ff;
   padding: 12px;
 }
 
