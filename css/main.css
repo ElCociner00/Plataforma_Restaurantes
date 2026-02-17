@@ -239,3 +239,16 @@ button:hover {
   text-transform: uppercase;
   letter-spacing: .04em;
 }
+
+
+/* =========================
+   TABLAS: CONTROL DE DESBORDE DE TEXTO
+========================= */
+.main table th,
+.main table td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.3;
+}
+

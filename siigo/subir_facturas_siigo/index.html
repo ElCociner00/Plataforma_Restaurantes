@@ -20,9 +20,6 @@
 
     <section class="bloque filtros-bloque">
       <div class="filtros-grid">
-        <label>Responsable
-          <select id="responsable"><option value="">Todos</option></select>
-        </label>
         <label>Fecha desde<input type="date" id="filtroFechaDesde"></label>
         <label>Fecha hasta<input type="date" id="filtroFechaHasta"></label>
         <label>Número factura<input type="text" id="filtroNumero" placeholder="SER197"></label>
@@ -32,12 +29,12 @@
       <div class="filtros-actions">
         <button id="aplicarFiltros" type="button">Aplicar filtros</button>
         <button id="limpiarFiltros" type="button">Limpiar filtros</button>
+        <button id="cargarTodasFacturas" type="button">Cargar todas en Siigo</button>
         <label class="descarga-label">Modo descarga
           <select id="modoDescarga">
-            <option value="excel_filtradas">Excel (filtradas)</option>
+            <option value="excel_unificada_filtradas">Excel unificado (filtradas)</option>
+            <option value="excel_cuadros_filtradas">Excel por factura (cuadros separados)</option>
             <option value="csv_filtradas">CSV (filtradas)</option>
-            <option value="excel_seleccionada">Excel (seleccionada)</option>
-            <option value="csv_seleccionada">CSV (seleccionada)</option>
           </select>
         </label>
         <button id="descargarFacturas" type="button">Descargar</button>
@@ -53,11 +50,12 @@
           <tbody id="facturasBody"></tbody>
         </table>
       </div>
+      <div id="facturasPaginacion" class="paginacion"></div>
     </section>
 
     <section class="bloque">
       <h2>Detalle de factura seleccionada</h2>
-            <div id="detalleFactura" class="detalle-box">Selecciona una factura para ver items.</div>
+      <div id="detalleFactura" class="detalle-box">Selecciona una factura para ver items debajo de su fila.</div>
       <div id="status" class="status"></div>
     </section>
   </div>
