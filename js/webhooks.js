@@ -88,4 +88,4 @@ export const WEBHOOK_CARGAR_FACTURAS_CORREO =
 
 // siigo/subir_facturas_siigo/index.html (subir/revertir factura en Siigo)
 export const WEBHOOK_SUBIR_SIIGO =
-  "https://n8n.globalnexoshop.com/webhook/subir_siigo";
+  "https://n8n.globalnexoshop.com/webhook/subir_factura_siigo";
