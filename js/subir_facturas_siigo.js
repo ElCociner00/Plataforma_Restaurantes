@@ -627,6 +627,9 @@ const handleBulkLoad = async () => {
   } finally {
     btnCargarTodasFacturas.disabled = false;
   }
+
+  renderTable();
+  setStatus(`Carga masiva finalizada. Facturas procesadas: ${pendingRows.length}.`);
 };
 
 const loadFacturas = async () => {
