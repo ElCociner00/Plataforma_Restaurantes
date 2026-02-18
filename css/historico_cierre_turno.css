@@ -285,9 +285,3 @@ th.dragging {
   margin: 0;
   padding-left: 18px;
 }
-
-
-#historicoBody > tr > td {
-  min-height: 52px;
-  vertical-align: top;
-}

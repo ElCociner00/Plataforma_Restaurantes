@@ -178,38 +178,6 @@ const fuzzyMatches = (query, value, threshold = 0.8) => {
 
 const getDisplayValue = (value) => toReadableLabel(formatCellValue(value));
 
-
-const createExpandableCellContent = (value, maxChars = 42) => {
-  const wrapper = document.createElement("div");
-  wrapper.className = "cell-expandable";
-
-  const text = String(value ?? "");
-  const textSpan = document.createElement("span");
-  textSpan.className = "cell-expandable-text";
-  textSpan.textContent = text;
-
-  if (text.length <= maxChars) {
-    wrapper.appendChild(textSpan);
-    return wrapper;
-  }
-
-  textSpan.classList.add("is-collapsed");
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "cell-expandable-toggle";
-  button.textContent = "Ver más";
-
-  button.addEventListener("click", (event) => {
-    event.stopPropagation();
-    const collapsed = textSpan.classList.toggle("is-collapsed");
-    button.textContent = collapsed ? "Ver más" : "Ver menos";
-  });
-
-  wrapper.appendChild(textSpan);
-  wrapper.appendChild(button);
-  return wrapper;
-};
-
 const getRowId = (row, index) => String(row.turno_nombre || `${row.fecha_turno || "sin_fecha"}-${row.numero_turno || "sin_turno"}-${index}`);
 
 const getDetailItemKey = (detail) => `${String(detail.variable || "")}|${String(detail.categoria || "")}`;
@@ -431,9 +399,7 @@ const renderBody = () => {
 
     state.visibleGeneralColumns.forEach((column) => {
       const td = document.createElement("td");
-      const value = formatCellValue(row.general[column]);
-      if (String(value).length > 36) td.appendChild(createExpandableCellContent(value));
-      else td.textContent = value;
+      td.textContent = formatCellValue(row.general[column]);
       tr.appendChild(td);
     });
 
