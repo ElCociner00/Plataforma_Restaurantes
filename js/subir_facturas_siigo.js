@@ -326,11 +326,19 @@ const renderPagination = () => {
 const runSwitchUpdate = async (row, checked) => {
   const payload = {
     tenant_id: state.context?.empresa_id,
-    numero_factura: row.numero_factura,
-    timestampwithtimezone: getTimestamp(),
+    empresa_id: state.context?.empresa_id,
+    usuario_id: getResponsableId(),
     responsable_id: getResponsableId(),
+    timestamp: getTimestamp(),
+    timestampwithtimezone: getTimestamp(),
     accion_subir_siigo: checked,
-    subir_siigo: checked
+    subir_siigo: checked,
+    numero_factura: row.numero_factura,
+    factura_id: row.factura_id || row.id || row.__id,
+    nit: row.nit || null,
+    proveedor: row.proveedor || null,
+    tipo_factura: row.tipo_factura || null,
+    estado_factura: row.estado || null
   };
 
   const data = await fetchJson(WEBHOOK_SUBIR_SIIGO, payload);
@@ -378,30 +386,36 @@ const renderTable = () => {
 
     const tdSwitch = document.createElement("td");
     tdSwitch.innerHTML = `
-      <label class="switch">
-        <input type="checkbox" ${row.siigo_subido ? "checked" : ""}>
-        <span class="slider"></span>
-      </label>
+      <div class="siigo-switch-wrap">
+        <label class="switch" data-switch-label>
+          <input type="checkbox" ${row.siigo_subido ? "checked" : ""}>
+          <span class="slider"></span>
+        </label>
+        <span class="siigo-state ${row.siigo_subido ? "is-on" : "is-off"}">${row.siigo_subido ? "Subida" : "Pendiente"}</span>
+      </div>
     `;
 
-    const switchInput = tdSwitch.querySelector("input");
-    switchInput?.addEventListener("click", (event) => {
-      event.stopPropagation();
-    });
+    tdSwitch.addEventListener("click", (event) => event.stopPropagation());
+    tdSwitch.querySelector("[data-switch-label]")?.addEventListener("click", (event) => event.stopPropagation());
 
+    const switchInput = tdSwitch.querySelector("input");
     switchInput?.addEventListener("change", async (event) => {
       event.stopPropagation();
       const checked = event.target.checked;
       event.target.disabled = true;
-      setStatus(checked ? "Subiendo factura a Siigo..." : "Quitando factura de Siigo...");
+      const rowAction = checked ? "subir" : "retirar";
+      setStatus(`Enviando señal para ${rowAction} factura ${format(row.numero_factura)}...`);
 
       try {
         const data = await enqueueSwitchUpdate(row, checked);
-        setStatus(data?.message || (checked ? "La factura se ha registrado en Siigo." : "Factura marcada para reversión en Siigo."));
+        row.siigo_subido = checked;
+        setStatus(data?.message || (checked
+          ? `Factura ${format(row.numero_factura)} subida en Siigo.`
+          : `Factura ${format(row.numero_factura)} retirada de Siigo.`));
       } catch {
         row.siigo_subido = !checked;
         event.target.checked = !checked;
-        setStatus("Error enviando estado de factura a Siigo.");
+        setStatus(`Error al enviar la señal de ${rowAction} para la factura ${format(row.numero_factura)}.`);
       } finally {
         event.target.disabled = false;
         renderTable();

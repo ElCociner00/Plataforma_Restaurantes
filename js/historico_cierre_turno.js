@@ -15,6 +15,10 @@ const filtroFechaHasta = document.getElementById("filtroFechaHasta");
 const filtroHoraInicio = document.getElementById("filtroHoraInicio");
 const filtroHoraFin = document.getElementById("filtroHoraFin");
 const filtroFila = document.getElementById("filtroFila");
+const filtroNombreTurno = document.getElementById("filtroNombreTurno");
+const filtroNumeroTurno = document.getElementById("filtroNumeroTurno");
+const filtroBusquedaGeneral = document.getElementById("filtroBusquedaGeneral");
+const coincidenciasSimilares = document.getElementById("coincidenciasSimilares");
 
 const btnAplicarFiltros = document.getElementById("aplicarFiltros");
 const btnLimpiarFiltros = document.getElementById("limpiarFiltros");
@@ -125,6 +129,55 @@ const formatCellValue = (value) => {
   return String(value);
 };
 
+const toReadableLabel = (value) => String(value || "")
+  .replace(/[_-]+/g, " ")
+  .replace(/\s+/g, " ")
+  .trim();
+
+const normalizeSearchText = (value) => String(value || "")
+  .normalize("NFD")
+  .replace(/[̀-ͯ]/g, "")
+  .toLowerCase()
+  .trim();
+
+const calculateSimilarity = (a, b) => {
+  const left = normalizeSearchText(a);
+  const right = normalizeSearchText(b);
+  if (!left || !right) return 0;
+  if (left === right) return 1;
+  if (left.includes(right) || right.includes(left)) return 0.95;
+
+  const bigrams = (text) => {
+    if (text.length < 2) return [text];
+    const out = [];
+    for (let i = 0; i < text.length - 1; i += 1) out.push(text.slice(i, i + 2));
+    return out;
+  };
+
+  const leftBigrams = bigrams(left);
+  const rightBigrams = bigrams(right);
+  const map = new Map();
+  leftBigrams.forEach((item) => map.set(item, (map.get(item) || 0) + 1));
+  let overlap = 0;
+  rightBigrams.forEach((item) => {
+    const count = map.get(item) || 0;
+    if (count > 0) {
+      overlap += 1;
+      map.set(item, count - 1);
+    }
+  });
+
+  return (2 * overlap) / (leftBigrams.length + rightBigrams.length);
+};
+
+const fuzzyMatches = (query, value, threshold = 0.8) => {
+  if (!query) return true;
+  const score = calculateSimilarity(query, value);
+  return score >= threshold;
+};
+
+const getDisplayValue = (value) => toReadableLabel(formatCellValue(value));
+
 const getRowId = (row, index) => String(row.turno_nombre || `${row.fecha_turno || "sin_fecha"}-${row.numero_turno || "sin_turno"}-${index}`);
 
 const getDetailItemKey = (detail) => `${String(detail.variable || "")}|${String(detail.categoria || "")}`;
@@ -232,12 +285,12 @@ const renderDetailSection = () => {
   }
 
   const generalHtml = state.visibleGeneralColumns
-    .map((key) => `<div class="kv"><strong>${key}</strong><span>${formatCellValue(selected.general[key])}</span></div>`)
+    .map((key) => `<div class="kv"><strong>${toReadableLabel(key)}</strong><span>${formatCellValue(selected.general[key])}</span></div>`)
     .join("");
 
   const detailRows = getDetailRowsFor(selected);
 
-  const detailHead = ["↕", ...state.visibleDetailColumns].map((col) => `<th>${col}</th>`).join("");
+  const detailHead = ["↕", ...state.visibleDetailColumns].map((col) => `<th>${toReadableLabel(col)}</th>`).join("");
   const detailBody = detailRows.map((detail) => {
     const detailKey = getDetailItemKey(detail);
     const cells = state.visibleDetailColumns.map((col) => `<td>${formatCellValue(detail[col])}</td>`).join("");
@@ -303,13 +356,14 @@ const renderHead = () => {
 
   state.visibleGeneralColumns.forEach((column) => {
     const th = document.createElement("th");
-    th.textContent = column;
+    th.textContent = toReadableLabel(column);
+    th.dataset.column = column;
     th.draggable = true;
     th.addEventListener("dragstart", () => th.classList.add("dragging"));
     th.addEventListener("dragend", () => th.classList.remove("dragging"));
     th.addEventListener("dragover", (event) => event.preventDefault());
     th.addEventListener("drop", () => {
-      const source = head.querySelector("th.dragging")?.textContent;
+      const source = head.querySelector("th.dragging")?.dataset.column;
       if (source) moveColumn(source, column);
     });
     tr.appendChild(th);
@@ -398,7 +452,7 @@ const renderSwitches = (container, columns, visibleColumns, onToggle) => {
     const row = document.createElement("div");
     row.className = "vis-row";
     row.innerHTML = `
-      <span>${column}</span>
+      <span>${toReadableLabel(column)}</span>
       <label class="switch">
         <input type="checkbox" ${visibleColumns.includes(column) ? "checked" : ""}>
         <span class="slider"></span>
@@ -439,16 +493,42 @@ const renderTable = () => {
   setStatus(`Mostrando ${state.filteredRows.length} turno(s). Página ${state.currentPage}.`);
 };
 
+const renderSimilarMatches = (rows, query, label) => {
+  if (!coincidenciasSimilares) return;
+  if (!query || !rows.length) {
+    coincidenciasSimilares.innerHTML = "";
+    return;
+  }
+
+  const items = rows.slice(0, 5).map((row) => {
+    const nombre = formatCellValue(row.general.turno_nombre || row.general.nombre_turno || row.id);
+    const numero = formatCellValue(row.general.numero_turno || "-");
+    return `<li><strong>${nombre}</strong> · Turno ${numero}</li>`;
+  }).join("");
+
+  coincidenciasSimilares.innerHTML = `
+    <h3>Coincidencias similares para ${label}</h3>
+    <ul>${items}</ul>
+  `;
+};
+
 const applyFilters = () => {
   const fechaDesde = filtroFechaDesde.value;
   const fechaHasta = filtroFechaHasta.value;
   const horaInicio = filtroHoraInicio.value;
   const horaFin = filtroHoraFin.value;
   const filaExacta = Number(filtroFila.value || 0);
+  const nombreTurno = filtroNombreTurno?.value?.trim() || "";
+  const numeroTurno = filtroNumeroTurno?.value?.trim() || "";
+  const busquedaGeneral = filtroBusquedaGeneral?.value?.trim() || "";
 
   const fechaCol = getCandidateColumn(state.allGeneralColumns, ["fecha", "date"]);
   const horaInicioCol = getCandidateColumn(state.allGeneralColumns, ["hora_inicio", "inicio"]);
   const horaFinCol = getCandidateColumn(state.allGeneralColumns, ["hora_fin", "fin"]);
+  const nombreCol = getCandidateColumn(state.allGeneralColumns, ["nombre_turno", "turno_nombre", "nombre"]);
+  const numeroCol = getCandidateColumn(state.allGeneralColumns, ["numero_turno", "turno", "numero"]);
+
+  const similarRows = [];
 
   state.filteredRows = state.allRows.filter((row, index) => {
     const rowNumber = index + 1;
@@ -468,13 +548,37 @@ const applyFilters = () => {
     }
 
     if (horaInicio && horaInicioCol) {
-      const value = String(row.general[horaInicioCol] ?? "");
-      if (value && value < horaInicio) return false;
+      const value = String(row.general[horaInicioCol] ?? "").slice(0, 5);
+      if (value !== horaInicio) {
+        if (fuzzyMatches(horaInicio, value, 0.6)) similarRows.push(row);
+        return false;
+      }
     }
 
     if (horaFin && horaFinCol) {
-      const value = String(row.general[horaFinCol] ?? "");
-      if (value && value > horaFin) return false;
+      const value = String(row.general[horaFinCol] ?? "").slice(0, 5);
+      if (value !== horaFin) {
+        if (fuzzyMatches(horaFin, value, 0.6)) similarRows.push(row);
+        return false;
+      }
+    }
+
+    if (nombreTurno) {
+      const value = getDisplayValue(row.general[nombreCol] || row.general.turno_nombre || row.id);
+      if (!fuzzyMatches(nombreTurno, value, 0.8)) return false;
+    }
+
+    if (numeroTurno) {
+      const value = getDisplayValue(row.general[numeroCol] || row.general.numero_turno || "");
+      if (!fuzzyMatches(numeroTurno, value, 0.8)) return false;
+    }
+
+    if (busquedaGeneral) {
+      const hayMatchGeneral = state.allGeneralColumns.some((col) => {
+        const value = getDisplayValue(row.general[col]);
+        return fuzzyMatches(busquedaGeneral, value, 0.8);
+      });
+      if (!hayMatchGeneral) return false;
     }
 
     return true;
@@ -482,6 +586,7 @@ const applyFilters = () => {
 
   state.currentPage = 1;
   renderTable();
+  renderSimilarMatches(similarRows, horaInicio || horaFin, "horario");
 };
 
 const escapeHtml = (value) => String(value)
@@ -631,6 +736,10 @@ btnLimpiarFiltros.addEventListener("click", () => {
   filtroHoraInicio.value = "";
   filtroHoraFin.value = "";
   filtroFila.value = "";
+  if (filtroNombreTurno) filtroNombreTurno.value = "";
+  if (filtroNumeroTurno) filtroNumeroTurno.value = "";
+  if (filtroBusquedaGeneral) filtroBusquedaGeneral.value = "";
+  if (coincidenciasSimilares) coincidenciasSimilares.innerHTML = "";
   state.filteredRows = [...state.allRows];
   state.currentPage = 1;
   renderTable();
