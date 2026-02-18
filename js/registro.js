@@ -14,6 +14,7 @@ const razonSocialInput = document.getElementById("razon_social");
 const nitInput = document.getElementById("nit");
 const correoEmpresaInput = document.getElementById("correo_empresa");
 const codigoInput = document.getElementById("codigo");
+const aceptaPoliticasInput = document.getElementById("acepta_politicas");
 
 enforceNumericInput([nitInput, codigoInput]);
 
@@ -27,11 +28,18 @@ form.addEventListener("submit", async (e) => {
   e.preventDefault();
   status.innerText = "Enviando código...";
 
+  if (!aceptaPoliticasInput?.checked) {
+    status.innerText = "Debes aceptar las políticas para continuar.";
+    return;
+  }
+
   datosEmpresa = {
     nombre_comercial: nombreComercialInput.value.trim(),
     razon_social: razonSocialInput.value.trim(),
     nit: nitInput.value.trim(),
-    correo_empresa: correoEmpresaInput.value.trim()
+    correo_empresa: correoEmpresaInput.value.trim(),
+    acepta_politicas: true,
+    acepta_politicas_fecha: new Date().toISOString()
   };
 
   try {

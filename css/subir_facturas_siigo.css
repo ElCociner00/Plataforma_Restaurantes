@@ -223,3 +223,119 @@ tr.selected {
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+
+
+.siigo-switch-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.siigo-state {
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+.siigo-state.is-on {
+  color: #065f46;
+  background: #d1fae5;
+}
+
+.siigo-state.is-off {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+
+.siigo-action-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.siigo-action-btn.is-on {
+  background: #dc2626;
+}
+
+.siigo-action-btn.is-off {
+  background: #16a34a;
+}
+
+.siigo-action-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+
+.siigo-switch-wrap,
+.siigo-switch-wrap * {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.siigo-switch-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 220px;
+}
+
+.siigo-state,
+.siigo-action-btn {
+  flex: 0 0 auto;
+  line-height: 1.2;
+}
+
+.siigo-warning-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.55);
+  display: grid;
+  place-items: center;
+  z-index: 1200;
+  padding: 16px;
+}
+
+.siigo-warning-modal.hidden {
+  display: none;
+}
+
+.siigo-warning-card {
+  width: min(640px, 95vw);
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #ddd6fe;
+  padding: 18px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+.siigo-warning-card h3 {
+  margin: 0 0 8px;
+}
+
+.siigo-warning-card p {
+  margin: 0;
+  color: #374151;
+  line-height: 1.5;
+}
+
+.siigo-warning-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.siigo-warning-cancel {
+  background: #6b7280;
+}
+
+.siigo-warning-confirm {
+  background: #b91c1c;
+}
