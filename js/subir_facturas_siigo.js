@@ -122,6 +122,42 @@ const normalizeRows = (raw) => {
 
 const normalizeText = (value) => String(value || "").toUpperCase().trim();
 
+const toReadableLabel = (value) => String(value || "")
+  .replace(/[_-]+/g, " ")
+  .replace(/\s+/g, " ")
+  .trim();
+
+const createExpandableCellContent = (value, maxChars = 42) => {
+  const wrapper = document.createElement("div");
+  wrapper.className = "cell-expandable";
+
+  const text = String(value ?? "-");
+  const textSpan = document.createElement("span");
+  textSpan.className = "cell-expandable-text";
+  textSpan.textContent = text;
+
+  if (text.length <= maxChars) {
+    wrapper.appendChild(textSpan);
+    return wrapper;
+  }
+
+  textSpan.classList.add("is-collapsed");
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "cell-expandable-toggle";
+  toggle.textContent = "Ver más";
+
+  toggle.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const collapsed = textSpan.classList.toggle("is-collapsed");
+    toggle.textContent = collapsed ? "Ver más" : "Ver menos";
+  });
+
+  wrapper.appendChild(textSpan);
+  wrapper.appendChild(toggle);
+  return wrapper;
+};
+
 const levenshteinDistance = (a, b) => {
   const first = normalizeText(a);
   const second = normalizeText(b);
@@ -337,7 +373,7 @@ const bindInlineDetailDrag = () => {
 
 const buildDetailTableHtml = (invoiceIdValue) => {
   const items = getDetailsByInvoiceId(invoiceIdValue);
-  const detailHead = ["↕", ...state.detailColumns].map((col) => `<th>${col}</th>`).join("");
+  const detailHead = ["↕", ...state.detailColumns].map((col) => `<th>${toReadableLabel(col)}</th>`).join("");
 
   if (!items.length) {
     return `
@@ -466,9 +502,9 @@ const enqueueSwitchUpdate = (row, checked) => {
 const renderTable = () => {
   const headers = ["subir_siigo", ...state.generalColumns];
   head.innerHTML = `<tr>${headers.map((col) => {
-    if (col === "subir_siigo") return "<th>Siigo</th>";
+    if (col === "subir_siigo") return '<th class="siigo-control-col">Siigo</th>';
     const className = col === "fecha_iso" ? " class=\"fecha-col\"" : "";
-    return `<th data-column="${col}"${className}>${col}</th>`;
+    return `<th data-column="${col}"${className}>${toReadableLabel(col)}</th>`;
   }).join("")}</tr>`;
 
   body.innerHTML = "";
@@ -480,6 +516,7 @@ const renderTable = () => {
 
     const isUploaded = getInvoiceState(row);
     const tdSwitch = document.createElement("td");
+    tdSwitch.className = "siigo-control-col";
     tdSwitch.innerHTML = `
       <div class="siigo-switch-wrap">
         <label class="switch" data-switch-label>
@@ -552,7 +589,10 @@ const renderTable = () => {
 
     state.generalColumns.forEach((col) => {
       const td = document.createElement("td");
-      td.textContent = format(row[col]);
+      const formatted = format(row[col]);
+      const shouldExpand = typeof formatted === "string" && formatted.length > 36;
+      if (shouldExpand) td.appendChild(createExpandableCellContent(formatted));
+      else td.textContent = formatted;
       if (col === "fecha_iso") td.classList.add("fecha-col");
       tr.appendChild(td);
     });
