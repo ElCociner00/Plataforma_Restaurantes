@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Registro de Empresa</title>
+  <title>AXIOMA | Registro de Empresa</title>
   <link rel="stylesheet" href="../css/main.css">
   <link rel="stylesheet" href="../css/registro.css">
 </head>
@@ -16,6 +16,18 @@
       <input type="text" id="razon_social" placeholder="Razón social" required>
       <input type="text" id="nit" placeholder="NIT" inputmode="numeric" pattern="[0-9]*" required>
       <input type="email" id="correo_empresa" placeholder="Correo de la empresa" required>
+
+      <label class="consentimiento-legal">
+        <input type="checkbox" id="acepta_politicas" required>
+        Afirmo que he leído y comprendido las políticas de AXIOMA: 
+        <a href="../legal/terminos.html" target="_blank" rel="noopener noreferrer">Términos y Condiciones</a>,
+        <a href="../legal/privacidad.html" target="_blank" rel="noopener noreferrer">Política de Privacidad</a>,
+        <a href="../legal/cookies.html" target="_blank" rel="noopener noreferrer">Política de Cookies</a>,
+        <a href="../legal/datos.html" target="_blank" rel="noopener noreferrer">Tratamiento de Datos</a>,
+        <a href="../legal/responsabilidad.html" target="_blank" rel="noopener noreferrer">Responsabilidad Legal</a>,
+        <a href="../legal/seguridad.html" target="_blank" rel="noopener noreferrer">Política de Seguridad</a> y
+        <a href="../legal/consentimientos.html" target="_blank" rel="noopener noreferrer">Consentimientos</a>.
+      </label>
 
       <button type="submit">Enviar código de verificación</button>
     </form>
@@ -34,5 +46,6 @@
 
   <!-- JS separado -->
   <script type="module" src="../js/registro.js"></script>
+  <script type="module" src="../js/footer.js"></script>
 </body>
 </html>
