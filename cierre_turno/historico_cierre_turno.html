@@ -2,7 +2,8 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Histórico cierres de turno</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AXIOMA | Histórico cierres de turno</title>
   <link rel="stylesheet" href="../css/main.css">
   <link rel="stylesheet" href="../css/historico_cierre_turno.css">
 </head>
@@ -27,6 +28,18 @@
         <label>
           Fecha desde
           <input type="date" id="filtroFechaDesde">
+        </label>
+        <label>
+          Nombre del turno
+          <input type="text" id="filtroNombreTurno" placeholder="Ej: turno mañana">
+        </label>
+        <label>
+          Número de turno
+          <input type="text" id="filtroNumeroTurno" placeholder="Ej: 2">
+        </label>
+        <label>
+          Búsqueda general
+          <input type="text" id="filtroBusquedaGeneral" placeholder="Busca por texto o número">
         </label>
         <label>
           Fecha hasta
@@ -93,6 +106,7 @@
         </table>
       </div>
       <div id="paginacion" class="paginacion"></div>
+      <div id="coincidenciasSimilares" class="coincidencias-similares"></div>
     </section>
 
     <section class="bloque">
@@ -103,5 +117,6 @@
   </div>
 
   <script type="module" src="../js/historico_cierre_turno.js"></script>
+  <script type="module" src="../js/footer.js"></script>
 </body>
 </html>

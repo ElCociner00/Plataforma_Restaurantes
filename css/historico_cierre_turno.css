@@ -262,3 +262,32 @@ th.dragging {
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+
+.tabla-wrap th {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.coincidencias-similares {
+  margin-top: 14px;
+  border: 1px dashed #c7d2fe;
+  background: #f8faff;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.coincidencias-similares h3 {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+}
+
+.coincidencias-similares ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+
+#historicoBody > tr > td {
+  min-height: 52px;
+  vertical-align: top;
+}

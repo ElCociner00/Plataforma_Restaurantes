@@ -1,0 +1,17 @@
+.main.legal {
+  max-width: 980px;
+  margin: 28px auto;
+}
+
+.main.legal h1,
+.main.legal h2,
+.main.legal h3,
+.main.legal p,
+.main.legal li {
+  text-align: left;
+}
+
+.main.legal h1 { margin-bottom: 20px; }
+.main.legal h2 { margin-top: 18px; margin-bottom: 10px; }
+.main.legal ul { margin: 0 0 12px 20px; }
+.main.legal li { margin-bottom: 6px; }

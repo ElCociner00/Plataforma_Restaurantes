@@ -50,6 +50,66 @@ const setStatus = (message) => { status.textContent = message; };
 const format = (v) => (v === null || v === undefined || v === "" ? "-" : String(v));
 const escapeCsv = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
 
+const DEACTIVATE_WARNING_MESSAGE = "Desactivar este switch no eliminará la factura de siigo y puede generar problemas o confusiones, estas seguro de desactivar? recuerda que para borrar un comprobante debes hacerlo desde la plataforma.";
+
+const normalizeBoolean = (value) => {
+  if (typeof value === "boolean") return value;
+  const text = String(value || "").toLowerCase().trim();
+  return text === "true" || text === "1" || text === "si" || text === "sí" || text === "subida" || text === "cargada";
+};
+
+const getInvoiceState = (row) => normalizeBoolean(row?.siigo_subido);
+
+const ensureWarningModal = () => {
+  let modal = document.getElementById("siigoDeactivateWarningModal");
+  if (modal) return modal;
+
+  modal = document.createElement("div");
+  modal.id = "siigoDeactivateWarningModal";
+  modal.className = "siigo-warning-modal hidden";
+  modal.innerHTML = `
+    <div class="siigo-warning-card" role="dialog" aria-modal="true" aria-labelledby="siigoWarningTitle">
+      <h3 id="siigoWarningTitle">Advertencia</h3>
+      <p>${DEACTIVATE_WARNING_MESSAGE}</p>
+      <div class="siigo-warning-actions">
+        <button type="button" class="siigo-warning-cancel" data-warning-cancel>Cancelar</button>
+        <button type="button" class="siigo-warning-confirm" data-warning-confirm>Desactivar</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  return modal;
+};
+
+const requestDeactivateConfirmation = () => new Promise((resolve) => {
+  const modal = ensureWarningModal();
+  modal.classList.remove("hidden");
+
+  const close = (result) => {
+    modal.classList.add("hidden");
+    modal.removeEventListener("click", onBackdrop);
+    cancelBtn?.removeEventListener("click", onCancel);
+    confirmBtn?.removeEventListener("click", onConfirm);
+    resolve(result);
+  };
+
+  const onBackdrop = (event) => {
+    if (event.target === modal) close(false);
+  };
+
+  const onCancel = () => close(false);
+  const onConfirm = () => close(true);
+
+  const cancelBtn = modal.querySelector("[data-warning-cancel]");
+  const confirmBtn = modal.querySelector("[data-warning-confirm]");
+
+  modal.addEventListener("click", onBackdrop);
+  cancelBtn?.addEventListener("click", onCancel);
+  confirmBtn?.addEventListener("click", onConfirm);
+});
+
+
 const normalizeRows = (raw) => {
   if (Array.isArray(raw)) return raw;
   if (!raw || typeof raw !== "object") return [];
@@ -61,6 +121,42 @@ const normalizeRows = (raw) => {
 };
 
 const normalizeText = (value) => String(value || "").toUpperCase().trim();
+
+const toReadableLabel = (value) => String(value || "")
+  .replace(/[_-]+/g, " ")
+  .replace(/\s+/g, " ")
+  .trim();
+
+const createExpandableCellContent = (value, maxChars = 42) => {
+  const wrapper = document.createElement("div");
+  wrapper.className = "cell-expandable";
+
+  const text = String(value ?? "-");
+  const textSpan = document.createElement("span");
+  textSpan.className = "cell-expandable-text";
+  textSpan.textContent = text;
+
+  if (text.length <= maxChars) {
+    wrapper.appendChild(textSpan);
+    return wrapper;
+  }
+
+  textSpan.classList.add("is-collapsed");
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "cell-expandable-toggle";
+  toggle.textContent = "Ver más";
+
+  toggle.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const collapsed = textSpan.classList.toggle("is-collapsed");
+    toggle.textContent = collapsed ? "Ver más" : "Ver menos";
+  });
+
+  wrapper.appendChild(textSpan);
+  wrapper.appendChild(toggle);
+  return wrapper;
+};
 
 const levenshteinDistance = (a, b) => {
   const first = normalizeText(a);
@@ -128,6 +224,18 @@ const buildContextPayload = () => ({
 
 const getResponsableId = () => state.context?.user?.id || state.context?.user?.user_id || "";
 
+const parseWebhookResponse = async (res) => {
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) return res.json();
+  const text = await res.text();
+  if (!text) return { ok: res.ok };
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text, ok: res.ok };
+  }
+};
+
 const fetchJson = async (url, payload, method = "POST") => {
   const requestUrl = method === "GET" && payload
     ? `${url}?${new URLSearchParams(payload).toString()}`
@@ -140,18 +248,37 @@ const fetchJson = async (url, payload, method = "POST") => {
   });
 
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return parseWebhookResponse(res);
+};
 
-  const contentType = res.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) return res.json();
+const fetchWebhookSignal = async (url, payload) => {
+  const asStringEntries = Object.entries(payload).map(([k, v]) => [k, typeof v === "boolean" ? String(v) : String(v ?? "")]);
+  const query = new URLSearchParams(asStringEntries);
 
-  const text = await res.text();
-  if (!text) return [];
+  const attempts = [
+    async () => {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+        body: query.toString()
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return parseWebhookResponse(res);
+    },
+    async () => fetchJson(url, payload, "POST"),
+    async () => fetchJson(url, payload, "GET")
+  ];
 
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { message: text };
+  let lastError = null;
+  for (const attempt of attempts) {
+    try {
+      return await attempt();
+    } catch (error) {
+      lastError = error;
+    }
   }
+
+  throw lastError || new Error("No se pudo enviar señal al webhook.");
 };
 
 const fetchWebhookWithFallback = async (url, payload) => {
@@ -246,7 +373,7 @@ const bindInlineDetailDrag = () => {
 
 const buildDetailTableHtml = (invoiceIdValue) => {
   const items = getDetailsByInvoiceId(invoiceIdValue);
-  const detailHead = ["↕", ...state.detailColumns].map((col) => `<th>${col}</th>`).join("");
+  const detailHead = ["↕", ...state.detailColumns].map((col) => `<th>${toReadableLabel(col)}</th>`).join("");
 
   if (!items.length) {
     return `
@@ -326,14 +453,25 @@ const renderPagination = () => {
 const runSwitchUpdate = async (row, checked) => {
   const payload = {
     tenant_id: state.context?.empresa_id,
-    numero_factura: row.numero_factura,
-    timestampwithtimezone: getTimestamp(),
+    empresa_id: state.context?.empresa_id,
+    usuario_id: getResponsableId(),
     responsable_id: getResponsableId(),
+    rol: state.context?.rol,
+    timestamp: getTimestamp(),
+    timestampwithtimezone: getTimestamp(),
     accion_subir_siigo: checked,
-    subir_siigo: checked
+    subir_siigo: checked,
+    ok: checked,
+    numero_factura: row.numero_factura,
+    factura_id: row.factura_id || row.id || row.__id,
+    nit: row.nit || null,
+    proveedor: row.proveedor || null,
+    tipo_factura: row.tipo_factura || null,
+    estado_factura: row.estado || null,
+    webhook_origen: WEBHOOK_SUBIR_SIIGO
   };
 
-  const data = await fetchJson(WEBHOOK_SUBIR_SIIGO, payload);
+  const data = await fetchWebhookSignal(WEBHOOK_SUBIR_SIIGO, payload);
   row.siigo_subido = checked;
   return data;
 };
@@ -364,9 +502,9 @@ const enqueueSwitchUpdate = (row, checked) => {
 const renderTable = () => {
   const headers = ["subir_siigo", ...state.generalColumns];
   head.innerHTML = `<tr>${headers.map((col) => {
-    if (col === "subir_siigo") return "<th>Siigo</th>";
+    if (col === "subir_siigo") return '<th class="siigo-control-col">Siigo</th>';
     const className = col === "fecha_iso" ? " class=\"fecha-col\"" : "";
-    return `<th data-column="${col}"${className}>${col}</th>`;
+    return `<th data-column="${col}"${className}>${toReadableLabel(col)}</th>`;
   }).join("")}</tr>`;
 
   body.innerHTML = "";
@@ -376,43 +514,85 @@ const renderTable = () => {
     const tr = document.createElement("tr");
     tr.classList.toggle("selected", row.__id === state.selectedId);
 
+    const isUploaded = getInvoiceState(row);
     const tdSwitch = document.createElement("td");
+    tdSwitch.className = "siigo-control-col";
     tdSwitch.innerHTML = `
-      <label class="switch">
-        <input type="checkbox" ${row.siigo_subido ? "checked" : ""}>
-        <span class="slider"></span>
-      </label>
+      <div class="siigo-switch-wrap">
+        <label class="switch" data-switch-label>
+          <input type="checkbox" ${isUploaded ? "checked" : ""}>
+          <span class="slider"></span>
+        </label>
+        <span class="siigo-state ${isUploaded ? "is-on" : "is-off"}">${isUploaded ? "Subida" : "Pendiente"}</span>
+        <button type="button" class="siigo-action-btn ${isUploaded ? "is-on" : "is-off"}" data-siigo-action>
+          ${isUploaded ? "Quitar" : "Subir"}
+        </button>
+      </div>
     `;
 
-    const switchInput = tdSwitch.querySelector("input");
-    switchInput?.addEventListener("click", (event) => {
-      event.stopPropagation();
-    });
-
-    switchInput?.addEventListener("change", async (event) => {
-      event.stopPropagation();
-      const checked = event.target.checked;
-      event.target.disabled = true;
-      setStatus(checked ? "Subiendo factura a Siigo..." : "Quitando factura de Siigo...");
+    const executeToggle = async (checked, inputEl = null, buttonEl = null) => {
+      const rowAction = checked ? "subir" : "retirar";
+      if (inputEl) inputEl.disabled = true;
+      if (buttonEl) buttonEl.disabled = true;
+      setStatus(`Enviando señal para ${rowAction} factura ${format(row.numero_factura)} a ${WEBHOOK_SUBIR_SIIGO}...`);
 
       try {
         const data = await enqueueSwitchUpdate(row, checked);
-        setStatus(data?.message || (checked ? "La factura se ha registrado en Siigo." : "Factura marcada para reversión en Siigo."));
+        const okResult = typeof data?.ok === "boolean" ? data.ok : checked;
+        row.siigo_subido = Boolean(okResult);
+        setStatus(data?.message || (okResult
+          ? `Factura ${format(row.numero_factura)} subida en Siigo.`
+          : `Factura ${format(row.numero_factura)} retirada de Siigo.`));
       } catch {
-        row.siigo_subido = !checked;
-        event.target.checked = !checked;
-        setStatus("Error enviando estado de factura a Siigo.");
+        row.siigo_subido = Boolean(!checked);
+        if (inputEl) inputEl.checked = !checked;
+        setStatus(`Error al enviar la señal de ${rowAction} para la factura ${format(row.numero_factura)}.`);
       } finally {
-        event.target.disabled = false;
+        if (inputEl) inputEl.disabled = false;
+        if (buttonEl) buttonEl.disabled = false;
         renderTable();
       }
+    };
+
+    tdSwitch.addEventListener("click", (event) => event.stopPropagation());
+    tdSwitch.querySelector("[data-switch-label]")?.addEventListener("click", (event) => event.stopPropagation());
+
+    const switchInput = tdSwitch.querySelector("input");
+    switchInput?.addEventListener("change", async (event) => {
+      event.stopPropagation();
+      const nextChecked = event.target.checked;
+      const currentChecked = getInvoiceState(row);
+      if (currentChecked && !nextChecked) {
+        const accepted = await requestDeactivateConfirmation();
+        if (!accepted) {
+          event.target.checked = true;
+          return;
+        }
+      }
+      await executeToggle(nextChecked, event.target, tdSwitch.querySelector("[data-siigo-action]"));
+    });
+
+    const actionButton = tdSwitch.querySelector("[data-siigo-action]");
+    actionButton?.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const current = getInvoiceState(row);
+      const next = !current;
+      if (current && !next) {
+        const accepted = await requestDeactivateConfirmation();
+        if (!accepted) return;
+      }
+      if (switchInput) switchInput.checked = next;
+      await executeToggle(next, switchInput, actionButton);
     });
 
     tr.appendChild(tdSwitch);
 
     state.generalColumns.forEach((col) => {
       const td = document.createElement("td");
-      td.textContent = format(row[col]);
+      const formatted = format(row[col]);
+      const shouldExpand = typeof formatted === "string" && formatted.length > 36;
+      if (shouldExpand) td.appendChild(createExpandableCellContent(formatted));
+      else td.textContent = formatted;
       if (col === "fecha_iso") td.classList.add("fecha-col");
       tr.appendChild(td);
     });
@@ -638,7 +818,7 @@ const loadFacturas = async () => {
   const rows = normalizeRows(data).map((row, idx) => ({
     ...row,
     __id: invoiceId(row, idx),
-    siigo_subido: false
+    siigo_subido: normalizeBoolean(row?.siigo_subido)
   }));
 
   state.allRows = rows;
