@@ -50,6 +50,66 @@ const setStatus = (message) => { status.textContent = message; };
 const format = (v) => (v === null || v === undefined || v === "" ? "-" : String(v));
 const escapeCsv = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
 
+const DEACTIVATE_WARNING_MESSAGE = "Desactivar este switch no eliminará la factura de siigo y puede generar problemas o confusiones, estas seguro de desactivar? recuerda que para borrar un comprobante debes hacerlo desde la plataforma.";
+
+const normalizeBoolean = (value) => {
+  if (typeof value === "boolean") return value;
+  const text = String(value || "").toLowerCase().trim();
+  return text === "true" || text === "1" || text === "si" || text === "sí" || text === "subida" || text === "cargada";
+};
+
+const getInvoiceState = (row) => normalizeBoolean(row?.siigo_subido);
+
+const ensureWarningModal = () => {
+  let modal = document.getElementById("siigoDeactivateWarningModal");
+  if (modal) return modal;
+
+  modal = document.createElement("div");
+  modal.id = "siigoDeactivateWarningModal";
+  modal.className = "siigo-warning-modal hidden";
+  modal.innerHTML = `
+    <div class="siigo-warning-card" role="dialog" aria-modal="true" aria-labelledby="siigoWarningTitle">
+      <h3 id="siigoWarningTitle">Advertencia</h3>
+      <p>${DEACTIVATE_WARNING_MESSAGE}</p>
+      <div class="siigo-warning-actions">
+        <button type="button" class="siigo-warning-cancel" data-warning-cancel>Cancelar</button>
+        <button type="button" class="siigo-warning-confirm" data-warning-confirm>Desactivar</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  return modal;
+};
+
+const requestDeactivateConfirmation = () => new Promise((resolve) => {
+  const modal = ensureWarningModal();
+  modal.classList.remove("hidden");
+
+  const close = (result) => {
+    modal.classList.add("hidden");
+    modal.removeEventListener("click", onBackdrop);
+    cancelBtn?.removeEventListener("click", onCancel);
+    confirmBtn?.removeEventListener("click", onConfirm);
+    resolve(result);
+  };
+
+  const onBackdrop = (event) => {
+    if (event.target === modal) close(false);
+  };
+
+  const onCancel = () => close(false);
+  const onConfirm = () => close(true);
+
+  const cancelBtn = modal.querySelector("[data-warning-cancel]");
+  const confirmBtn = modal.querySelector("[data-warning-confirm]");
+
+  modal.addEventListener("click", onBackdrop);
+  cancelBtn?.addEventListener("click", onCancel);
+  confirmBtn?.addEventListener("click", onConfirm);
+});
+
+
 const normalizeRows = (raw) => {
   if (Array.isArray(raw)) return raw;
   if (!raw || typeof raw !== "object") return [];
@@ -418,16 +478,17 @@ const renderTable = () => {
     const tr = document.createElement("tr");
     tr.classList.toggle("selected", row.__id === state.selectedId);
 
+    const isUploaded = getInvoiceState(row);
     const tdSwitch = document.createElement("td");
     tdSwitch.innerHTML = `
       <div class="siigo-switch-wrap">
         <label class="switch" data-switch-label>
-          <input type="checkbox" ${row.siigo_subido ? "checked" : ""}>
+          <input type="checkbox" ${isUploaded ? "checked" : ""}>
           <span class="slider"></span>
         </label>
-        <span class="siigo-state ${row.siigo_subido ? "is-on" : "is-off"}">${row.siigo_subido ? "Subida" : "Pendiente"}</span>
-        <button type="button" class="siigo-action-btn ${row.siigo_subido ? "is-on" : "is-off"}" data-siigo-action>
-          ${row.siigo_subido ? "Quitar" : "Subir"}
+        <span class="siigo-state ${isUploaded ? "is-on" : "is-off"}">${isUploaded ? "Subida" : "Pendiente"}</span>
+        <button type="button" class="siigo-action-btn ${isUploaded ? "is-on" : "is-off"}" data-siigo-action>
+          ${isUploaded ? "Quitar" : "Subir"}
         </button>
       </div>
     `;
@@ -441,12 +502,12 @@ const renderTable = () => {
       try {
         const data = await enqueueSwitchUpdate(row, checked);
         const okResult = typeof data?.ok === "boolean" ? data.ok : checked;
-        row.siigo_subido = okResult;
+        row.siigo_subido = Boolean(okResult);
         setStatus(data?.message || (okResult
           ? `Factura ${format(row.numero_factura)} subida en Siigo.`
           : `Factura ${format(row.numero_factura)} retirada de Siigo.`));
       } catch {
-        row.siigo_subido = !checked;
+        row.siigo_subido = Boolean(!checked);
         if (inputEl) inputEl.checked = !checked;
         setStatus(`Error al enviar la señal de ${rowAction} para la factura ${format(row.numero_factura)}.`);
       } finally {
@@ -462,13 +523,27 @@ const renderTable = () => {
     const switchInput = tdSwitch.querySelector("input");
     switchInput?.addEventListener("change", async (event) => {
       event.stopPropagation();
-      await executeToggle(event.target.checked, event.target, tdSwitch.querySelector("[data-siigo-action]"));
+      const nextChecked = event.target.checked;
+      const currentChecked = getInvoiceState(row);
+      if (currentChecked && !nextChecked) {
+        const accepted = await requestDeactivateConfirmation();
+        if (!accepted) {
+          event.target.checked = true;
+          return;
+        }
+      }
+      await executeToggle(nextChecked, event.target, tdSwitch.querySelector("[data-siigo-action]"));
     });
 
     const actionButton = tdSwitch.querySelector("[data-siigo-action]");
     actionButton?.addEventListener("click", async (event) => {
       event.stopPropagation();
-      const next = !row.siigo_subido;
+      const current = getInvoiceState(row);
+      const next = !current;
+      if (current && !next) {
+        const accepted = await requestDeactivateConfirmation();
+        if (!accepted) return;
+      }
       if (switchInput) switchInput.checked = next;
       await executeToggle(next, switchInput, actionButton);
     });
@@ -703,7 +778,7 @@ const loadFacturas = async () => {
   const rows = normalizeRows(data).map((row, idx) => ({
     ...row,
     __id: invoiceId(row, idx),
-    siigo_subido: false
+    siigo_subido: normalizeBoolean(row?.siigo_subido)
   }));
 
   state.allRows = rows;
