@@ -49,6 +49,13 @@ const state = {
 const setStatus = (message) => { status.textContent = message; };
 const format = (v) => (v === null || v === undefined || v === "" ? "-" : String(v));
 const escapeCsv = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+const escapeHtml = (value) => String(value ?? "")
+  .replaceAll("&", "&amp;")
+  .replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;")
+  .replaceAll('"', "&quot;")
+  .replaceAll("'", "&#39;");
+const escapeAttr = (value) => escapeHtml(value).replaceAll("`", "&#96;");
 
 const DEACTIVATE_WARNING_MESSAGE = "Desactivar este switch no eliminará la factura de siigo y puede generar problemas o confusiones, estas seguro de desactivar? recuerda que para borrar un comprobante debes hacerlo desde la plataforma.";
 
@@ -118,6 +125,14 @@ const normalizeRows = (raw) => {
     if (Array.isArray(raw[key])) return raw[key];
   }
   return [];
+};
+
+const safeParseJson = (value, fallback) => {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
 };
 
 const normalizeText = (value) => String(value || "").toUpperCase().trim();
@@ -388,8 +403,8 @@ const buildDetailTableHtml = (invoiceIdValue) => {
 
   const detailRows = items.map((item, idx) => {
     const key = String(item.id_unico || `${item.producto}-${idx}`);
-    const cols = state.detailColumns.map((col) => `<td>${format(item[col])}</td>`).join("");
-    return `<tr draggable="true" data-detail-key="${key}"><td class="drag-col">⋮⋮</td>${cols}</tr>`;
+    const cols = state.detailColumns.map((col) => `<td>${escapeHtml(format(item[col]))}</td>`).join("");
+    return `<tr draggable="true" data-detail-key="${escapeAttr(key)}"><td class="drag-col">⋮⋮</td>${cols}</tr>`;
   }).join("");
 
   return `
@@ -843,7 +858,7 @@ const init = async () => {
     return;
   }
 
-  state.detailOrderByInvoice = JSON.parse(localStorage.getItem(DETAILS_ORDER_KEY) || "{}");
+  state.detailOrderByInvoice = safeParseJson(localStorage.getItem(DETAILS_ORDER_KEY) || "{}", {});
 
   try {
     await loadFacturas();
