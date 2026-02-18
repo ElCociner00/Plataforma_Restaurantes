@@ -128,6 +128,18 @@ const buildContextPayload = () => ({
 
 const getResponsableId = () => state.context?.user?.id || state.context?.user?.user_id || "";
 
+const parseWebhookResponse = async (res) => {
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) return res.json();
+  const text = await res.text();
+  if (!text) return { ok: res.ok };
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text, ok: res.ok };
+  }
+};
+
 const fetchJson = async (url, payload, method = "POST") => {
   const requestUrl = method === "GET" && payload
     ? `${url}?${new URLSearchParams(payload).toString()}`
@@ -140,18 +152,37 @@ const fetchJson = async (url, payload, method = "POST") => {
   });
 
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return parseWebhookResponse(res);
+};
 
-  const contentType = res.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) return res.json();
+const fetchWebhookSignal = async (url, payload) => {
+  const asStringEntries = Object.entries(payload).map(([k, v]) => [k, typeof v === "boolean" ? String(v) : String(v ?? "")]);
+  const query = new URLSearchParams(asStringEntries);
 
-  const text = await res.text();
-  if (!text) return [];
+  const attempts = [
+    async () => {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+        body: query.toString()
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return parseWebhookResponse(res);
+    },
+    async () => fetchJson(url, payload, "POST"),
+    async () => fetchJson(url, payload, "GET")
+  ];
 
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { message: text };
+  let lastError = null;
+  for (const attempt of attempts) {
+    try {
+      return await attempt();
+    } catch (error) {
+      lastError = error;
+    }
   }
+
+  throw lastError || new Error("No se pudo enviar señal al webhook.");
 };
 
 const fetchWebhookWithFallback = async (url, payload) => {
@@ -326,14 +357,25 @@ const renderPagination = () => {
 const runSwitchUpdate = async (row, checked) => {
   const payload = {
     tenant_id: state.context?.empresa_id,
-    numero_factura: row.numero_factura,
-    timestampwithtimezone: getTimestamp(),
+    empresa_id: state.context?.empresa_id,
+    usuario_id: getResponsableId(),
     responsable_id: getResponsableId(),
+    rol: state.context?.rol,
+    timestamp: getTimestamp(),
+    timestampwithtimezone: getTimestamp(),
     accion_subir_siigo: checked,
-    subir_siigo: checked
+    subir_siigo: checked,
+    ok: checked,
+    numero_factura: row.numero_factura,
+    factura_id: row.factura_id || row.id || row.__id,
+    nit: row.nit || null,
+    proveedor: row.proveedor || null,
+    tipo_factura: row.tipo_factura || null,
+    estado_factura: row.estado || null,
+    webhook_origen: WEBHOOK_SUBIR_SIIGO
   };
 
-  const data = await fetchJson(WEBHOOK_SUBIR_SIIGO, payload);
+  const data = await fetchWebhookSignal(WEBHOOK_SUBIR_SIIGO, payload);
   row.siigo_subido = checked;
   return data;
 };
@@ -378,34 +420,57 @@ const renderTable = () => {
 
     const tdSwitch = document.createElement("td");
     tdSwitch.innerHTML = `
-      <label class="switch">
-        <input type="checkbox" ${row.siigo_subido ? "checked" : ""}>
-        <span class="slider"></span>
-      </label>
+      <div class="siigo-switch-wrap">
+        <label class="switch" data-switch-label>
+          <input type="checkbox" ${row.siigo_subido ? "checked" : ""}>
+          <span class="slider"></span>
+        </label>
+        <span class="siigo-state ${row.siigo_subido ? "is-on" : "is-off"}">${row.siigo_subido ? "Subida" : "Pendiente"}</span>
+        <button type="button" class="siigo-action-btn ${row.siigo_subido ? "is-on" : "is-off"}" data-siigo-action>
+          ${row.siigo_subido ? "Quitar" : "Subir"}
+        </button>
+      </div>
     `;
 
-    const switchInput = tdSwitch.querySelector("input");
-    switchInput?.addEventListener("click", (event) => {
-      event.stopPropagation();
-    });
-
-    switchInput?.addEventListener("change", async (event) => {
-      event.stopPropagation();
-      const checked = event.target.checked;
-      event.target.disabled = true;
-      setStatus(checked ? "Subiendo factura a Siigo..." : "Quitando factura de Siigo...");
+    const executeToggle = async (checked, inputEl = null, buttonEl = null) => {
+      const rowAction = checked ? "subir" : "retirar";
+      if (inputEl) inputEl.disabled = true;
+      if (buttonEl) buttonEl.disabled = true;
+      setStatus(`Enviando señal para ${rowAction} factura ${format(row.numero_factura)} a ${WEBHOOK_SUBIR_SIIGO}...`);
 
       try {
         const data = await enqueueSwitchUpdate(row, checked);
-        setStatus(data?.message || (checked ? "La factura se ha registrado en Siigo." : "Factura marcada para reversión en Siigo."));
+        const okResult = typeof data?.ok === "boolean" ? data.ok : checked;
+        row.siigo_subido = okResult;
+        setStatus(data?.message || (okResult
+          ? `Factura ${format(row.numero_factura)} subida en Siigo.`
+          : `Factura ${format(row.numero_factura)} retirada de Siigo.`));
       } catch {
         row.siigo_subido = !checked;
-        event.target.checked = !checked;
-        setStatus("Error enviando estado de factura a Siigo.");
+        if (inputEl) inputEl.checked = !checked;
+        setStatus(`Error al enviar la señal de ${rowAction} para la factura ${format(row.numero_factura)}.`);
       } finally {
-        event.target.disabled = false;
+        if (inputEl) inputEl.disabled = false;
+        if (buttonEl) buttonEl.disabled = false;
         renderTable();
       }
+    };
+
+    tdSwitch.addEventListener("click", (event) => event.stopPropagation());
+    tdSwitch.querySelector("[data-switch-label]")?.addEventListener("click", (event) => event.stopPropagation());
+
+    const switchInput = tdSwitch.querySelector("input");
+    switchInput?.addEventListener("change", async (event) => {
+      event.stopPropagation();
+      await executeToggle(event.target.checked, event.target, tdSwitch.querySelector("[data-siigo-action]"));
+    });
+
+    const actionButton = tdSwitch.querySelector("[data-siigo-action]");
+    actionButton?.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const next = !row.siigo_subido;
+      if (switchInput) switchInput.checked = next;
+      await executeToggle(next, switchInput, actionButton);
     });
 
     tr.appendChild(tdSwitch);
