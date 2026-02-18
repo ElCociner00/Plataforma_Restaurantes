@@ -74,7 +74,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   `;
 
   header.innerHTML = `
-    <div class="logo">🍽 Plataforma Restaurantes</div>
+    <div class="logo">AXIOMA</div>
     <nav>${menu}</nav>
   `;
 
