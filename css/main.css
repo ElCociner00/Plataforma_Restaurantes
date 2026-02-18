@@ -260,11 +260,21 @@ button:hover {
 /* =========================
    FOOTER LEGAL GLOBAL
 ========================= */
+body.has-legal-footer {
+  padding-bottom: var(--legal-footer-offset, 120px);
+}
+
 .legal-footer {
-  margin-top: auto;
+  margin-top: 0;
   background: #111827;
   color: #e5e7eb;
   padding: 16px 20px;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  z-index: 1000;
 }
 
 .legal-footer-inner {
