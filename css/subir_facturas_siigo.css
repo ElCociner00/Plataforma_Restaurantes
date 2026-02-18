@@ -247,3 +247,26 @@ tr.selected {
   color: #92400e;
   background: #fef3c7;
 }
+
+
+.siigo-action-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.siigo-action-btn.is-on {
+  background: #dc2626;
+}
+
+.siigo-action-btn.is-off {
+  background: #16a34a;
+}
+
+.siigo-action-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
