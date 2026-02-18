@@ -21,8 +21,6 @@ document.addEventListener("DOMContentLoaded", () => {
       <p class="legal-copy">© 2026 AXIOMA by Global Nexo SAS</p>
       <nav class="legal-links" aria-label="Legal">
         ${linksHtml}
-        <span class="sep">·</span>
-        <a href="mailto:contacto@globalnexo.com">Contacto</a>
       </nav>
     </div>
   `;
