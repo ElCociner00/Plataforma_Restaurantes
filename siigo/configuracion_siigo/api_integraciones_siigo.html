@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>AXIOMA | API's e Integraciones Siigo</title>
   <link rel="stylesheet" href="../../css/main.css">
+  <link rel="stylesheet" href="../../css/api_integraciones_siigo.css">
 </head>
 <body style="display:none">
   <script type="module" src="../../js/auth_guard.js"></script>
@@ -13,19 +14,46 @@
   </script>
   <script type="module" src="../../js/header.js"></script>
 
-  <div class="main" style="max-width:720px;">
+  <div class="main api-siigo-main">
     <h1>API's e Integraciones - Siigo</h1>
-    <p style="font-size:.9rem;color:#6b7280;">Este módulo es obligatorio para usar el entorno Siigo.</p>
+    <p>Este módulo es obligatorio para usar el entorno Siigo.</p>
 
-    <section class="bloque" style="display:grid;gap:10px;">
-      <label>Client ID<input id="client_id" type="text"></label>
-      <label>Project ID<input id="project_id" type="text"></label>
-      <label>Auth URL<input id="auth_url" type="text"></label>
-      <label>Token URL<input id="token_url" type="text"></label>
-      <label>Client Secret<input id="client_secret" type="password"></label>
-      <button type="button" disabled title="Próximamente">Guardar (próximamente)</button>
-    </section>
+    <form id="siigoApiForm" class="api-siigo-card">
+      <div class="api-siigo-grid">
+        <div class="api-row">
+          <label for="client_id">Client ID</label>
+          <input id="client_id" type="text" required>
+        </div>
+
+        <div class="api-row">
+          <label for="project_id">Project ID</label>
+          <input id="project_id" type="text" required>
+        </div>
+
+        <div class="api-row">
+          <label for="auth_url">Auth URL</label>
+          <input id="auth_url" type="url" required>
+        </div>
+
+        <div class="api-row">
+          <label for="token_url">Token URL</label>
+          <input id="token_url" type="url" required>
+        </div>
+
+        <div class="api-row">
+          <label for="client_secret">Client Secret</label>
+          <input id="client_secret" type="password" required>
+        </div>
+      </div>
+
+      <div class="api-actions">
+        <button type="submit">Guardar configuración</button>
+      </div>
+      <div id="status" class="api-status"></div>
+    </form>
   </div>
+
+  <script type="module" src="../../js/api_integraciones_siigo.js"></script>
   <script type="module" src="../../js/footer.js"></script>
 </body>
 </html>

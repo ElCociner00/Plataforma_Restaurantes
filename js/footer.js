@@ -8,7 +8,18 @@ const FOOTER_LINKS = [
   { label: "Consentimientos", href: "/Plataforma_Restaurantes/legal/consentimientos.html" }
 ];
 
+const FOOTER_OFFSET_VAR = "--legal-footer-offset";
+
+const syncFooterOffset = (footer) => {
+  const footerHeight = Math.ceil(footer.getBoundingClientRect().height);
+  const offset = `${footerHeight}px`;
+  document.body.style.setProperty(FOOTER_OFFSET_VAR, offset);
+  document.documentElement.style.setProperty(FOOTER_OFFSET_VAR, offset);
+};
+
 document.addEventListener("DOMContentLoaded", () => {
+  if (document.querySelector("footer.legal-footer")) return;
+
   const footer = document.createElement("footer");
   footer.className = "legal-footer";
 
@@ -26,4 +37,15 @@ document.addEventListener("DOMContentLoaded", () => {
   `;
 
   document.body.appendChild(footer);
+  document.body.classList.add("has-legal-footer");
+
+  const applyOffset = () => syncFooterOffset(footer);
+  applyOffset();
+
+  if (typeof ResizeObserver === "function") {
+    const observer = new ResizeObserver(applyOffset);
+    observer.observe(footer);
+  }
+
+  window.addEventListener("resize", applyOffset);
 });

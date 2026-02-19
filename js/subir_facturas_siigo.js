@@ -43,12 +43,20 @@ const state = {
   ],
   detailOrderByInvoice: {},
   switchQueue: Promise.resolve(),
-  switchQueueCount: 0
+  switchQueueCount: 0,
+  switchErrorByInvoice: {}
 };
 
 const setStatus = (message) => { status.textContent = message; };
 const format = (v) => (v === null || v === undefined || v === "" ? "-" : String(v));
 const escapeCsv = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+const escapeHtml = (value) => String(value ?? "")
+  .replaceAll("&", "&amp;")
+  .replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;")
+  .replaceAll('"', "&quot;")
+  .replaceAll("'", "&#39;");
+const escapeAttr = (value) => escapeHtml(value).replaceAll("`", "&#96;");
 
 const DEACTIVATE_WARNING_MESSAGE = "Desactivar este switch no eliminará la factura de siigo y puede generar problemas o confusiones, estas seguro de desactivar? recuerda que para borrar un comprobante debes hacerlo desde la plataforma.";
 
@@ -118,6 +126,14 @@ const normalizeRows = (raw) => {
     if (Array.isArray(raw[key])) return raw[key];
   }
   return [];
+};
+
+const safeParseJson = (value, fallback) => {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
 };
 
 const normalizeText = (value) => String(value || "").toUpperCase().trim();
@@ -388,8 +404,8 @@ const buildDetailTableHtml = (invoiceIdValue) => {
 
   const detailRows = items.map((item, idx) => {
     const key = String(item.id_unico || `${item.producto}-${idx}`);
-    const cols = state.detailColumns.map((col) => `<td>${format(item[col])}</td>`).join("");
-    return `<tr draggable="true" data-detail-key="${key}"><td class="drag-col">⋮⋮</td>${cols}</tr>`;
+    const cols = state.detailColumns.map((col) => `<td>${escapeHtml(format(item[col]))}</td>`).join("");
+    return `<tr draggable="true" data-detail-key="${escapeAttr(key)}"><td class="drag-col">⋮⋮</td>${cols}</tr>`;
   }).join("");
 
   return `
@@ -515,6 +531,7 @@ const renderTable = () => {
     tr.classList.toggle("selected", row.__id === state.selectedId);
 
     const isUploaded = getInvoiceState(row);
+    const hasSyncError = Boolean(state.switchErrorByInvoice[row.__id]);
     const tdSwitch = document.createElement("td");
     tdSwitch.className = "siigo-control-col";
     tdSwitch.innerHTML = `
@@ -523,33 +540,54 @@ const renderTable = () => {
           <input type="checkbox" ${isUploaded ? "checked" : ""}>
           <span class="slider"></span>
         </label>
-        <span class="siigo-state ${isUploaded ? "is-on" : "is-off"}">${isUploaded ? "Subida" : "Pendiente"}</span>
-        <button type="button" class="siigo-action-btn ${isUploaded ? "is-on" : "is-off"}" data-siigo-action>
-          ${isUploaded ? "Quitar" : "Subir"}
-        </button>
+        <span class="siigo-state ${hasSyncError ? "is-error" : (isUploaded ? "is-on" : "is-off")}">${hasSyncError ? "Error al subir" : (isUploaded ? "Subida" : "Pendiente")}</span>
       </div>
     `;
 
-    const executeToggle = async (checked, inputEl = null, buttonEl = null) => {
+    const executeToggle = async (checked, inputEl = null) => {
       const rowAction = checked ? "subir" : "retirar";
+      const previousChecked = getInvoiceState(row);
       if (inputEl) inputEl.disabled = true;
-      if (buttonEl) buttonEl.disabled = true;
       setStatus(`Enviando señal para ${rowAction} factura ${format(row.numero_factura)} a ${WEBHOOK_SUBIR_SIIGO}...`);
 
       try {
         const data = await enqueueSwitchUpdate(row, checked);
         const okResult = typeof data?.ok === "boolean" ? data.ok : checked;
-        row.siigo_subido = Boolean(okResult);
-        setStatus(data?.message || (okResult
+
+        if (checked && !okResult) {
+          row.siigo_subido = false;
+          state.switchErrorByInvoice[row.__id] = true;
+          if (inputEl) {
+            inputEl.checked = false;
+            inputEl.closest(".switch")?.classList.add("siigo-switch-failed");
+            setTimeout(() => inputEl.closest(".switch")?.classList.remove("siigo-switch-failed"), 460);
+          }
+          setStatus(data?.message || "Error al subir factura, revisa tus proveedores y recuerda tener creado el item matriz.");
+          await wait(460);
+          return;
+        }
+
+        row.siigo_subido = Boolean(checked);
+        delete state.switchErrorByInvoice[row.__id];
+        setStatus(data?.message || (checked
           ? `Factura ${format(row.numero_factura)} subida en Siigo.`
           : `Factura ${format(row.numero_factura)} retirada de Siigo.`));
       } catch {
-        row.siigo_subido = Boolean(!checked);
-        if (inputEl) inputEl.checked = !checked;
-        setStatus(`Error al enviar la señal de ${rowAction} para la factura ${format(row.numero_factura)}.`);
+        row.siigo_subido = previousChecked;
+        if (inputEl) {
+          inputEl.checked = previousChecked;
+          if (checked) {
+            state.switchErrorByInvoice[row.__id] = true;
+            inputEl.closest(".switch")?.classList.add("siigo-switch-failed");
+            setTimeout(() => inputEl.closest(".switch")?.classList.remove("siigo-switch-failed"), 460);
+            await wait(460);
+          }
+        }
+        setStatus(checked
+          ? "Error al subir factura, revisa tus proveedores y recuerda tener creado el item matriz."
+          : `Error al enviar la señal de ${rowAction} para la factura ${format(row.numero_factura)}.`);
       } finally {
         if (inputEl) inputEl.disabled = false;
-        if (buttonEl) buttonEl.disabled = false;
         renderTable();
       }
     };
@@ -569,20 +607,7 @@ const renderTable = () => {
           return;
         }
       }
-      await executeToggle(nextChecked, event.target, tdSwitch.querySelector("[data-siigo-action]"));
-    });
-
-    const actionButton = tdSwitch.querySelector("[data-siigo-action]");
-    actionButton?.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      const current = getInvoiceState(row);
-      const next = !current;
-      if (current && !next) {
-        const accepted = await requestDeactivateConfirmation();
-        if (!accepted) return;
-      }
-      if (switchInput) switchInput.checked = next;
-      await executeToggle(next, switchInput, actionButton);
+      await executeToggle(nextChecked, event.target);
     });
 
     tr.appendChild(tdSwitch);
@@ -843,7 +868,7 @@ const init = async () => {
     return;
   }
 
-  state.detailOrderByInvoice = JSON.parse(localStorage.getItem(DETAILS_ORDER_KEY) || "{}");
+  state.detailOrderByInvoice = safeParseJson(localStorage.getItem(DETAILS_ORDER_KEY) || "{}", {});
 
   try {
     await loadFacturas();
