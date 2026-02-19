@@ -1,0 +1,62 @@
+.main.api-siigo-main {
+  max-width: 900px;
+}
+
+.api-siigo-card {
+  margin-top: 16px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.api-siigo-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.api-row {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.api-row label {
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.api-row input {
+  width: 100%;
+  background: #fff;
+}
+
+.api-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+}
+
+.api-actions button {
+  min-width: 240px;
+}
+
+.api-status {
+  margin-top: 10px;
+  text-align: center;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 720px) {
+  .api-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}

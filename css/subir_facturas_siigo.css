@@ -225,8 +225,18 @@ tr.selected {
 }
 
 
+.siigo-control-col {
+  width: 230px;
+  min-width: 230px;
+  vertical-align: top;
+}
+
 .siigo-switch-wrap {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: auto 116px;
+  grid-template-areas:
+    "switch state"
+    "action action";
   align-items: center;
   gap: 8px;
 }
@@ -279,16 +289,24 @@ tr.selected {
   word-break: normal;
 }
 
-.siigo-switch-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 220px;
+.siigo-switch-wrap .switch {
+  grid-area: switch;
+}
+
+.siigo-state {
+  grid-area: state;
+  justify-self: end;
+  width: 100%;
+  text-align: center;
+}
+
+.siigo-action-btn {
+  grid-area: action;
+  width: 100%;
 }
 
 .siigo-state,
 .siigo-action-btn {
-  flex: 0 0 auto;
   line-height: 1.2;
 }
 
