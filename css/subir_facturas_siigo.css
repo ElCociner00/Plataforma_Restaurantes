@@ -234,9 +234,7 @@ tr.selected {
 .siigo-switch-wrap {
   display: grid;
   grid-template-columns: auto 116px;
-  grid-template-areas:
-    "switch state"
-    "action action";
+  grid-template-areas: "switch state";
   align-items: center;
   gap: 8px;
 }
@@ -259,28 +257,6 @@ tr.selected {
 }
 
 
-.siigo-action-btn {
-  border: none;
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #fff;
-}
-
-.siigo-action-btn.is-on {
-  background: #dc2626;
-}
-
-.siigo-action-btn.is-off {
-  background: #16a34a;
-}
-
-.siigo-action-btn:disabled {
-  opacity: 0.6;
-  cursor: wait;
-}
-
 
 .siigo-switch-wrap,
 .siigo-switch-wrap * {
@@ -300,14 +276,25 @@ tr.selected {
   text-align: center;
 }
 
-.siigo-action-btn {
-  grid-area: action;
-  width: 100%;
+.siigo-state {
+  line-height: 1.2;
 }
 
-.siigo-state,
-.siigo-action-btn {
-  line-height: 1.2;
+.siigo-state.is-error {
+  color: #ffffff;
+  background: #b91c1c;
+}
+
+.switch.siigo-switch-failed {
+  animation: siigoSwitchFail .46s ease;
+}
+
+@keyframes siigoSwitchFail {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+  75% { transform: translateX(-2px); }
+  100% { transform: translateX(0); }
 }
 
 .siigo-warning-modal {
