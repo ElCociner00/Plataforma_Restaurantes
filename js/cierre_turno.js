@@ -16,6 +16,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const responsable = document.getElementById("responsable");
   const horaInicio = document.getElementById("hora_inicio");
   const horaFin = document.getElementById("hora_fin");
+  const horaLlegadaHora = document.getElementById("hora_llegada_hora");
+  const horaLlegadaMinuto = document.getElementById("hora_llegada_minuto");
+  const horaLlegadaMomento = document.getElementById("hora_llegada_momento");
   const efectivoApertura = document.getElementById("efectivo_apertura");
   const bolsa = document.getElementById("bolsa");
   const caja = document.getElementById("caja");
@@ -368,6 +371,41 @@ document.addEventListener("DOMContentLoaded", () => {
     return hour >= 12 ? "PM" : "AM";
   };
 
+
+  const populateHoraLlegadaOptions = () => {
+    if (horaLlegadaHora && !horaLlegadaHora.options.length) {
+      horaLlegadaHora.innerHTML = '<option value="">Hora</option>';
+      for (let hour = 1; hour <= 12; hour += 1) {
+        const option = document.createElement("option");
+        option.value = String(hour).padStart(2, "0");
+        option.textContent = String(hour).padStart(2, "0");
+        horaLlegadaHora.appendChild(option);
+      }
+    }
+
+    if (horaLlegadaMinuto && !horaLlegadaMinuto.options.length) {
+      horaLlegadaMinuto.innerHTML = '<option value="">Min</option>';
+      for (let minute = 0; minute <= 59; minute += 1) {
+        const option = document.createElement("option");
+        option.value = String(minute).padStart(2, "0");
+        option.textContent = String(minute).padStart(2, "0");
+        horaLlegadaMinuto.appendChild(option);
+      }
+    }
+
+    if (horaLlegadaMomento && !horaLlegadaMomento.value) {
+      horaLlegadaMomento.value = "AM";
+    }
+  };
+
+  const getHoraLlegadaCompleta = () => {
+    const hour = horaLlegadaHora?.value || "";
+    const minute = horaLlegadaMinuto?.value || "";
+    const momento = horaLlegadaMomento?.value || "";
+    if (!hour || !minute || !momento) return "";
+    return `${hour}:${minute} ${momento}`;
+  };
+
   const toggleButtons = ({ consultar, verificar, enviar }) => {
     if (typeof consultar === "boolean") btnConsultar.disabled = !consultar;
     if (typeof verificar === "boolean") btnVerificar.disabled = !verificar;
@@ -382,6 +420,7 @@ document.addEventListener("DOMContentLoaded", () => {
       fecha: fecha.value,
       responsable: responsable.value,
       turno: {
+        hora_llegada: getHoraLlegadaCompleta(),
         inicio: horaInicio.value,
         fin: horaFin.value,
         inicio_momento: getMomentoDia(horaInicio.value),
@@ -538,6 +577,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     limpiarDiferencias();
     comentarios.value = "";
+    if (horaLlegadaHora) horaLlegadaHora.value = "";
+    if (horaLlegadaMinuto) horaLlegadaMinuto.value = "";
+    if (horaLlegadaMomento) horaLlegadaMomento.value = "AM";
     marcarComoNoVerificado();
     applyVisibilitySettings();
   };
@@ -550,6 +592,7 @@ document.addEventListener("DOMContentLoaded", () => {
   syncEfectivoSistemaDisplay();
   syncTotalesExtras();
   actualizarEstadoHoraFin();
+  populateHoraLlegadaOptions();
   cargarResponsables();
   cargarExtrasCatalogo();
 
@@ -560,6 +603,9 @@ document.addEventListener("DOMContentLoaded", () => {
   responsable.addEventListener("change", marcarComoNoVerificado);
   horaInicio.addEventListener("change", marcarComoNoVerificado);
   horaFin.addEventListener("change", marcarComoNoVerificado);
+  horaLlegadaHora?.addEventListener("change", marcarComoNoVerificado);
+  horaLlegadaMinuto?.addEventListener("change", marcarComoNoVerificado);
+  horaLlegadaMomento?.addEventListener("change", marcarComoNoVerificado);
   comentarios.addEventListener("input", marcarComoNoVerificado);
   bolsa?.addEventListener("input", () => {
     syncEfectivoRealFromCajaBolsa();
@@ -595,8 +641,8 @@ document.addEventListener("DOMContentLoaded", () => {
     setStatus("Consultando Loggro...");
 
     const requiereHoraFin = !fechaEsPasada(fecha.value);
-    if (!fecha.value || !responsable.value || !horaInicio.value || (requiereHoraFin && !horaFin.value) || !efectivoApertura?.value) {
-      setStatus("⚠️ Completa fecha, responsable, hora inicio/fin y efectivo de apertura.");
+    if (!fecha.value || !responsable.value || !getHoraLlegadaCompleta() || !horaInicio.value || (requiereHoraFin && !horaFin.value) || !efectivoApertura?.value) {
+      setStatus("⚠️ Completa fecha, responsable, hora de llegada, hora inicio/fin y efectivo de apertura.");
       return;
     }
 
@@ -666,7 +712,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setStatus("Consultando gastos...");
 
     const requiereHoraFin = !fechaEsPasada(fecha.value);
-    if (!fecha.value || !responsable.value || !horaInicio.value || (requiereHoraFin && !horaFin.value)) {
+    if (!fecha.value || !responsable.value || !getHoraLlegadaCompleta() || !horaInicio.value || (requiereHoraFin && !horaFin.value)) {
       setStatus("⚠️ Completa todos los datos del turno.");
       return;
     }
@@ -734,6 +780,7 @@ document.addEventListener("DOMContentLoaded", () => {
       fecha: fecha.value,
       responsable: responsable.value,
       turno: {
+        hora_llegada: getHoraLlegadaCompleta(),
         inicio: horaInicio.value,
         fin: horaFin.value,
         inicio_momento: getMomentoDia(horaInicio.value),
@@ -932,7 +979,9 @@ document.addEventListener("DOMContentLoaded", () => {
         rol: contextPayload.rol,
         timestamp: contextPayload.timestamp,
         comentarios: comentarios.value || "",
+        hora_llegada: getHoraLlegadaCompleta(),
         turno: {
+          hora_llegada: getHoraLlegadaCompleta(),
           inicio: horaInicio.value,
           fin: horaFin.value,
           inicio_momento: getMomentoDia(horaInicio.value),

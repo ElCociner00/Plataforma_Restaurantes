@@ -601,6 +601,66 @@ const escapeCsv = (value) => {
   return /[,"\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
 };
 
+
+const toNumericValue = (value) => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") {
+    const normalized = value.trim().replace(/\s+/g, "").replace(/\./g, "").replace(/,/g, ".");
+    if (!normalized) return null;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const buildDifferenceSummary = (rows) => {
+  const summary = new Map();
+
+  rows.forEach((row) => {
+    const general = row?.general || {};
+    Object.keys(general).forEach((key) => {
+      if (!key.endsWith("_sistema")) return;
+      const base = key.slice(0, -"_sistema".length);
+      const realKey = `${base}_real`;
+      if (!(realKey in general)) return;
+
+      const sistemaNum = toNumericValue(general[key]);
+      const realNum = toNumericValue(general[realKey]);
+      if (sistemaNum === null || realNum === null) return;
+
+      const current = summary.get(base) || { sistema: 0, real: 0 };
+      current.sistema += sistemaNum;
+      current.real += realNum;
+      summary.set(base, current);
+    });
+  });
+
+  return Array.from(summary.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([base, totals]) => ({
+      base,
+      sistema: totals.sistema,
+      real: totals.real,
+      diferencia: totals.sistema - totals.real
+    }));
+};
+
+const buildDifferenceRowsHtml = (rows, colspan, title) => {
+  const summary = buildDifferenceSummary(rows);
+  if (!summary.length) return "";
+
+  const rowsHtml = summary
+    .map(({ base, sistema, real, diferencia }) => `
+      <tr><td colspan="${colspan}"><strong>${escapeHtml(base)}_diferencia:</strong> ${escapeHtml(formatCellValue(diferencia))} <span style="color:#6b7280;">(sistema: ${escapeHtml(formatCellValue(sistema))}, real: ${escapeHtml(formatCellValue(real))})</span></td></tr>
+    `)
+    .join("");
+
+  return `
+    <tr><td colspan="${colspan}"><strong>${escapeHtml(title)}</strong></td></tr>
+    ${rowsHtml}
+  `;
+};
+
 const buildRowsForExport = (rows) => rows.map((row) => {
   const details = getDetailRowsFor(row);
   return {
@@ -613,14 +673,16 @@ const downloadExcel = (rows, fileName) => {
   if (!rows.length) return setStatus("No hay turnos para descargar con esos criterios.");
 
   const exports = buildRowsForExport(rows);
+  const headers = [...state.visibleGeneralColumns, ...state.visibleDetailColumns];
   const blocks = exports.map(({ turno, details }, index) => {
-    const headers = [...state.visibleGeneralColumns, ...state.visibleDetailColumns];
     const headRow = headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("");
     const bodyRows = details.map((detail) => {
       const generalCells = state.visibleGeneralColumns.map((col) => `<td>${escapeHtml(formatCellValue(turno.general[col]))}</td>`).join("");
       const detailCells = state.visibleDetailColumns.map((col) => `<td>${escapeHtml(formatCellValue(detail[col]))}</td>`).join("");
       return `<tr>${generalCells}${detailCells}</tr>`;
     }).join("");
+
+    const rowDiffBlock = buildDifferenceRowsHtml([turno], headers.length, "Diferencias del turno");
 
     const spacer = index < exports.length - 1
       ? `<tr><td colspan="${headers.length}">&nbsp;</td></tr><tr><td colspan="${headers.length}">&nbsp;</td></tr>`
@@ -630,11 +692,16 @@ const downloadExcel = (rows, fileName) => {
       <tr><td colspan="${headers.length}"><strong>${escapeHtml(formatCellValue(turno.general.turno_nombre || turno.id))}</strong></td></tr>
       <tr>${headRow}</tr>
       ${bodyRows}
+      ${rowDiffBlock}
       ${spacer}
     `;
   }).join("");
 
-  const html = `<html><head><meta charset="utf-8"/></head><body><table>${blocks}</table></body></html>`;
+  const consolidatedDiffBlock = rows.length > 1
+    ? buildDifferenceRowsHtml(rows, headers.length, "Diferencias consolidadas (turnos exportados)")
+    : "";
+
+  const html = `<html><head><meta charset="utf-8"/></head><body><table>${blocks}${consolidatedDiffBlock}</table></body></html>`;
   const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
