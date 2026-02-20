@@ -14,6 +14,39 @@
   margin-bottom: 12px;
 }
 
+.turno-datos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.turno-datos-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px;
+  background: #f9fafb;
+}
+
+.turno-datos-card h5 {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  color: #374151;
+}
+
+.hora-llegada-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.hora-llegada-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.88rem;
+}
+
 .turno-grid label {
   display: flex;
   flex-direction: column;

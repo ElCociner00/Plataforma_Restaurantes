@@ -31,16 +31,42 @@
         <option value="">Seleccione responsable</option>
       </select>
 
-      <h4>Turno</h4>
-      <div class="turno-grid">
-        <label>
-          Hora inicio
-          <input id="hora_inicio" type="time">
-        </label>
-        <label>
-          Hora fin
-          <input id="hora_fin" type="time">
-        </label>
+      <h4>Datos del turno</h4>
+      <div class="turno-datos-grid">
+        <div class="turno-datos-card">
+          <h5>Hora de llegada</h5>
+          <div class="hora-llegada-grid">
+            <label>
+              Hora
+              <select id="hora_llegada_hora"></select>
+            </label>
+            <label>
+              Minuto
+              <select id="hora_llegada_minuto"></select>
+            </label>
+            <label>
+              Momento
+              <select id="hora_llegada_momento">
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="turno-datos-card">
+          <h5>Duración del turno</h5>
+          <div class="turno-grid">
+            <label>
+              Hora inicio
+              <input id="hora_inicio" type="time">
+            </label>
+            <label>
+              Hora fin
+              <input id="hora_fin" type="time">
+            </label>
+          </div>
+        </div>
       </div>
 
       <div class="apertura-grid">
