@@ -1,5 +1,6 @@
 import { getUserContext } from "./session.js";
-import { PERMISSIONS, PAGE_ENVIRONMENT } from "./permissions.js";
+import { PAGE_ENVIRONMENT } from "./permissions.js";
+import { getEffectivePermissionForModule } from "./permisosService.js";
 
 const LOGIN_URL = "/Plataforma_Restaurantes/index.html";
 const SELECTOR_URL = "/Plataforma_Restaurantes/entorno/";
@@ -34,36 +35,22 @@ export async function guardPage(pageKey) {
   }
 
   if (expectedEnvironment && activeEnvironment && expectedEnvironment !== activeEnvironment) {
-    alert("Este módulo pertenece a otro entorno.");
+    alert("Este mÃ³dulo pertenece a otro entorno.");
     window.location.href = SELECTOR_URL;
     return;
   }
 
-  const storageKey = `permisos_por_usuario_${context.empresa_id || "global"}`;
-  const stored = localStorage.getItem(storageKey);
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored);
-      const userId = context.user?.id || context.user?.user_id;
-      const userPermissions = parsed?.[userId];
-      if (userPermissions && Object.prototype.hasOwnProperty.call(userPermissions, pageKey)) {
-        if (!userPermissions[pageKey]) {
-          alert("No tienes permisos para acceder a este módulo");
-          window.location.href = getForbiddenRedirect(context);
-          return;
-        }
-        return;
-      }
-    } catch (error) {
-      // fallback to role-based guard
-    }
+  const userId = context.user?.id || context.user?.user_id;
+  let allowed = false;
+
+  try {
+    allowed = await getEffectivePermissionForModule(pageKey, userId);
+  } catch (error) {
+    allowed = false;
   }
 
-  if (context.rol === "admin_root") return;
-
-  const allowedRoles = PERMISSIONS[pageKey];
-  if (!allowedRoles || !allowedRoles.includes(context.rol)) {
-    alert("No tienes permisos para acceder a este módulo");
+  if (!allowed) {
+    alert("No tienes permisos para acceder a este mÃ³dulo");
     window.location.href = getForbiddenRedirect(context);
   }
 }

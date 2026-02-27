@@ -1,8 +1,13 @@
-import { getUserContext } from "./session.js";
+import { getUserContext, buildRequestHeaders } from "./session.js";
 import { WEBHOOK_LISTAR_RESPONSABLES } from "./webhooks.js";
+import {
+  fetchEffectivePermissionsMap,
+  fetchPermissionModules,
+  upsertUserPermissionOverride
+} from "./permisosService.js";
 
 // ===============================
-// CONFIGURACIÓN
+// CONFIGURACIÃ“N
 // ===============================
 const DATA_ENDPOINT = "";
 const DEFAULT_PAGES = [
@@ -12,7 +17,6 @@ const DEFAULT_PAGES = [
   "cierre_inventarios",
   "configuracion"
 ];
-const getPermissionsStorageKey = (tenantId) => `permisos_por_usuario_${tenantId || "global"}`;
 
 // ===============================
 // ELEMENTOS
@@ -63,7 +67,7 @@ const renderSummary = () => {
       <strong>${state.empleados.length}</strong>
     </div>
     <div class="resumen-item">
-      <span class="resumen-label">Módulos configurables</span>
+      <span class="resumen-label">MÃ³dulos configurables</span>
       <strong>${state.pages.length}</strong>
     </div>
     <div class="resumen-item">
@@ -85,7 +89,7 @@ const renderTable = () => {
     const switches = state.pages.map((page) => {
       const isBlocked = isBlockedPermission(empleado, page);
       return `
-        <label class="permiso-switch" title="${isBlocked ? "Bloqueado (NO)" : "Permitido (SÍ)"}">
+        <label class="permiso-switch" title="${isBlocked ? "Bloqueado (NO)" : "Permitido (SÃ)"}">
           <input
             type="checkbox"
             data-empleado-id="${empleado.id}"
@@ -93,7 +97,7 @@ const renderTable = () => {
             ${isBlocked ? "checked" : ""}
           >
           <span aria-hidden="true" class="switch-slider"></span>
-          <span class="switch-state">${isBlocked ? "NO" : "SÍ"}</span>
+          <span class="switch-state">${isBlocked ? "NO" : "SÃ"}</span>
           <span class="sr-only">${isBlocked ? "Bloqueado" : "Permitido"}</span>
         </label>
       `;
@@ -126,20 +130,25 @@ const setStatus = (message) => {
   status.textContent = message;
 };
 
-const persistPermissionChange = ({ empleadoId, page, value }) => {
-  const storageKey = getPermissionsStorageKey(userContext?.empresa_id);
-  const stored = localStorage.getItem(storageKey);
-  const parsed = stored ? JSON.parse(stored) : {};
-  parsed[empleadoId] = {
-    ...(parsed[empleadoId] || {}),
-    [page]: value
-  };
-  localStorage.setItem(storageKey, JSON.stringify(parsed));
+const persistPermissionChange = async ({ empleadoId, page, value }) => {
+  setStatus("Guardando cambios...");
 
-  setStatus("Cambios de permisos guardados.");
+  try {
+    await upsertUserPermissionOverride({
+      usuarioId: empleadoId,
+      modulo: page,
+      permitido: value,
+      updatedBy: userContext?.user?.id || userContext?.user?.user_id
+    });
+
+    setStatus("Cambios de permisos guardados.");
+  } catch (error) {
+    setStatus("No se pudo guardar el cambio de permisos.");
+    throw error;
+  }
 };
 
-const handleToggle = (event) => {
+const handleToggle = async (event) => {
   const target = event.target;
   if (!target.matches("input[type=\"checkbox\"]")) return;
 
@@ -157,18 +166,30 @@ const handleToggle = (event) => {
 
   const switchState = target.parentElement.querySelector(".switch-state");
   if (switchState) {
-    switchState.textContent = value ? "SÍ" : "NO";
+    switchState.textContent = value ? "SÃ" : "NO";
   }
 
-  persistPermissionChange({ empleadoId, page, value });
+  try {
+    await persistPermissionChange({ empleadoId, page, value });
+  } catch (error) {
+    // rollback visual on error
+    empleado.permisos[page] = !value;
+    target.checked = value;
+    if (switchState) {
+      switchState.textContent = !value ? "SÃ" : "NO";
+    }
+  }
+
   renderSummary();
 };
 
-const handleBulkAction = (event) => {
+const handleBulkAction = async (event) => {
   const button = event.currentTarget;
   const role = button.dataset.role;
   const action = button.dataset.action;
   const value = action === "grant";
+
+  const updates = [];
 
   state.empleados = state.empleados.map((empleado) => {
     if (empleado.rol !== role) return empleado;
@@ -188,7 +209,7 @@ const handleBulkAction = (event) => {
 
     const empleadoId = updatedEmpleado.id;
     state.pages.forEach((page) => {
-      persistPermissionChange({ empleadoId, page, value });
+      updates.push({ empleadoId, page, value });
     });
 
     return updatedEmpleado;
@@ -196,7 +217,15 @@ const handleBulkAction = (event) => {
 
   renderTable();
   attachTableHandlers();
-  setStatus(`Acción masiva aplicada para rol ${role}.`);
+
+  try {
+    for (const update of updates) {
+      await persistPermissionChange(update);
+    }
+    setStatus(`AcciÃ³n masiva aplicada para rol ${role}.`);
+  } catch (error) {
+    setStatus("No se pudieron aplicar todos los cambios masivos.");
+  }
 };
 
 const attachTableHandlers = () => {
@@ -208,13 +237,17 @@ const attachTableHandlers = () => {
 const loadPermissions = async () => {
   if (window.PERMISOS_DATA) return window.PERMISOS_DATA;
 
+  const headers = await buildRequestHeaders({ includeTenant: true });
+  const baseHeaders = {
+    ...headers,
+    "Content-Type": "application/json"
+  };
+
   if (!DATA_ENDPOINT) {
     const response = await fetch(WEBHOOK_LISTAR_RESPONSABLES, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: baseHeaders,
       body: JSON.stringify({
-        empresa_id: userContext?.empresa_id,
-        tenant_id: userContext?.empresa_id,
         usuario_id: userContext?.user?.id || userContext?.user?.user_id,
         solicitado_por: userContext?.user?.id || userContext?.user?.user_id,
         timestamp: getTimestamp(),
@@ -227,27 +260,29 @@ const loadPermissions = async () => {
       ? data.flatMap((item) => item.responsables || [])
       : data.responsables || [];
 
-    const storageKey = getPermissionsStorageKey(userContext?.empresa_id);
-    const stored = localStorage.getItem(storageKey);
-    const storedPermissions = stored ? JSON.parse(stored) : {};
+    const [modules, permissionsByUser] = await Promise.all([
+      fetchPermissionModules().catch(() => []),
+      fetchEffectivePermissionsMap().catch(() => ({}))
+    ]);
 
     return {
-      pages: DEFAULT_PAGES,
-      empleados: responsables.map((item) => ({
-        id: item.id ?? item.value ?? item,
-        nombre: item.nombre ?? item.name ?? item,
-        rol: item.rol ?? item.role ?? "",
-        permisos: storedPermissions[item.id ?? item.value ?? item] || {}
-      }))
+      pages: modules.length ? modules : DEFAULT_PAGES,
+      empleados: responsables.map((item) => {
+        const id = item.id ?? item.value ?? item;
+        return {
+          id,
+          nombre: item.nombre ?? item.name ?? item,
+          rol: item.rol ?? item.role ?? "",
+          permisos: permissionsByUser[String(id)] || {}
+        };
+      })
     };
   }
 
   const response = await fetch(DATA_ENDPOINT, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: baseHeaders,
     body: JSON.stringify({
-      empresa_id: userContext?.empresa_id,
-      tenant_id: userContext?.empresa_id,
       usuario_id: userContext?.user?.id || userContext?.user?.user_id,
       solicitado_por: userContext?.user?.id || userContext?.user?.user_id,
       timestamp: getTimestamp()
@@ -255,15 +290,14 @@ const loadPermissions = async () => {
   });
 
   const data = await response.json();
-  const storageKey = getPermissionsStorageKey(userContext?.empresa_id);
-  const stored = localStorage.getItem(storageKey);
-  const storedPermissions = stored ? JSON.parse(stored) : {};
+  const permissionsByUser = await fetchEffectivePermissionsMap().catch(() => ({}));
 
   return {
     ...data,
+    pages: (data.pages || []).length ? data.pages : DEFAULT_PAGES,
     empleados: (data.empleados || []).map((empleado) => ({
       ...empleado,
-      permisos: storedPermissions[empleado.id] || empleado.permisos || {}
+      permisos: permissionsByUser[String(empleado.id)] || empleado.permisos || {}
     }))
   };
 };
@@ -275,7 +309,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   userContext = await getUserContext();
 
   if (!userContext) {
-    setStatus("No se pudo validar la sesión.");
+    setStatus("No se pudo validar la sesiÃ³n.");
     return;
   }
 
@@ -290,7 +324,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     attachTableHandlers();
     setStatus("Permisos cargados correctamente.");
   } catch (err) {
-    setStatus(err.message || "No se pudo cargar la información.");
+    setStatus(err.message || "No se pudo cargar la informaciÃ³n.");
   }
 
   bulkButtons.forEach((button) => {
