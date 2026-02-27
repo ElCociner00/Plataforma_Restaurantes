@@ -1,5 +1,7 @@
 import { supabase } from "./supabase.js";
 import { esSuperAdmin } from "./permisos.core.js";
+import { getSessionConEmpresa } from "./session.js";
+import { WEBHOOKS } from "./webhooks.js";
 
 const bodyEl = document.getElementById("empresasBody");
 const statusEl = document.getElementById("estadoAccion");
@@ -38,6 +40,7 @@ const renderRows = (rows) => {
           <div class="acciones">
             <button data-action="toggleEstado" data-id="${empresa.id}">${empresa.activa ? "Desactivar" : "Activar"}</button>
             <button data-action="togglePlan" data-id="${empresa.id}">Cambiar Plan</button>
+            <button data-action="toggleAnuncio" data-id="${empresa.id}">${empresa.mostrar_anuncio_impago ? "Quitar Anuncio" : "Activar Anuncio"}</button>
             <button data-action="verDetalle" data-id="${empresa.id}">Ver Detalles</button>
           </div>
         </td>
@@ -91,6 +94,35 @@ async function togglePlan(empresaId, empresas) {
   if (error) throw error;
 }
 
+async function toggleAnuncio(empresaId, empresas, empresaActualId) {
+  const empresa = empresas.find((item) => String(item.id) === String(empresaId));
+  if (!empresa) return;
+
+  const activar = !empresa.mostrar_anuncio_impago;
+  const { error } = await supabase
+    .from("empresas")
+    .update({ mostrar_anuncio_impago: activar })
+    .eq("id", empresaId);
+
+  if (error) throw error;
+
+  if (WEBHOOKS?.NOTIFICACION_IMAGO?.url) {
+    fetch(WEBHOOKS.NOTIFICACION_IMAGO.url, {
+      method: WEBHOOKS.NOTIFICACION_IMAGO.metodo || "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        empresa_id: empresaId,
+        mostrar_anuncio_impago: activar,
+        fecha: new Date().toISOString()
+      })
+    }).catch(() => {});
+  }
+
+  if (String(empresaActualId || "") === String(empresaId)) {
+    window.dispatchEvent(new Event("empresaCambiada"));
+  }
+}
+
 function verDetalle(empresaId, empresas) {
   const empresa = empresas.find((item) => String(item.id) === String(empresaId));
   if (!empresa) return;
@@ -114,6 +146,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  const session = await getSessionConEmpresa().catch(() => null);
+  const empresaActualId = session?.empresa?.id || null;
   let empresas = await loadEmpresas().catch(() => []);
 
   if (btnRecargar) {
@@ -138,6 +172,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         } else if (action === "togglePlan") {
           await togglePlan(empresaId, empresas);
           setStatus("Plan actualizado.");
+        } else if (action === "toggleAnuncio") {
+          await toggleAnuncio(empresaId, empresas, empresaActualId);
+          setStatus("Anuncio de impago actualizado.");
         } else if (action === "verDetalle") {
           verDetalle(empresaId, empresas);
           return;

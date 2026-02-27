@@ -36,6 +36,45 @@ export async function obtenerUsuarioActual() {
   return context?.user || null;
 }
 
+export async function getSessionConEmpresa() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: usuarioSistema, error } = await supabase
+    .from("usuarios_sistema")
+    .select(`
+      id,
+      rol,
+      empresa_id,
+      activo,
+      empresas (
+        id,
+        nombre_comercial,
+        razon_social,
+        nit,
+        plan,
+        activo,
+        mostrar_anuncio_impago,
+        deuda_actual,
+        correo_empresa
+      )
+    `)
+    .eq("id", user.id)
+    .single();
+
+  if (error || !usuarioSistema || usuarioSistema.activo === false) return null;
+
+  const empresa = Array.isArray(usuarioSistema.empresas)
+    ? usuarioSistema.empresas[0]
+    : usuarioSistema.empresas || null;
+
+  return {
+    user,
+    usuarioSistema,
+    empresa
+  };
+}
+
 export async function buildRequestHeaders({ includeTenant = true } = {}) {
   const headers = {};
   const { data } = await supabase.auth.getSession();
@@ -53,4 +92,11 @@ export async function buildRequestHeaders({ includeTenant = true } = {}) {
   }
 
   return headers;
+}
+
+if (typeof window !== "undefined") {
+  window.getEmpresaActual = async () => {
+    const session = await getSessionConEmpresa();
+    return session?.empresa || null;
+  };
 }

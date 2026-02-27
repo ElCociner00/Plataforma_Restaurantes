@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AXIOMA | Facturacion</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/facturacion.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../js/auth_guard.js"></script>
+  <script type="module">
+    import { guardPage } from "../js/guard_page.js";
+    guardPage("facturacion");
+  </script>
+  <script type="module" src="../js/header.js"></script>
+  <script type="module" src="../js/facturacion.js"></script>
+
+  <main class="main facturacion-main">
+    <h1>Facturacion</h1>
+    <p class="helper-text">Factura mensual de suscripcion por empresa.</p>
+    <section id="factura-contenido" class="factura-shell"></section>
+  </main>
+
+  <script type="module" src="../js/footer.js"></script>
+</body>
+</html>

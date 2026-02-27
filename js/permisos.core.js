@@ -8,12 +8,24 @@ const superAdminCache = new Map();
 const SUPER_ADMIN_EMAIL = "santiagoelchameluco@gmail.com";
 const SUPER_ADMIN_ID = "1e17e7c6-d959-4089-ab22-3f64b5b5be41";
 
-export async function getPermisosEfectivos(usuarioId, empresaId) {
+export async function getPermisosEfectivos(usuarioId, empresaId, forceRefresh = false) {
   if (!usuarioId || !empresaId) return [];
   const cacheKey = `${usuarioId}:${empresaId}`;
 
-  if (permisosCache && permisosCacheKey === cacheKey) {
+  if (!forceRefresh && permisosCache && permisosCacheKey === cacheKey) {
     return permisosCache;
+  }
+
+  const { data: empresa } = await supabase
+    .from("empresas")
+    .select("plan, activo")
+    .eq("id", empresaId)
+    .maybeSingle();
+
+  if (empresa && empresa.activo === false) {
+    permisosCacheSet([]);
+    permisosCacheKey = cacheKey;
+    return [];
   }
 
   const { data, error } = await supabase
@@ -24,7 +36,20 @@ export async function getPermisosEfectivos(usuarioId, empresaId) {
 
   if (error) throw error;
 
-  const permisos = data || [];
+  let permisos = data || [];
+  if (empresa?.plan === "free") {
+    const soloLectura = new Set([
+      "dashboard",
+      "historico_cierre_turno",
+      "historico_cierre_inventarios",
+      "facturacion"
+    ]);
+    permisos = permisos.map((item) => ({
+      ...item,
+      permitido: soloLectura.has(item.modulo) ? item.permitido === true : false
+    }));
+  }
+
   permisosCacheSet(permisos);
   permisosCacheKey = cacheKey;
 

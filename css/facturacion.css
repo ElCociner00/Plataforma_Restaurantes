@@ -1,0 +1,62 @@
+.facturacion-main {
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.factura-shell {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 18px;
+}
+
+.factura-container {
+  display: grid;
+  gap: 14px;
+}
+
+.factura-header h2 {
+  margin: 0;
+}
+
+.factura-meta {
+  font-size: 14px;
+  color: #4b5563;
+}
+
+.factura-items {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.factura-items th,
+.factura-items td {
+  border: 1px solid #e5e7eb;
+  padding: 10px;
+  text-align: left;
+}
+
+.factura-total td {
+  font-weight: 700;
+}
+
+.factura-info-pago {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.factura-info-pago input[type="file"] {
+  margin: 10px 0;
+  display: block;
+}
+
+.factura-info-pago button {
+  padding: 8px 12px;
+}
+
+.nequi {
+  font-size: 18px;
+  margin: 8px 0;
+}

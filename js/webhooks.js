@@ -113,3 +113,17 @@ export const WEBHOOKS = {
 };
 
 // NOTA: Los permisos de LECTURA van DIRECTOS a Supabase, no pasan por webhook
+
+WEBHOOKS.COMPROBANTE_PAGO = {
+  url: "https://tu-n8n-instancia.com/webhook/comprobante-pago",
+  archivos_que_usan: ["js/facturacion.js"],
+  metodo: "POST",
+  descripcion: "Recibe comprobantes de pago adjuntos por usuarios"
+};
+
+WEBHOOKS.NOTIFICACION_IMAGO = {
+  url: "https://tu-n8n-instancia.com/webhook/notificar-impago",
+  archivos_que_usan: ["js/gestion_empresas.js"],
+  metodo: "POST",
+  descripcion: "Notifica cuando una empresa se marca como impaga"
+};
