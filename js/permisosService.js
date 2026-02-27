@@ -1,15 +1,10 @@
 import { supabase } from "./supabase.js";
-import { getUserContext } from "./session.js";
+import { getCurrentEmpresaId, getUserContext } from "./session.js";
+import { getPermisosEfectivos, tienePermiso } from "./permisos.core.js";
 
 const normalizeModule = (modulo) => String(modulo || "").trim();
 
-const getEmpresaIdFromBackend = async () => {
-  const { data, error } = await supabase.rpc("current_empresa_id");
-  if (!error && data) return data;
-
-  const context = await getUserContext();
-  return context?.empresa_id || null;
-};
+const getEmpresaIdFromBackend = async () => getCurrentEmpresaId();
 
 export const fetchPermissionModules = async () => {
   const { data, error } = await supabase
@@ -26,9 +21,13 @@ export const fetchPermissionModules = async () => {
 };
 
 export const fetchEffectivePermissionsMap = async () => {
+  const empresaId = await getEmpresaIdFromBackend();
+  if (!empresaId) return {};
+
   const { data, error } = await supabase
     .from("v_permisos_efectivos")
-    .select("usuario_id, modulo, permitido");
+    .select("usuario_id, modulo, permitido")
+    .eq("empresa_id", empresaId);
 
   if (error) throw error;
 
@@ -41,34 +40,18 @@ export const fetchEffectivePermissionsMap = async () => {
 };
 
 export const fetchEffectivePermissionsForUser = async (userId) => {
-  if (!userId) return {};
-
-  const { data, error } = await supabase
-    .from("v_permisos_efectivos")
-    .select("modulo, permitido")
-    .eq("usuario_id", userId);
-
-  if (error) throw error;
-
-  return (data || []).reduce((acc, row) => {
+  const empresaId = await getEmpresaIdFromBackend();
+  const rows = await getPermisosEfectivos(userId, empresaId);
+  return (rows || []).reduce((acc, row) => {
     acc[normalizeModule(row.modulo)] = row.permitido === true;
     return acc;
   }, {});
 };
 
 export const getEffectivePermissionForModule = async (moduleKey, userId) => {
-  if (!moduleKey || !userId) return false;
-
-  const { data, error } = await supabase
-    .from("v_permisos_efectivos")
-    .select("permitido")
-    .eq("usuario_id", userId)
-    .eq("modulo", moduleKey)
-    .maybeSingle();
-
-  if (error) throw error;
-
-  return data?.permitido === true;
+  const empresaId = await getEmpresaIdFromBackend();
+  const rows = await getPermisosEfectivos(userId, empresaId);
+  return tienePermiso(moduleKey, rows);
 };
 
 export const upsertUserPermissionOverride = async ({

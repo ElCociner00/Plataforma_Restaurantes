@@ -1,6 +1,10 @@
 import { supabase } from "./supabase.js";
 
+let cachedUserContext = null;
+
 export async function getUserContext() {
+  if (cachedUserContext) return cachedUserContext;
+
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) return null;
@@ -13,17 +17,18 @@ export async function getUserContext() {
 
   if (error || !data || data.activo === false) return null;
 
-  let empresaId = data.empresa_id;
-  const { data: empresaFromRpc, error: empresaRpcError } = await supabase.rpc("current_empresa_id");
-  if (!empresaRpcError && empresaFromRpc) {
-    empresaId = empresaFromRpc;
-  }
-
-  return {
+  cachedUserContext = {
     user,
     rol: data.rol,
-    empresa_id: empresaId
+    empresa_id: data.empresa_id
   };
+
+  return cachedUserContext;
+}
+
+export async function getCurrentEmpresaId() {
+  const context = await getUserContext();
+  return context?.empresa_id || null;
 }
 
 export async function buildRequestHeaders({ includeTenant = true } = {}) {

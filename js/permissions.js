@@ -1,24 +1,3 @@
-// /js/permissions.js
-export const PERMISSIONS = {
-  dashboard: ["admin_root", "admin", "revisor"],
-  cierre_turno: ["admin_root", "admin", "operativo", "revisor"],
-  historico_cierre_turno: ["admin_root", "admin", "revisor"],
-  cierre_inventarios: ["admin_root", "admin", "operativo", "revisor"],
-  historico_cierre_inventarios: ["admin_root", "admin", "revisor"],
-  configuracion: ["admin_root", "admin"],
-  loggro: ["admin_root", "admin"],
-  visualizacion_cierre_turno: ["admin_root", "admin"],
-  visualizacion_cierre_turno_historico: ["admin_root", "admin"],
-  visualizacion_cierre_inventarios: ["admin_root", "admin"],
-  visualizacion_cierre_inventarios_historico: ["admin_root", "admin"],
-  inventarios: ["admin_root", "admin", "operativo", "revisor"],
-  dashboard_siigo: ["admin_root", "admin", "operativo", "revisor"],
-  subir_facturas_siigo: ["admin_root", "admin", "operativo", "revisor"],
-  configuracion_siigo: ["admin_root", "admin"],
-  nomina: ["admin_root", "admin"],
-  permisos: ["admin_root", "admin"]
-};
-
 export const PAGE_ENVIRONMENT = {
   dashboard: "loggro",
   cierre_turno: "loggro",
@@ -32,7 +11,102 @@ export const PAGE_ENVIRONMENT = {
   visualizacion_cierre_inventarios: "loggro",
   visualizacion_cierre_inventarios_historico: "loggro",
   inventarios: "loggro",
+  permisos: "loggro",
   dashboard_siigo: "siigo",
+  configuracion_siigo: "siigo",
   subir_facturas_siigo: "siigo",
-  configuracion_siigo: "siigo"
+  historico_facturas_siigo: "siigo",
+  nomina: "siigo"
 };
+
+export const DEFAULT_ROLE_PERMISSIONS = {
+  admin_root: {
+    dashboard: true,
+    cierre_turno: true,
+    historico_cierre_turno: true,
+    cierre_inventarios: true,
+    historico_cierre_inventarios: true,
+    configuracion: true,
+    loggro: true,
+    visualizacion_cierre_turno: true,
+    visualizacion_cierre_turno_historico: true,
+    visualizacion_cierre_inventarios: true,
+    visualizacion_cierre_inventarios_historico: true,
+    inventarios: true,
+    permisos: true,
+    dashboard_siigo: true,
+    configuracion_siigo: true,
+    subir_facturas_siigo: true,
+    historico_facturas_siigo: true,
+    nomina: true
+  },
+  admin: {
+    dashboard: true,
+    cierre_turno: true,
+    historico_cierre_turno: true,
+    cierre_inventarios: true,
+    historico_cierre_inventarios: true,
+    configuracion: true,
+    loggro: true,
+    visualizacion_cierre_turno: true,
+    visualizacion_cierre_turno_historico: true,
+    visualizacion_cierre_inventarios: true,
+    visualizacion_cierre_inventarios_historico: true,
+    inventarios: true,
+    permisos: true,
+    dashboard_siigo: true,
+    configuracion_siigo: true,
+    subir_facturas_siigo: true,
+    historico_facturas_siigo: true,
+    nomina: true
+  },
+  revisor: {
+    dashboard: true,
+    cierre_turno: true,
+    historico_cierre_turno: true,
+    cierre_inventarios: true,
+    historico_cierre_inventarios: true,
+    configuracion: false,
+    loggro: false,
+    visualizacion_cierre_turno: false,
+    visualizacion_cierre_turno_historico: false,
+    visualizacion_cierre_inventarios: false,
+    visualizacion_cierre_inventarios_historico: false,
+    inventarios: true,
+    permisos: false,
+    dashboard_siigo: true,
+    configuracion_siigo: false,
+    subir_facturas_siigo: false,
+    historico_facturas_siigo: true,
+    nomina: false
+  },
+  operativo: {
+    dashboard: false,
+    cierre_turno: true,
+    historico_cierre_turno: false,
+    cierre_inventarios: true,
+    historico_cierre_inventarios: false,
+    configuracion: false,
+    loggro: false,
+    visualizacion_cierre_turno: false,
+    visualizacion_cierre_turno_historico: false,
+    visualizacion_cierre_inventarios: false,
+    visualizacion_cierre_inventarios_historico: false,
+    inventarios: true,
+    permisos: false,
+    dashboard_siigo: true,
+    configuracion_siigo: false,
+    subir_facturas_siigo: false,
+    historico_facturas_siigo: false,
+    nomina: false
+  }
+};
+
+export const PERMISSIONS = Object.fromEntries(
+  Object.keys(PAGE_ENVIRONMENT).map((moduleKey) => [
+    moduleKey,
+    Object.entries(DEFAULT_ROLE_PERMISSIONS)
+      .filter(([, modules]) => modules?.[moduleKey] === true)
+      .map(([role]) => role)
+  ])
+);

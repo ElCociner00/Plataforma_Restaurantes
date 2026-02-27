@@ -1,9 +1,10 @@
-import { getUserContext } from "./session.js";
+﻿import { getUserContext } from "./session.js";
 import { PAGE_ENVIRONMENT } from "./permissions.js";
-import { getEffectivePermissionForModule } from "./permisosService.js";
+import { permisosCacheGet, tienePermiso } from "./permisos.core.js";
 
 const LOGIN_URL = "/Plataforma_Restaurantes/index.html";
 const SELECTOR_URL = "/Plataforma_Restaurantes/entorno/";
+let isRedirecting = false;
 
 const getForbiddenRedirect = (context) => {
   const env = localStorage.getItem("app_entorno_activo") || "loggro";
@@ -18,11 +19,23 @@ const getForbiddenRedirect = (context) => {
   return "/Plataforma_Restaurantes/dashboard/";
 };
 
-export async function guardPage(pageKey) {
+const safeRedirect = (targetUrl) => {
+  if (!targetUrl || isRedirecting) return;
+
+  const normalizePath = (value) => String(value || "").replace(/\/+$/, "");
+  const currentPath = normalizePath(window.location.pathname);
+  const targetPath = normalizePath(targetUrl);
+  if (currentPath === targetPath) return;
+
+  isRedirecting = true;
+  window.location.href = targetUrl;
+};
+
+export async function guardPage(pageKey, permisosOverride = null) {
   const context = await getUserContext();
 
   if (!context) {
-    window.location.href = LOGIN_URL;
+    safeRedirect(LOGIN_URL);
     return;
   }
 
@@ -30,27 +43,27 @@ export async function guardPage(pageKey) {
   const activeEnvironment = localStorage.getItem("app_entorno_activo");
 
   if (expectedEnvironment && !activeEnvironment) {
-    window.location.href = SELECTOR_URL;
+    safeRedirect(SELECTOR_URL);
     return;
   }
 
   if (expectedEnvironment && activeEnvironment && expectedEnvironment !== activeEnvironment) {
-    alert("Este mÃ³dulo pertenece a otro entorno.");
-    window.location.href = SELECTOR_URL;
+    alert("Este modulo pertenece a otro entorno.");
+    safeRedirect(SELECTOR_URL);
     return;
   }
 
-  const userId = context.user?.id || context.user?.user_id;
-  let allowed = false;
-
-  try {
-    allowed = await getEffectivePermissionForModule(pageKey, userId);
-  } catch (error) {
-    allowed = false;
+  const permisos = permisosOverride || permisosCacheGet();
+  if (!context.empresa_id || !permisos) {
+    safeRedirect(getForbiddenRedirect(context));
+    return;
   }
+
+  const allowed = tienePermiso(pageKey, permisos);
 
   if (!allowed) {
-    alert("No tienes permisos para acceder a este mÃ³dulo");
-    window.location.href = getForbiddenRedirect(context);
+    alert("No tienes permisos para acceder a este modulo");
+    safeRedirect(getForbiddenRedirect(context));
   }
 }
+

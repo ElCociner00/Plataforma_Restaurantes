@@ -1,21 +1,21 @@
-import { getUserContext, buildRequestHeaders } from "./session.js";
-import { WEBHOOK_LISTAR_RESPONSABLES } from "./webhooks.js";
-import {
-  fetchEffectivePermissionsMap,
-  fetchPermissionModules,
-  upsertUserPermissionOverride
-} from "./permisosService.js";
+import { buildRequestHeaders, getCurrentEmpresaId, getUserContext } from "./session.js";
+import { WEBHOOKS } from "./webhooks.js";
+import { permisosCacheSet } from "./permisos.core.js";
+import { DEFAULT_ROLE_PERMISSIONS, PAGE_ENVIRONMENT } from "./permissions.js";
+import { supabase } from "./supabase.js";
 
 // ===============================
-// CONFIGURACIÃ“N
+// CONFIGURACIÃƒâ€œN
 // ===============================
-const DATA_ENDPOINT = "";
 const DEFAULT_PAGES = [
   "dashboard",
   "cierre_turno",
   "historico_cierre_turno",
   "cierre_inventarios",
-  "configuracion"
+  "historico_cierre_inventarios",
+  "configuracion",
+  "subir_facturas_siigo",
+  "historico_facturas_siigo"
 ];
 
 // ===============================
@@ -28,7 +28,6 @@ const bulkButtons = document.querySelectorAll(".bulk-actions button");
 
 let state = { pages: [], empleados: [] };
 let userContext = null;
-const getTimestamp = () => new Date().toISOString();
 
 // ===============================
 // UTILIDADES
@@ -43,6 +42,13 @@ const formatPageLabel = (page) =>
     .join(" ");
 
 const isBlockedPermission = (empleado, page) => empleado.permisos?.[page] === false;
+
+const getRoleDefaults = (role) => ({ ...(DEFAULT_ROLE_PERMISSIONS?.[role] || {}) });
+
+const mergeRoleDefaults = (role, permisosMap) => ({
+  ...getRoleDefaults(role),
+  ...(permisosMap || {})
+});
 
 const renderSummary = () => {
   if (!summary) return;
@@ -67,7 +73,7 @@ const renderSummary = () => {
       <strong>${state.empleados.length}</strong>
     </div>
     <div class="resumen-item">
-      <span class="resumen-label">MÃ³dulos configurables</span>
+      <span class="resumen-label">MÃƒÂ³dulos configurables</span>
       <strong>${state.pages.length}</strong>
     </div>
     <div class="resumen-item">
@@ -89,7 +95,7 @@ const renderTable = () => {
     const switches = state.pages.map((page) => {
       const isBlocked = isBlockedPermission(empleado, page);
       return `
-        <label class="permiso-switch" title="${isBlocked ? "Bloqueado (NO)" : "Permitido (SÃ)"}">
+        <label class="permiso-switch" title="${isBlocked ? "Bloqueado (NO)" : "Permitido (SÃƒÂ)"}">
           <input
             type="checkbox"
             data-empleado-id="${empleado.id}"
@@ -97,7 +103,7 @@ const renderTable = () => {
             ${isBlocked ? "checked" : ""}
           >
           <span aria-hidden="true" class="switch-slider"></span>
-          <span class="switch-state">${isBlocked ? "NO" : "SÃ"}</span>
+          <span class="switch-state">${isBlocked ? "NO" : "SÃƒÂ"}</span>
           <span class="sr-only">${isBlocked ? "Bloqueado" : "Permitido"}</span>
         </label>
       `;
@@ -134,12 +140,24 @@ const persistPermissionChange = async ({ empleadoId, page, value }) => {
   setStatus("Guardando cambios...");
 
   try {
-    await upsertUserPermissionOverride({
-      usuarioId: empleadoId,
-      modulo: page,
-      permitido: value,
-      updatedBy: userContext?.user?.id || userContext?.user?.user_id
+    const headers = await buildRequestHeaders({ includeTenant: true });
+    const response = await fetch(WEBHOOKS.PERMISOS_EXCEPCION.url, {
+      method: WEBHOOKS.PERMISOS_EXCEPCION.metodo || "POST",
+      headers: {
+        ...headers,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        usuario_id: empleadoId,
+        modulo: page,
+        permitido: value,
+        actualizado_por: userContext?.user?.id || userContext?.user?.user_id
+      })
     });
+
+    if (!response.ok) {
+      throw new Error("Webhook error");
+    }
 
     setStatus("Cambios de permisos guardados.");
   } catch (error) {
@@ -166,7 +184,7 @@ const handleToggle = async (event) => {
 
   const switchState = target.parentElement.querySelector(".switch-state");
   if (switchState) {
-    switchState.textContent = value ? "SÃ" : "NO";
+    switchState.textContent = value ? "SÃƒÂ" : "NO";
   }
 
   try {
@@ -176,7 +194,7 @@ const handleToggle = async (event) => {
     empleado.permisos[page] = !value;
     target.checked = value;
     if (switchState) {
-      switchState.textContent = !value ? "SÃ" : "NO";
+      switchState.textContent = !value ? "SÃƒÂ" : "NO";
     }
   }
 
@@ -222,7 +240,7 @@ const handleBulkAction = async (event) => {
     for (const update of updates) {
       await persistPermissionChange(update);
     }
-    setStatus(`AcciÃ³n masiva aplicada para rol ${role}.`);
+    setStatus(`AcciÃƒÂ³n masiva aplicada para rol ${role}.`);
   } catch (error) {
     setStatus("No se pudieron aplicar todos los cambios masivos.");
   }
@@ -235,70 +253,62 @@ const attachTableHandlers = () => {
 };
 
 const loadPermissions = async () => {
-  if (window.PERMISOS_DATA) return window.PERMISOS_DATA;
-
-  const headers = await buildRequestHeaders({ includeTenant: true });
-  const baseHeaders = {
-    ...headers,
-    "Content-Type": "application/json"
-  };
-
-  if (!DATA_ENDPOINT) {
-    const response = await fetch(WEBHOOK_LISTAR_RESPONSABLES, {
-      method: "POST",
-      headers: baseHeaders,
-      body: JSON.stringify({
-        usuario_id: userContext?.user?.id || userContext?.user?.user_id,
-        solicitado_por: userContext?.user?.id || userContext?.user?.user_id,
-        timestamp: getTimestamp(),
-        origen: "permisos"
-      })
-    });
-
-    const data = await response.json();
-    const responsables = Array.isArray(data)
-      ? data.flatMap((item) => item.responsables || [])
-      : data.responsables || [];
-
-    const [modules, permissionsByUser] = await Promise.all([
-      fetchPermissionModules().catch(() => []),
-      fetchEffectivePermissionsMap().catch(() => ({}))
-    ]);
-
-    return {
-      pages: modules.length ? modules : DEFAULT_PAGES,
-      empleados: responsables.map((item) => {
-        const id = item.id ?? item.value ?? item;
-        return {
-          id,
-          nombre: item.nombre ?? item.name ?? item,
-          rol: item.rol ?? item.role ?? "",
-          permisos: permissionsByUser[String(id)] || {}
-        };
-      })
-    };
+  const empresaId = await getCurrentEmpresaId();
+  if (!empresaId) {
+    return { pages: DEFAULT_PAGES, empleados: [] };
   }
 
-  const response = await fetch(DATA_ENDPOINT, {
-    method: "POST",
-    headers: baseHeaders,
-    body: JSON.stringify({
-      usuario_id: userContext?.user?.id || userContext?.user?.user_id,
-      solicitado_por: userContext?.user?.id || userContext?.user?.user_id,
-      timestamp: getTimestamp()
-    })
-  });
+  const { data: empleadosData, error: empleadosError } = await supabase
+    .from("usuarios_sistema")
+    .select("id, nombre_completo, rol")
+    .eq("empresa_id", empresaId)
+    .eq("activo", true);
 
-  const data = await response.json();
-  const permissionsByUser = await fetchEffectivePermissionsMap().catch(() => ({}));
+  if (empleadosError) {
+    throw empleadosError;
+  }
+
+  const empleados = empleadosData || [];
+  const userIds = empleados.map((item) => item.id).filter(Boolean);
+  const pagesSet = new Set([
+    ...DEFAULT_PAGES,
+    ...Object.keys(PAGE_ENVIRONMENT || {})
+  ]);
+
+  let permisosRows = [];
+
+  if (userIds.length) {
+    const { data: permisosData, error: permisosError } = await supabase
+      .from("v_permisos_efectivos")
+      .select("usuario_id, modulo, permitido")
+      .eq("empresa_id", empresaId)
+      .in("usuario_id", userIds);
+
+    if (permisosError) throw permisosError;
+    permisosRows = permisosData || [];
+  }
+
+  const permissionsByUser = permisosRows.reduce((acc, row) => {
+    const userKey = String(row.usuario_id);
+    if (!acc[userKey]) acc[userKey] = {};
+    acc[userKey][row.modulo] = row.permitido === true;
+    pagesSet.add(row.modulo);
+    return acc;
+  }, {});
 
   return {
-    ...data,
-    pages: (data.pages || []).length ? data.pages : DEFAULT_PAGES,
-    empleados: (data.empleados || []).map((empleado) => ({
-      ...empleado,
-      permisos: permissionsByUser[String(empleado.id)] || empleado.permisos || {}
-    }))
+    pages: Array.from(pagesSet),
+    empleados: empleados.map((item) => {
+      const id = item.id ?? item.value ?? item;
+      const role = item.rol ?? item.role ?? "";
+      const permisos = mergeRoleDefaults(role, permissionsByUser[String(id)] || {});
+      return {
+        id,
+        nombre: item.nombre_completo ?? item.nombre ?? item.name ?? item,
+        rol: role,
+        permisos
+      };
+    })
   };
 };
 
@@ -309,7 +319,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   userContext = await getUserContext();
 
   if (!userContext) {
-    setStatus("No se pudo validar la sesiÃ³n.");
+    setStatus("No se pudo validar la sesiÃƒÂ³n.");
     return;
   }
 
@@ -320,11 +330,21 @@ document.addEventListener("DOMContentLoaded", async () => {
       empleados: data.empleados || []
     };
 
+    const currentUserId = userContext?.user?.id || userContext?.user?.user_id;
+    const currentUser = state.empleados.find((empleado) => String(empleado.id) === String(currentUserId));
+    if (currentUser?.permisos) {
+      const cacheRows = Object.entries(currentUser.permisos).map(([modulo, permitido]) => ({
+        modulo,
+        permitido: permitido === true
+      }));
+      permisosCacheSet(cacheRows);
+    }
+
     renderTable();
     attachTableHandlers();
     setStatus("Permisos cargados correctamente.");
   } catch (err) {
-    setStatus(err.message || "No se pudo cargar la informaciÃ³n.");
+    setStatus(err.message || "No se pudo cargar la informaciÃƒÂ³n.");
   }
 
   bulkButtons.forEach((button) => {

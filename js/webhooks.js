@@ -89,3 +89,27 @@ export const WEBHOOK_CARGAR_FACTURAS_CORREO =
 // siigo/subir_facturas_siigo/index.html (subir/revertir factura en Siigo)
 export const WEBHOOK_SUBIR_SIIGO =
   "https://n8n.globalnexoshop.com/webhook/subir_factura_siigo";
+
+/**
+ * WEBHOOKS CENTRALIZADOS
+ * Instrucción: Para modificar URLs, cambiar SOLO aquí
+ */
+export const WEBHOOKS = {
+  // Permisos excepcionales (crear/actualizar)
+  PERMISOS_EXCEPCION: {
+    url: "https://ivgzwgyjyqfunheaesxx.supabase.co/rest/v1/rpc/guardar_permiso_excepcion",
+    archivos_que_usan: [
+      "js/permisos.js"
+    ],
+    metodo: "POST",
+    descripcion: "Guarda permisos especiales por usuario (override)"
+  },
+
+  // Aquí irán otros webhooks SOLO para escritura
+  EJEMPLO_OTRO: {
+    url: "...",
+    archivos_que_usan: []
+  }
+};
+
+// NOTA: Los permisos de LECTURA van DIRECTOS a Supabase, no pasan por webhook
