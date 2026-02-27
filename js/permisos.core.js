@@ -1,7 +1,12 @@
 import { supabase } from "./supabase.js";
+import { getUserContext, obtenerUsuarioActual } from "./session.js";
 
 let permisosCache = null;
 let permisosCacheKey = null;
+const superAdminCache = new Map();
+
+const SUPER_ADMIN_EMAIL = "santiagoelchameluco@gmail.com";
+const SUPER_ADMIN_ID = "1e17e7c6-d959-4089-ab22-3f64b5b5be41";
 
 export async function getPermisosEfectivos(usuarioId, empresaId) {
   if (!usuarioId || !empresaId) return [];
@@ -52,4 +57,45 @@ export function permisosCacheGet() {
 export function permisosCacheClear() {
   permisosCache = null;
   permisosCacheKey = null;
+}
+
+export async function esSuperAdmin() {
+  const context = await getUserContext();
+  const user = (await obtenerUsuarioActual()) || context?.user;
+  const userId = user?.id || user?.user_id;
+  const email = String(user?.email || "").toLowerCase();
+  if (!userId && !email) return false;
+
+  const cacheKey = `${userId || ""}:${email}`;
+  if (superAdminCache.has(cacheKey)) {
+    return superAdminCache.get(cacheKey);
+  }
+
+  if (userId === SUPER_ADMIN_ID || email === SUPER_ADMIN_EMAIL) {
+    superAdminCache.set(cacheKey, true);
+    return true;
+  }
+
+  const filters = [];
+  if (userId) filters.push(`id.eq.${userId}`);
+  if (email) filters.push(`correo.eq.${email}`);
+  if (!filters.length) {
+    superAdminCache.set(cacheKey, false);
+    return false;
+  }
+
+  const { data, error } = await supabase
+    .from("system_users")
+    .select("id, correo")
+    .or(filters.join(","))
+    .limit(1);
+
+  if (error) {
+    superAdminCache.set(cacheKey, false);
+    return false;
+  }
+
+  const isAllowed = Array.isArray(data) && data.length > 0;
+  superAdminCache.set(cacheKey, isAllowed);
+  return isAllowed;
 }

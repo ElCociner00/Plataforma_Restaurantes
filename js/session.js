@@ -31,6 +31,11 @@ export async function getCurrentEmpresaId() {
   return context?.empresa_id || null;
 }
 
+export async function obtenerUsuarioActual() {
+  const context = await getUserContext();
+  return context?.user || null;
+}
+
 export async function buildRequestHeaders({ includeTenant = true } = {}) {
   const headers = {};
   const { data } = await supabase.auth.getSession();

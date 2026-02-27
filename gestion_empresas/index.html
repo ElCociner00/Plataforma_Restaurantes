@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AXIOMA | Gestion de Empresas</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/gestion_empresas.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../js/auth_guard.js"></script>
+  <script type="module">
+    import { guardPage } from "../js/guard_page.js";
+    guardPage("gestion_empresas");
+  </script>
+  <script type="module" src="../js/header.js"></script>
+  <script type="module" src="../js/gestion_empresas.js"></script>
+
+  <main class="main gestion-empresas-main">
+    <h1>Gestion de Empresas</h1>
+    <p class="helper-text">Modulo exclusivo de super administracion.</p>
+    <div class="toolbar">
+      <button id="btnRecargar" type="button">Recargar</button>
+      <span id="estadoAccion" aria-live="polite"></span>
+    </div>
+
+    <div class="table-wrap">
+      <table id="tablaEmpresas">
+        <thead>
+          <tr>
+            <th>Empresa</th>
+            <th>NIT</th>
+            <th>Plan</th>
+            <th>Estado</th>
+            <th>Registro</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="empresasBody">
+          <tr>
+            <td colspan="6">Cargando empresas...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module" src="../js/footer.js"></script>
+</body>
+</html>

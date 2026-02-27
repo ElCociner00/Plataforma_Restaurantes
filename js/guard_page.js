@@ -1,6 +1,6 @@
 ﻿import { getUserContext } from "./session.js";
 import { PAGE_ENVIRONMENT } from "./permissions.js";
-import { permisosCacheGet, tienePermiso } from "./permisos.core.js";
+import { esSuperAdmin, permisosCacheGet, tienePermiso } from "./permisos.core.js";
 
 const LOGIN_URL = "/Plataforma_Restaurantes/index.html";
 const SELECTOR_URL = "/Plataforma_Restaurantes/entorno/";
@@ -36,6 +36,12 @@ export async function guardPage(pageKey, permisosOverride = null) {
 
   if (!context) {
     safeRedirect(LOGIN_URL);
+    return;
+  }
+
+  if (pageKey === "gestion_empresas" && !(await esSuperAdmin())) {
+    console.warn("Acceso denegado a gestion empresas (solo super admin)");
+    safeRedirect("/Plataforma_Restaurantes/dashboard/");
     return;
   }
 
