@@ -3,10 +3,63 @@ import { getUserContext, obtenerUsuarioActual } from "./session.js";
 
 let permisosCache = null;
 let permisosCacheKey = null;
+const empresaPolicyCache = new Map();
 const superAdminCache = new Map();
 
 const SUPER_ADMIN_EMAIL = "santiagoelchameluco@gmail.com";
 const SUPER_ADMIN_ID = "1e17e7c6-d959-4089-ab22-3f64b5b5be41";
+
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+
+const normalizePlan = (empresa) => {
+  const raw = empresa?.plan_actual ?? empresa?.plan ?? "free";
+  return String(raw).trim().toLowerCase() || "free";
+};
+
+const normalizeActiva = (empresa) => {
+  if (!empresa || typeof empresa !== "object") return true;
+  if (typeof empresa.activo === "boolean") return empresa.activo;
+  if (typeof empresa.activa === "boolean") return empresa.activa;
+  return true;
+};
+
+export async function getEmpresaPolicy(empresaId, forceRefresh = false) {
+  if (!empresaId) {
+    return {
+      empresa_id: null,
+      plan: "free",
+      activa: true,
+      solo_lectura: false
+    };
+  }
+
+  if (!forceRefresh && empresaPolicyCache.has(empresaId)) {
+    return empresaPolicyCache.get(empresaId);
+  }
+
+  const { data, error } = await supabase
+    .from("empresas")
+    .select("id, plan, plan_actual, activo, activa")
+    .eq("id", empresaId)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  const policy = {
+    empresa_id: empresaId,
+    plan: normalizePlan(data),
+    activa: normalizeActiva(data),
+    solo_lectura: normalizePlan(data) === "free"
+  };
+
+  empresaPolicyCache.set(empresaId, policy);
+  return policy;
+}
+
+export async function puedeEnviarDatos(empresaId, forceRefresh = false) {
+  const policy = await getEmpresaPolicy(empresaId, forceRefresh);
+  return policy.activa === true && policy.solo_lectura !== true;
+}
 
 export async function getPermisosEfectivos(usuarioId, empresaId, forceRefresh = false) {
   if (!usuarioId || !empresaId) return [];
@@ -14,18 +67,6 @@ export async function getPermisosEfectivos(usuarioId, empresaId, forceRefresh = 
 
   if (!forceRefresh && permisosCache && permisosCacheKey === cacheKey) {
     return permisosCache;
-  }
-
-  const { data: empresa } = await supabase
-    .from("empresas")
-    .select("plan, activo")
-    .eq("id", empresaId)
-    .maybeSingle();
-
-  if (empresa && empresa.activo === false) {
-    permisosCacheSet([]);
-    permisosCacheKey = cacheKey;
-    return [];
   }
 
   const { data, error } = await supabase
@@ -36,20 +77,7 @@ export async function getPermisosEfectivos(usuarioId, empresaId, forceRefresh = 
 
   if (error) throw error;
 
-  let permisos = data || [];
-  if (empresa?.plan === "free") {
-    const soloLectura = new Set([
-      "dashboard",
-      "historico_cierre_turno",
-      "historico_cierre_inventarios",
-      "facturacion"
-    ]);
-    permisos = permisos.map((item) => ({
-      ...item,
-      permitido: soloLectura.has(item.modulo) ? item.permitido === true : false
-    }));
-  }
-
+  const permisos = data || [];
   permisosCacheSet(permisos);
   permisosCacheKey = cacheKey;
 
@@ -88,7 +116,7 @@ export async function esSuperAdmin() {
   const context = await getUserContext();
   const user = (await obtenerUsuarioActual()) || context?.user;
   const userId = user?.id || user?.user_id;
-  const email = String(user?.email || "").toLowerCase();
+  const email = normalizeEmail(user?.email);
   if (!userId && !email) return false;
 
   const cacheKey = `${userId || ""}:${email}`;
@@ -109,18 +137,19 @@ export async function esSuperAdmin() {
     return false;
   }
 
-  const { data, error } = await supabase
-    .from("system_users")
-    .select("id, correo")
-    .or(filters.join(","))
-    .limit(1);
+  for (const tableName of ["system_users", "system_user"]) {
+    const { data, error } = await supabase
+      .from(tableName)
+      .select("id, correo")
+      .or(filters.join(","))
+      .limit(1);
 
-  if (error) {
-    superAdminCache.set(cacheKey, false);
-    return false;
+    if (!error && Array.isArray(data) && data.length > 0) {
+      superAdminCache.set(cacheKey, true);
+      return true;
+    }
   }
 
-  const isAllowed = Array.isArray(data) && data.length > 0;
-  superAdminCache.set(cacheKey, isAllowed);
-  return isAllowed;
+  superAdminCache.set(cacheKey, false);
+  return false;
 }

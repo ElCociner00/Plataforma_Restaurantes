@@ -1,5 +1,6 @@
 import { enforceNumericInput } from "../js/input_utils.js";
 import { getUserContext } from "../js/session.js";
+import { getEmpresaPolicy, puedeEnviarDatos } from "../js/permisos.core.js";
 import {
   WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS,
   WEBHOOK_CIERRE_INVENTARIOS_CONSULTAR,
@@ -75,6 +76,13 @@ const getContextPayload = async () => {
     rol: context.rol,
     timestamp: getTimestamp()
   };
+};
+
+const cargarPoliticaEmpresa = async () => {
+  const context = await getUserContext();
+  if (!context?.empresa_id) return;
+  empresaPolicy = await getEmpresaPolicy(context.empresa_id).catch(() => empresaPolicy);
+  aplicarPoliticaSoloLectura();
 };
 
 const normalizeList = (raw, keys = []) => {
@@ -250,11 +258,27 @@ const getVisibilitySettings = (tenantId) => {
 
 const productRows = new Map();
 let verified = false;
+let empresaPolicy = {
+  plan: "pro",
+  activa: true,
+  solo_lectura: false
+};
 
 const setButtonState = ({ consultar, verificar, subir }) => {
   if (typeof consultar === "boolean") btnConsultar.disabled = !consultar;
   if (typeof verificar === "boolean") btnVerificar.disabled = !verificar;
   if (typeof subir === "boolean") btnSubir.disabled = !subir;
+};
+
+const aplicarPoliticaSoloLectura = () => {
+  const isReadOnly = empresaPolicy?.solo_lectura === true;
+  if (isReadOnly) {
+    btnSubir.disabled = true;
+    btnSubir.title = "Plan FREE: envio bloqueado";
+    setStatus("Plan FREE activo: puedes consultar y visualizar, pero no subir cierres.");
+  } else {
+    btnSubir.title = "";
+  }
 };
 
 const resetVerification = () => {
@@ -529,6 +553,11 @@ btnVerificar.addEventListener("click", () => {
 });
 
 btnSubir.addEventListener("click", async () => {
+  if (empresaPolicy?.solo_lectura === true) {
+    setStatus("Plan FREE: no se permite subir cierres de inventario.");
+    return;
+  }
+
   if (!verified) {
     setStatus("⚠️ Primero debes verificar los datos.");
     return;
@@ -537,6 +566,12 @@ btnSubir.addEventListener("click", async () => {
   const payload = await buildBasePayload();
   if (!payload) {
     setStatus("No se pudo validar la sesión.");
+    return;
+  }
+
+  const writeAllowed = await puedeEnviarDatos(payload?.empresa_id, true).catch(() => false);
+  if (!writeAllowed) {
+    setStatus("Plan FREE o empresa inactiva: envio bloqueado por seguridad.");
     return;
   }
 
@@ -552,8 +587,21 @@ btnSubir.addEventListener("click", async () => {
       })
     });
 
-    const data = await res.json();
-    setStatus(data.message || (data.ok ? "Datos subidos correctamente." : "El webhook devolvió error."));
+    const raw = await res.text();
+    let data = {};
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch (_parseError) {
+      data = { message: raw };
+    }
+
+    if (!res.ok) {
+      console.error("Error webhook cierre_inventarios_subir", { status: res.status, data });
+      setStatus(data?.message || `Error subiendo datos (HTTP ${res.status}).`);
+      return;
+    }
+
+    setStatus(data.message || (data.ok ? "Datos subidos correctamente." : "El webhook devolvio error."));
   } catch (error) {
     setStatus("Error subiendo datos.");
   }
@@ -575,5 +623,6 @@ btnLimpiar.addEventListener("click", () => {
 });
 
 setButtonState({ consultar: true, verificar: false, subir: false });
+cargarPoliticaEmpresa();
 loadResponsables();
 renderProducts();

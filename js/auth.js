@@ -49,6 +49,11 @@ form.addEventListener("submit", async (e) => {
 
     // 3. Redirigir al selector de entorno
     console.log("Rol del usuario:", context.rol);
+    if (context.super_admin === true && !context.empresa_id) {
+      window.location.href = "/Plataforma_Restaurantes/gestion_empresas/";
+      return;
+    }
+
     window.location.href = "/Plataforma_Restaurantes/entorno/";
 
   } catch (catchError) {

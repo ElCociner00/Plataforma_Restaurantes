@@ -11,10 +11,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   verificarYMostrarAnuncio().catch(() => {});
 
   const activeEnvironment = getActiveEnvironment();
-  if (!activeEnvironment) {
+  const currentPath = String(window.location.pathname || "");
+  const isGlobalNoTenantPage = currentPath.includes("/gestion_empresas/") || currentPath.includes("/facturacion/");
+  if (!activeEnvironment && !isGlobalNoTenantPage) {
     window.location.href = "/Plataforma_Restaurantes/entorno/";
     return;
   }
+  const environmentForMenu = activeEnvironment || (isGlobalNoTenantPage ? ENV_LOGGRO : "");
   const header = document.createElement("header");
   header.className = "app-header";
 
@@ -23,7 +26,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let menu = "";
 
-  if (activeEnvironment === ENV_LOGGRO) {
+  if (environmentForMenu === ENV_LOGGRO) {
     if (context.rol !== "operativo") {
       menu += `<a href="/Plataforma_Restaurantes/dashboard/">Dashboard</a>`;
     }
@@ -49,18 +52,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     `;
   }
 
-  if (activeEnvironment === ENV_SIIGO) {
+  if (environmentForMenu === ENV_SIIGO) {
     menu += `<a href="/Plataforma_Restaurantes/siigo/dashboard_siigo/">Dashboard</a>`;
     menu += `<a href="/Plataforma_Restaurantes/siigo/subir_facturas_siigo/">Ver o subir facturas correo</a>`;
   }
 
   menu += `<a href="/Plataforma_Restaurantes/facturacion/">Facturacion</a>`;
 
-  const configLink = activeEnvironment === ENV_SIIGO
+  const configLink = environmentForMenu === ENV_SIIGO
     ? "/Plataforma_Restaurantes/siigo/configuracion_siigo/"
     : "/Plataforma_Restaurantes/configuracion/";
 
-  const environmentOptions = activeEnvironment === ENV_LOGGRO
+  const environmentOptions = environmentForMenu === ENV_LOGGRO
     ? `<a href="#" data-switch-env="siigo">Siigo</a>`
     : `<a href="#" data-switch-env="loggro">Loggro</a>`;
 
@@ -117,7 +120,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 function mostrarBannerPlan(empresa) {
-  if (!empresa || empresa.plan !== "free") return;
+  const plan = String(empresa?.plan_actual || empresa?.plan || "").toLowerCase();
+  if (!empresa || plan !== "free") return;
   if (document.getElementById("banner-plan-free")) return;
 
   const banner = document.createElement("div");

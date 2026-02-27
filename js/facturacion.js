@@ -12,10 +12,11 @@ export async function cargarFactura() {
     return;
   }
 
+  const planActual = String(empresa?.plan_actual || empresa?.plan || "free").toLowerCase();
   const planInfo = {
     free: { precio: 0, descripcion: "Plan Free" },
     pro: { precio: 150000, descripcion: "Plan Profesional" }
-  }[empresa?.plan || "free"] || { precio: 0, descripcion: "Plan Free" };
+  }[planActual] || { precio: 0, descripcion: "Plan Free" };
 
   const subtotal = Number(planInfo.precio || 0);
   const iva = 0;

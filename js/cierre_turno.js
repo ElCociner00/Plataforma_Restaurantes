@@ -1,5 +1,6 @@
 import { enforceNumericInput } from "./input_utils.js";
 import { getUserContext } from "./session.js";
+import { getEmpresaPolicy, puedeEnviarDatos } from "./permisos.core.js";
 import {
   WEBHOOK_CONSULTAR_DATOS_CIERRE,
   WEBHOOK_LISTAR_RESPONSABLES,
@@ -104,6 +105,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const getTimestamp = () => new Date().toISOString();
   let modoEfectivoSistema = "bruto";
   let efectivoSistemaLoggro = 0;
+  let empresaPolicy = {
+    plan: "pro",
+    activa: true,
+    solo_lectura: false
+  };
 
   const toNumberValue = (value) => {
     const parsed = Number(value);
@@ -168,6 +174,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const setStatus = (message) => {
     status.textContent = message;
+  };
+
+  const aplicarPoliticaSoloLectura = () => {
+    const isReadOnly = empresaPolicy?.solo_lectura === true;
+    if (btnEnviar) {
+      btnEnviar.disabled = isReadOnly;
+      btnEnviar.title = isReadOnly ? "Plan FREE: solo visualizacion" : "";
+    }
+    if (btnConfirmarEnvio) {
+      btnConfirmarEnvio.disabled = isReadOnly;
+      btnConfirmarEnvio.title = isReadOnly ? "Plan FREE: envio bloqueado" : "";
+    }
+    if (isReadOnly) {
+      setStatus("Plan FREE activo: puedes consultar y visualizar, pero no enviar cierres.");
+    }
   };
 
   const fetchWithTimeout = async (url, options = {}, timeoutMs = MAX_LOADING_MS) => {
@@ -304,6 +325,13 @@ document.addEventListener("DOMContentLoaded", () => {
       registrado_por: context.user?.id || context.user?.user_id,
       timestamp: getTimestamp()
     };
+  };
+
+  const cargarPoliticaEmpresa = async () => {
+    const context = await getUserContext();
+    if (!context?.empresa_id) return;
+    empresaPolicy = await getEmpresaPolicy(context.empresa_id).catch(() => empresaPolicy);
+    aplicarPoliticaSoloLectura();
   };
 
   const cargarResponsables = async () => {
@@ -593,6 +621,7 @@ document.addEventListener("DOMContentLoaded", () => {
   syncTotalesExtras();
   actualizarEstadoHoraFin();
   populateHoraLlegadaOptions();
+  cargarPoliticaEmpresa();
   cargarResponsables();
   cargarExtrasCatalogo();
 
@@ -1011,15 +1040,33 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   btnEnviar.addEventListener("click", async () => {
+    if (empresaPolicy?.solo_lectura === true) {
+      setStatus("Plan FREE: envio bloqueado. Solo visualizacion.");
+      confirmacionEnvio.classList.add("is-hidden");
+      return;
+    }
     const estado = obtenerEstadoGlobalDiferencias();
     mensajeEnvio.textContent = obtenerMensajeEnvio(estado);
     confirmacionEnvio.classList.remove("is-hidden");
   });
 
   btnConfirmarEnvio.addEventListener("click", async () => {
+    if (empresaPolicy?.solo_lectura === true) {
+      setStatus("Plan FREE: no se permite subir cierres.");
+      confirmacionEnvio.classList.add("is-hidden");
+      return;
+    }
+
     setStatus("Enviando cierre...");
     const payload = await construirPayloadEnvio();
     if (!payload) return;
+
+    const writeAllowed = await puedeEnviarDatos(payload?.global?.empresa_id, true).catch(() => false);
+    if (!writeAllowed) {
+      setStatus("Plan FREE o empresa inactiva: envio bloqueado por seguridad.");
+      confirmacionEnvio.classList.add("is-hidden");
+      return;
+    }
 
     try {
       const res = await fetch(WEBHOOK_SUBIR_CIERRE, {
@@ -1028,9 +1075,23 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify(payload)
       });
 
-      const data = await res.json();
-      setStatus(data.message || "");
-      window.location.reload();
+      const raw = await res.text();
+      let data = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch (_parseError) {
+        data = { message: raw };
+      }
+
+      if (!res.ok) {
+        console.error("Error webhook subir_cierre", { status: res.status, data });
+        setStatus(data?.message || `Error al subir cierre (HTTP ${res.status}).`);
+        return;
+      }
+
+      console.info("Webhook subir_cierre OK", { status: res.status, data });
+      setStatus(data?.message || "Cierre enviado correctamente.");
+      confirmacionEnvio.classList.add("is-hidden");
     } catch (err) {
       setStatus("Error de conexión al subir cierre.");
     }

@@ -2,28 +2,93 @@ import { supabase } from "./supabase.js";
 
 let cachedUserContext = null;
 
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+const normalizeRole = (value) => String(value || "").trim().toLowerCase();
+
+const isRecordActive = (record) => {
+  if (!record || typeof record !== "object") return false;
+  if (typeof record.activo === "boolean") return record.activo;
+  if (typeof record.activa === "boolean") return record.activa;
+  if (record.estado == null) return true;
+  return String(record.estado).toLowerCase() !== "inactivo";
+};
+
+async function getSuperAdminContext(user) {
+  const email = normalizeEmail(user?.email);
+  const filters = [];
+  if (user?.id) filters.push(`id.eq.${user.id}`);
+  if (email) filters.push(`correo.eq.${email}`);
+  if (!filters.length) return null;
+
+  const queryFilter = filters.join(",");
+  const tableCandidates = ["system_users", "system_user"];
+
+  for (const tableName of tableCandidates) {
+    const { data, error } = await supabase
+      .from(tableName)
+      .select("id, correo")
+      .or(queryFilter)
+      .limit(1);
+
+    if (error) continue;
+    if (Array.isArray(data) && data.length > 0) {
+      return {
+        user,
+        rol: "admin_root",
+        empresa_id: null,
+        super_admin: true
+      };
+    }
+  }
+
+  return null;
+}
+
 export async function getUserContext() {
   if (cachedUserContext) return cachedUserContext;
 
   const { data: { user } } = await supabase.auth.getUser();
-
   if (!user) return null;
 
-  const { data, error } = await supabase
+  const { data: usuarioSistema, error: usuarioSistemaError } = await supabase
     .from("usuarios_sistema")
     .select("rol, empresa_id, activo")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
-  if (error || !data || data.activo === false) return null;
+  if (!usuarioSistemaError && usuarioSistema && isRecordActive(usuarioSistema)) {
+    cachedUserContext = {
+      user,
+      rol: normalizeRole(usuarioSistema.rol),
+      empresa_id: usuarioSistema.empresa_id,
+      super_admin: false
+    };
+    return cachedUserContext;
+  }
 
-  cachedUserContext = {
-    user,
-    rol: data.rol,
-    empresa_id: data.empresa_id
-  };
+  const { data: otroUsuario, error: otroUsuarioError } = await supabase
+    .from("otros_usuarios")
+    .select("empresa_id, estado")
+    .eq("id", user.id)
+    .maybeSingle();
 
-  return cachedUserContext;
+  if (!otroUsuarioError && otroUsuario && isRecordActive(otroUsuario)) {
+    cachedUserContext = {
+      user,
+      rol: "revisor",
+      empresa_id: otroUsuario.empresa_id,
+      super_admin: false
+    };
+    return cachedUserContext;
+  }
+
+  const superAdminContext = await getSuperAdminContext(user);
+  if (superAdminContext) {
+    cachedUserContext = superAdminContext;
+    return cachedUserContext;
+  }
+
+  return null;
 }
 
 export async function getCurrentEmpresaId() {
@@ -53,16 +118,28 @@ export async function getSessionConEmpresa() {
         razon_social,
         nit,
         plan,
+        plan_actual,
         activo,
+        activa,
         mostrar_anuncio_impago,
         deuda_actual,
         correo_empresa
       )
     `)
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
-  if (error || !usuarioSistema || usuarioSistema.activo === false) return null;
+  if (error) return null;
+  if (!usuarioSistema || usuarioSistema.activo === false) {
+    const superAdminContext = await getSuperAdminContext(user);
+    if (!superAdminContext) return null;
+    return {
+      user,
+      usuarioSistema: null,
+      empresa: null,
+      superAdmin: true
+    };
+  }
 
   const empresa = Array.isArray(usuarioSistema.empresas)
     ? usuarioSistema.empresas[0]
@@ -71,7 +148,8 @@ export async function getSessionConEmpresa() {
   return {
     user,
     usuarioSistema,
-    empresa
+    empresa,
+    superAdmin: false
   };
 }
 

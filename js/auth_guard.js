@@ -1,6 +1,6 @@
 import { supabase } from "./supabase.js";
 import { getUserContext } from "./session.js";
-import { getPermisosEfectivos, permisosCacheSet } from "./permisos.core.js";
+import { esSuperAdmin, getPermisosEfectivos, permisosCacheSet } from "./permisos.core.js";
 
 const LOGIN_URL = "/Plataforma_Restaurantes/index.html";
 const SELECTOR_URL = "/Plataforma_Restaurantes/entorno/";
@@ -25,10 +25,12 @@ const enforceSessionAndEnvironment = (session) => {
     return false;
   }
 
+  const currentPath = String(window.location.pathname || "");
   const isSelectorPage = window.location.pathname.includes("/entorno/");
+  const isGlobalNoTenantPage = currentPath.includes("/gestion_empresas/") || currentPath.includes("/facturacion/");
   const entornoActivo = localStorage.getItem("app_entorno_activo");
 
-  if (!isSelectorPage && !entornoActivo) {
+  if (!isSelectorPage && !isGlobalNoTenantPage && !entornoActivo) {
     window.location.replace(SELECTOR_URL);
     return false;
   }
@@ -40,8 +42,14 @@ const hydratePermisosCache = async () => {
   if (permisosHydrated) return;
 
   const context = await getUserContext();
+  const isSuper = await esSuperAdmin().catch(() => false);
   const userId = context?.user?.id || context?.user?.user_id;
   const empresaId = context?.empresa_id;
+  if (isSuper && !empresaId) {
+    permisosCacheSet([]);
+    permisosHydrated = true;
+    return;
+  }
   if (!userId || !empresaId) return;
 
   const permisos = await getPermisosEfectivos(userId, empresaId);
