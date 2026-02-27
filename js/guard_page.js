@@ -1,6 +1,6 @@
 ﻿import { getUserContext } from "./session.js";
 import { PAGE_ENVIRONMENT } from "./permissions.js";
-import { esSuperAdmin, permisosCacheGet, tienePermiso } from "./permisos.core.js";
+import { esSuperAdmin, getPermisosEfectivos, permisosCacheGet, permisosCacheSet, tienePermiso } from "./permisos.core.js";
 
 const LOGIN_URL = "/Plataforma_Restaurantes/index.html";
 const SELECTOR_URL = "/Plataforma_Restaurantes/entorno/";
@@ -61,9 +61,22 @@ const safeRedirect = (targetUrl) => {
   window.location.href = targetUrl;
 };
 
+async function ensurePermisos(context, override) {
+  if (override) return override;
+  const cached = permisosCacheGet();
+  if (cached) return cached;
+  if (!context?.empresa_id || !context?.user) return null;
+  const userId = context.user.id || context.user.user_id;
+  if (!userId) return null;
+  const permisos = await getPermisosEfectivos(userId, context.empresa_id).catch(() => null);
+  permisosCacheSet(permisos);
+  return permisos;
+}
+
 export async function guardPage(pageKey, permisosOverride = null) {
   const context = await getUserContext();
   const isSuper = await esSuperAdmin().catch(() => false);
+  const userId = context?.user?.id || context?.user?.user_id;
 
   if (!context && !isSuper) {
     safeRedirect(LOGIN_URL);
@@ -96,7 +109,7 @@ export async function guardPage(pageKey, permisosOverride = null) {
     return;
   }
 
-  const permisos = permisosOverride || permisosCacheGet();
+  const permisos = await ensurePermisos(context, permisosOverride);
   if (!context?.empresa_id || !permisos) {
     safeRedirect(getForbiddenRedirect(context, permisos, isSuper));
     return;
