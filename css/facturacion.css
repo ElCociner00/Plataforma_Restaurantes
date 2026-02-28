@@ -1,62 +1,98 @@
+﻿
 .facturacion-main {
-  max-width: 920px;
+  max-width: 1024px;
   margin: 0 auto;
 }
 
 .factura-shell {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  background: #eef2f7;
+  border: 1px solid #dbe2ea;
+  border-radius: 10px;
   padding: 18px;
 }
 
-.factura-container {
+.factura-oficio {
+  max-width: 860px;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 22px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
   display: grid;
-  gap: 14px;
+  gap: 18px;
 }
 
-.factura-header h2 {
-  margin: 0;
+.factura-top {
+  text-align: center;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 10px;
 }
 
-.factura-meta {
-  font-size: 14px;
-  color: #4b5563;
+.factura-top h2 { margin: 0; }
+.factura-top p { margin: 6px 0 0; color: #475569; }
+.factura-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
 }
 
-.factura-items {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.factura-items th,
-.factura-items td {
-  border: 1px solid #e5e7eb;
-  padding: 10px;
+.factura-grid p {
+  margin: 6px 0;
   text-align: left;
+  color: #1f2937;
 }
 
-.factura-total td {
+.factura-lineas {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.factura-lineas .linea {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.factura-lineas .linea.total {
+  background: #f8fafc;
   font-weight: 700;
 }
+.factura-pago {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 16px;
+  align-items: start;
+}
 
-.factura-info-pago {
-  background: #f8fafc;
-  border: 1px solid #e5e7eb;
+.factura-qr {
+  width: 180px;
+  height: 180px;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
-  padding: 12px;
+  background: #fff;
 }
 
-.factura-info-pago input[type="file"] {
-  margin: 10px 0;
-  display: block;
+.factura-actions {
+  display: grid;
+  gap: 10px;
 }
 
-.factura-info-pago button {
-  padding: 8px 12px;
-}
+.file-label { font-weight: 600; }
+#comprobantePago { width: 100%; }
+.factura-actions button { width: fit-content; min-width: 140px; }
+.factura-status { margin: 0; color: #334155; }
 
-.nequi {
-  font-size: 18px;
-  margin: 8px 0;
+@media (max-width: 900px) {
+  .factura-grid,
+  .factura-pago {
+    grid-template-columns: 1fr;
+  }
+
+  .factura-qr {
+    width: 160px;
+    height: 160px;
+  }
 }

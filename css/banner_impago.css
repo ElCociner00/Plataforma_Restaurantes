@@ -1,0 +1,44 @@
+﻿.impago-banner {
+  position: fixed;
+  top: 96px;
+  right: 16px;
+  width: 280px;
+  z-index: 900;
+}
+
+.impago-banner-card {
+  border: 1px solid #ef4444;
+  background: #fff7ed;
+  color: #7f1d1d;
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+}
+
+.impago-banner-card h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+.impago-banner-card p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  text-align: left;
+}
+
+body.has-impago-banner .main {
+  margin-right: min(320px, 28vw);
+}
+
+@media (max-width: 1120px) {
+  .impago-banner {
+    position: static;
+    width: auto;
+    margin: 0 16px 12px;
+  }
+
+  body.has-impago-banner .main {
+    margin-right: auto;
+  }
+}

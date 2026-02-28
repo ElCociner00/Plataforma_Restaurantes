@@ -1,99 +1,171 @@
-﻿import { getSessionConEmpresa } from "./session.js";
-import { WEBHOOKS } from "./webhooks.js";
-import { resolveEmpresaPlan } from "./plan.js";
+﻿
+import { supabase } from "./supabase.js";
+import { getSessionConEmpresa, getUserContext } from "./session.js";
 
 const rootEl = document.getElementById("factura-contenido");
+let currentFactura = null;
+
+const fmtMoney = (v) => Number(v || 0).toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+const fmtDate = (v) => (v ? new Date(v).toLocaleDateString("es-CO") : "-");
+
+function buildQrUrl(payload) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(payload)}`;
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const raw = String(reader.result || "");
+      resolve(raw.includes(",") ? raw.split(",")[1] : raw);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function loadFactura(empresaId) {
+  const { data, error } = await supabase
+    .from("facturacion")
+    .select("*")
+    .eq("empresa_id", empresaId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+function render(empresa, factura) {
+  const nombreEmpresa = empresa?.nombre_comercial || empresa?.razon_social || "Empresa";
+  const prefijo = factura?.prefijo_factura || "AX";
+  const consecutivo = Number(factura?.consecutivo_actual || 1);
+  const plan = String(factura?.plan || "free").toUpperCase();
+  const servicio = Number(factura?.valor_plan || 0);
+  const deuda = Number(factura?.deuda || 0);
+  const iva = 0;
+  const total = servicio + iva;
+
+  const qrPayload = `EMPRESA:${nombreEmpresa}|PLAN:${plan}|TOTAL:${total}|FACTURA:${prefijo}-${consecutivo}`;
+
+  rootEl.innerHTML = `
+    <article class="factura-oficio">
+      <header class="factura-top">
+        <h2>Axioma _by global nexo shop sas_</h2>
+        <p>Factura de servicio</p>
+      </header>
+
+      <section class="factura-grid">
+        <div>
+          <p><strong>Hola, ${nombreEmpresa}</strong></p>
+          <p>Barranquilla, Atlantico, Colombia</p>
+          <p>Fecha expedicion: ${fmtDate(new Date())}</p>
+          <p>Factura: ${prefijo}-${consecutivo}</p>
+        </div>
+        <div>
+          <p><strong>Plan:</strong> ${plan}</p>
+          <p><strong>Valor plan:</strong> ${fmtMoney(servicio)}</p>
+          <p><strong>Deuda actual:</strong> ${fmtMoney(deuda)}</p>
+          <p><strong>Fecha corte:</strong> ${fmtDate(factura?.fecha_corte)}</p>
+          <p><strong>Fecha suspension:</strong> ${fmtDate(factura?.fecha_suspension)}</p>
+        </div>
+      </section>
+
+      <section class="factura-lineas">
+        <div class="linea"><span>Servicio</span><strong>${fmtMoney(servicio)}</strong></div>
+        <div class="linea"><span>IVA 0%</span><strong>${fmtMoney(iva)}</strong></div>
+        <div class="linea total"><span>Total</span><strong>${fmtMoney(total)}</strong></div>
+      </section>
+
+      <section class="factura-pago">
+        <img class="factura-qr" src="${buildQrUrl(qrPayload)}" alt="QR de pago">
+        <div class="factura-actions">
+          <label class="file-label" for="comprobantePago">Adjuntar comprobante aqui</label>
+          <input id="comprobantePago" type="file" accept="image/png,image/jpeg,application/pdf">
+          <button id="btnEnviarPago" type="button" disabled>Enviar</button>
+          <p id="facturaStatus" class="factura-status"></p>
+        </div>
+      </section>
+    </article>
+  `;
+}
+
+async function enviarPagoRevision(file) {
+  const session = await getSessionConEmpresa();
+  const context = await getUserContext();
+  const empresa = session?.empresa;
+  if (!empresa) throw new Error("No se encontro empresa activa");
+  if (!currentFactura) throw new Error("No hay factura configurada");
+
+  const base64 = await fileToBase64(file);
+  const prefijo = currentFactura.prefijo_factura || "AX";
+  const consecutivo = Number(currentFactura.consecutivo_actual || 1);
+  const monto = Number(currentFactura.valor_plan || 0);
+
+  const payload = {
+    empresa_id: empresa.id,
+    facturacion_id: currentFactura.id,
+    prefijo,
+    consecutivo,
+    monto,
+    fecha_pago: new Date().toISOString(),
+    comprobante_nombre: file.name,
+    comprobante_mime: file.type || "application/octet-stream",
+    comprobante_base64: base64,
+    estado: "pendiente",
+    revisado_por: null
+  };
+
+  const { error } = await supabase.from("pagos_en_revision").insert(payload);
+  if (error) throw error;
+
+  await supabase
+    .from("facturacion")
+    .update({ consecutivo_actual: consecutivo + 1 })
+    .eq("id", currentFactura.id);
+
+  return context;
+}
+
+function bindFacturaEvents() {
+  const fileInput = document.getElementById("comprobantePago");
+  const btnEnviar = document.getElementById("btnEnviarPago");
+  const status = document.getElementById("facturaStatus");
+
+  fileInput?.addEventListener("change", () => {
+    btnEnviar.disabled = !(fileInput.files && fileInput.files[0]);
+  });
+
+  btnEnviar?.addEventListener("click", async () => {
+    const file = fileInput?.files?.[0];
+    if (!file) return;
+
+    status.textContent = "Enviando comprobante...";
+    try {
+      await enviarPagoRevision(file);
+      status.textContent = "Comprobante enviado. Queda en revision.";
+      btnEnviar.disabled = true;
+      fileInput.value = "";
+    } catch (_e) {
+      status.textContent = "No se pudo enviar el comprobante.";
+    }
+  });
+}
 
 export async function cargarFactura() {
+  if (!rootEl) return;
   const session = await getSessionConEmpresa();
   const empresa = session?.empresa;
-  if (!rootEl) return;
+
   if (!empresa) {
     rootEl.innerHTML = "<p>No se pudo cargar la empresa actual.</p>";
     return;
   }
 
-  const planActual = resolveEmpresaPlan(empresa);
-  const planInfo = {
-    free: { precio: 0, descripcion: "Plan Free" },
-    pro: { precio: 150000, descripcion: "Plan Profesional" }
-  }[planActual] || { precio: 0, descripcion: "Plan Free" };
-
-  const subtotal = Number(planInfo.precio || 0);
-  const iva = 0;
-  const total = subtotal + iva;
-  const periodo = new Date().toLocaleDateString("es-CO", { month: "long", year: "numeric" });
-
-  rootEl.innerHTML = `
-    <div class="factura-container">
-      <div class="factura-header">
-        <h2>FACTURA ELECTRONICA</h2>
-        <div class="factura-meta">Formato aproximado UBL 2.1 (IVA 0%)</div>
-        <p>NIT: ${empresa?.nit || "N/A"}</p>
-      </div>
-      <div class="factura-cuerpo">
-        <table class="factura-items">
-          <tr>
-            <th>Concepto</th>
-            <th>Valor</th>
-          </tr>
-          <tr>
-            <td>${planInfo.descripcion} - ${periodo}</td>
-            <td>$${subtotal.toLocaleString("es-CO")}</td>
-          </tr>
-          <tr>
-            <td>IVA (0%)</td>
-            <td>$${iva.toLocaleString("es-CO")}</td>
-          </tr>
-          <tr class="factura-total">
-            <td>Total a pagar:</td>
-            <td>$${total.toLocaleString("es-CO")}</td>
-          </tr>
-        </table>
-        <div class="factura-info-pago">
-          <p>Para pagar tu factura, transfiere el dinero a:</p>
-          <p class="nequi"><strong>Nequi: 3044394874</strong></p>
-          <div class="adjuntar-comprobante">
-            <h4>Adjuntar comprobante de pago</h4>
-            <input type="file" id="comprobante-pago" accept="image/*,.pdf">
-            <button id="btnEnviarComprobante" type="button">Enviar comprobante</button>
-          </div>
-          <p class="factura-nota">Tu pago sera revisado y procesado. Se notificara por correo cuando se confirme.</p>
-        </div>
-      </div>
-    </div>
-  `;
-
-  const btn = document.getElementById("btnEnviarComprobante");
-  if (btn) {
-    btn.addEventListener("click", () => subirComprobante(empresa?.id));
-  }
-}
-
-async function subirComprobante(empresaId) {
-  const fileInput = document.getElementById("comprobante-pago");
-  const file = fileInput?.files?.[0];
-  if (!file) {
-    alert("Por favor selecciona un archivo");
-    return;
-  }
-
-  const formData = new FormData();
-  formData.append("comprobante", file);
-  formData.append("empresa_id", empresaId || "");
-  formData.append("fecha", new Date().toISOString());
-
   try {
-    const response = await fetch(WEBHOOKS.COMPROBANTE_PAGO.url, {
-      method: WEBHOOKS.COMPROBANTE_PAGO.metodo || "POST",
-      body: formData
-    });
-
-    if (!response.ok) throw new Error("Webhook error");
-    alert("Comprobante enviado correctamente. Sera revisado a la brevedad.");
-    fileInput.value = "";
-  } catch (_error) {
-    alert("Error al enviar comprobante. Intenta nuevamente.");
+    currentFactura = await loadFactura(empresa.id);
+    render(empresa, currentFactura || {});
+    bindFacturaEvents();
+  } catch (_e) {
+    rootEl.innerHTML = "<p>Error cargando facturacion.</p>";
   }
 }
 

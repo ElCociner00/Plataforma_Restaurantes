@@ -1,0 +1,33 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AXIOMA | Revision de Pagos</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/revision_pagos.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../js/auth_guard.js"></script>
+  <script type="module">
+    import { guardPage } from "../js/guard_page.js";
+    guardPage("gestion_empresas");
+  </script>
+  <script type="module" src="../js/header.js"></script>
+  <script type="module" src="../js/revision_pagos.js"></script>
+
+  <main class="main revision-main">
+    <h1>Pagos en revision</h1>
+    <p class="helper-text">Modulo exclusivo super admin para aprobar o rechazar comprobantes.</p>
+    <div class="toolbar"><button id="btnRecargarRevision" type="button">Recargar</button><span id="statusRevision"></span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Empresa</th><th>Factura</th><th>Monto</th><th>Fecha pago</th><th>Adjunto</th><th>Acciones</th></tr></thead>
+        <tbody id="revisionBody"><tr><td colspan="6">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module" src="../js/footer.js"></script>
+</body>
+</html>

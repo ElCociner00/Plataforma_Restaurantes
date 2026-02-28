@@ -1,4 +1,4 @@
-﻿import { supabase } from "./supabase.js";
+import { supabase } from "./supabase.js";
 import { getSessionConEmpresa, getUserContext } from "./session.js";
 import { verificarYMostrarAnuncio } from "./anuncio_impago.js";
 import { ENV_LOGGRO, ENV_SIIGO, getActiveEnvironment, setActiveEnvironment } from "./environment.js";
@@ -34,20 +34,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     menu += `
       <div class="nav-dropdown">
-        <button type="button" class="nav-dropdown-toggle">Cierre de Turno â–¾</button>
+        <button type="button" class="nav-dropdown-toggle">Cierre de Turno v</button>
         <div class="nav-dropdown-menu">
           <a href="/Plataforma_Restaurantes/cierre_turno/">Cierre de Turno</a>
-          <a href="/Plataforma_Restaurantes/cierre_turno/historico_cierre_turno.html">HistÃ³rico cierres de turno</a>
+          <a href="/Plataforma_Restaurantes/cierre_turno/historico_cierre_turno.html">Historico cierres de turno</a>
         </div>
       </div>
     `;
 
     menu += `
       <div class="nav-dropdown">
-        <button type="button" class="nav-dropdown-toggle">Cierre Inventarios â–¾</button>
+        <button type="button" class="nav-dropdown-toggle">Cierre Inventarios v</button>
         <div class="nav-dropdown-menu">
           <a href="/Plataforma_Restaurantes/cierre_inventarios/">Cierre inventarios</a>
-          <a href="/Plataforma_Restaurantes/cierre_inventarios/historico_cierre_inventarios.html">HistÃ³rico cierre inventarios</a>
+          <a href="/Plataforma_Restaurantes/cierre_inventarios/historico_cierre_inventarios.html">Historico cierre inventarios</a>
         </div>
       </div>
     `;
@@ -70,12 +70,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   menu += `
     <div class="nav-dropdown user-dropdown">
-      <button type="button" class="nav-dropdown-toggle user-menu-toggle" aria-label="MenÃº de usuario">
+      <button type="button" class="nav-dropdown-toggle user-menu-toggle" aria-label="Menu de usuario">
         <span class="user-avatar">${avatarLabel}</span>
         <span class="user-name">${userName}</span>
       </button>
       <div class="nav-dropdown-menu user-dropdown-menu">
-        ${context.rol === "admin_root" || context.rol === "admin" ? `<a href="${configLink}">ConfiguraciÃ³n</a>` : ""}
+        ${context.rol === "admin_root" || context.rol === "admin" ? `<a href="${configLink}">Configuracion</a>` : ""}
         <div class="menu-group-title">Cambiar de entorno</div>
         ${environmentOptions}
         <a href="#" id="logoutBtnMenu">Salir</a>

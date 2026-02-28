@@ -1,5 +1,5 @@
 import { getUserContext } from "./session.js";
-import { WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS } from "./webhooks.js";
+import { supabase } from "./supabase.js";
 
 const head = document.getElementById("historicoHead");
 const body = document.getElementById("historicoBody");
@@ -27,7 +27,7 @@ const btnDescargarDatos = document.getElementById("descargarDatos");
 
 const PAGE_SIZE = 20;
 const MAX_LOADING_MS = 5000;
-const EXCLUDED_GENERAL_FIELDS = new Set(["registrado_por", "total_variables", "diferencia_caja", "variables_detalle"]);
+const EXCLUDED_GENERAL_FIELDS = new Set(["empresa_id", "registrado_por", "total_variables", "diferencia_caja", "variables_detalle"]);
 const EXCLUDED_DETAIL_FIELDS = new Set(["id"]);
 const getTimestamp = () => new Date().toISOString();
 
@@ -64,22 +64,12 @@ const setLoading = (isLoading, message = "") => {
   if (isLoading) {
     loadingSafetyTimeoutId = setTimeout(() => {
       loadingOverlay?.classList.add("is-hidden");
-      setStatus("Carga finalizada por límite de 5 segundos.");
+      setStatus("Carga finalizada por limite de 5 segundos.");
       loadingSafetyTimeoutId = null;
     }, MAX_LOADING_MS);
   }
 
   if (message) setStatus(message);
-};
-
-const fetchWithTimeout = async (url, options = {}, timeoutMs = MAX_LOADING_MS) => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timeoutId);
-  }
 };
 
 const getGeneralVisibilityKey = (tenantId) => `historico_cierre_turno_visibilidad_${tenantId || "global"}`;
@@ -136,7 +126,7 @@ const toReadableLabel = (value) => String(value || "")
 
 const normalizeSearchText = (value) => String(value || "")
   .normalize("NFD")
-  .replace(/[̀-ͯ]/g, "")
+  .replace(/[Ì€-Í¯]/g, "")
   .toLowerCase()
   .trim();
 
@@ -290,11 +280,11 @@ const renderDetailSection = () => {
 
   const detailRows = getDetailRowsFor(selected);
 
-  const detailHead = ["↕", ...state.visibleDetailColumns].map((col) => `<th>${toReadableLabel(col)}</th>`).join("");
+  const detailHead = ["#", ...state.visibleDetailColumns].map((col) => `<th>${toReadableLabel(col)}</th>`).join("");
   const detailBody = detailRows.map((detail) => {
     const detailKey = getDetailItemKey(detail);
     const cells = state.visibleDetailColumns.map((col) => `<td>${formatCellValue(detail[col])}</td>`).join("");
-    return `<tr draggable="true" data-detail-key="${detailKey}"><td class="drag-col">⋮⋮</td>${cells}</tr>`;
+    return `<tr draggable="true" data-detail-key="${detailKey}"><td class="drag-col">::</td>${cells}</tr>`;
   }).join("");
 
   detalleTurno.innerHTML = `
@@ -352,7 +342,7 @@ const moveColumn = (source, target) => {
 const renderHead = () => {
   head.innerHTML = "";
   const tr = document.createElement("tr");
-  tr.innerHTML = "<th>#</th><th>✔</th>";
+  tr.innerHTML = "<th>#</th><th>OK</th>";
 
   state.visibleGeneralColumns.forEach((column) => {
     const th = document.createElement("th");
@@ -428,7 +418,7 @@ const renderPagination = () => {
     paginacion.appendChild(button);
   };
 
-  addButton("← Anterior", () => {
+  addButton("Anterior", () => {
     state.currentPage -= 1;
     renderTable();
   }, state.currentPage <= 1);
@@ -440,7 +430,7 @@ const renderPagination = () => {
     }, false, page === state.currentPage);
   }
 
-  addButton("Siguiente →", () => {
+  addButton("Siguiente", () => {
     state.currentPage += 1;
     renderTable();
   }, state.currentPage >= totalPages);
@@ -490,7 +480,7 @@ const renderTable = () => {
   renderPagination();
   renderColumnControls();
   renderDetailSection();
-  setStatus(`Mostrando ${state.filteredRows.length} turno(s). Página ${state.currentPage}.`);
+  setStatus(`Mostrando ${state.filteredRows.length} turno(s). Pagina ${state.currentPage}.`);
 };
 
 const renderSimilarMatches = (rows, query, label) => {
@@ -503,7 +493,7 @@ const renderSimilarMatches = (rows, query, label) => {
   const items = rows.slice(0, 5).map((row) => {
     const nombre = formatCellValue(row.general.turno_nombre || row.general.nombre_turno || row.id);
     const numero = formatCellValue(row.general.numero_turno || "-");
-    return `<li><strong>${nombre}</strong> · Turno ${numero}</li>`;
+    return `<li><strong>${nombre}</strong> - Turno ${numero}</li>`;
   }).join("");
 
   coincidenciasSimilares.innerHTML = `
@@ -736,9 +726,9 @@ const downloadCsv = (rows, fileName) => {
 
 const loadInitialData = async () => {
   state.context = await getUserContext();
-  if (!state.context) return setStatus("No se pudo validar la sesión.");
+  if (!state.context) return setStatus("No se pudo validar la sesion.");
 
-  setLoading(true, "Cargando histórico...");
+  setLoading(true, "Cargando historico...");
   try {
     const payload = {
       tenant_id: state.context.empresa_id,
@@ -753,12 +743,14 @@ const loadInitialData = async () => {
     const detailItemSettings = loadJson(getDetailItemVisibilityKey(payload.tenant_id), {});
     const orderSettings = loadJson(getGeneralOrderKey(payload.tenant_id), []);
 
-    const rowsRes = await fetchWithTimeout(WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    const rowsData = await rowsRes.json();
+    const { data: rowsData, error: rowsError } = await supabase
+      .from("turnos_agrupados")
+      .select("*")
+      .eq("empresa_id", state.context.empresa_id)
+      .order("fecha_turno", { ascending: false })
+      .order("numero_turno", { ascending: false });
+
+    if (rowsError) throw rowsError;
 
     state.allRows = normalizeRows(rowsData).map(sanitizeRow);
     state.filteredRows = [...state.allRows];
@@ -787,9 +779,9 @@ const loadInitialData = async () => {
     state.currentPage = 1;
 
     renderTable();
-    setStatus(state.allRows.length ? "Histórico cargado." : "No se recibieron cierres.");
+    setStatus(state.allRows.length ? "Historico cargado." : "No se recibieron cierres.");
   } catch (error) {
-    setStatus(error?.name === "AbortError" ? "La carga tardó más de 5 segundos." : "Error cargando histórico.");
+    setStatus(error?.name === "AbortError" ? "La carga tardo mas de 5 segundos." : "Error cargando historico.");
   } finally {
     setLoading(false);
   }
@@ -823,7 +815,7 @@ btnDescargarDatos.addEventListener("click", () => {
   if (value === "turnos_pagina") return downloadExcel(getPaginatedRows(), `turnos_pagina_${state.currentPage}.xls`);
   if (value === "turnos_filtrados_csv") return downloadCsv(state.filteredRows, "turnos_filtrados.csv");
 
-  return setStatus("Selecciona un tipo de descarga válido.");
+  return setStatus("Selecciona un tipo de descarga valido.");
 });
 
 loadInitialData();

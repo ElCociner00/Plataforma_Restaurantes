@@ -1,11 +1,11 @@
-import { buildRequestHeaders, getCurrentEmpresaId, getUserContext } from "./session.js";
+﻿import { buildRequestHeaders, getCurrentEmpresaId, getUserContext } from "./session.js";
 import { WEBHOOKS } from "./webhooks.js";
 import { permisosCacheSet } from "./permisos.core.js";
 import { DEFAULT_ROLE_PERMISSIONS, PAGE_ENVIRONMENT } from "./permissions.js";
 import { supabase } from "./supabase.js";
 
 // ===============================
-// CONFIGURACIÃƒâ€œN
+// CONFIGURACION
 // ===============================
 const DEFAULT_PAGES = [
   "dashboard",
@@ -73,7 +73,7 @@ const renderSummary = () => {
       <strong>${state.empleados.length}</strong>
     </div>
     <div class="resumen-item">
-      <span class="resumen-label">MÃƒÂ³dulos configurables</span>
+      <span class="resumen-label">Modulos configurables</span>
       <strong>${state.pages.length}</strong>
     </div>
     <div class="resumen-item">
@@ -95,7 +95,7 @@ const renderTable = () => {
     const switches = state.pages.map((page) => {
       const isBlocked = isBlockedPermission(empleado, page);
       return `
-        <label class="permiso-switch" title="${isBlocked ? "Bloqueado (NO)" : "Permitido (SÃƒÂ)"}">
+        <label class="permiso-switch" title="${isBlocked ? "Bloqueado (NO)" : "Permitido (SI)"}">
           <input
             type="checkbox"
             data-empleado-id="${empleado.id}"
@@ -103,7 +103,7 @@ const renderTable = () => {
             ${isBlocked ? "checked" : ""}
           >
           <span aria-hidden="true" class="switch-slider"></span>
-          <span class="switch-state">${isBlocked ? "NO" : "SÃƒÂ"}</span>
+          <span class="switch-state">${isBlocked ? "NO" : "SI"}</span>
           <span class="sr-only">${isBlocked ? "Bloqueado" : "Permitido"}</span>
         </label>
       `;
@@ -184,7 +184,7 @@ const handleToggle = async (event) => {
 
   const switchState = target.parentElement.querySelector(".switch-state");
   if (switchState) {
-    switchState.textContent = value ? "SÃƒÂ" : "NO";
+    switchState.textContent = value ? "SI" : "NO";
   }
 
   try {
@@ -194,7 +194,7 @@ const handleToggle = async (event) => {
     empleado.permisos[page] = !value;
     target.checked = value;
     if (switchState) {
-      switchState.textContent = !value ? "SÃƒÂ" : "NO";
+      switchState.textContent = !value ? "SI" : "NO";
     }
   }
 
@@ -240,7 +240,7 @@ const handleBulkAction = async (event) => {
     for (const update of updates) {
       await persistPermissionChange(update);
     }
-    setStatus(`AcciÃƒÂ³n masiva aplicada para rol ${role}.`);
+    setStatus(`Accion masiva aplicada para rol ${role}.`);
   } catch (error) {
     setStatus("No se pudieron aplicar todos los cambios masivos.");
   }
@@ -319,7 +319,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   userContext = await getUserContext();
 
   if (!userContext) {
-    setStatus("No se pudo validar la sesiÃƒÂ³n.");
+    setStatus("No se pudo validar la sesion.");
     return;
   }
 
@@ -344,7 +344,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     attachTableHandlers();
     setStatus("Permisos cargados correctamente.");
   } catch (err) {
-    setStatus(err.message || "No se pudo cargar la informaciÃƒÂ³n.");
+    setStatus(err.message || "No se pudo cargar la informacion.");
   }
 
   bulkButtons.forEach((button) => {

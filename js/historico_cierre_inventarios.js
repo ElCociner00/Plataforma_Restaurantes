@@ -1,5 +1,5 @@
-import { getUserContext } from "./session.js";
-import { WEBHOOK_HISTORICO_CIERRE_INVENTARIOS_DATOS } from "./webhooks.js";
+﻿import { getUserContext } from "./session.js";
+import { supabase } from "./supabase.js";
 
 const head = document.getElementById("historicoHead");
 const body = document.getElementById("historicoBody");
@@ -76,11 +76,11 @@ const renderDetail = () => {
   }
 
   const productos = filteredProducts(row);
-  const ths = ["↕", ...state.visibleDetailColumns].map((col) => `<th>${col}</th>`).join("");
+  const ths = ["::", ...state.visibleDetailColumns].map((col) => `<th>${col}</th>`).join("");
   const trs = productos.map((item) => {
     const key = `${item.producto_id || ""}|${item.hora_inicio || ""}|${item.hora_fin || ""}`;
     const tds = state.visibleDetailColumns.map((col) => `<td>${formatValue(item[col])}</td>`).join("");
-    return `<tr draggable="true" data-detail-key="${key}"><td class="drag-col">⋮⋮</td>${tds}</tr>`;
+    return `<tr draggable="true" data-detail-key="${key}"><td class="drag-col">::</td>${tds}</tr>`;
   }).join("");
 
   detalleInventario.innerHTML = `<div class="tabla-wrap"><table><thead><tr>${ths}</tr></thead><tbody id="detalleBodyRows">${trs || `<tr><td colspan="${state.visibleDetailColumns.length + 1}">Sin filas visibles.</td></tr>`}</tbody></table></div>`;
@@ -240,7 +240,7 @@ const getRowsByDownloadMode = () => {
 
 const loadData = async () => {
   const context = await getUserContext();
-  if (!context) return setStatus("No se pudo validar la sesión.");
+  if (!context) return setStatus("No se pudo validar la sesion.");
 
   state.context = {
     tenant_id: context.empresa_id,
@@ -250,16 +250,18 @@ const loadData = async () => {
     timestamp: getTimestamp()
   };
 
-  setStatus("Cargando histórico de inventarios...");
+  setStatus("Cargando historico de inventarios...");
 
   try {
-    const res = await fetch(WEBHOOK_HISTORICO_CIERRE_INVENTARIOS_DATOS, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(state.context)
-    });
+    const { data: rowsData, error: rowsError } = await supabase
+      .from("inventario_diario_resumen")
+      .select("*")
+      .eq("empresa_id", state.context.empresa_id)
+      .order("fecha_cierre", { ascending: false });
 
-    const rows = normalizeRows(await res.json()).map((item, idx) => ({ id: item.id || item._id || `inv-${idx}`, ...item }));
+    if (rowsError) throw rowsError;
+
+    const rows = normalizeRows(rowsData).map((item, idx) => ({ id: item.id || item._id || `inv-${idx}`, ...item }));
     state.allRows = rows;
 
     const savedGeneralOrder = loadJson(getGeneralOrderKey(state.context.tenant_id), null);
@@ -277,9 +279,9 @@ const loadData = async () => {
     state.visibleDetailColumns = ordered.filter((col) => detailColumnsVisibility[col] !== false);
 
     applyFilters();
-    setStatus(rows.length ? "Histórico cargado." : "No hay datos históricos.");
+    setStatus(rows.length ? "historico cargado." : "No hay datos historicos.");
   } catch (error) {
-    setStatus("Error cargando histórico de inventarios.");
+    setStatus("Error cargando historico de inventarios.");
   }
 };
 

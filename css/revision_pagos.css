@@ -1,0 +1,8 @@
+﻿.revision-main { max-width: 1220px; margin: 0 auto; }
+.toolbar { display: flex; justify-content: space-between; align-items: center; margin: 10px 0 14px; }
+.table-wrap { overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
+.table-wrap table { width: 100%; border-collapse: collapse; min-width: 900px; }
+.table-wrap th, .table-wrap td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: middle; }
+.table-wrap th { background: #f8fafc; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.actions button { min-width: 90px; }

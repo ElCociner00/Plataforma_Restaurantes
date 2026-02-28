@@ -8,6 +8,7 @@ import { WEBHOOKS } from "./webhooks.js";
 const bodyEl = document.getElementById("empresasBody");
 const statusEl = document.getElementById("estadoAccion");
 const btnRecargar = document.getElementById("btnRecargar");
+const btnRevisionPagos = document.getElementById("btnRevisionPagos");
 const state = {
   empresas: [],
   planes: [],
@@ -70,7 +71,7 @@ const getPlanOptions = (planActual) => {
 const renderRows = () => {
   if (!bodyEl) return;
   if (!state.empresas.length) {
-    bodyEl.innerHTML = '<tr><td colspan="9">No hay empresas registradas.</td></tr>';
+    bodyEl.innerHTML = '<tr><td colspan="11">No hay empresas registradas.</td></tr>';
     return;
   }
 
@@ -98,7 +99,7 @@ const renderRows = () => {
         <td>
           <label class="switch-cell"><input type="checkbox" data-action="toggleAnuncio" data-id="${empresa.id}" ${empresa.mostrar_anuncio_impago ? "checked" : ""}><span class="switch-slider"></span></label>
         </td>
-        <td>${fmtMoney(empresa.deuda_actual)}</td>
+        <td>${fmtMoney(empresa.deuda_actual)}</td><td>${fmtDate(empresa.fecha_corte)}</td><td>${fmtDate(empresa.fecha_suspension)}</td>
         <td>${fmtDate(empresa.created_at)}</td>
         <td><code>${empresa.id}</code></td>
       </tr>
@@ -118,7 +119,29 @@ async function loadEmpresas() {
     return;
   }
 
-  state.empresas = data || [];
+  const empresas = Array.isArray(data) ? data : [];
+  const empresaIds = empresas.map((empresa) => empresa.id).filter(Boolean);
+
+  let hydratedEmpresas = empresas;
+  if (empresaIds.length) {
+    const { data: facturacionRows } = await supabase
+      .from("facturacion")
+      .select("empresa_id, deuda, fecha_corte, fecha_suspension")
+      .in("empresa_id", empresaIds);
+
+    const facturacionMap = new Map((facturacionRows || []).map((row) => [String(row.empresa_id), row]));
+    hydratedEmpresas = empresas.map((empresa) => {
+      const billing = facturacionMap.get(String(empresa.id));
+      return {
+        ...empresa,
+        deuda_actual: billing?.deuda ?? empresa.deuda_actual ?? 0,
+        fecha_corte: billing?.fecha_corte ?? null,
+        fecha_suspension: billing?.fecha_suspension ?? null
+      };
+    });
+  }
+
+  state.empresas = hydratedEmpresas;
   renderRows();
   setStatus(`${state.empresas.length} empresa(s) cargada(s).`);
 }
@@ -180,6 +203,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadEmpresas();
 
   btnRecargar?.addEventListener("click", loadEmpresas);
+
+  btnRevisionPagos?.addEventListener("click", () => {
+    window.location.assign("/Plataforma_Restaurantes/facturacion/revision_pagos.html");
+  });
 
   bodyEl?.addEventListener("change", async (event) => {
     const el = event.target;
