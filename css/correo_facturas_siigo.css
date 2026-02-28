@@ -1,0 +1,33 @@
+﻿.main.correo-facturas-main {
+  max-width: 760px;
+}
+
+.correo-card {
+  margin-top: 16px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  display: grid;
+  gap: 12px;
+}
+
+.correo-card label {
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.correo-card input {
+  width: 100%;
+}
+
+.correo-card button {
+  width: fit-content;
+  min-width: 220px;
+}
+
+.correo-status {
+  font-size: 0.9rem;
+  color: #374151;
+}

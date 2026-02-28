@@ -1,0 +1,33 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AXIOMA | Correo para Facturas</title>
+  <link rel="stylesheet" href="../../css/main.css">
+  <link rel="stylesheet" href="../../css/correo_facturas_siigo.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../../js/auth_guard.js"></script>
+  <script type="module">
+    import { guardPage } from "../../js/guard_page.js";
+    guardPage("configuracion_siigo");
+  </script>
+  <script type="module" src="../../js/header.js"></script>
+
+  <main class="main correo-facturas-main">
+    <h1>Correo para Facturas</h1>
+    <p>Registra el correo donde tu empresa recibe las facturas.</p>
+
+    <form id="correoFacturasForm" class="correo-card">
+      <label for="correo">Correo empresarial</label>
+      <input id="correo" type="email" placeholder="facturas@empresa.com" required>
+      <button type="submit">Guardar correo</button>
+      <div id="correoStatus" class="correo-status" aria-live="polite"></div>
+    </form>
+  </main>
+
+  <script type="module" src="../../js/correo_facturas_siigo.js"></script>
+  <script type="module" src="../../js/footer.js"></script>
+</body>
+</html>

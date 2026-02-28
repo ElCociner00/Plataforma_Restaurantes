@@ -314,3 +314,16 @@ body.has-legal-footer {
 .legal-links .sep {
   color: #6b7280;
 }
+
+.app-header nav > .nav-link-btn {
+  border: 1px solid #4b5563;
+  border-radius: 6px;
+  padding: 6px 10px;
+  text-decoration: none;
+  line-height: 1.2;
+}
+
+.app-header nav > .nav-link-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  text-decoration: none;
+}

@@ -1,7 +1,8 @@
-import { supabase } from "./supabase.js";
+﻿import { supabase } from "./supabase.js";
 import { getSessionConEmpresa, getUserContext } from "./session.js";
 import { verificarYMostrarAnuncio } from "./anuncio_impago.js";
 import { ENV_LOGGRO, ENV_SIIGO, getActiveEnvironment, setActiveEnvironment } from "./environment.js";
+import { resolveEmpresaPlan } from "./plan.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const context = await getUserContext();
@@ -28,36 +29,36 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (environmentForMenu === ENV_LOGGRO) {
     if (context.rol !== "operativo") {
-      menu += `<a href="/Plataforma_Restaurantes/dashboard/">Dashboard</a>`;
+      menu += `<a class="nav-link-btn" href="/Plataforma_Restaurantes/dashboard/">Dashboard</a>`;
     }
 
     menu += `
       <div class="nav-dropdown">
-        <button type="button" class="nav-dropdown-toggle">Cierre de Turno ▾</button>
+        <button type="button" class="nav-dropdown-toggle">Cierre de Turno â–¾</button>
         <div class="nav-dropdown-menu">
           <a href="/Plataforma_Restaurantes/cierre_turno/">Cierre de Turno</a>
-          <a href="/Plataforma_Restaurantes/cierre_turno/historico_cierre_turno.html">Histórico cierres de turno</a>
+          <a href="/Plataforma_Restaurantes/cierre_turno/historico_cierre_turno.html">HistÃ³rico cierres de turno</a>
         </div>
       </div>
     `;
 
     menu += `
       <div class="nav-dropdown">
-        <button type="button" class="nav-dropdown-toggle">Cierre Inventarios ▾</button>
+        <button type="button" class="nav-dropdown-toggle">Cierre Inventarios â–¾</button>
         <div class="nav-dropdown-menu">
           <a href="/Plataforma_Restaurantes/cierre_inventarios/">Cierre inventarios</a>
-          <a href="/Plataforma_Restaurantes/cierre_inventarios/historico_cierre_inventarios.html">Histórico cierre inventarios</a>
+          <a href="/Plataforma_Restaurantes/cierre_inventarios/historico_cierre_inventarios.html">HistÃ³rico cierre inventarios</a>
         </div>
       </div>
     `;
   }
 
   if (environmentForMenu === ENV_SIIGO) {
-    menu += `<a href="/Plataforma_Restaurantes/siigo/dashboard_siigo/">Dashboard</a>`;
-    menu += `<a href="/Plataforma_Restaurantes/siigo/subir_facturas_siigo/">Ver o subir facturas correo</a>`;
+    menu += `<a class="nav-link-btn" href="/Plataforma_Restaurantes/siigo/dashboard_siigo/">Dashboard</a>`;
+    menu += `<a class="nav-link-btn" href="/Plataforma_Restaurantes/siigo/subir_facturas_siigo/">Ver o subir facturas correo</a>`;
   }
 
-  menu += `<a href="/Plataforma_Restaurantes/facturacion/">Facturacion</a>`;
+  menu += `<a class="nav-link-btn" href="/Plataforma_Restaurantes/facturacion/">Facturacion</a>`;
 
   const configLink = environmentForMenu === ENV_SIIGO
     ? "/Plataforma_Restaurantes/siigo/configuracion_siigo/"
@@ -69,12 +70,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   menu += `
     <div class="nav-dropdown user-dropdown">
-      <button type="button" class="nav-dropdown-toggle user-menu-toggle" aria-label="Menú de usuario">
+      <button type="button" class="nav-dropdown-toggle user-menu-toggle" aria-label="MenÃº de usuario">
         <span class="user-avatar">${avatarLabel}</span>
         <span class="user-name">${userName}</span>
       </button>
       <div class="nav-dropdown-menu user-dropdown-menu">
-        ${context.rol === "admin_root" || context.rol === "admin" ? `<a href="${configLink}">Configuración</a>` : ""}
+        ${context.rol === "admin_root" || context.rol === "admin" ? `<a href="${configLink}">ConfiguraciÃ³n</a>` : ""}
         <div class="menu-group-title">Cambiar de entorno</div>
         ${environmentOptions}
         <a href="#" id="logoutBtnMenu">Salir</a>
@@ -120,7 +121,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 function mostrarBannerPlan(empresa) {
-  const plan = String(empresa?.plan_actual || empresa?.plan || "").toLowerCase();
+  const plan = resolveEmpresaPlan(empresa);
   if (!empresa || plan !== "free") return;
   if (document.getElementById("banner-plan-free")) return;
 

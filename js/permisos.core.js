@@ -1,5 +1,6 @@
-import { supabase } from "./supabase.js";
+﻿import { supabase } from "./supabase.js";
 import { getUserContext, obtenerUsuarioActual } from "./session.js";
+import { isEmpresaReadOnlyPlan, normalizeEmpresaActiva, resolveEmpresaPlan } from "./plan.js";
 
 let permisosCache = null;
 let permisosCacheKey = null;
@@ -12,7 +13,7 @@ const SUPER_ADMIN_ID = "1e17e7c6-d959-4089-ab22-3f64b5b5be41";
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 
 const normalizePlan = (empresa) => {
-  const raw = empresa?.plan_actual ?? empresa?.plan ?? "free";
+  const raw = resolveEmpresaPlan(empresa);
   return String(raw).trim().toLowerCase() || "free";
 };
 
@@ -49,7 +50,7 @@ export async function getEmpresaPolicy(empresaId, forceRefresh = false) {
     empresa_id: empresaId,
     plan: normalizePlan(data),
     activa: normalizeActiva(data),
-    solo_lectura: normalizePlan(data) === "free"
+    solo_lectura: isEmpresaReadOnlyPlan(data)
   };
 
   empresaPolicyCache.set(empresaId, policy);
@@ -153,3 +154,4 @@ export async function esSuperAdmin() {
   superAdminCache.set(cacheKey, false);
   return false;
 }
+

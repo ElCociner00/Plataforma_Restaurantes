@@ -1,5 +1,6 @@
-import { getSessionConEmpresa } from "./session.js";
+﻿import { getSessionConEmpresa } from "./session.js";
 import { WEBHOOKS } from "./webhooks.js";
+import { resolveEmpresaPlan } from "./plan.js";
 
 const rootEl = document.getElementById("factura-contenido");
 
@@ -12,7 +13,7 @@ export async function cargarFactura() {
     return;
   }
 
-  const planActual = String(empresa?.plan_actual || empresa?.plan || "free").toLowerCase();
+  const planActual = resolveEmpresaPlan(empresa);
   const planInfo = {
     free: { precio: 0, descripcion: "Plan Free" },
     pro: { precio: 150000, descripcion: "Plan Profesional" }
