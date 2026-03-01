@@ -5,14 +5,13 @@ import { WEBHOOKS } from "./webhooks.js";
 
 const rootEl = document.getElementById("factura-contenido");
 let currentFactura = null;
+let currentMetodoPago = null;
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
 const fmtDate = (v) => (v ? new Date(v).toLocaleDateString("es-CO") : "-");
 
 function buildQrUrl(payload) {
   return `${WEBHOOKS?.QR_GENERATOR?.url || "https://api.qrserver.com/v1/create-qr-code/"}?size=180x180&data=${encodeURIComponent(payload)}`;
-}
-  return `${base}?size=180x180&data=${encodeURIComponent(payload)}`;
 }
 
 function fileToBase64(file) {
@@ -47,7 +46,7 @@ function render(empresa, factura) {
   const iva = 0;
   const total = servicio + iva;
 
-  const qrPayload = `EMPRESA:${nombreEmpresa}|PLAN:${plan}|TOTAL:${total}|FACTURA:${prefijo}-${consecutivo}`;
+  const qrPayload = (currentMetodoPago?.qr_data || `EMPRESA:${nombreEmpresa}|PLAN:${plan}|TOTAL:${total}|FACTURA:${prefijo}-${consecutivo}`); const qrImage = currentMetodoPago?.qr_image_url || buildQrUrl(qrPayload);
 
   rootEl.innerHTML = `
     <article class="factura-oficio">
@@ -79,9 +78,9 @@ function render(empresa, factura) {
       </section>
 
       <section class="factura-pago">
-        <img class="factura-qr" src="${buildQrUrl(qrPayload)}" alt="QR de pago">
+        <img class="factura-qr" src="${qrImage}" alt="QR de pago">
         <div class="factura-actions">
-          <label class="file-label" for="comprobantePago">Adjuntar comprobante aqui</label>
+          <p><strong>Metodo:</strong> ${currentMetodoPago?.nombre || "Nequi"}</p><p>${currentMetodoPago?.instrucciones || "Escanea el QR, paga el monto exacto y adjunta el comprobante."}</p><p>Tu pago sera verificado en un plazo de 1 a 12 horas. Si el valor no es exacto, el pago sera rechazado.</p><label class="file-label" for="comprobantePago">Adjuntar comprobante aqui</label>
           <input id="comprobantePago" type="file" accept="image/png,image/jpeg,application/pdf">
           <button id="btnEnviarPago" type="button" disabled>Enviar</button>
           <p id="facturaStatus" class="factura-status"></p>
@@ -165,11 +164,11 @@ export async function cargarFactura() {
 
   try {
     currentFactura = await loadFactura(empresa.id);
+    const { data: metodosRows } = await supabase.from("metodos_pago").select("empresa_id,nombre,qr_data,qr_image_url,instrucciones,activo,orden").eq("activo", true).order("orden", { ascending: true });
+    currentMetodoPago = (metodosRows || []).find((item) => String(item.empresa_id || "") === String(empresa.id)) || (metodosRows || []).find((item) => !item.empresa_id) || null;
     render(empresa, currentFactura || {});
     bindFacturaEvents();
   } catch (_e) {
     rootEl.innerHTML = "<p>Error cargando facturacion.</p>";
   }
 }
-
-document.addEventListener("DOMContentLoaded", cargarFactura);

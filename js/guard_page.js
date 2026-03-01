@@ -32,7 +32,7 @@ const getForbiddenRedirect = (context, permisos = null, isSuper = false) => {
 
   const env = localStorage.getItem("app_entorno_activo") || "loggro";
   if (env === "siigo") {
-    return "/Plataforma_Restaurantes/siigo/subir_facturas_siigo/";
+    return "/Plataforma_Restaurantes/siigo/dashboard_siigo/";
   }
 
   if (String(context?.rol || "").toLowerCase() === "operativo") {

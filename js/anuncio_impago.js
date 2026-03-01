@@ -30,19 +30,19 @@ async function getDeudaEmpresa(empresaId) {
 
 function getMessageByDeuda(deuda) {
   if (Number(deuda || 0) > 0) {
-    return "Para seguir disfrutando de todas nuestras funciones debes pagar tu plan. Mientras tanto podras seguir viendo tu informacion.";
+    return "Tienes una factura pendiente. Realiza el pago antes del dia 25 para conservar tu plan Pro. El corte es el dia 15 de cada mes. Validamos pagos entre 1 y 12 horas y solo se aprueban montos exactos.";
   }
   return "Mejora tu negocio y evita perder dinero. Adquiere con nosotros un plan para desbloquear funciones avanzadas.";
 }
 
 async function buildBannerNode(message) {
-  const url = new URL(BANNER_HTML_PATH, import.meta.url);
-  const res = await fetch(url);
-  const html = await res.text();
-  const wrapper = document.createElement("div");
-  wrapper.innerHTML = html.trim();
-  const node = wrapper.firstElementChild;
-  const msgEl = node?.querySelector("#impagoBannerMessage");
+  const node = document.createElement("aside");
+  node.id = "anuncio-impago";
+  node.className = "impago-banner";
+  node.setAttribute("role", "note");
+  node.setAttribute("aria-live", "polite");
+  node.innerHTML = `<div class="impago-banner-card"><h3>Aviso de facturacion</h3><p id="impagoBannerMessage"></p></div>`;
+  const msgEl = node.querySelector("#impagoBannerMessage");
   if (msgEl) msgEl.textContent = message;
   return node;
 }
