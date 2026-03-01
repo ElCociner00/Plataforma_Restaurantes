@@ -1,5 +1,6 @@
-import { enforceNumericInput } from "../js/input_utils.js";
+﻿import { enforceNumericInput } from "../js/input_utils.js";
 import { getUserContext } from "../js/session.js";
+import { supabase } from "../js/supabase.js";
 import { getEmpresaPolicy, puedeEnviarDatos } from "../js/permisos.core.js";
 import {
   WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS,
@@ -40,7 +41,7 @@ const setLoading = (isLoading, message = "") => {
     if (isLoading) {
       loadingSafetyTimeoutId = setTimeout(() => {
         loadingOverlay.classList.add("is-hidden");
-        setStatus("Carga finalizada por límite de 5 segundos.");
+        setStatus("Carga finalizada por lÃ­mite de 5 segundos.");
         loadingSafetyTimeoutId = null;
       }, MAX_LOADING_MS);
     }
@@ -323,25 +324,25 @@ const buildBasePayload = async () => {
 const loadResponsables = async () => {
   const contextPayload = await getContextPayload();
   if (!contextPayload) {
-    setStatus("No se pudo validar la sesión.");
+    setStatus("No se pudo validar la sesion.");
     return;
   }
 
   try {
-    const res = await fetchWithTimeout(WEBHOOK_LISTAR_RESPONSABLES, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(contextPayload)
-    });
-
-    const data = await res.json();
-    const responsables = normalizeList(data, ["responsables"]);
+    const empresaId = contextPayload.empresa_id || contextPayload.tenant_id;
+    const { data, error } = await supabase
+      .from("usuarios_sistema")
+      .select("id, nombre_completo, activo")
+      .eq("empresa_id", empresaId)
+      .eq("activo", true)
+      .order("nombre_completo", { ascending: true });
+    const responsables = error ? [] : (Array.isArray(data) ? data : []);
 
     responsable.innerHTML = '<option value="">Seleccione responsable</option>';
     responsables.forEach((item) => {
       const option = document.createElement("option");
-      option.value = item.id ?? item.value ?? item.nombre ?? item.name ?? "";
-      option.textContent = item.nombre ?? item.name ?? item.label ?? option.value;
+      option.value = item.id ?? "";
+      option.textContent = item.nombre_completo ?? item.id ?? option.value;
       responsable.appendChild(option);
     });
   } catch (error) {
@@ -433,11 +434,11 @@ const renderProductRows = (productos) => {
 const renderProducts = async () => {
   const contextPayload = await getContextPayload();
   if (!contextPayload) {
-    setStatus("No se pudo validar la sesión.");
+    setStatus("No se pudo validar la sesiÃ³n.");
     return;
   }
 
-  setLoading(true, "Cargando configuración de visibilidad...");
+  setLoading(true, "Cargando configuraciÃ³n de visibilidad...");
 
   try {
     const visibilidad = getVisibilitySettings(contextPayload.tenant_id);
@@ -453,7 +454,7 @@ const renderProducts = async () => {
   } catch (error) {
     const timedOut = error?.name === "AbortError";
     setStatus(timedOut
-      ? "La carga tardó más de 5 segundos. Intenta nuevamente."
+      ? "La carga tardÃ³ mÃ¡s de 5 segundos. Intenta nuevamente."
       : "Error al cargar productos.");
     console.error("Error renderizando cierre de inventarios:", error);
   } finally {
@@ -464,11 +465,11 @@ const renderProducts = async () => {
 
 const validateRequiredFields = () => {
   if (!fecha.value || !responsable.value || !horaInicio.value || !horaFin.value) {
-    setStatus("⚠️ Completa fecha, responsable y turno.");
+    setStatus("âš ï¸ Completa fecha, responsable y turno.");
     return false;
   }
   if (!productRows.size) {
-    setStatus("⚠️ No hay productos cargados para operar.");
+    setStatus("âš ï¸ No hay productos cargados para operar.");
     return false;
   }
   return true;
@@ -479,7 +480,7 @@ btnConsultar.addEventListener("click", async () => {
 
   const payload = await buildBasePayload();
   if (!payload) {
-    setStatus("No se pudo validar la sesión.");
+    setStatus("No se pudo validar la sesiÃ³n.");
     return;
   }
 
@@ -543,13 +544,13 @@ btnVerificar.addEventListener("click", () => {
   if (hasInvalidValue) {
     verified = false;
     setButtonState({ subir: false });
-    setStatus("⚠️ Hay valores inválidos en stock o stock gastado.");
+    setStatus("âš ï¸ Hay valores invÃ¡lidos en stock o stock gastado.");
     return;
   }
 
   verified = true;
   setButtonState({ subir: true });
-  setStatus("Verificación completada.");
+  setStatus("VerificaciÃ³n completada.");
 });
 
 btnSubir.addEventListener("click", async () => {
@@ -559,13 +560,13 @@ btnSubir.addEventListener("click", async () => {
   }
 
   if (!verified) {
-    setStatus("⚠️ Primero debes verificar los datos.");
+    setStatus("âš ï¸ Primero debes verificar los datos.");
     return;
   }
 
   const payload = await buildBasePayload();
   if (!payload) {
-    setStatus("No se pudo validar la sesión.");
+    setStatus("No se pudo validar la sesiÃ³n.");
     return;
   }
 
