@@ -1,6 +1,7 @@
 ﻿
 import { supabase } from "./supabase.js";
 import { getSessionConEmpresa, getUserContext } from "./session.js";
+import { WEBHOOKS } from "./webhooks.js";
 
 const rootEl = document.getElementById("factura-contenido");
 let currentFactura = null;
@@ -9,7 +10,9 @@ const fmtMoney = (v) => Number(v || 0).toLocaleString("es-CO", { style: "currenc
 const fmtDate = (v) => (v ? new Date(v).toLocaleDateString("es-CO") : "-");
 
 function buildQrUrl(payload) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(payload)}`;
+  return `${WEBHOOKS?.QR_GENERATOR?.url || "https://api.qrserver.com/v1/create-qr-code/"}?size=180x180&data=${encodeURIComponent(payload)}`;
+}
+  return `${base}?size=180x180&data=${encodeURIComponent(payload)}`;
 }
 
 function fileToBase64(file) {
@@ -49,7 +52,7 @@ function render(empresa, factura) {
   rootEl.innerHTML = `
     <article class="factura-oficio">
       <header class="factura-top">
-        <h2>Axioma _by global nexo shop sas_</h2>
+        <h2>Axioma _by Global Nexo Shop_</h2>
         <p>Factura de servicio</p>
       </header>
 
