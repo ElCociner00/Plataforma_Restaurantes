@@ -1,5 +1,6 @@
-import { getUserContext } from "./session.js";
+import { buildRequestHeaders, getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
+import { WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS } from "./webhooks.js";
 
 const head = document.getElementById("historicoHead");
 const body = document.getElementById("historicoBody");
@@ -88,6 +89,8 @@ const loadJson = (key, fallback) => {
 };
 
 const saveJson = (key, value) => localStorage.setItem(key, JSON.stringify(value));
+
+const fetchWithTimeout = async (url, options = {}, timeoutMs = MAX_LOADING_MS) => { const controller = new AbortController(); const timeoutId = setTimeout(() => controller.abort(), timeoutMs); try { return await fetch(url, { ...options, signal: controller.signal }); } finally { clearTimeout(timeoutId); } };
 
 const normalizeRows = (raw) => {
   if (!raw) return [];
@@ -199,7 +202,7 @@ const sanitizeRow = (rawRow, index) => {
     if (!EXCLUDED_GENERAL_FIELDS.has(key)) general[key] = value;
   });
 
-  const detailsRaw = Array.isArray(rawRow?.variables_detalle) ? rawRow.variables_detalle : [];
+  const detailsRaw = Array.isArray(rawRow?.variables_detalle) ? rawRow.variables_detalle : (typeof rawRow?.variables_detalle === "string" ? (() => { try { const parsed = JSON.parse(rawRow.variables_detalle); return Array.isArray(parsed) ? parsed : []; } catch { return []; } })() : []);
   const details = sortDetailsBase(detailsRaw.map((item) => {
     const clean = {};
     Object.entries(item || {}).forEach(([key, value]) => {
@@ -738,19 +741,33 @@ const loadInitialData = async () => {
       timestamp: getTimestamp()
     };
 
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData?.session?.access_token) throw new Error("No hay JWT activo para consultar el historico.");
+
     const generalSettings = loadJson(getGeneralVisibilityKey(payload.tenant_id), {});
     const detailSettings = loadJson(getDetailVisibilityKey(payload.tenant_id), {});
     const detailItemSettings = loadJson(getDetailItemVisibilityKey(payload.tenant_id), {});
     const orderSettings = loadJson(getGeneralOrderKey(payload.tenant_id), []);
 
-    const { data: rowsData, error: rowsError } = await supabase
+    let rowsData = null;
+    let sourceLabel = "supabase";
+
+    const { data: directRows, error: rowsError } = await supabase
       .from("turnos_agrupados")
       .select("*")
       .eq("empresa_id", state.context.empresa_id)
       .order("fecha_turno", { ascending: false })
       .order("numero_turno", { ascending: false });
 
-    if (rowsError) throw rowsError;
+    if (!rowsError) {
+      rowsData = directRows;
+    } else {
+      const headers = await buildRequestHeaders({ includeTenant: true });
+      const webhookResponse = await fetchWithTimeout(WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(payload) });
+      if (!webhookResponse.ok) throw new Error("Fallo Supabase y webhook historico (" + webhookResponse.status + "). " + (rowsError.message || rowsError.code || "Sin detalle."));
+      rowsData = await webhookResponse.json();
+      sourceLabel = "webhook";
+    }
 
     state.allRows = normalizeRows(rowsData).map(sanitizeRow);
     state.filteredRows = [...state.allRows];
@@ -779,9 +796,15 @@ const loadInitialData = async () => {
     state.currentPage = 1;
 
     renderTable();
-    setStatus(state.allRows.length ? "Historico cargado." : "No se recibieron cierres.");
+    setStatus(state.allRows.length ? `Historico cargado (${sourceLabel}).` : "No se recibieron cierres.");
   } catch (error) {
-    setStatus(error?.name === "AbortError" ? "La carga tardo mas de 5 segundos." : "Error cargando historico.");
+    if (error?.name === "AbortError") {
+      setStatus("La carga tardo mas de 5 segundos.");
+    } else {
+      const message = error?.message || "Error desconocido";
+      const isRlsError = /permission|rls|jwt|not authorized|forbidden/i.test(message);
+      setStatus((isRlsError ? "Error de permisos/JWT en historico: " : "Error cargando historico: ") + message);
+    }
   } finally {
     setLoading(false);
   }
