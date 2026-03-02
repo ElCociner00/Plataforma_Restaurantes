@@ -1,15 +1,9 @@
 import { enforceNumericInput } from "./input_utils.js";
-import { getUserContext } from "./session.js";
+import { buildRequestHeaders, getUserContext } from "./session.js";
 import { WEBHOOK_REGISTRO_OTROS_USUARIOS } from "./webhooks.js";
 
-// ===============================
-// REGISTRO DE ADMINS Y REVISORES
-// ===============================
-
-// ===============================
-// ELEMENTOS
-// ===============================
 const form = document.getElementById("registroOtrosUsuariosForm");
+const btnRegistrar = document.getElementById("btnRegistrar");
 const statusDiv = document.getElementById("status");
 const cedulaInput = document.getElementById("cedula");
 const emailInput = document.getElementById("email");
@@ -18,38 +12,49 @@ const getTimestamp = () => new Date().toISOString();
 
 enforceNumericInput([cedulaInput]);
 
-// ===============================
-// ENVÍO DEL FORMULARIO
-// ===============================
-form.addEventListener("submit", async (e) => {
+const setSubmitting = (isSubmitting) => {
+  if (!btnRegistrar) return;
+  btnRegistrar.disabled = isSubmitting;
+  btnRegistrar.textContent = isSubmitting ? "Registrando..." : "Registrar";
+};
+
+const readResponseBody = async (res) => {
+  const raw = await res.text();
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { message: raw };
+  }
+};
+
+form?.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  const emailValue = emailInput.value.trim();
-
-  if (!emailValue || !emailInput.checkValidity()) {
-    statusDiv.textContent = "Ingresa un correo válido.";
-    emailInput.focus();
+  const emailValue = emailInput?.value.trim();
+  if (!emailValue || !emailInput?.checkValidity()) {
+    statusDiv.textContent = "Ingresa un correo valido.";
+    emailInput?.focus();
     return;
   }
 
-  if (!rolSelect.value) {
+  if (!rolSelect?.value) {
     statusDiv.textContent = "Selecciona un rol.";
-    rolSelect.focus();
+    rolSelect?.focus();
     return;
   }
 
   const context = await getUserContext();
-
-  if (!context) {
-    statusDiv.textContent = "No se pudo validar la sesión.";
+  if (!context?.empresa_id) {
+    statusDiv.textContent = "No se pudo validar la sesion.";
     return;
   }
 
   const payload = {
-    nombre: document.getElementById("nombre").value.trim(),
-    cedula: cedulaInput.value.trim(),
+    nombre: document.getElementById("nombre")?.value.trim() || "",
+    cedula: cedulaInput?.value.trim() || "",
     email: emailValue,
-    password: document.getElementById("password").value,
+    password: document.getElementById("password")?.value || "",
     rol: rolSelect.value,
     empresa_id: context.empresa_id,
     tenant_id: context.empresa_id,
@@ -58,24 +63,32 @@ form.addEventListener("submit", async (e) => {
     timestamp: getTimestamp()
   };
 
+  setSubmitting(true);
   statusDiv.textContent = "Enviando registro...";
 
   try {
+    const authHeaders = await buildRequestHeaders({ includeTenant: true });
     const res = await fetch(WEBHOOK_REGISTRO_OTROS_USUARIOS, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders
+      },
       body: JSON.stringify(payload)
     });
 
-    const data = await res.json();
+    const data = await readResponseBody(res);
+    const isSuccess = res.ok && (data?.success === true || data?.ok === true || /registrad/i.test(String(data?.message || "")));
 
-    if (data?.ok === true) {
-      statusDiv.textContent = data.message || "";
+    if (isSuccess) {
+      statusDiv.textContent = data?.message || "Usuario registrado correctamente.";
       form.reset();
     } else {
-      statusDiv.textContent = data?.message || "";
+      statusDiv.textContent = data?.message || `Error registrando usuario (HTTP ${res.status}).`;
     }
-  } catch (err) {
-    statusDiv.textContent = "Error de conexión con el servidor.";
+  } catch {
+    statusDiv.textContent = "Error de conexion con backend plataforma.";
+  } finally {
+    setSubmitting(false);
   }
 });

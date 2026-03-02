@@ -76,3 +76,57 @@
   font-size: 13px;
   margin-top: 8px;
 }
+
+.usuarios-panel {
+  margin-top: 14px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 14px;
+}
+
+.usuarios-subtitulo {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.usuarios-tabla-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.usuarios-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.usuarios-tabla th,
+.usuarios-tabla td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 8px;
+  text-align: left;
+}
+
+.toggle-usuario {
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.toggle-usuario.on {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.toggle-usuario.off {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.usuarios-estado,
+.usuarios-vacio {
+  margin-top: 8px;
+  font-size: 13px;
+}
