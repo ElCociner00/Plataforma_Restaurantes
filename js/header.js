@@ -31,20 +31,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     menu += `
       <div class="nav-dropdown">
-        <button type="button" class="nav-dropdown-toggle">Cierre de Turno v</button>
+        <button type="button" class="nav-dropdown-toggle">Cierre de turno</button>
         <div class="nav-dropdown-menu">
           <a href="/Plataforma_Restaurantes/cierre_turno/">Cierre de Turno</a>
-          <a href="/Plataforma_Restaurantes/cierre_turno/historico_cierre_turno.html">Historico cierres de turno</a>
+          <a href="/Plataforma_Restaurantes/cierre_turno/historico_cierre_turno.html">Historico cierre turno</a>
         </div>
       </div>
     `;
 
     menu += `
       <div class="nav-dropdown">
-        <button type="button" class="nav-dropdown-toggle">Cierre Inventarios v</button>
+        <button type="button" class="nav-dropdown-toggle">Cierre inventarios</button>
         <div class="nav-dropdown-menu">
           <a href="/Plataforma_Restaurantes/cierre_inventarios/">Cierre inventarios</a>
-          <a href="/Plataforma_Restaurantes/cierre_inventarios/historico_cierre_inventarios.html">Historico cierre inventarios</a>
+          <a href="/Plataforma_Restaurantes/cierre_inventarios/historico_cierre_inventarios.html">Historico cierre inventario</a>
         </div>
       </div>
     `;
@@ -116,5 +116,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.location.href = "/Plataforma_Restaurantes/index.html";
   };
 });
+
 
 

@@ -7,7 +7,7 @@
 
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
+  font-family: "Segoe UI", Tahoma, sans-serif;
   background: linear-gradient(135deg, #f5f5f5, #eef2ff);
   color: #111827;
   min-height: 100vh;
@@ -19,7 +19,7 @@ body {
    HEADER GLOBAL
 ========================= */
 .app-header {
-  background: #1f2937;
+  background: #0f172a;
   color: white;
   padding: 12px 20px;
   display: flex;
@@ -123,12 +123,12 @@ button {
   border-radius: 6px;
   border: none;
   cursor: pointer;
-  background: #4f46e5;
+  background: #334155;
   color: white;
 }
 
 button:hover {
-  background: #4338ca;
+  background: #0f172a;
 }
 
 /* =========================
@@ -181,7 +181,7 @@ button:hover {
   top: calc(100% + 6px);
   right: 0;
   min-width: 220px;
-  background: #111827;
+  background: #0f172a;
   border: 1px solid #374151;
   border-radius: 8px;
   padding: 8px;
@@ -266,7 +266,7 @@ body.has-legal-footer {
 
 .legal-footer {
   margin-top: 0;
-  background: #111827;
+  background: #0f172a;
   color: #e5e7eb;
   padding: 16px 20px;
   position: fixed;
@@ -327,3 +327,7 @@ body.has-legal-footer {
   background: rgba(255, 255, 255, 0.12);
   text-decoration: none;
 }
+
+
+
+

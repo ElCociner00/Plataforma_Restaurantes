@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>AXIOMA | Configuración</title>
+  <title>AXIOMA | Configuracion</title>
 
   <link rel="stylesheet" href="../css/main.css">
   <link rel="stylesheet" href="../css/configuracion.css">
@@ -10,40 +10,24 @@
 
 <body style="display:none">
 
-  <!-- Guardia de autenticación -->
   <script type="module" src="../js/auth_guard.js"></script>
 
-  <!-- Guardia de permisos -->
   <script type="module">
     import { guardPage } from "../js/guard_page.js";
     guardPage("configuracion");
   </script>
 
-  <!-- Header -->
   <script type="module" src="../js/header.js"></script>
 
   <div class="main">
-    <h1>Configuración</h1>
+    <h1>Configuracion</h1>
 
     <div class="config-section">
-
-      <!-- USUARIOS -->
-      <button class="accordion-toggle">
-        👥 Usuarios
-      </button>
-
+      <button class="accordion-toggle">Usuarios</button>
       <div class="accordion-content">
         <ul class="config-list">
-          <li>
-            <a href="registro_empleados.html">
-              ➕ Registrar empleados
-            </a>
-          </li>
-          <li>
-            <a href="registro_otros_usuarios.html">
-              ➕ Registro revisores y admins
-            </a>
-          </li>
+          <li><a href="registro_empleados.html">Registrar empleados</a></li>
+          <li><a href="registro_otros_usuarios.html">Registro revisores y admins</a></li>
         </ul>
         <div class="usuarios-panel" id="usuariosPanel">
           <h3>Usuarios de la empresa</h3>
@@ -53,80 +37,39 @@
         </div>
       </div>
 
-      <!-- (FUTURO) SEGURIDAD -->
-      <button class="accordion-toggle">
-        🔐 Seguridad y permisos
-      </button>
-
+      <button class="accordion-toggle">Seguridad y permisos</button>
       <div class="accordion-content">
         <ul class="config-list">
-          <li>
-            <a href="permisos.html">
-              🛡️ Permisos
-            </a>
-          </li>
+          <li><a href="permisos.html">Permisos</a></li>
         </ul>
-        <p class="coming-soon">
-          Próximamente: gestión de permisos y roles
-        </p>
+        <p class="coming-soon">Proximamente gestion de permisos y roles</p>
       </div>
 
-      <!-- VISUALIZACION -->
-      <button class="accordion-toggle">
-        👁️ Visualización
-      </button>
-
+      <button class="accordion-toggle">Visualizacion</button>
       <div class="accordion-content">
         <ul class="config-list">
-          <li>
-            <a href="visualizacion_cierre_turno.html">
-              👀 Visualización cierre turno
-            </a>
-          </li>
-          <li>
-            <a href="visualizacion_cierre_inventarios.html">
-              📦 Visualización cierre inventarios
-            </a>
-          </li>
-          <li>
-            <a href="visualizacion_cierre_turno_historico.html">
-              🧾 Visualización histórico cierre turno
-            </a>
-          </li>
-          <li>
-            <a href="visualizacion_cierre_inventarios_historico.html">
-              📚 Visualización histórico cierre inventarios
-            </a>
-          </li>
+          <li><a href="visualizacion_cierre_turno.html">Visualizacion cierre turno</a></li>
+          <li><a href="visualizacion_cierre_inventarios.html">Visualizacion cierre inventario</a></li>
+          <li><a href="visualizacion_cierre_turno_historico.html">Visualizacion historico cierre turno</a></li>
+          <li><a href="visualizacion_cierre_inventarios_historico.html">Visualizacion historico cierre inventario</a></li>
         </ul>
       </div>
 
-      <!-- API'S E INTEGRACIONES -->
-      <button class="accordion-toggle">
-        🔌 API's e Integraciones
-      </button>
-
+      <button class="accordion-toggle">Apis e integraciones</button>
       <div class="accordion-content">
         <ul class="config-list">
-          <li>
-            <a href="loggro.html">
-              🔗 Loggro
-            </a>
-          </li>
+          <li><a href="loggro.html">Loggro</a></li>
         </ul>
       </div>
-
     </div>
   </div>
 
-  <!-- JS Accordion -->
   <script>
-    document.querySelectorAll(".accordion-toggle").forEach(button => {
+    document.querySelectorAll(".accordion-toggle").forEach((button) => {
       button.addEventListener("click", () => {
         button.classList.toggle("active");
         const content = button.nextElementSibling;
-        content.style.display =
-          content.style.display === "block" ? "none" : "block";
+        content.style.display = content.style.display === "block" ? "none" : "block";
       });
     });
   </script>
@@ -135,4 +78,3 @@
   <script type="module" src="../js/footer.js"></script>
 </body>
 </html>
-
