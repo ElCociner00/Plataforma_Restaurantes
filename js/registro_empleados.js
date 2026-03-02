@@ -33,14 +33,14 @@ form?.addEventListener("submit", async (e) => {
 
   const emailValue = emailInput?.value.trim();
   if (!emailValue || !emailInput?.checkValidity()) {
-    statusDiv.textContent = "Ingresa un correo valido.";
+    statusDiv.textContent = "Ingresa un correo válido.";
     emailInput?.focus();
     return;
   }
 
   const context = await getUserContext();
   if (!context?.empresa_id) {
-    statusDiv.textContent = "No se pudo validar la sesion.";
+    statusDiv.textContent = "No se pudo validar la sesión.";
     return;
   }
 
@@ -81,7 +81,7 @@ form?.addEventListener("submit", async (e) => {
       statusDiv.textContent = data?.message || `Error registrando empleado (HTTP ${res.status}).`;
     }
   } catch {
-    statusDiv.textContent = "Error de conexion con backend plataforma.";
+    statusDiv.textContent = "Error de conexión con backend plataforma.";
   } finally {
     setSubmitting(false);
   }

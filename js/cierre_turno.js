@@ -1,4 +1,4 @@
-﻿import { enforceNumericInput } from "./input_utils.js";
+import { enforceNumericInput } from "./input_utils.js";
 import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 import { getEmpresaPolicy, puedeEnviarDatos } from "./permisos.core.js";
@@ -177,6 +177,16 @@ document.addEventListener("DOMContentLoaded", () => {
     status.textContent = message;
   };
 
+  const readResponseBody = async (res) => {
+    const raw = await res.text();
+    if (!raw) return {};
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return { message: raw };
+    }
+  };
+
   const aplicarPoliticaSoloLectura = () => {
     const isReadOnly = empresaPolicy?.solo_lectura === true;
     if (btnEnviar) {
@@ -314,7 +324,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const getContextPayload = async () => {
     const context = await getUserContext();
     if (!context) {
-      setStatus("No se pudo validar la sesiÃ³n.");
+      setStatus("No se pudo validar la sesión.");
       return null;
     }
 
@@ -377,14 +387,18 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify(contextPayload)
       });
 
-      const data = await res.json();
+      const data = await readResponseBody(res);
+      if (!res.ok) {
+        setStatus(data?.message || `Error al consultar gastos (HTTP ${res.status}).`);
+        return;
+      }
       const extras = normalizeExtras(data);
 
       if (extras.length) {
         buildExtrasRows(extras);
       }
     } catch (error) {
-      // silencioso: los extras se cargan tambiÃ©n al consultar gastos
+      // silencioso: los extras se cargan también al consultar gastos
     }
   };
 
@@ -499,12 +513,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (value < 0) {
       input.classList.add("diff-faltante");
-      nota.textContent = "AquÃ­ hay un faltante!";
+      nota.textContent = "Aquí hay un faltante!";
       return;
     }
     if (value > 0) {
       input.classList.add("diff-sobrante");
-      nota.textContent = "AquÃ­ hay un sobrante";
+      nota.textContent = "Aquí hay un sobrante";
       return;
     }
     input.classList.add("diff-ok");
@@ -672,7 +686,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const requiereHoraFin = !fechaEsPasada(fecha.value);
     if (!fecha.value || !responsable.value || !getHoraLlegadaCompleta() || !horaInicio.value || (requiereHoraFin && !horaFin.value) || !efectivoApertura?.value) {
-      setStatus("âš ï¸ Completa fecha, responsable, hora de llegada, hora inicio/fin y efectivo de apertura.");
+      setStatus("Atención: Completa fecha, responsable, hora de llegada, hora inicio/fin y efectivo de apertura.");
       return;
     }
 
@@ -686,7 +700,11 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify(payload)
       });
 
-      const data = await res.json();
+      const data = await readResponseBody(res);
+      if (!res.ok) {
+        setStatus(data?.message || `Error al consultar datos (HTTP ${res.status}).`);
+        return;
+      }
 
       const efectivoSistemaDesdeLoggro =
         data.efectivo_sistema
@@ -734,7 +752,7 @@ document.addEventListener("DOMContentLoaded", () => {
       setStatus(data.message || "Datos consultados.");
       toggleButtons({ verificar: true });
     } catch (err) {
-      setStatus("Error de conexiÃ³n al consultar datos.");
+      setStatus("Error de conexión al consultar datos.");
     }
   });
 
@@ -743,7 +761,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const requiereHoraFin = !fechaEsPasada(fecha.value);
     if (!fecha.value || !responsable.value || !getHoraLlegadaCompleta() || !horaInicio.value || (requiereHoraFin && !horaFin.value)) {
-      setStatus("âš ï¸ Completa todos los datos del turno.");
+      setStatus("Atención: Completa todos los datos del turno.");
       return;
     }
 
@@ -757,7 +775,11 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify(payload)
       });
 
-      const data = await res.json();
+      const data = await readResponseBody(res);
+      if (!res.ok) {
+        setStatus(data?.message || `Error al consultar gastos (HTTP ${res.status}).`);
+        return;
+      }
       const extras = normalizeExtras(data);
 
       if (!extrasRows.size) {
@@ -782,7 +804,7 @@ document.addEventListener("DOMContentLoaded", () => {
       setStatus("Gastos consultados.");
     } catch (error) {
       setStatus(error?.name === "AbortError"
-        ? "La consulta de gastos tardÃ³ mÃ¡s de 5 segundos."
+        ? "La consulta de gastos tardó más de 5 segundos."
         : "Error consultando gastos/No hay gastos de caja  por obtener");
     }
   });
@@ -791,13 +813,13 @@ document.addEventListener("DOMContentLoaded", () => {
     setStatus("Verificando...");
     btnVerificar.disabled = true;
 
-    // Siempre limpiar antes de un nuevo ciclo de verificaciÃ³n
+    // Siempre limpiar antes de un nuevo ciclo de verificación
     limpiarDiferencias();
 
     actualizarDomiciliosDesdeExtras();
 
     if (!efectivoApertura?.value) {
-      setStatus("âš ï¸ Completa el efectivo de apertura.");
+      setStatus("Atención: Completa el efectivo de apertura.");
       return;
     }
 
@@ -862,7 +884,11 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify(payload)
       });
 
-      const data = await res.json();
+      const data = await readResponseBody(res);
+      if (!res.ok) {
+        setStatus(data?.message || `Error al verificar cierre (HTTP ${res.status}).`);
+        return;
+      }
       const diferenciaEfectivoCalculada = syncDiferenciaEfectivo();
       const diferencias = {
         efectivo: diferenciaEfectivoCalculada,
@@ -884,8 +910,8 @@ document.addEventListener("DOMContentLoaded", () => {
       toggleButtons({ enviar: true });
     } catch (err) {
       setStatus(err?.name === "AbortError"
-        ? "La verificaciÃ³n tardÃ³ mÃ¡s de 5 segundos."
-        : "Error de conexiÃ³n al verificar.");
+        ? "La verificación tardó más de 5 segundos."
+        : "Error de conexión al verificar.");
     } finally {
       btnVerificar.disabled = false;
     }
@@ -907,7 +933,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const obtenerMensajeEnvio = (estado) => {
     if (estado === "faltante") {
-      return "En estos datos hay un faltante, ten en cuenta que esto se descontarÃ¡ de tu nÃ³mina.";
+      return "En estos datos hay un faltante, ten en cuenta que esto se descontará de tu nómina.";
     }
     if (estado === "sobrante") {
       return "En estos datos hay un sobrante, verifica bien las cuentas antes de enviar.";
@@ -920,7 +946,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!contextPayload) return null;
 
     if (!efectivoApertura?.value) {
-      setStatus("âš ï¸ Completa el efectivo de apertura.");
+      setStatus("Atención: Completa el efectivo de apertura.");
       return null;
     }
 
@@ -945,8 +971,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (label.includes("insumo")) return "insumos";
       if (label.includes("arriendo")) return "arriendo";
       if (label.includes("aseo") || label.includes("limpieza")) return "aseo";
-      if (label.includes("plÃ¡stico") || label.includes("plastico") || label.includes("desechable")) return "desechables";
-      if (label.includes("prote") || label.includes("tÃ©") || label.includes("te")) return "insumos_especiales";
+      if (label.includes("plástico") || label.includes("plastico") || label.includes("desechable")) return "desechables";
+      if (label.includes("prote") || label.includes("té") || label.includes("te")) return "insumos_especiales";
       return "general";
     };
 
@@ -1094,7 +1120,7 @@ document.addEventListener("DOMContentLoaded", () => {
       setStatus(data?.message || "Cierre enviado correctamente.");
       confirmacionEnvio.classList.add("is-hidden");
     } catch (err) {
-      setStatus("Error de conexiÃ³n al subir cierre.");
+      setStatus("Error de conexión al subir cierre.");
     }
   });
 
