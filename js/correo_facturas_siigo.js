@@ -1,4 +1,4 @@
-﻿
+
 import { supabase } from "./supabase.js";
 import { getUserContext } from "./session.js";
 
@@ -52,7 +52,7 @@ form?.addEventListener("submit", async (event) => {
   }
 
   if (!correo) {
-    setStatus("Ingresa un correo valido.");
+    setStatus("Ingresa un correo válido.");
     return;
   }
 

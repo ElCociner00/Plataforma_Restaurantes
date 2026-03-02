@@ -1,4 +1,4 @@
-﻿import { buildRequestHeaders, getCurrentEmpresaId, getUserContext } from "./session.js";
+import { buildRequestHeaders, getCurrentEmpresaId, getUserContext } from "./session.js";
 import { WEBHOOKS } from "./webhooks.js";
 import { permisosCacheSet } from "./permisos.core.js";
 import { DEFAULT_ROLE_PERMISSIONS, PAGE_ENVIRONMENT } from "./permissions.js";
@@ -319,7 +319,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   userContext = await getUserContext();
 
   if (!userContext) {
-    setStatus("No se pudo validar la sesion.");
+    setStatus("No se pudo validar la sesión.");
     return;
   }
 

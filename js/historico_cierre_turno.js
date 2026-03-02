@@ -729,7 +729,7 @@ const downloadCsv = (rows, fileName) => {
 
 const loadInitialData = async () => {
   state.context = await getUserContext();
-  if (!state.context) return setStatus("No se pudo validar la sesion.");
+  if (!state.context) return setStatus("No se pudo validar la sesión.");
 
   setLoading(true, "Cargando historico...");
   try {
@@ -838,7 +838,7 @@ btnDescargarDatos.addEventListener("click", () => {
   if (value === "turnos_pagina") return downloadExcel(getPaginatedRows(), `turnos_pagina_${state.currentPage}.xls`);
   if (value === "turnos_filtrados_csv") return downloadCsv(state.filteredRows, "turnos_filtrados.csv");
 
-  return setStatus("Selecciona un tipo de descarga valido.");
+  return setStatus("Selecciona un tipo de descarga válido.");
 });
 
 loadInitialData();

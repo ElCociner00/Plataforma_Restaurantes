@@ -1,4 +1,4 @@
-﻿import { getUserContext } from "./session.js";
+import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 
 const head = document.getElementById("historicoHead");
@@ -240,7 +240,7 @@ const getRowsByDownloadMode = () => {
 
 const loadData = async () => {
   const context = await getUserContext();
-  if (!context) return setStatus("No se pudo validar la sesion.");
+  if (!context) return setStatus("No se pudo validar la sesión.");
 
   state.context = {
     tenant_id: context.empresa_id,

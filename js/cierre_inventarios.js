@@ -1,4 +1,4 @@
-﻿import { enforceNumericInput } from "../js/input_utils.js";
+import { enforceNumericInput } from "../js/input_utils.js";
 import { getUserContext } from "../js/session.js";
 import { supabase } from "../js/supabase.js";
 import { getEmpresaPolicy, puedeEnviarDatos } from "../js/permisos.core.js";
@@ -41,7 +41,7 @@ const setLoading = (isLoading, message = "") => {
     if (isLoading) {
       loadingSafetyTimeoutId = setTimeout(() => {
         loadingOverlay.classList.add("is-hidden");
-        setStatus("Carga finalizada por lÃ­mite de 5 segundos.");
+        setStatus("Carga finalizada por límite de 5 segundos.");
         loadingSafetyTimeoutId = null;
       }, MAX_LOADING_MS);
     }
@@ -52,6 +52,16 @@ const setLoading = (isLoading, message = "") => {
 
 const MAX_LOADING_MS = 5000;
 const getTimestamp = () => new Date().toISOString();
+
+const readResponseBody = async (res) => {
+  const raw = await res.text();
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { message: raw };
+  }
+};
 
 const fetchWithTimeout = async (url, options = {}, timeoutMs = MAX_LOADING_MS) => {
   const controller = new AbortController();
@@ -324,7 +334,7 @@ const buildBasePayload = async () => {
 const loadResponsables = async () => {
   const contextPayload = await getContextPayload();
   if (!contextPayload) {
-    setStatus("No se pudo validar la sesion.");
+    setStatus("No se pudo validar la sesión.");
     return;
   }
 
@@ -357,7 +367,8 @@ const fetchProductosConfigurados = async (contextPayload) => {
     body: JSON.stringify(contextPayload)
   });
 
-  const data = await res.json();
+  const data = await readResponseBody(res);
+  if (!res.ok) throw new Error(data?.message || `Error cargando productos (HTTP ${res.status}).`);
   return normalizeList(data, ["productos", "items"]);
 };
 
@@ -434,11 +445,11 @@ const renderProductRows = (productos) => {
 const renderProducts = async () => {
   const contextPayload = await getContextPayload();
   if (!contextPayload) {
-    setStatus("No se pudo validar la sesiÃ³n.");
+    setStatus("No se pudo validar la sesión.");
     return;
   }
 
-  setLoading(true, "Cargando configuraciÃ³n de visibilidad...");
+  setLoading(true, "Cargando configuración de visibilidad...");
 
   try {
     const visibilidad = getVisibilitySettings(contextPayload.tenant_id);
@@ -454,7 +465,7 @@ const renderProducts = async () => {
   } catch (error) {
     const timedOut = error?.name === "AbortError";
     setStatus(timedOut
-      ? "La carga tardÃ³ mÃ¡s de 5 segundos. Intenta nuevamente."
+      ? "La carga tardó más de 5 segundos. Intenta nuevamente."
       : "Error al cargar productos.");
     console.error("Error renderizando cierre de inventarios:", error);
   } finally {
@@ -465,11 +476,11 @@ const renderProducts = async () => {
 
 const validateRequiredFields = () => {
   if (!fecha.value || !responsable.value || !horaInicio.value || !horaFin.value) {
-    setStatus("âš ï¸ Completa fecha, responsable y turno.");
+    setStatus("Atención: Completa fecha, responsable y turno.");
     return false;
   }
   if (!productRows.size) {
-    setStatus("âš ï¸ No hay productos cargados para operar.");
+    setStatus("Atención: No hay productos cargados para operar.");
     return false;
   }
   return true;
@@ -480,7 +491,7 @@ btnConsultar.addEventListener("click", async () => {
 
   const payload = await buildBasePayload();
   if (!payload) {
-    setStatus("No se pudo validar la sesiÃ³n.");
+    setStatus("No se pudo validar la sesión.");
     return;
   }
 
@@ -496,7 +507,11 @@ btnConsultar.addEventListener("click", async () => {
       })
     });
 
-    const data = await res.json();
+    const data = await readResponseBody(res);
+    if (!res.ok) {
+      setStatus(data?.message || `Error consultando stock (HTTP ${res.status}).`);
+      return;
+    }
     const stocks = normalizeList(data, ["stocks", "productos", "items"]);
     const rowIndex = buildRowIndex();
 
@@ -544,13 +559,13 @@ btnVerificar.addEventListener("click", () => {
   if (hasInvalidValue) {
     verified = false;
     setButtonState({ subir: false });
-    setStatus("âš ï¸ Hay valores invÃ¡lidos en stock o stock gastado.");
+    setStatus("Atención: Hay valores inválidos en stock o stock gastado.");
     return;
   }
 
   verified = true;
   setButtonState({ subir: true });
-  setStatus("VerificaciÃ³n completada.");
+  setStatus("Verificación completada.");
 });
 
 btnSubir.addEventListener("click", async () => {
@@ -560,13 +575,13 @@ btnSubir.addEventListener("click", async () => {
   }
 
   if (!verified) {
-    setStatus("âš ï¸ Primero debes verificar los datos.");
+    setStatus("Atención: Primero debes verificar los datos.");
     return;
   }
 
   const payload = await buildBasePayload();
   if (!payload) {
-    setStatus("No se pudo validar la sesiÃ³n.");
+    setStatus("No se pudo validar la sesión.");
     return;
   }
 

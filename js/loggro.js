@@ -11,6 +11,16 @@ const setStatus = (message) => {
   status.textContent = message;
 };
 
+const readResponseBody = async (res) => {
+  const raw = await res.text();
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { message: raw };
+  }
+};
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   setStatus("Guardando credenciales...");
@@ -38,7 +48,12 @@ form.addEventListener("submit", async (event) => {
       body: JSON.stringify(payload)
     });
 
-    const data = await res.json();
+    const data = await readResponseBody(res);
+    if (!res.ok) {
+      setStatus(data.message || `No se pudieron guardar las credenciales (HTTP ${res.status}).`);
+      return;
+    }
+
     setStatus(data.message || "Credenciales guardadas.");
   } catch (error) {
     setStatus("Error de conexión al guardar credenciales.");
