@@ -182,3 +182,7 @@ export async function cargarFactura() {
 document.addEventListener("DOMContentLoaded", () => {
   cargarFactura();
 });
+
+window.addEventListener("empresaCambiada", () => {
+  cargarFactura();
+});
