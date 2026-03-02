@@ -1,14 +1,11 @@
 import { supabase } from "./supabase.js";
-import { getSessionConEmpresa, getUserContext } from "./session.js";
+import { getUserContext } from "./session.js";
 import { verificarYMostrarAnuncio } from "./anuncio_impago.js";
 import { ENV_LOGGRO, ENV_SIIGO, getActiveEnvironment, setActiveEnvironment } from "./environment.js";
-import { resolveEmpresaPlan } from "./plan.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const context = await getUserContext();
   if (!context) return;
-  const sessionEmpresa = await getSessionConEmpresa().catch(() => null);
-  mostrarBannerPlan(sessionEmpresa?.empresa || null);
   verificarYMostrarAnuncio().catch(() => {});
 
   const activeEnvironment = getActiveEnvironment();
@@ -120,17 +117,4 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 });
 
-function mostrarBannerPlan(empresa) {
-  const plan = resolveEmpresaPlan(empresa);
-  if (!empresa || plan !== "free") return;
-  if (document.getElementById("banner-plan-free")) return;
 
-  const banner = document.createElement("div");
-  banner.id = "banner-plan-free";
-  banner.innerHTML = `
-    <div style="background:#fbbf24;color:black;padding:4px;text-align:center;">
-      MODO GRATUITO - Solo visualizacion. Actualiza a PRO para operar.
-    </div>
-  `;
-  document.body.prepend(banner);
-}

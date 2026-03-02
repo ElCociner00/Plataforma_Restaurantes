@@ -1,24 +1,33 @@
-﻿.impago-banner {
+.impago-banner {
   position: fixed;
-  top: 92px;
+  top: 86px;
   right: 14px;
-  width: 320px;
+  width: 330px;
   z-index: 1400;
 }
 
 .impago-banner-card {
-  border: 2px solid #8b5cf6;
-  background: linear-gradient(180deg, #f5f3ff 0%, #ede9fe 100%);
-  color: #4c1d95;
+  border: 1px solid #d1d5db;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  color: #1f2937;
   border-radius: 12px;
   padding: 14px;
-  box-shadow: 0 10px 24px rgba(124, 58, 237, 0.28);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+}
+
+.impago-badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
 }
 
 .impago-banner-card h3 {
   margin: 0 0 8px;
   font-size: 1rem;
-  color: #6d28d9;
 }
 
 .impago-banner-card p {
@@ -26,6 +35,21 @@
   font-size: 0.9rem;
   line-height: 1.4;
   text-align: left;
+}
+
+.impago-banner[data-banner-state="free"] .impago-badge {
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.impago-banner[data-banner-state="morosa"] .impago-badge {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.impago-banner[data-banner-state="impago"] .impago-badge {
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 body.has-impago-banner .main {

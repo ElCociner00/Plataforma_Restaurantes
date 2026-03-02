@@ -1,8 +1,8 @@
-﻿
 import { supabase } from "./supabase.js";
+import { resolveEmpresaPlan } from "./plan.js";
 import { getSessionConEmpresa } from "./session.js";
 
-const BANNER_HTML_PATH = "../components/banner_impago.html";
+const BANNER_HTML_PATH = "/Plataforma_Restaurantes/components/banner_impago.html";
 const BANNER_CSS_PATH = "/Plataforma_Restaurantes/css/banner_impago.css";
 
 let anuncioInyectado = false;
@@ -16,62 +16,98 @@ function ensureBannerStyles() {
   document.head.appendChild(link);
 }
 
-async function getDeudaEmpresa(empresaId) {
-  if (!empresaId) return 0;
+async function getFacturacionEmpresa(empresaId) {
+  if (!empresaId) return { deuda: 0, fecha_suspension: null };
+
   const { data, error } = await supabase
     .from("facturacion")
-    .select("deuda")
+    .select("deuda,fecha_suspension")
     .eq("empresa_id", empresaId)
     .maybeSingle();
 
-  if (error) return 0;
-  return Number(data?.deuda || 0);
+  if (error) return { deuda: 0, fecha_suspension: null };
+  return {
+    deuda: Number(data?.deuda || 0),
+    fecha_suspension: data?.fecha_suspension || null
+  };
 }
 
-function getMessageByDeuda(deuda) {
-  if (Number(deuda || 0) > 0) {
-    return "Tienes una factura pendiente. Realiza el pago antes del dia 25 para conservar tu plan Pro. El corte es el dia 15 de cada mes. Validamos pagos entre 1 y 12 horas y solo se aprueban montos exactos.";
+function isImpagoByFecha(fechaSuspension) {
+  if (!fechaSuspension) return false;
+  const target = new Date(fechaSuspension);
+  if (Number.isNaN(target.getTime())) return false;
+  return Date.now() >= target.getTime();
+}
+
+function resolveBannerState(empresa, facturacion) {
+  const plan = resolveEmpresaPlan(empresa);
+  const deuda = Number(facturacion?.deuda || empresa?.deuda_actual || 0);
+
+  if (deuda > 0) {
+    if (isImpagoByFecha(facturacion?.fecha_suspension)) {
+      return {
+        state: "impago",
+        badge: "Impago",
+        title: "Cuenta suspendida por pago",
+        message: "Tienes pagos pendientes. Regulariza tu deuda para reactivar todos los modulos."
+      };
+    }
+
+    return {
+      state: "morosa",
+      badge: "Morosa",
+      title: "Tienes una deuda pendiente",
+      message: "Realiza el pago antes de la fecha de corte para evitar suspension del servicio."
+    };
   }
-  return "Mejora tu negocio y evita perder dinero. Adquiere con nosotros un plan para desbloquear funciones avanzadas.";
+
+  if (plan === "free") {
+    return {
+      state: "free",
+      badge: "Plan Free",
+      title: "Funciones limitadas en plan free",
+      message: "Actualiza a plan pro para activar operaciones completas y automatizaciones."
+    };
+  }
+
+  return null;
 }
 
-async function buildBannerNode(message) {
-  const node = document.createElement("aside");
-  node.id = "anuncio-impago";
-  node.className = "impago-banner";
-  node.setAttribute("role", "note");
-  node.setAttribute("aria-live", "polite");
-  node.innerHTML = `<div class="impago-banner-card"><h3>Aviso de facturacion</h3><p id="impagoBannerMessage"></p></div>`;
+async function getBannerTemplateHtml() {
+  try {
+    const res = await fetch(BANNER_HTML_PATH, { cache: "no-store" });
+    if (!res.ok) throw new Error("template not found");
+    return await res.text();
+  } catch {
+    return "<aside id='anuncio-impago' class='impago-banner' role='note' aria-live='polite' data-banner-state='info'><div class='impago-banner-card'><span class='impago-badge' id='impagoBannerBadge'>Aviso</span><h3 id='impagoBannerTitle'>Estado de facturacion</h3><p id='impagoBannerMessage'></p></div></aside>";
+  }
+}
+
+async function buildBannerNode(config) {
+  const container = document.createElement("div");
+  container.innerHTML = await getBannerTemplateHtml();
+  const node = container.querySelector("#anuncio-impago");
+  if (!node) return null;
+
+  node.setAttribute("data-banner-state", config.state || "info");
+
+  const badge = node.querySelector("#impagoBannerBadge");
+  if (badge) badge.textContent = config.badge || "Aviso";
+
+  const title = node.querySelector("#impagoBannerTitle");
+  if (title) title.textContent = config.title || "Estado de facturacion";
+
   const msgEl = node.querySelector("#impagoBannerMessage");
-  if (msgEl) msgEl.textContent = message;
+  if (msgEl) msgEl.textContent = config.message || "";
+
   return node;
 }
 
-export async function verificarYMostrarAnuncio() {
-  const session = await getSessionConEmpresa();
-  const empresa = session?.empresa;
-
-  if (!empresa?.mostrar_anuncio_impago) {
-    ocultarAnuncio();
-    return;
-  }
-
-  ensureBannerStyles();
-  const deuda = await getDeudaEmpresa(empresa.id).catch(() => 0);
-  await mostrarAnuncio(getMessageByDeuda(deuda));
-}
-async function mostrarAnuncio(message) {
+async function mostrarAnuncio(config) {
   const existente = document.getElementById("anuncio-impago");
-  if (existente) {
-    const msg = existente.querySelector("#impagoBannerMessage");
-    if (msg) msg.textContent = message;
-    document.body.classList.add("has-impago-banner");
-    anuncioInyectado = true;
-    return;
-  }
+  if (existente) existente.remove();
 
-  if (anuncioInyectado) return;
-  const anuncio = await buildBannerNode(message);
+  const anuncio = await buildBannerNode(config);
   if (!anuncio) return;
 
   document.body.appendChild(anuncio);
@@ -86,5 +122,35 @@ function ocultarAnuncio() {
   anuncioInyectado = false;
 }
 
-document.addEventListener("DOMContentLoaded", verificarYMostrarAnuncio);
-window.addEventListener("empresaCambiada", verificarYMostrarAnuncio);
+export async function verificarYMostrarAnuncio() {
+  const session = await getSessionConEmpresa().catch(() => null);
+  const empresa = session?.empresa;
+
+  if (!empresa || !empresa.mostrar_anuncio_impago) {
+    ocultarAnuncio();
+    return;
+  }
+
+  ensureBannerStyles();
+  const facturacion = await getFacturacionEmpresa(empresa.id).catch(() => ({ deuda: 0, fecha_suspension: null }));
+  const config = resolveBannerState(empresa, facturacion);
+
+  if (!config) {
+    ocultarAnuncio();
+    return;
+  }
+
+  await mostrarAnuncio(config);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  verificarYMostrarAnuncio().catch(() => {
+    if (!anuncioInyectado) ocultarAnuncio();
+  });
+});
+
+window.addEventListener("empresaCambiada", () => {
+  verificarYMostrarAnuncio().catch(() => {
+    if (!anuncioInyectado) ocultarAnuncio();
+  });
+});
