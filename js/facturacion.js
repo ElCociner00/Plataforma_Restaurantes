@@ -1,4 +1,4 @@
-﻿
+
 import { supabase } from "./supabase.js";
 import { getSessionConEmpresa, getUserContext } from "./session.js";
 import { WEBHOOKS } from "./webhooks.js";
@@ -119,10 +119,11 @@ async function enviarPagoRevision(file) {
   const { error } = await supabase.from("pagos_en_revision").insert(payload);
   if (error) throw error;
 
-  await supabase
+  const { error: updateError } = await supabase
     .from("facturacion")
     .update({ consecutivo_actual: consecutivo + 1 })
     .eq("id", currentFactura.id);
+  if (updateError) throw updateError;
 
   return context;
 }
@@ -137,9 +138,11 @@ function bindFacturaEvents() {
   });
 
   btnEnviar?.addEventListener("click", async () => {
+    if (btnEnviar.disabled) return;
     const file = fileInput?.files?.[0];
     if (!file) return;
 
+    btnEnviar.disabled = true;
     status.textContent = "Enviando comprobante...";
     try {
       await enviarPagoRevision(file);
@@ -148,12 +151,14 @@ function bindFacturaEvents() {
       fileInput.value = "";
     } catch (_e) {
       status.textContent = "No se pudo enviar el comprobante.";
+      btnEnviar.disabled = false;
     }
   });
 }
 
 export async function cargarFactura() {
   if (!rootEl) return;
+  rootEl.innerHTML = "<p>Cargando facturacion...</p>";
   const session = await getSessionConEmpresa();
   const empresa = session?.empresa;
 
@@ -172,3 +177,8 @@ export async function cargarFactura() {
     rootEl.innerHTML = "<p>Error cargando facturacion.</p>";
   }
 }
+
+
+document.addEventListener("DOMContentLoaded", () => {
+  cargarFactura();
+});
