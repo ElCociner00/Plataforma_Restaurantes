@@ -1,69 +1,44 @@
-.impago-banner {
+.impago-modal {
   position: fixed;
-  top: 86px;
-  right: 14px;
-  width: 330px;
-  z-index: 1400;
+  inset: 0;
+  z-index: 2500;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(2px);
+  display: grid;
+  place-items: center;
+  padding: 20px;
 }
 
-.impago-banner-card {
-  border: 1px solid #d1d5db;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  color: #1f2937;
-  border-radius: 12px;
-  padding: 14px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+.impago-modal-card {
+  width: min(700px, 100%);
+  background: #ffffff;
+  border: 1px solid #dbe2ea;
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 22px 40px rgba(15, 23, 42, 0.24);
 }
 
-.impago-badge {
-  display: inline-block;
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  margin-bottom: 8px;
+.impago-modal-card h3 {
+  margin: 0 0 12px;
+  color: #0f172a;
 }
 
-.impago-banner-card h3 {
-  margin: 0 0 8px;
-  font-size: 1rem;
-}
-
-.impago-banner-card p {
+.impago-modal-card p {
   margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.4;
-  text-align: left;
+  color: #1f2937;
+  line-height: 1.55;
 }
 
-.impago-banner[data-banner-state="free"] .impago-badge {
-  background: #dbeafe;
-  color: #1e3a8a;
+.impago-modal-card a {
+  color: #4f46e5;
+  font-weight: 700;
 }
 
-.impago-banner[data-banner-state="morosa"] .impago-badge {
-  background: #fef3c7;
-  color: #92400e;
+#impagoModalAceptar {
+  margin-top: 20px;
+  min-width: 130px;
 }
 
-.impago-banner[data-banner-state="impago"] .impago-badge {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-body.has-impago-banner .main {
-  margin-right: min(360px, 30vw);
-}
-
-@media (max-width: 1120px) {
-  .impago-banner {
-    position: static;
-    width: auto;
-    margin: 0 16px 12px;
-  }
-
-  body.has-impago-banner .main {
-    margin-right: auto;
-  }
+body.has-impago-banner {
+  overflow: hidden;
 }
