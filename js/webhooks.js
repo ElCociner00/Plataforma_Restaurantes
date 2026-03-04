@@ -134,3 +134,10 @@ WEBHOOKS.NOTIFICACION_IMAGO = {
   metodo: "POST",
   descripcion: "Notifica cuando una empresa se marca como impaga"
 };
+
+WEBHOOKS.FACTURACION_RESUMEN = {
+  url: "https://tu-n8n-instancia.com/webhook/facturacion-resumen",
+  archivos_que_usan: ["js/facturacion.js"],
+  metodo: "POST",
+  descripcion: "Fuente opcional para obtener datos de factura por tenant cuando Supabase no responda o se quiera usar intermediario"
+};

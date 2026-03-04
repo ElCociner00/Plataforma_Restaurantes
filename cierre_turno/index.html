@@ -90,6 +90,14 @@
           <input id="caja" type="text" inputmode="numeric" pattern="[0-9]*">
         </label>
       </div>
+
+      <div class="acciones-cierre acciones-cierre-top">
+        <button id="consultarDatos" type="button">Consultar Loggro</button>
+        <button id="consultarGastos" type="button">Consultar gastos</button>
+        <button id="verificar" disabled>Verificar</button>
+        <button id="enviar" disabled>Subir cierre</button>
+        <button id="limpiarDatos" type="button">Limpiar datos</button>
+      </div>
     </section>
 
     <section class="bloque">
@@ -192,13 +200,6 @@
     </section>
 
     <section class="bloque">
-      <div class="acciones-cierre">
-        <button id="consultarDatos" type="button">Consultar Loggro</button>
-        <button id="consultarGastos" type="button">Consultar gastos</button>
-        <button id="verificar" disabled>Verificar</button>
-        <button id="enviar" disabled>Subir cierre</button>
-        <button id="limpiarDatos" type="button">Limpiar datos</button>
-      </div>
       <div id="confirmacionEnvio" class="confirmacion-envio is-hidden">
         <p id="mensajeEnvio"></p>
         <p class="confirmacion-pregunta">¿Estás seguro de subir este cierre?</p>

@@ -218,6 +218,10 @@
   cursor: not-allowed;
 }
 
+.acciones-cierre-top {
+  margin-top: 16px;
+}
+
 input[readonly] {
   background: #f1efff;
   border-color: #d8d2ff;
