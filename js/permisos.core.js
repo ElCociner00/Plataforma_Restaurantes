@@ -1,4 +1,4 @@
-﻿import { supabase } from "./supabase.js";
+import { supabase } from "./supabase.js";
 import { getUserContext, obtenerUsuarioActual } from "./session.js";
 import { isEmpresaReadOnlyPlan, normalizeEmpresaActiva, resolveEmpresaPlan } from "./plan.js";
 
@@ -14,7 +14,7 @@ const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 
 const normalizePlan = (empresa) => {
   const raw = resolveEmpresaPlan(empresa);
-  return String(raw).trim().toLowerCase() || "free";
+  return String(raw).trim().toLowerCase() || "pro";
 };
 
 const normalizeActiva = (empresa) => {
