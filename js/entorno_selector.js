@@ -15,6 +15,12 @@ const goByRole = async (env) => {
   setActiveEnvironment(env);
 
   if (env === ENV_SIIGO) {
+    if (String(context.rol || "").toLowerCase() === "operativo") {
+      status.textContent = "Acceso a Siigo bloqueado para rol operativo.";
+      setActiveEnvironment(ENV_LOGGRO);
+      window.location.href = "/Plataforma_Restaurantes/cierre_turno/";
+      return;
+    }
     window.location.href = "/Plataforma_Restaurantes/siigo/subir_facturas_siigo/";
     return;
   }
@@ -26,5 +32,15 @@ const goByRole = async (env) => {
   }
 };
 
+const initRoleUi = async () => {
+  const context = await getUserContext().catch(() => null);
+  if (!context) return;
+  if (String(context.rol || "").toLowerCase() === "operativo") {
+    btnSiigo.disabled = true;
+    btnSiigo.title = "Bloqueado para rol operativo";
+  }
+};
+
 btnLoggro?.addEventListener("click", () => goByRole(ENV_LOGGRO));
 btnSiigo?.addEventListener("click", () => goByRole(ENV_SIIGO));
+initRoleUi();
