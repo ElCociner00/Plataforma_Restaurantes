@@ -4,9 +4,9 @@ import { verificarYMostrarAnuncio } from "./anuncio_impago.js";
 import { ENV_LOGGRO, ENV_SIIGO, getActiveEnvironment, setActiveEnvironment } from "./environment.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
+  verificarYMostrarAnuncio().catch(() => {});
   const context = await getUserContext();
   if (!context) return;
-  verificarYMostrarAnuncio().catch(() => {});
 
   const activeEnvironment = getActiveEnvironment();
   const currentPath = String(window.location.pathname || "");

@@ -1,10 +1,10 @@
-import { getSessionConEmpresa } from "./session.js";
+import { getUserContext } from "./session.js";
+import { supabase } from "./supabase.js";
 
 const BANNER_HTML_PATH = "/Plataforma_Restaurantes/components/banner_impago.html";
 const BANNER_CSS_PATH = "/Plataforma_Restaurantes/css/banner_impago.css";
 const FACTURACION_URL = "/Plataforma_Restaurantes/facturacion/";
-
-const STORAGE_KEY = "axioma_aviso_bienvenida_v1";
+const STORAGE_KEY = "axioma_aviso_bienvenida_v2";
 
 let anuncioInyectado = false;
 
@@ -31,18 +31,18 @@ function wasAlreadyShown(key) {
   return sessionStorage.getItem(key) === "1";
 }
 
-function getMensajeHtml() {
-  return `Muchas gracias por utilizar nuestra plataforma, esperamos la estés disfrutando, la seguiremos mejorando poco a poco para que el control de tu negocio esté en tus manos. Recuerda que el 15 de cada mes es la fecha de expedición de tu factura electrónica, podrás encontrarla en el módulo de facturación o si quieres pagarla inmediatamente haz click <a href="${FACTURACION_URL}">aquí</a>.`;
-}
-
 async function getModalTemplateHtml() {
   try {
     const res = await fetch(BANNER_HTML_PATH, { cache: "no-store" });
     if (!res.ok) throw new Error("template not found");
     return await res.text();
   } catch {
-    return "<div id='anuncio-impago' class='impago-modal' role='dialog' aria-modal='true'><div class='impago-modal-card'><h3 id='impagoModalTitle'>Aviso importante</h3><p id='impagoModalMessage'></p><button id='impagoModalAceptar' type='button'>Aceptar</button></div></div>";
+    return "<div id='anuncio-impago' class='impago-modal' role='dialog' aria-modal='true'><div class='impago-modal-card'><h3 id='impagoModalTitle'>Aviso importante</h3><p id='impagoModalMessage'></p><div class='impago-modal-actions'><button id='impagoModalAceptar' type='button'>Aceptar</button><a id='impagoModalPagar' href='/Plataforma_Restaurantes/facturacion/'>Pagar inmediatamente</a></div></div></div>";
   }
+}
+
+function getMensajeHtml() {
+  return `Muchas gracias por utilizar nuestra plataforma, esperamos la estés disfrutando, la seguiremos mejorando poco a poco para que el control de tu negocio esté en tus manos, recuerda que el 15 de cada mes es la fecha de expedicion de tu factura electronica, podrás encontrarla en el modulo de facturacion o si quieres pagarla inmediatamente haz click aqui.`;
 }
 
 function ocultarAnuncio() {
@@ -50,6 +50,23 @@ function ocultarAnuncio() {
   if (existente) existente.remove();
   document.body.classList.remove("has-impago-banner");
   anuncioInyectado = false;
+}
+
+async function getEmpresaActual() {
+  const context = await getUserContext().catch(() => null);
+  const empresaId = context?.empresa_id;
+  const userId = context?.user?.id || null;
+
+  if (!empresaId) return { empresa: null, userId };
+
+  const { data, error } = await supabase
+    .from("empresas")
+    .select("id, mostrar_anuncio_impago")
+    .eq("id", empresaId)
+    .maybeSingle();
+
+  if (error) return { empresa: null, userId };
+  return { empresa: data || null, userId };
 }
 
 async function mostrarAnuncio({ storageKey }) {
@@ -64,7 +81,7 @@ async function mostrarAnuncio({ storageKey }) {
   if (title) title.textContent = "Aviso importante de facturación";
 
   const message = modal.querySelector("#impagoModalMessage");
-  if (message) message.innerHTML = getMensajeHtml();
+  if (message) message.textContent = getMensajeHtml();
 
   const btnAceptar = modal.querySelector("#impagoModalAceptar");
   btnAceptar?.addEventListener("click", () => {
@@ -72,17 +89,22 @@ async function mostrarAnuncio({ storageKey }) {
     ocultarAnuncio();
   });
 
+  const btnPagar = modal.querySelector("#impagoModalPagar");
+  btnPagar?.addEventListener("click", () => {
+    markAsShown(storageKey);
+  });
+  if (btnPagar) btnPagar.setAttribute("href", FACTURACION_URL);
+
   document.body.appendChild(modal);
   document.body.classList.add("has-impago-banner");
   anuncioInyectado = true;
 }
 
 export async function verificarYMostrarAnuncio() {
-  const session = await getSessionConEmpresa().catch(() => null);
-  const empresa = session?.empresa;
-  const userId = session?.user?.id;
+  ensureBannerStyles();
 
-  if (!empresa || !empresa.mostrar_anuncio_impago) {
+  const { empresa, userId } = await getEmpresaActual();
+  if (!empresa || empresa.mostrar_anuncio_impago !== true) {
     ocultarAnuncio();
     return;
   }
@@ -93,14 +115,15 @@ export async function verificarYMostrarAnuncio() {
     return;
   }
 
-  ensureBannerStyles();
   await mostrarAnuncio({ storageKey });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  verificarYMostrarAnuncio().catch(() => {
-    if (!anuncioInyectado) ocultarAnuncio();
-  });
+  setTimeout(() => {
+    verificarYMostrarAnuncio().catch(() => {
+      if (!anuncioInyectado) ocultarAnuncio();
+    });
+  }, 50);
 });
 
 window.addEventListener("empresaCambiada", () => {

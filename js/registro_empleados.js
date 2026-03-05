@@ -1,6 +1,7 @@
 import { enforceNumericInput } from "./input_utils.js";
 import { buildRequestHeaders, getUserContext } from "./session.js";
 import { WEBHOOK_REGISTRAR_EMPLEADO } from "./webhooks.js";
+import { supabase } from "./supabase.js";
 
 const form = document.getElementById("registroEmpleadoForm");
 const btnRegistrar = document.getElementById("btnRegistrar");
@@ -8,6 +9,10 @@ const statusDiv = document.getElementById("status");
 const nitInput = document.getElementById("nit_empresa");
 const cedulaInput = document.getElementById("cedula");
 const emailInput = document.getElementById("email");
+
+const usuariosPanel = document.getElementById("usuariosSistemaPanel");
+const usuariosEstado = document.getElementById("usuariosSistemaEstado");
+
 const getTimestamp = () => new Date().toISOString();
 
 enforceNumericInput([nitInput, cedulaInput]);
@@ -16,6 +21,10 @@ const setSubmitting = (isSubmitting) => {
   if (!btnRegistrar) return;
   btnRegistrar.disabled = isSubmitting;
   btnRegistrar.textContent = isSubmitting ? "Registrando..." : "Registrar empleado";
+};
+
+const setUsuariosEstado = (message) => {
+  if (usuariosEstado) usuariosEstado.textContent = message || "";
 };
 
 const readResponseBody = async (res) => {
@@ -27,6 +36,105 @@ const readResponseBody = async (res) => {
     return { message: raw };
   }
 };
+
+const escapeHtml = (value) => String(value || "")
+  .replaceAll("&", "&amp;")
+  .replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;")
+  .replaceAll('"', "&quot;")
+  .replaceAll("'", "&#39;");
+
+function renderUsuarios(rows) {
+  if (!usuariosPanel) return;
+  if (!rows.length) {
+    usuariosPanel.innerHTML = "<p class='usuarios-vacio'>No hay usuarios para gestionar en esta empresa.</p>";
+    return;
+  }
+
+  usuariosPanel.innerHTML = `
+    <div class="usuarios-tabla-wrap">
+      <table class="usuarios-tabla">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Correo/ID</th>
+            <th>Rol</th>
+            <th>Activo</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row) => {
+    const bloqueado = String(row.rol || "").toLowerCase() === "admin_root";
+    return `
+              <tr>
+                <td>${escapeHtml(row.nombre_completo || "Sin nombre")}</td>
+                <td>${escapeHtml(row.id)}</td>
+                <td>${escapeHtml(row.rol || "-")}</td>
+                <td>
+                  <label class="switch-cell ${bloqueado ? "disabled" : ""}">
+                    <input type="checkbox" data-action="toggleUsuario" data-user-id="${row.id}" ${row.activo ? "checked" : ""} ${bloqueado ? "disabled" : ""}>
+                    <span class="switch-slider"></span>
+                  </label>
+                </td>
+              </tr>
+            `;
+  }).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function cargarUsuariosGestion() {
+  const context = await getUserContext().catch(() => null);
+  if (!context?.empresa_id) {
+    setUsuariosEstado("No se pudo validar la empresa actual.");
+    return;
+  }
+
+  setUsuariosEstado("Cargando usuarios...");
+  const { data, error } = await supabase
+    .from("usuarios_sistema")
+    .select("id,nombre_completo,rol,activo")
+    .eq("empresa_id", context.empresa_id)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    setUsuariosEstado(`No se pudieron cargar usuarios: ${error.message || "sin detalle"}`);
+    return;
+  }
+
+  const rows = Array.isArray(data) ? data : [];
+  renderUsuarios(rows);
+  setUsuariosEstado(`Usuarios gestionables: ${rows.filter((item) => String(item.rol || "").toLowerCase() !== "admin_root").length}.`);
+}
+
+usuariosPanel?.addEventListener("change", async (event) => {
+  const input = event.target.closest('input[data-action="toggleUsuario"]');
+  if (!input) return;
+
+  const userId = input.dataset.userId;
+  if (!userId) return;
+
+  input.disabled = true;
+  setUsuariosEstado("Actualizando usuario...");
+
+  const { error } = await supabase
+    .from("usuarios_sistema")
+    .update({ activo: input.checked })
+    .eq("id", userId)
+    .neq("rol", "admin_root");
+
+  if (error) {
+    setUsuariosEstado(`No se pudo actualizar: ${error.message || "sin detalle"}`);
+    input.disabled = false;
+    await cargarUsuariosGestion();
+    return;
+  }
+
+  setUsuariosEstado("Estado actualizado correctamente.");
+  await cargarUsuariosGestion();
+});
 
 form?.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -77,6 +185,7 @@ form?.addEventListener("submit", async (e) => {
     if (isSuccess) {
       statusDiv.textContent = data?.message || "Empleado registrado correctamente.";
       form.reset();
+      await cargarUsuariosGestion();
     } else {
       statusDiv.textContent = data?.message || `Error registrando empleado (HTTP ${res.status}).`;
     }
@@ -86,3 +195,5 @@ form?.addEventListener("submit", async (e) => {
     setSubmitting(false);
   }
 });
+
+cargarUsuariosGestion();

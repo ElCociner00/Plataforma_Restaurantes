@@ -1,26 +1,25 @@
 .impago-modal {
   position: fixed;
   inset: 0;
-  z-index: 2500;
-  background: rgba(15, 23, 42, 0.5);
-  backdrop-filter: blur(2px);
+  z-index: 5000;
+  background: rgba(15, 23, 42, 0.58);
   display: grid;
   place-items: center;
   padding: 20px;
 }
 
 .impago-modal-card {
-  width: min(700px, 100%);
+  width: min(720px, 100%);
   background: #ffffff;
-  border: 1px solid #dbe2ea;
+  border: 1px solid #d8ccff;
   border-radius: 14px;
   padding: 24px;
-  box-shadow: 0 22px 40px rgba(15, 23, 42, 0.24);
+  box-shadow: 0 24px 50px rgba(15, 23, 42, 0.3);
 }
 
 .impago-modal-card h3 {
   margin: 0 0 12px;
-  color: #0f172a;
+  color: #312e81;
 }
 
 .impago-modal-card p {
@@ -29,14 +28,27 @@
   line-height: 1.55;
 }
 
-.impago-modal-card a {
-  color: #4f46e5;
-  font-weight: 700;
+.impago-modal-actions {
+  margin-top: 18px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
+#impagoModalPagar,
 #impagoModalAceptar {
-  margin-top: 20px;
-  min-width: 130px;
+  min-width: 160px;
+  text-align: center;
+}
+
+#impagoModalPagar {
+  text-decoration: none;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  color: #312e81;
+  font-weight: 600;
 }
 
 body.has-impago-banner {
