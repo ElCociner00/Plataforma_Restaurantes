@@ -1,9 +1,10 @@
+import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
-import { resolveEmpresaPlan } from "./plan.js";
-import { getSessionConEmpresa } from "./session.js";
 
 const BANNER_HTML_PATH = "/Plataforma_Restaurantes/components/banner_impago.html";
 const BANNER_CSS_PATH = "/Plataforma_Restaurantes/css/banner_impago.css";
+const FACTURACION_URL = "/Plataforma_Restaurantes/facturacion/";
+const STORAGE_KEY = "axioma_aviso_bienvenida_v2";
 
 let anuncioInyectado = false;
 
@@ -16,103 +17,32 @@ function ensureBannerStyles() {
   document.head.appendChild(link);
 }
 
-async function getFacturacionEmpresa(empresaId) {
-  if (!empresaId) return { deuda: 0, fecha_suspension: null };
-
-  const { data, error } = await supabase
-    .from("facturacion")
-    .select("deuda,fecha_suspension")
-    .eq("empresa_id", empresaId)
-    .maybeSingle();
-
-  if (error) return { deuda: 0, fecha_suspension: null };
-  return {
-    deuda: Number(data?.deuda || 0),
-    fecha_suspension: data?.fecha_suspension || null
-  };
+function getSessionOnceKey({ userId, empresaId }) {
+  return `${STORAGE_KEY}:${userId || "anon"}:${empresaId || "sin_empresa"}`;
 }
 
-function isImpagoByFecha(fechaSuspension) {
-  if (!fechaSuspension) return false;
-  const target = new Date(fechaSuspension);
-  if (Number.isNaN(target.getTime())) return false;
-  return Date.now() >= target.getTime();
+function markAsShown(key) {
+  if (!key) return;
+  sessionStorage.setItem(key, "1");
 }
 
-function resolveBannerState(empresa, facturacion) {
-  const plan = resolveEmpresaPlan(empresa);
-  const deuda = Number(facturacion?.deuda || empresa?.deuda_actual || 0);
-
-  if (deuda > 0) {
-    if (isImpagoByFecha(facturacion?.fecha_suspension)) {
-      return {
-        state: "impago",
-        badge: "Impago",
-        title: "Cuenta suspendida por pago",
-        message: "Tienes pagos pendientes. Regulariza tu deuda para reactivar todos los modulos."
-      };
-    }
-
-    return {
-      state: "morosa",
-      badge: "Morosa",
-      title: "Tienes una deuda pendiente",
-      message: "Realiza el pago antes de la fecha de corte para evitar suspension del servicio."
-    };
-  }
-
-  if (plan === "free") {
-    return {
-      state: "free",
-      badge: "Plan Free",
-      title: "Funciones limitadas en plan free",
-      message: "Actualiza a plan pro para activar operaciones completas y automatizaciones."
-    };
-  }
-
-  return null;
+function wasAlreadyShown(key) {
+  if (!key) return false;
+  return sessionStorage.getItem(key) === "1";
 }
 
-async function getBannerTemplateHtml() {
+async function getModalTemplateHtml() {
   try {
     const res = await fetch(BANNER_HTML_PATH, { cache: "no-store" });
     if (!res.ok) throw new Error("template not found");
     return await res.text();
   } catch {
-    return "<aside id='anuncio-impago' class='impago-banner' role='note' aria-live='polite' data-banner-state='info'><div class='impago-banner-card'><span class='impago-badge' id='impagoBannerBadge'>Aviso</span><h3 id='impagoBannerTitle'>Estado de facturacion</h3><p id='impagoBannerMessage'></p></div></aside>";
+    return "<div id='anuncio-impago' class='impago-modal' role='dialog' aria-modal='true'><div class='impago-modal-card'><h3 id='impagoModalTitle'>Aviso importante</h3><p id='impagoModalMessage'></p><div class='impago-modal-actions'><button id='impagoModalAceptar' type='button'>Aceptar</button><a id='impagoModalPagar' href='/Plataforma_Restaurantes/facturacion/'>Pagar inmediatamente</a></div></div></div>";
   }
 }
 
-async function buildBannerNode(config) {
-  const container = document.createElement("div");
-  container.innerHTML = await getBannerTemplateHtml();
-  const node = container.querySelector("#anuncio-impago");
-  if (!node) return null;
-
-  node.setAttribute("data-banner-state", config.state || "info");
-
-  const badge = node.querySelector("#impagoBannerBadge");
-  if (badge) badge.textContent = config.badge || "Aviso";
-
-  const title = node.querySelector("#impagoBannerTitle");
-  if (title) title.textContent = config.title || "Estado de facturacion";
-
-  const msgEl = node.querySelector("#impagoBannerMessage");
-  if (msgEl) msgEl.textContent = config.message || "";
-
-  return node;
-}
-
-async function mostrarAnuncio(config) {
-  const existente = document.getElementById("anuncio-impago");
-  if (existente) existente.remove();
-
-  const anuncio = await buildBannerNode(config);
-  if (!anuncio) return;
-
-  document.body.appendChild(anuncio);
-  document.body.classList.add("has-impago-banner");
-  anuncioInyectado = true;
+function getMensajeHtml() {
+  return `Muchas gracias por utilizar nuestra plataforma, esperamos la estés disfrutando, la seguiremos mejorando poco a poco para que el control de tu negocio esté en tus manos, recuerda que el 15 de cada mes es la fecha de expedicion de tu factura electronica, podrás encontrarla en el modulo de facturacion o si quieres pagarla inmediatamente haz click aqui.`;
 }
 
 function ocultarAnuncio() {
@@ -122,31 +52,78 @@ function ocultarAnuncio() {
   anuncioInyectado = false;
 }
 
+async function getEmpresaActual() {
+  const context = await getUserContext().catch(() => null);
+  const empresaId = context?.empresa_id;
+  const userId = context?.user?.id || null;
+
+  if (!empresaId) return { empresa: null, userId };
+
+  const { data, error } = await supabase
+    .from("empresas")
+    .select("id, mostrar_anuncio_impago")
+    .eq("id", empresaId)
+    .maybeSingle();
+
+  if (error) return { empresa: null, userId };
+  return { empresa: data || null, userId };
+}
+
+async function mostrarAnuncio({ storageKey }) {
+  ocultarAnuncio();
+
+  const container = document.createElement("div");
+  container.innerHTML = await getModalTemplateHtml();
+  const modal = container.querySelector("#anuncio-impago");
+  if (!modal) return;
+
+  const title = modal.querySelector("#impagoModalTitle");
+  if (title) title.textContent = "Aviso importante de facturación";
+
+  const message = modal.querySelector("#impagoModalMessage");
+  if (message) message.textContent = getMensajeHtml();
+
+  const btnAceptar = modal.querySelector("#impagoModalAceptar");
+  btnAceptar?.addEventListener("click", () => {
+    markAsShown(storageKey);
+    ocultarAnuncio();
+  });
+
+  const btnPagar = modal.querySelector("#impagoModalPagar");
+  btnPagar?.addEventListener("click", () => {
+    markAsShown(storageKey);
+  });
+  if (btnPagar) btnPagar.setAttribute("href", FACTURACION_URL);
+
+  document.body.appendChild(modal);
+  document.body.classList.add("has-impago-banner");
+  anuncioInyectado = true;
+}
+
 export async function verificarYMostrarAnuncio() {
-  const session = await getSessionConEmpresa().catch(() => null);
-  const empresa = session?.empresa;
-
-  if (!empresa || !empresa.mostrar_anuncio_impago) {
-    ocultarAnuncio();
-    return;
-  }
-
   ensureBannerStyles();
-  const facturacion = await getFacturacionEmpresa(empresa.id).catch(() => ({ deuda: 0, fecha_suspension: null }));
-  const config = resolveBannerState(empresa, facturacion);
 
-  if (!config) {
+  const { empresa, userId } = await getEmpresaActual();
+  if (!empresa || empresa.mostrar_anuncio_impago !== true) {
     ocultarAnuncio();
     return;
   }
 
-  await mostrarAnuncio(config);
+  const storageKey = getSessionOnceKey({ userId, empresaId: empresa.id });
+  if (wasAlreadyShown(storageKey)) {
+    ocultarAnuncio();
+    return;
+  }
+
+  await mostrarAnuncio({ storageKey });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  verificarYMostrarAnuncio().catch(() => {
-    if (!anuncioInyectado) ocultarAnuncio();
-  });
+  setTimeout(() => {
+    verificarYMostrarAnuncio().catch(() => {
+      if (!anuncioInyectado) ocultarAnuncio();
+    });
+  }, 50);
 });
 
 window.addEventListener("empresaCambiada", () => {

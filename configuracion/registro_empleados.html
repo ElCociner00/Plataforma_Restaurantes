@@ -2,15 +2,13 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>AXIOMA | Registrar Empleado</title>
+  <title>AXIOMA | Registrar Empleados</title>
 
   <link rel="stylesheet" href="../css/main.css">
   <link rel="stylesheet" href="../css/registro_empleados.css">
 </head>
-
 <body style="display:none">
 
-  <!-- Guardia de autenticación -->
   <script type="module" src="../js/auth_guard.js"></script>
 
   <script type="module">
@@ -22,31 +20,35 @@
   <script type="module" src="../js/registro_empleados.js"></script>
 
   <div class="main">
-    <h1>Registrar empleado</h1>
+    <h1>Registrar empleados</h1>
 
     <form id="registroEmpleadoForm">
+      <label for="nombre">Nombre completo</label>
+      <input id="nombre" type="text" required>
 
-      <!-- Datos personales -->
-      <input type="text" id="nombre" placeholder="Nombre completo del empleado" required>
-      <input type="text" id="cedula" placeholder="Cédula del empleado" inputmode="numeric" pattern="[0-9]*" required>
+      <label for="cedula">Cedula</label>
+      <input id="cedula" type="text" inputmode="numeric" pattern="[0-9]*" required>
 
-      <!-- Fecha laboral -->
-      <label class="label-info">Fecha de contratación</label>
-      <input type="date" id="fecha_ingreso" required>
+      <label for="fecha_ingreso">Fecha ingreso</label>
+      <input id="fecha_ingreso" type="date" required>
 
-      <!-- Usuario -->
-      <input type="email" id="email" placeholder="Correo electrónico" required>
+      <label for="email">Correo</label>
+      <input id="email" type="email" required>
 
-      <input type="password" id="password" placeholder="Contraseña" required>
+      <label for="password">Contrasena</label>
+      <input id="password" type="password" required>
 
-      <hr>
-      
-      <button type="submit" id="btnRegistrar">
-        Registrar empleado
-      </button>
+      <button id="btnRegistrar" type="submit">Registrar empleado</button>
 
       <div id="status"></div>
     </form>
+
+    <section class="usuarios-gestion-box" id="usuariosGestionBox">
+      <h2>Gestión de usuarios</h2>
+      <p class="usuarios-help">Activa o desactiva el acceso de usuarios de tu empresa. El rol <strong>admin_root</strong> no se puede gestionar.</p>
+      <div id="usuariosSistemaPanel"></div>
+      <p id="usuariosSistemaEstado" class="usuarios-estado"></p>
+    </section>
   </div>
 
   <script type="module" src="../js/footer.js"></script>

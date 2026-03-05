@@ -1,15 +1,11 @@
-/* ===============================
-   FORM REGISTRO EMPLEADOS
-   =============================== */
-
 form {
   max-width: 520px;
 }
 
-/* Inputs generales */
 input[type="text"],
 input[type="password"],
-input[type="date"] {
+input[type="date"],
+input[type="email"] {
   width: 100%;
   padding: 10px;
   margin-bottom: 12px;
@@ -17,28 +13,100 @@ input[type="date"] {
   border: 1px solid #d1d5db;
 }
 
-.username-field input {
-  flex: 1;
-  border-radius: 6px 0 0 6px;
-}
-
-.username-field span {
-  padding: 11px;
-  background: #e5e7eb;
-  border: 1px solid #d1d5db;
-  border-left: none;
-  border-radius: 0 6px 6px 0;
-  font-size: 0.9rem;
-  color: #374151;
-}
-
-/* Botón */
 button[type="submit"] {
   margin-top: 12px;
 }
 
-/* Estado */
 #status {
   margin-top: 10px;
   font-size: 0.9rem;
+}
+
+.usuarios-gestion-box {
+  margin-top: 26px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 14px;
+  background: #fff;
+}
+
+.usuarios-gestion-box h2 {
+  margin: 0 0 6px;
+}
+
+.usuarios-help {
+  margin: 0 0 10px;
+  color: #4b5563;
+  font-size: 0.92rem;
+}
+
+.usuarios-tabla-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.usuarios-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.usuarios-tabla th,
+.usuarios-tabla td {
+  padding: 8px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+
+.usuarios-estado,
+.usuarios-vacio {
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.switch-cell {
+  position: relative;
+  display: inline-block;
+  width: 46px;
+  height: 24px;
+}
+
+.switch-cell input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: #d1d5db;
+  border-radius: 999px;
+  transition: .2s ease;
+}
+
+.switch-slider::before {
+  content: "";
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  top: 3px;
+  border-radius: 999px;
+  background: #fff;
+  transition: .2s ease;
+}
+
+.switch-cell input:checked + .switch-slider {
+  background: #4f46e5;
+}
+
+.switch-cell input:checked + .switch-slider::before {
+  transform: translateX(22px);
+}
+
+.switch-cell.disabled .switch-slider {
+  background: #e5e7eb;
+  cursor: not-allowed;
 }

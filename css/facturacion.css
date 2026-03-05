@@ -1,98 +1,139 @@
-﻿
 .facturacion-main {
-  max-width: 1024px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 
 .factura-shell {
-  background: #eef2f7;
-  border: 1px solid #dbe2ea;
-  border-radius: 10px;
-  padding: 18px;
+  background: #f6f3ff;
+  border: 1px solid #ddd6fe;
+  border-radius: 14px;
+  padding: 24px;
 }
 
-.factura-oficio {
-  max-width: 860px;
+.factura-sheet {
+  width: min(760px, 100%);
+  min-height: 1200px;
   margin: 0 auto;
-  background: #fff;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 22px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  background: #fffefe;
+  border: 2px solid #c4b5fd;
+  border-radius: 16px;
+  padding: 28px;
   display: grid;
-  gap: 18px;
+  gap: 16px;
+  box-shadow: 0 16px 34px rgba(79, 70, 229, 0.14);
+  aspect-ratio: 9 / 16;
 }
 
-.factura-top {
-  text-align: center;
-  border-bottom: 1px solid #e5e7eb;
-  padding-bottom: 10px;
+.bloque {
+  border: 1px solid #d8ccff;
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 12px 14px;
 }
 
-.factura-top h2 { margin: 0; }
-.factura-top p { margin: 6px 0 0; color: #475569; }
-.factura-grid {
+.factura-top-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 18px;
-}
-
-.factura-grid p {
-  margin: 6px 0;
-  text-align: left;
-  color: #1f2937;
-}
-
-.factura-lineas {
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.factura-lineas .linea {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px 12px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.factura-lineas .linea.total {
-  background: #f8fafc;
-  font-weight: 700;
-}
-.factura-pago {
-  display: grid;
-  grid-template-columns: 200px 1fr;
-  gap: 16px;
+  gap: 12px;
   align-items: start;
 }
 
-.factura-qr {
-  width: 180px;
-  height: 180px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #fff;
+.bloque-empresa {
+  text-align: center;
 }
 
-.factura-actions {
+.bloque-empresa h2 {
+  margin: 0;
+  color: #312e81;
+  letter-spacing: 0.03em;
+}
+
+.bloque-empresa p {
+  margin: 6px 0 0;
+}
+
+.bloque-cabecera-factura {
+  text-align: center;
+}
+
+.bloque-cabecera-factura h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #312e81;
+}
+
+.linea-factura {
+  margin-top: 16px;
+  border-top: 1px solid #c4b5fd;
+}
+
+.factura-codigo-row {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+}
+
+.factura-datos-row {
   display: grid;
-  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
-.file-label { font-weight: 600; }
-#comprobantePago { width: 100%; }
-.factura-actions button { width: fit-content; min-width: 140px; }
-.factura-status { margin: 0; color: #334155; }
+.bloque-datos-cliente p,
+.bloque-datos-fecha p {
+  margin: 6px 0;
+}
+
+.tabla-grid {
+  display: grid;
+  grid-template-columns: 0.7fr 0.8fr 2fr 0.6fr 1.1fr 1.1fr;
+}
+
+.tabla-grid > div {
+  padding: 10px 8px;
+  text-align: center;
+  border-right: 1px solid #d8ccff;
+}
+
+.tabla-grid > div:last-child {
+  border-right: 0;
+}
+
+.tabla-grid.header > div {
+  font-weight: 700;
+  border-bottom: 1px solid #d8ccff;
+}
+
+.tabla-grid.body > div {
+  min-height: 58px;
+  display: grid;
+  place-items: center;
+}
 
 @media (max-width: 900px) {
-  .factura-grid,
-  .factura-pago {
+  .factura-shell {
+    padding: 10px;
+  }
+
+  .factura-sheet {
+    min-height: auto;
+    aspect-ratio: auto;
+    padding: 14px;
+  }
+
+  .factura-top-row,
+  .factura-datos-row {
     grid-template-columns: 1fr;
   }
 
-  .factura-qr {
-    width: 160px;
-    height: 160px;
+  .tabla-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .tabla-grid > div {
+    border-right: 0;
+    border-bottom: 1px solid #e9e4ff;
   }
 }
