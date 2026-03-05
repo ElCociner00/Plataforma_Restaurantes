@@ -31,6 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnVerificar = document.getElementById("verificar");
   const btnEnviar = document.getElementById("enviar");
   const btnLimpiar = document.getElementById("limpiarDatos");
+  const btnDescargarImagen = document.getElementById("descargarImagenCierre");
   const confirmacionEnvio = document.getElementById("confirmacionEnvio");
   const mensajeEnvio = document.getElementById("mensajeEnvio");
   const btnConfirmarEnvio = document.getElementById("confirmarEnvio");
@@ -102,6 +103,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const EXTRAS_STORAGE_KEY = "cierre_turno_extras_visibilidad";
   const MAX_LOADING_MS = 5000;
+  const BUTTON_LOADING_MS = 8000;
   const extrasRows = new Map();
   const getTimestamp = () => new Date().toISOString();
   let modoEfectivoSistema = "bruto";
@@ -115,6 +117,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const toNumberValue = (value) => {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const formatCOP = (value) => {
+    const amount = Math.round(toNumberValue(value));
+    const miles = Math.abs(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    const sign = amount < 0 ? "-" : "";
+    return `${sign}$${miles},00`;
   };
 
   const syncEfectivoRealFromCajaBolsa = () => {
@@ -667,6 +676,8 @@ document.addEventListener("DOMContentLoaded", () => {
     marcarComoNoVerificado();
   });
 
+  btnDescargarImagen?.addEventListener("click", descargarImagenResumen);
+
   btnToggleEfectivoSistema?.addEventListener("click", () => {
     modoEfectivoSistema = modoEfectivoSistema === "bruto" ? "neto" : "bruto";
     btnToggleEfectivoSistema.classList.add("rotating");
@@ -681,6 +692,156 @@ document.addEventListener("DOMContentLoaded", () => {
     input.addEventListener("input", marcarComoNoVerificado);
   });
 
+
+  const buildSnapshotRows = () => {
+    const finanzas = [
+      ["Efectivo", inputsFinanzas.efectivo.sistema.value, inputsFinanzas.efectivo.real.value, inputsDiferencias.efectivo.input.value],
+      ["Datáfono", inputsFinanzas.datafono.sistema.value, inputsFinanzas.datafono.real.value, inputsDiferencias.datafono.input.value],
+      ["Rappi", inputsFinanzas.rappi.sistema.value, inputsFinanzas.rappi.real.value, inputsDiferencias.rappi.input.value],
+      ["Nequi", inputsFinanzas.nequi.sistema.value, inputsFinanzas.nequi.real.value, inputsDiferencias.nequi.input.value],
+      ["Transferencias", inputsFinanzas.transferencias.sistema.value, inputsFinanzas.transferencias.real.value, inputsDiferencias.transferencias.input.value],
+      ["Bono regalo", inputsFinanzas.bono_regalo.sistema.value, inputsFinanzas.bono_regalo.real.value, inputsDiferencias.bono_regalo.input.value],
+      ["Propina", inputsSoloVista.propina.value, "-", "-"],
+      ["Domicilios", inputsSoloVista.domicilios.value, "-", "-"]
+    ];
+
+    const gastos = Array.from(extrasRows.values())
+      .filter((row) => row.visible)
+      .map((row) => [row.name || "Gasto", row.input?.value || row.value || "0"]);
+
+    return { finanzas, gastos };
+  };
+
+  const descargarImagenResumen = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1080;
+    canvas.height = 1920;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      setStatus("No se pudo generar la imagen del resumen.");
+      return;
+    }
+
+    const { finanzas, gastos } = buildSnapshotRows();
+    const responsableTexto = responsable?.selectedOptions?.[0]?.textContent || "-";
+    const horaLlegada = getHoraLlegadaCompleta() || "-";
+
+    ctx.fillStyle = "#f3edff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const cardX = 46;
+    const cardY = 46;
+    const cardW = canvas.width - 92;
+    const cardH = canvas.height - 92;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "#b8a6f8";
+    ctx.lineWidth = 4;
+    ctx.fillRect(cardX, cardY, cardW, cardH);
+    ctx.strokeRect(cardX, cardY, cardW, cardH);
+
+    let y = cardY + 54;
+    ctx.fillStyle = "#4c1d95";
+    ctx.font = "bold 44px Arial";
+    ctx.fillText("CIERRE DE TURNO", cardX + 36, y);
+
+    y += 48;
+    ctx.fillStyle = "#3f3f46";
+    ctx.font = "28px Arial";
+    ctx.fillText(`Fecha: ${fecha.value || "-"}`, cardX + 36, y);
+    y += 40;
+    ctx.fillText(`Responsable: ${responsableTexto}`, cardX + 36, y);
+    y += 40;
+    ctx.fillText(`Hora llegada: ${horaLlegada}`, cardX + 36, y);
+    y += 40;
+    ctx.fillText(`Inicio/Fin: ${horaInicio.value || "-"} / ${horaFin.value || "-"}`, cardX + 36, y);
+
+    y += 58;
+    ctx.fillStyle = "#5b21b6";
+    ctx.font = "bold 30px Arial";
+    ctx.fillText("Datos financieros del turno", cardX + 36, y);
+
+    y += 24;
+    const tableX = cardX + 32;
+    const tableW = cardW - 64;
+    const colW = [0.36, 0.22, 0.22, 0.2].map((r) => Math.floor(tableW * r));
+    const rowH = 42;
+
+    const drawRow = (rowY, cols, header = false) => {
+      let x = tableX;
+      ctx.strokeStyle = "#d8ccff";
+      ctx.lineWidth = 1;
+      ctx.fillStyle = header ? "#ede9fe" : "#ffffff";
+      ctx.fillRect(tableX, rowY, tableW, rowH);
+      ctx.strokeRect(tableX, rowY, tableW, rowH);
+      cols.forEach((col, i) => {
+        if (i > 0) {
+          ctx.beginPath();
+          ctx.moveTo(x, rowY);
+          ctx.lineTo(x, rowY + rowH);
+          ctx.stroke();
+        }
+        ctx.fillStyle = "#27272a";
+        ctx.font = header ? "bold 20px Arial" : "19px Arial";
+        ctx.fillText(String(col), x + 8, rowY + 27);
+        x += colW[i];
+      });
+    };
+
+    drawRow(y + 14, ["Dato", "Sistema", "Real", "Diferencia"], true);
+    let tableY = y + 14 + rowH;
+    finanzas.forEach((row) => {
+      drawRow(tableY, [
+        row[0],
+        row[1] === "-" ? "-" : formatCOP(row[1]),
+        row[2] === "-" ? "-" : formatCOP(row[2]),
+        row[3] === "-" ? "-" : formatCOP(row[3])
+      ]);
+      tableY += rowH;
+    });
+
+    y = tableY + 56;
+    ctx.fillStyle = "#5b21b6";
+    ctx.font = "bold 30px Arial";
+    ctx.fillText("Gastos", cardX + 36, y);
+
+    y += 16;
+    const gastosCols = [0.7, 0.3].map((r) => Math.floor(tableW * r));
+    const drawGasto = (rowY, cols, header = false) => {
+      let x = tableX;
+      ctx.fillStyle = header ? "#ede9fe" : "#ffffff";
+      ctx.fillRect(tableX, rowY, tableW, rowH);
+      ctx.strokeRect(tableX, rowY, tableW, rowH);
+      cols.forEach((col, i) => {
+        if (i > 0) {
+          ctx.beginPath();
+          ctx.moveTo(x, rowY);
+          ctx.lineTo(x, rowY + rowH);
+          ctx.stroke();
+        }
+        ctx.fillStyle = "#27272a";
+        ctx.font = header ? "bold 20px Arial" : "19px Arial";
+        ctx.fillText(String(col), x + 8, rowY + 27);
+        x += gastosCols[i];
+      });
+    };
+
+    drawGasto(y + 14, ["Gasto", "Valor"], true);
+    let gastoY = y + 14 + rowH;
+    (gastos.length ? gastos : [["Sin gastos", "0"]]).forEach(([name, value]) => {
+      drawGasto(gastoY, [name, formatCOP(value)]);
+      gastoY += rowH;
+    });
+
+    const link = document.createElement("a");
+    const fechaNombre = (fecha.value || new Date().toISOString().slice(0, 10));
+    link.download = `cierre_turno_${fechaNombre}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+
+    setStatus("Imagen del cierre descargada.");
+  };
+
   btnConsultar.addEventListener("click", async () => {
     setStatus("Consultando Loggro...");
 
@@ -694,11 +855,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!payload) return;
 
     try {
-      const res = await fetch(WEBHOOK_CONSULTAR_DATOS_CIERRE, {
+      const res = await fetchWithTimeout(WEBHOOK_CONSULTAR_DATOS_CIERRE, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
-      });
+      }, BUTTON_LOADING_MS);
 
       const data = await readResponseBody(res);
       if (!res.ok) {
@@ -752,7 +913,9 @@ document.addEventListener("DOMContentLoaded", () => {
       setStatus(data.message || "Datos consultados.");
       toggleButtons({ verificar: true });
     } catch (err) {
-      setStatus("Error de conexión al consultar datos.");
+      setStatus(err?.name === "AbortError"
+        ? "La consulta tardó más de 8 segundos."
+        : "Error de conexión al consultar datos.");
     }
   });
 
@@ -773,7 +936,7 @@ document.addEventListener("DOMContentLoaded", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
-      });
+      }, BUTTON_LOADING_MS);
 
       const data = await readResponseBody(res);
       if (!res.ok) {
@@ -804,7 +967,7 @@ document.addEventListener("DOMContentLoaded", () => {
       setStatus("Gastos consultados.");
     } catch (error) {
       setStatus(error?.name === "AbortError"
-        ? "La consulta de gastos tardó más de 5 segundos."
+        ? "La consulta de gastos tardó más de 8 segundos."
         : "Error consultando gastos/No hay gastos de caja  por obtener");
     }
   });
@@ -882,7 +1045,7 @@ document.addEventListener("DOMContentLoaded", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
-      });
+      }, BUTTON_LOADING_MS);
 
       const data = await readResponseBody(res);
       if (!res.ok) {
@@ -910,7 +1073,7 @@ document.addEventListener("DOMContentLoaded", () => {
       toggleButtons({ enviar: true });
     } catch (err) {
       setStatus(err?.name === "AbortError"
-        ? "La verificación tardó más de 5 segundos."
+        ? "La verificación tardó más de 8 segundos."
         : "Error de conexión al verificar.");
     } finally {
       btnVerificar.disabled = false;

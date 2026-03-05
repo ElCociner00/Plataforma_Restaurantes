@@ -30,13 +30,13 @@ const toModulePath = (moduleKey) => {
 const getForbiddenRedirect = (context, permisos = null, isSuper = false) => {
   if (isSuper) return "/Plataforma_Restaurantes/gestion_empresas/";
 
+  if (String(context?.rol || "").toLowerCase() === "operativo") {
+    return "/Plataforma_Restaurantes/cierre_turno/";
+  }
+
   const env = localStorage.getItem("app_entorno_activo") || "loggro";
   if (env === "siigo") {
     return "/Plataforma_Restaurantes/siigo/dashboard_siigo/";
-  }
-
-  if (String(context?.rol || "").toLowerCase() === "operativo") {
-    return "/Plataforma_Restaurantes/cierre_turno/";
   }
 
   const permisosArray = Array.isArray(permisos) ? permisos : [];
@@ -76,7 +76,7 @@ async function ensurePermisos(context, override) {
 export async function guardPage(pageKey, permisosOverride = null) {
   const context = await getUserContext();
   const isSuper = await esSuperAdmin().catch(() => false);
-  const userId = context?.user?.id || context?.user?.user_id;
+  const role = String(context?.rol || "").toLowerCase();
 
   if (!context && !isSuper) {
     safeRedirect(LOGIN_URL);
@@ -87,6 +87,15 @@ export async function guardPage(pageKey, permisosOverride = null) {
     console.warn("Acceso denegado a gestion empresas (solo super admin)");
     safeRedirect(getForbiddenRedirect(context));
     return;
+  }
+
+  if (!isSuper && role === "operativo") {
+    const forcedPage = "/Plataforma_Restaurantes/cierre_turno/";
+    const modulesAllowedForOperativo = new Set(["cierre_turno"]);
+    if (!modulesAllowedForOperativo.has(pageKey)) {
+      safeRedirect(forcedPage);
+      return;
+    }
   }
 
   const expectedEnvironment = pageKey === "facturacion" || pageKey === "gestion_empresas" || isSuper
@@ -122,4 +131,3 @@ export async function guardPage(pageKey, permisosOverride = null) {
     safeRedirect(getForbiddenRedirect(context, permisos, isSuper));
   }
 }
-
