@@ -377,3 +377,7 @@ input:not([readonly]) {
   color: #312e81;
   line-height: 1.4;
 }
+
+.is-hidden {
+  display: none !important;
+}

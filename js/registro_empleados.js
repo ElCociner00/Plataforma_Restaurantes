@@ -58,6 +58,7 @@ function renderUsuarios(rows) {
             <th>Usuario</th>
             <th>Correo</th>
             <th>Rol</th>
+            <th>Acceso</th>
           </tr>
         </thead>
         <tbody>
@@ -66,6 +67,12 @@ function renderUsuarios(rows) {
                 <td>${escapeHtml(row.nombre_completo || "Sin nombre")}</td>
                 <td>${escapeHtml(row.email || "-")}</td>
                 <td>${escapeHtml(row.rol || "-")}</td>
+                <td>
+                  <label class="switch-cell">
+                    <input type="checkbox" data-action="toggleUsuario" data-user-id="${escapeHtml(row.id)}" ${row.activo ? "checked" : ""}>
+                    <span class="switch-slider"></span>
+                  </label>
+                </td>
               </tr>
             `).join("")}
         </tbody>
@@ -84,7 +91,7 @@ async function cargarUsuariosGestion() {
   setUsuariosEstado("Cargando usuarios...");
   const { data, error } = await supabase
     .from("usuarios_sistema")
-    .select("id,nombre_completo,email,rol")
+    .select("id,nombre_completo,email,rol,activo")
     .eq("empresa_id", context.empresa_id)
     .order("created_at", { ascending: true });
 
@@ -99,6 +106,32 @@ async function cargarUsuariosGestion() {
 }
 
 
+
+usuariosPanel?.addEventListener("change", async (event) => {
+  const input = event.target.closest('input[data-action="toggleUsuario"]');
+  if (!input) return;
+
+  const userId = input.dataset.userId;
+  if (!userId) return;
+
+  input.disabled = true;
+  setUsuariosEstado("Actualizando usuario...");
+
+  const { error } = await supabase
+    .from("usuarios_sistema")
+    .update({ activo: input.checked })
+    .eq("id", userId)
+    .neq("rol", "admin_root");
+
+  if (error) {
+    setUsuariosEstado(`No se pudo actualizar: ${error.message || "sin detalle"}`);
+    await cargarUsuariosGestion();
+    return;
+  }
+
+  setUsuariosEstado("Estado actualizado correctamente.");
+  await cargarUsuariosGestion();
+});
 
 form?.addEventListener("submit", async (e) => {
   e.preventDefault();
