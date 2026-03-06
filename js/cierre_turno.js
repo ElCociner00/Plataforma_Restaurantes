@@ -108,6 +108,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const getTimestamp = () => new Date().toISOString();
   let modoEfectivoSistema = "bruto";
   let efectivoSistemaLoggro = 0;
+  let nombreEmpresaActual = "";
   let empresaPolicy = {
     plan: "free",
     activa: true,
@@ -345,6 +346,27 @@ document.addEventListener("DOMContentLoaded", () => {
       registrado_por: context.user?.id || context.user?.user_id,
       timestamp: getTimestamp()
     };
+  };
+
+
+
+  const cargarNombreEmpresa = async () => {
+    try {
+      const context = await getUserContext();
+      const empresaId = context?.empresa_id;
+      if (!empresaId) return;
+
+      const { data, error } = await supabase
+        .from("empresas")
+        .select("nombre_comercial")
+        .eq("id", empresaId)
+        .maybeSingle();
+
+      if (error) return;
+      nombreEmpresaActual = String(data?.nombre_comercial || "").trim();
+    } catch (_error) {
+      nombreEmpresaActual = "";
+    }
   };
 
   const cargarPoliticaEmpresa = async () => {
@@ -648,6 +670,7 @@ document.addEventListener("DOMContentLoaded", () => {
   cargarPoliticaEmpresa();
   cargarResponsables();
   cargarExtrasCatalogo();
+  cargarNombreEmpresa();
 
   fecha.addEventListener("change", () => {
     actualizarEstadoHoraFin();
@@ -675,8 +698,6 @@ document.addEventListener("DOMContentLoaded", () => {
     syncDiferenciaEfectivo();
     marcarComoNoVerificado();
   });
-
-  btnDescargarImagen?.addEventListener("click", descargarImagenResumen);
 
   btnToggleEfectivoSistema?.addEventListener("click", () => {
     modoEfectivoSistema = modoEfectivoSistema === "bruto" ? "neto" : "bruto";
@@ -707,7 +728,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const gastos = Array.from(extrasRows.values())
       .filter((row) => row.visible)
-      .map((row) => [row.name || "Gasto", row.input?.value || row.value || "0"]);
+      .map((row) => [row.nombre || "Gasto", row.input?.value || row.value || "0"]);
 
     return { finanzas, gastos };
   };
@@ -725,6 +746,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const { finanzas, gastos } = buildSnapshotRows();
     const responsableTexto = responsable?.selectedOptions?.[0]?.textContent || "-";
     const horaLlegada = getHoraLlegadaCompleta() || "-";
+    const empresaNombre = nombreEmpresaActual || "Empresa";
+    const marcaAxioma = "AXIOMA by Global Nexo Shop";
+    const fechaExpedicion = new Date().toLocaleDateString("es-CO");
 
     ctx.fillStyle = "#f3edff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -744,6 +768,15 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.fillStyle = "#4c1d95";
     ctx.font = "bold 44px Arial";
     ctx.fillText("CIERRE DE TURNO", cardX + 36, y);
+
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#312e81";
+    ctx.font = "bold 34px Arial";
+    ctx.fillText(empresaNombre, cardX + cardW - 36, y);
+    ctx.font = "bold 20px Arial";
+    ctx.fillStyle = "#6d28d9";
+    ctx.fillText(marcaAxioma, cardX + cardW - 36, y + 34);
+    ctx.textAlign = "left";
 
     y += 48;
     ctx.fillStyle = "#3f3f46";
@@ -832,6 +865,13 @@ document.addEventListener("DOMContentLoaded", () => {
       drawGasto(gastoY, [name, formatCOP(value)]);
       gastoY += rowH;
     });
+
+    const selloY = cardY + cardH - 30;
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#4338ca";
+    ctx.font = "bold 20px Arial";
+    ctx.fillText(`Expedido por AXIOMA by Global Nexo Shop (${fechaExpedicion})`, cardX + (cardW / 2), selloY);
+    ctx.textAlign = "left";
 
     const link = document.createElement("a");
     const fechaNombre = (fecha.value || new Date().toISOString().slice(0, 10));
@@ -1300,4 +1340,3 @@ document.addEventListener("DOMContentLoaded", () => {
     setStatus("Datos limpiados.");
   });
 });
-
