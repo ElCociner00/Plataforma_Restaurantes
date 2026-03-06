@@ -1,4 +1,4 @@
-﻿import { supabase } from "./supabase.js";
+import { supabase } from "./supabase.js";
 import { getUserContext, obtenerUsuarioActual } from "./session.js";
 import { isEmpresaReadOnlyPlan, normalizeEmpresaActiva, resolveEmpresaPlan } from "./plan.js";
 
@@ -38,13 +38,35 @@ export async function getEmpresaPolicy(empresaId, forceRefresh = false) {
     return empresaPolicyCache.get(empresaId);
   }
 
-  const { data, error } = await supabase
+  const response = await supabase
     .from("empresas")
     .select("id, plan, plan_actual, activo, activa")
     .eq("id", empresaId)
     .maybeSingle();
 
+  let data = response?.data || null;
+  const error = response?.error || null;
+
+  if (!data && !error) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const retry = await supabase
+      .from("empresas")
+      .select("id, plan, plan_actual, activo, activa")
+      .eq("id", empresaId)
+      .maybeSingle();
+    if (!retry?.error && retry?.data) {
+      data = retry.data;
+    }
+  }
+
   if (error) throw error;
+
+  if (!data) {
+    const unresolvedError = new Error("No se pudo resolver el plan de la empresa. Recarga la pagina e intenta de nuevo.");
+    unresolvedError.code = "PLAN_UNRESOLVED";
+    throw unresolvedError;
+  }
+
 
   const policy = {
     empresa_id: empresaId,

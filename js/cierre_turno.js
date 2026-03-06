@@ -109,9 +109,9 @@ document.addEventListener("DOMContentLoaded", () => {
   let modoEfectivoSistema = "bruto";
   let efectivoSistemaLoggro = 0;
   let empresaPolicy = {
-    plan: "pro",
+    plan: "free",
     activa: true,
-    solo_lectura: false
+    solo_lectura: true
   };
 
   const toNumberValue = (value) => {
@@ -350,7 +350,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const cargarPoliticaEmpresa = async () => {
     const context = await getUserContext();
     if (!context?.empresa_id) return;
-    empresaPolicy = await getEmpresaPolicy(context.empresa_id).catch(() => empresaPolicy);
+    empresaPolicy = await getEmpresaPolicy(context.empresa_id).catch((error) => { setStatus("Error del sistema validando el plan. Recarga la pagina."); console.error("Error cargando politica de plan:", error); return { ...empresaPolicy, plan: "free", solo_lectura: true }; });
     aplicarPoliticaSoloLectura();
   };
 
@@ -675,6 +675,8 @@ document.addEventListener("DOMContentLoaded", () => {
     syncDiferenciaEfectivo();
     marcarComoNoVerificado();
   });
+
+  btnDescargarImagen?.addEventListener("click", descargarImagenResumen);
 
   btnToggleEfectivoSistema?.addEventListener("click", () => {
     modoEfectivoSistema = modoEfectivoSistema === "bruto" ? "neto" : "bruto";
@@ -1298,3 +1300,4 @@ document.addEventListener("DOMContentLoaded", () => {
     setStatus("Datos limpiados.");
   });
 });
+
