@@ -112,6 +112,35 @@
   place-items: center;
 }
 
+.factura-payment {
+  border: 1px solid #d8ccff;
+  border-radius: 10px;
+  padding: 14px;
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+
+.btn-pago {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 170px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid #c4b5fd;
+  background: #6d28d9;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.factura-payment p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.88rem;
+}
+
 @media (max-width: 900px) {
   .factura-shell {
     padding: 10px;

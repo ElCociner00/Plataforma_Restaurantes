@@ -136,6 +136,11 @@ function render(empresa, factura) {
           <div>${fmtMoney(valorTotal)}</div>
         </div>
       </section>
+
+      <section class="factura-payment">
+        <a class="btn-pago" href="https://mpago.li/15d6BkC" target="_blank" rel="noopener noreferrer">Paga aqui</a>
+        <p>Link de Mercado Pago</p>
+      </section>
     </article>
   `;
 }
@@ -144,13 +149,11 @@ export async function cargarFactura() {
   if (!rootEl) return;
 
   const session = await getSessionConEmpresa().catch(() => null);
-  const empresa = session?.empresa;
-  if (!empresa) {
-    rootEl.innerHTML = "<p>No se pudo cargar la empresa actual.</p>";
-    return;
-  }
+  const empresa = session?.empresa || {};
 
-  currentFactura = await loadFactura(empresa.id).catch(() => null);
+  currentFactura = empresa?.id
+    ? await loadFactura(empresa.id).catch(() => null)
+    : null;
   render(empresa, currentFactura || {});
 }
 
