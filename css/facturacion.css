@@ -126,9 +126,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 128px;
-  padding: 7px 14px;
-  border-radius: 999px;
+  min-width: 148px;
+  padding: 8px 16px;
+  border-radius: 8px;
   border: 1px solid #c4b5fd;
   background: #6d28d9;
   color: #fff;
