@@ -842,6 +842,10 @@ document.addEventListener("DOMContentLoaded", () => {
     setStatus("Imagen del cierre descargada.");
   };
 
+  btnDescargarImagen?.addEventListener("click", () => {
+    descargarImagenResumen();
+  });
+
   btnConsultar.addEventListener("click", async () => {
     setStatus("Consultando Loggro...");
 
