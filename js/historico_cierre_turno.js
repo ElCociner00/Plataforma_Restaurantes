@@ -246,8 +246,28 @@ const getCandidateColumn = (columns, candidates) => {
 
 const toDateValue = (value) => {
   if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    const [, y, m, d] = isoMatch;
+    return new Date(Number(y), Number(m) - 1, Number(d));
+  }
+
+  const latamMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (latamMatch) {
+    const [, d, m, y] = latamMatch;
+    return new Date(Number(y), Number(m) - 1, Number(d));
+  }
+
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? null : new Date(date.getFullYear(), date.getMonth(), date.getDate());
 };
 
 const getPaginatedRows = () => {
@@ -634,7 +654,7 @@ const buildDifferenceSummary = (rows) => {
       base,
       sistema: totals.sistema,
       real: totals.real,
-      diferencia: totals.sistema - totals.real
+      diferencia: totals.real - totals.sistema
     }));
 };
 

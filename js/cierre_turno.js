@@ -644,7 +644,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const calcularDiferenciaEfectivoLocal = () => {
     const efectivoSistemaNeto = getEfectivoSistemaNeto();
     const efectivoReal = toNumberValue(inputsFinanzas.efectivo.real.value);
-    return efectivoSistemaNeto - efectivoReal;
+    return efectivoReal - efectivoSistemaNeto;
   };
 
   const syncDiferenciaEfectivo = () => {
@@ -1225,13 +1225,16 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
       const diferenciaEfectivoCalculada = syncDiferenciaEfectivo();
+      const diferenciaLocal = (medio) => (
+        toNumberValue(inputsFinanzas[medio]?.real?.value) - toNumberValue(inputsFinanzas[medio]?.sistema?.value)
+      );
       const diferencias = {
         efectivo: diferenciaEfectivoCalculada,
-        datafono: data.datafono_diferencia,
-        rappi: data.rappi_diferencia,
-        nequi: data.nequi_diferencia,
-        transferencias: data.transferencias_diferencia,
-        bono_regalo: data.bono_de_regalo_diferencia
+        datafono: diferenciaLocal("datafono"),
+        rappi: diferenciaLocal("rappi"),
+        nequi: diferenciaLocal("nequi"),
+        transferencias: diferenciaLocal("transferencias"),
+        bono_regalo: diferenciaLocal("bono_regalo")
       };
 
       Object.entries(diferencias).forEach(([field, value]) => {

@@ -805,7 +805,7 @@ const descargarImagenInventario = () => {
     });
   };
 
-  drawRow(y, ["Producto", "Sistema", "Gastado", "Restante"], true);
+  drawRow(y, ["Producto", "Sistema", "Stock actual", "Restante"], true);
   y += rowH;
 
   const rows = Array.from(productRows.values());
