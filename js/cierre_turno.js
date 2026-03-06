@@ -676,8 +676,6 @@ document.addEventListener("DOMContentLoaded", () => {
     marcarComoNoVerificado();
   });
 
-  btnDescargarImagen?.addEventListener("click", descargarImagenResumen);
-
   btnToggleEfectivoSistema?.addEventListener("click", () => {
     modoEfectivoSistema = modoEfectivoSistema === "bruto" ? "neto" : "bruto";
     btnToggleEfectivoSistema.classList.add("rotating");
@@ -1300,4 +1298,3 @@ document.addEventListener("DOMContentLoaded", () => {
     setStatus("Datos limpiados.");
   });
 });
-
