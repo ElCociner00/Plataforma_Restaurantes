@@ -330,3 +330,50 @@ input:not([readonly]) {
     grid-template-columns: 1fr;
   }
 }
+
+
+.snapshot-locked input:disabled,
+.snapshot-locked select:disabled,
+.snapshot-locked textarea:disabled,
+.snapshot-locked button:disabled {
+  background: #ede9fe !important;
+  border-color: #d8b4fe !important;
+  color: #6b21a8 !important;
+  opacity: 1;
+}
+
+.correccion-wrap {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+}
+
+.btn-correccion {
+  max-width: 420px;
+  width: 100%;
+  background: #7c3aed;
+}
+
+.modal-alerta {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 1200;
+}
+
+.modal-alerta-card {
+  width: min(680px, 92vw);
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #ddd6fe;
+  padding: 18px;
+  text-align: center;
+}
+
+.modal-alerta-card p {
+  margin: 0 0 14px;
+  color: #312e81;
+  line-height: 1.4;
+}

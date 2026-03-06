@@ -6,7 +6,8 @@ import {
   WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS,
   WEBHOOK_CIERRE_INVENTARIOS_CONSULTAR,
   WEBHOOK_CIERRE_INVENTARIOS_SUBIR,
-  WEBHOOK_LISTAR_RESPONSABLES
+  WEBHOOK_LISTAR_RESPONSABLES,
+  WEBHOOK_ALERTA_MANIPULACION_CIERRE
 } from "../js/webhooks.js";
 
 const fecha = document.getElementById("fecha");
@@ -22,9 +23,16 @@ const btnVerificar = document.getElementById("verificar");
 const btnSubir = document.getElementById("subir");
 const btnLimpiar = document.getElementById("limpiar");
 const btnDescargarImagen = document.getElementById("descargarImagenInventario");
+const correccionWrap = document.getElementById("correccionWrapInventario");
+const btnSolicitarCorreccion = document.getElementById("solicitarCorreccionInventario");
+const modalCorreccion = document.getElementById("modalCorreccionInventario");
+const btnAceptarCorreccion = document.getElementById("aceptarCorreccionInventario");
+const mainContainer = document.querySelector(".main");
 
 let loadingSafetyTimeoutId = null;
 let nombreEmpresaActual = "";
+let resumenDescargado = false;
+let bloqueoConstanciaActivo = false;
 
 const setStatus = (message) => {
   status.textContent = message;
@@ -313,11 +321,75 @@ const aplicarPoliticaSoloLectura = () => {
   } else {
     btnSubir.title = "";
   }
+  refreshEstadoSubir();
 };
 
 const resetVerification = () => {
   verified = false;
+  resumenDescargado = false;
   setButtonState({ subir: false });
+  refreshEstadoSubir();
+};
+
+const enviarAlertaManipulacion = (motivo) => {
+  const payload = {
+    modulo: "cierre_inventarios",
+    motivo,
+    responsable_id: responsable?.value || "",
+    responsable_nombre: responsable?.selectedOptions?.[0]?.textContent || "",
+    empresa_nombre: nombreEmpresaActual || "",
+    fecha_turno: fecha?.value || "",
+    timestamp: getTimestamp()
+  };
+
+  try {
+    const body = JSON.stringify(payload);
+    if (navigator.sendBeacon) {
+      const blob = new Blob([body], { type: "application/json" });
+      navigator.sendBeacon(WEBHOOK_ALERTA_MANIPULACION_CIERRE, blob);
+      return;
+    }
+    fetch(WEBHOOK_ALERTA_MANIPULACION_CIERRE, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+      keepalive: true
+    }).catch(() => {});
+  } catch (_error) {
+    // no-op
+  }
+};
+
+const refreshEstadoSubir = () => {
+  const habilitar = verified && resumenDescargado && empresaPolicy?.solo_lectura !== true;
+  btnSubir.disabled = !habilitar;
+};
+
+const aplicarBloqueoConstancia = (activo) => {
+  bloqueoConstanciaActivo = activo;
+
+  const controlesBloqueables = [
+    btnConsultar,
+    btnVerificar,
+    btnLimpiar,
+    btnDescargarImagen,
+    fecha,
+    responsable,
+    horaInicio,
+    horaFin
+  ].filter(Boolean);
+
+  controlesBloqueables.forEach((control) => {
+    control.disabled = activo;
+  });
+
+  productRows.forEach((rowData) => {
+    rowData.gastadoInput.disabled = activo;
+  });
+
+  correccionWrap?.classList.toggle("is-hidden", !activo);
+  mainContainer?.classList.toggle("snapshot-locked", activo);
+  refreshEstadoSubir();
 };
 
 const readRowsForWebhook = ({ includeHiddenAsZero = true } = {}) => {
@@ -587,11 +659,16 @@ btnVerificar.addEventListener("click", () => {
   }
 
   verified = true;
-  setButtonState({ subir: true });
-  setStatus("Verificación completada.");
+  setButtonState({ subir: false });
+  refreshEstadoSubir();
+  setStatus("Verificación completada. Descarga el resumen (⤓) para habilitar Subir datos.");
 });
 
 btnSubir.addEventListener("click", async () => {
+  if (!resumenDescargado) {
+    setStatus("Debes descargar el resumen (⤓) antes de subir datos.");
+    return;
+  }
   if (empresaPolicy?.solo_lectura === true) {
     setStatus("Plan FREE: no se permite subir cierres de inventario.");
     return;
@@ -641,6 +718,7 @@ btnSubir.addEventListener("click", async () => {
     }
 
     setStatus(data.message || (data.ok ? "Datos subidos correctamente." : "El webhook devolvio error."));
+    aplicarBloqueoConstancia(false);
   } catch (error) {
     setStatus("Error subiendo datos.");
   }
@@ -755,11 +833,49 @@ const descargarImagenInventario = () => {
   link.href = canvas.toDataURL("image/png");
   link.click();
 
-  setStatus("Imagen del cierre inventarios descargada.");
+  resumenDescargado = true;
+  aplicarBloqueoConstancia(true);
+  setStatus("Imagen del cierre inventarios descargada. Campos bloqueados hasta corregir o subir.");
 };
 
 btnDescargarImagen?.addEventListener("click", () => {
   descargarImagenInventario();
+});
+
+btnSolicitarCorreccion?.addEventListener("click", () => {
+  if (!bloqueoConstanciaActivo) return;
+  enviarAlertaManipulacion("solicita_correccion");
+  modalCorreccion?.classList.remove("is-hidden");
+});
+
+btnAceptarCorreccion?.addEventListener("click", () => {
+  modalCorreccion?.classList.add("is-hidden");
+  resumenDescargado = false;
+  verified = false;
+  aplicarBloqueoConstancia(false);
+  setStatus("Modo corrección habilitado. Revisa datos, verifica y descarga nuevamente antes de subir.");
+});
+
+document.addEventListener("contextmenu", (event) => {
+  if (!bloqueoConstanciaActivo || !resumenDescargado) return;
+  event.preventDefault();
+  enviarAlertaManipulacion("click_derecho_bloqueado");
+});
+
+window.addEventListener("keydown", (event) => {
+  const key = String(event.key || "").toLowerCase();
+  const recarga = key === "f5" || ((event.ctrlKey || event.metaKey) && key === "r");
+  if (!recarga || !bloqueoConstanciaActivo || !resumenDescargado) return;
+  event.preventDefault();
+  enviarAlertaManipulacion("intento_recarga_teclado");
+  setStatus("Recarga bloqueada por seguridad luego de generar constancia visual.");
+});
+
+window.addEventListener("beforeunload", (event) => {
+  if (!bloqueoConstanciaActivo || !resumenDescargado) return;
+  enviarAlertaManipulacion("intento_recarga_beforeunload");
+  event.preventDefault();
+  event.returnValue = "";
 });
 
 btnLimpiar.addEventListener("click", () => {
