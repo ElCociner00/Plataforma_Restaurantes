@@ -8,7 +8,8 @@ import {
   WEBHOOK_SUBIR_CIERRE,
   WEBHOOK_VERIFICAR_CIERRE,
   WEBHOOK_CONSULTAR_GASTOS,
-  WEBHOOK_CONSULTAR_GASTOS_CATALOGO
+  WEBHOOK_CONSULTAR_GASTOS_CATALOGO,
+  WEBHOOK_ALERTA_MANIPULACION_CIERRE
 } from "./webhooks.js";
 
 // ../js/cierre_turno.js
@@ -39,6 +40,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnToggleEfectivoSistema = document.getElementById("toggleEfectivoSistema");
   const efectivoSistemaModo = document.getElementById("efectivoSistemaModo");
   const totalGastosExtrasEl = document.getElementById("totalGastosExtras");
+  const correccionWrap = document.getElementById("correccionWrap");
+  const btnSolicitarCorreccion = document.getElementById("solicitarCorreccion");
+  const modalCorreccion = document.getElementById("modalCorreccion");
+  const btnAceptarCorreccion = document.getElementById("aceptarCorreccion");
+  const mainContainer = document.querySelector(".main");
 
   const inputsFinanzas = {
     efectivo: {
@@ -108,6 +114,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const getTimestamp = () => new Date().toISOString();
   let modoEfectivoSistema = "bruto";
   let efectivoSistemaLoggro = 0;
+  let nombreEmpresaActual = "";
+  let resumenDescargado = false;
+  let bloqueoConstanciaActivo = false;
+  let verificado = false;
   let empresaPolicy = {
     plan: "free",
     activa: true,
@@ -194,6 +204,82 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch {
       return { message: raw };
     }
+  };
+
+  const enviarAlertaManipulacion = (motivo) => {
+    const payload = {
+      modulo: "cierre_turno",
+      motivo,
+      responsable_id: responsable?.value || "",
+      responsable_nombre: responsable?.selectedOptions?.[0]?.textContent || "",
+      empresa_nombre: nombreEmpresaActual || "",
+      fecha_turno: fecha?.value || "",
+      timestamp: getTimestamp()
+    };
+
+    try {
+      const body = JSON.stringify(payload);
+      if (navigator.sendBeacon) {
+        const blob = new Blob([body], { type: "application/json" });
+        navigator.sendBeacon(WEBHOOK_ALERTA_MANIPULACION_CIERRE, blob);
+        return;
+      }
+      fetch(WEBHOOK_ALERTA_MANIPULACION_CIERRE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+        keepalive: true
+      }).catch(() => {});
+    } catch (_error) {
+      // no-op
+    }
+  };
+
+  const refreshEstadoBotonSubir = () => {
+    const habilitar = verificado && resumenDescargado && empresaPolicy?.solo_lectura !== true;
+    btnEnviar.disabled = !habilitar;
+  };
+
+  const aplicarBloqueoConstancia = (activo) => {
+    bloqueoConstanciaActivo = activo;
+
+    const controlesBloqueables = [
+      btnConsultar,
+      btnConsultarGastos,
+      btnVerificar,
+      btnLimpiar,
+      btnDescargarImagen,
+      btnToggleEfectivoSistema,
+      fecha,
+      responsable,
+      horaInicio,
+      horaFin,
+      horaLlegadaHora,
+      horaLlegadaMinuto,
+      horaLlegadaMomento,
+      efectivoApertura,
+      bolsa,
+      caja,
+      comentarios,
+      ...Object.values(inputsFinanzas).flatMap((grupo) => [grupo.sistema, grupo.real]),
+      ...Object.values(inputsDiferencias).map(({ input }) => input),
+      ...Object.values(inputsSoloVista)
+    ].filter(Boolean);
+
+    controlesBloqueables.forEach((control) => {
+      control.disabled = activo;
+    });
+
+    extrasRows.forEach((row) => {
+      if (row.input) row.input.disabled = activo;
+    });
+
+    correccionWrap?.classList.toggle("is-hidden", !activo);
+    if (mainContainer) {
+      mainContainer.classList.toggle("snapshot-locked", activo);
+    }
+
+    refreshEstadoBotonSubir();
   };
 
   const aplicarPoliticaSoloLectura = () => {
@@ -345,6 +431,27 @@ document.addEventListener("DOMContentLoaded", () => {
       registrado_por: context.user?.id || context.user?.user_id,
       timestamp: getTimestamp()
     };
+  };
+
+
+
+  const cargarNombreEmpresa = async () => {
+    try {
+      const context = await getUserContext();
+      const empresaId = context?.empresa_id;
+      if (!empresaId) return;
+
+      const { data, error } = await supabase
+        .from("empresas")
+        .select("nombre_comercial")
+        .eq("id", empresaId)
+        .maybeSingle();
+
+      if (error) return;
+      nombreEmpresaActual = String(data?.nombre_comercial || "").trim();
+    } catch (_error) {
+      nombreEmpresaActual = "";
+    }
   };
 
   const cargarPoliticaEmpresa = async () => {
@@ -590,14 +697,18 @@ document.addEventListener("DOMContentLoaded", () => {
     horaFin.disabled = false;
   };
 
-  let verificado = false;
 
   const marcarComoNoVerificado = () => {
     limpiarDiferencias();
-    if (!verificado) return;
+    resumenDescargado = false;
+    if (!verificado) {
+      refreshEstadoBotonSubir();
+      return;
+    }
     verificado = false;
     toggleButtons({ enviar: false });
     confirmacionEnvio.classList.add("is-hidden");
+    refreshEstadoBotonSubir();
   };
 
   const limpiarCamposDatos = () => {
@@ -639,6 +750,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const settingsVisibilidad = applyVisibilitySettings();
 
   toggleButtons({ consultar: true, verificar: false, enviar: false });
+  btnEnviar.disabled = true;
 
   syncEfectivoRealFromCajaBolsa();
   syncEfectivoSistemaDisplay();
@@ -648,6 +760,7 @@ document.addEventListener("DOMContentLoaded", () => {
   cargarPoliticaEmpresa();
   cargarResponsables();
   cargarExtrasCatalogo();
+  cargarNombreEmpresa();
 
   fecha.addEventListener("change", () => {
     actualizarEstadoHoraFin();
@@ -675,8 +788,6 @@ document.addEventListener("DOMContentLoaded", () => {
     syncDiferenciaEfectivo();
     marcarComoNoVerificado();
   });
-
-  btnDescargarImagen?.addEventListener("click", descargarImagenResumen);
 
   btnToggleEfectivoSistema?.addEventListener("click", () => {
     modoEfectivoSistema = modoEfectivoSistema === "bruto" ? "neto" : "bruto";
@@ -707,7 +818,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const gastos = Array.from(extrasRows.values())
       .filter((row) => row.visible)
-      .map((row) => [row.name || "Gasto", row.input?.value || row.value || "0"]);
+      .map((row) => [row.nombre || "Gasto", row.input?.value || row.value || "0"]);
 
     return { finanzas, gastos };
   };
@@ -725,6 +836,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const { finanzas, gastos } = buildSnapshotRows();
     const responsableTexto = responsable?.selectedOptions?.[0]?.textContent || "-";
     const horaLlegada = getHoraLlegadaCompleta() || "-";
+    const empresaNombre = nombreEmpresaActual || "Empresa";
+    const marcaAxioma = "AXIOMA by Global Nexo Shop";
+    const fechaExpedicion = new Date().toLocaleDateString("es-CO");
 
     ctx.fillStyle = "#f3edff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -744,6 +858,15 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.fillStyle = "#4c1d95";
     ctx.font = "bold 44px Arial";
     ctx.fillText("CIERRE DE TURNO", cardX + 36, y);
+
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#312e81";
+    ctx.font = "bold 34px Arial";
+    ctx.fillText(empresaNombre, cardX + cardW - 36, y);
+    ctx.font = "bold 20px Arial";
+    ctx.fillStyle = "#6d28d9";
+    ctx.fillText(marcaAxioma, cardX + cardW - 36, y + 34);
+    ctx.textAlign = "left";
 
     y += 48;
     ctx.fillStyle = "#3f3f46";
@@ -833,18 +956,63 @@ document.addEventListener("DOMContentLoaded", () => {
       gastoY += rowH;
     });
 
+    const selloY = cardY + cardH - 30;
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#4338ca";
+    ctx.font = "bold 20px Arial";
+    ctx.fillText(`Expedido por AXIOMA by Global Nexo Shop (${fechaExpedicion})`, cardX + (cardW / 2), selloY);
+    ctx.textAlign = "left";
+
     const link = document.createElement("a");
     const fechaNombre = (fecha.value || new Date().toISOString().slice(0, 10));
     link.download = `cierre_turno_${fechaNombre}.png`;
     link.href = canvas.toDataURL("image/png");
     link.click();
 
-    setStatus("Imagen del cierre descargada.");
+    resumenDescargado = true;
+    aplicarBloqueoConstancia(true);
+    setStatus("Imagen del cierre descargada. Campos bloqueados hasta confirmar corrección o subir cierre.");
   };
 
   btnDescargarImagen?.addEventListener("click", () => {
     descargarImagenResumen();
   });
+  btnSolicitarCorreccion?.addEventListener("click", () => {
+    if (!bloqueoConstanciaActivo) return;
+    enviarAlertaManipulacion("solicita_correccion");
+    modalCorreccion?.classList.remove("is-hidden");
+  });
+
+  btnAceptarCorreccion?.addEventListener("click", () => {
+    modalCorreccion?.classList.add("is-hidden");
+    resumenDescargado = false;
+    verificado = false;
+    aplicarBloqueoConstancia(false);
+    setStatus("Modo corrección habilitado. Vuelve a verificar y descarga nuevamente el resumen para subir.");
+  });
+
+  document.addEventListener("contextmenu", (event) => {
+    if (!bloqueoConstanciaActivo || !resumenDescargado) return;
+    event.preventDefault();
+    enviarAlertaManipulacion("click_derecho_bloqueado");
+  });
+
+  window.addEventListener("keydown", (event) => {
+    const key = String(event.key || "").toLowerCase();
+    const recarga = key === "f5" || ((event.ctrlKey || event.metaKey) && key === "r");
+    if (!recarga || !bloqueoConstanciaActivo || !resumenDescargado) return;
+    event.preventDefault();
+    enviarAlertaManipulacion("intento_recarga_teclado");
+    setStatus("Recarga bloqueada por seguridad luego de generar constancia visual.");
+  });
+
+  window.addEventListener("beforeunload", (event) => {
+    if (!bloqueoConstanciaActivo || !resumenDescargado) return;
+    enviarAlertaManipulacion("intento_recarga_beforeunload");
+    event.preventDefault();
+    event.returnValue = "";
+  });
+
 
   btnConsultar.addEventListener("click", async () => {
     setStatus("Consultando Loggro...");
@@ -1074,7 +1242,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       setStatus(data.message || "");
       verificado = true;
-      toggleButtons({ enviar: true });
+      setStatus((data.message || "") + " Descarga el resumen (⤓) para habilitar Subir cierre.");
+      refreshEstadoBotonSubir();
     } catch (err) {
       setStatus(err?.name === "AbortError"
         ? "La verificación tardó más de 8 segundos."
@@ -1234,6 +1403,10 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   btnEnviar.addEventListener("click", async () => {
+    if (!resumenDescargado) {
+      setStatus("Debes descargar el resumen (⤓) antes de subir el cierre.");
+      return;
+    }
     if (empresaPolicy?.solo_lectura === true) {
       setStatus("Plan FREE: envio bloqueado. Solo visualizacion.");
       confirmacionEnvio.classList.add("is-hidden");
@@ -1286,6 +1459,7 @@ document.addEventListener("DOMContentLoaded", () => {
       console.info("Webhook subir_cierre OK", { status: res.status, data });
       setStatus(data?.message || "Cierre enviado correctamente.");
       confirmacionEnvio.classList.add("is-hidden");
+      aplicarBloqueoConstancia(false);
     } catch (err) {
       setStatus("Error de conexión al subir cierre.");
     }
@@ -1300,4 +1474,3 @@ document.addEventListener("DOMContentLoaded", () => {
     setStatus("Datos limpiados.");
   });
 });
-

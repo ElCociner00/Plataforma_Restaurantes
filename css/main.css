@@ -22,13 +22,22 @@ body {
   background: #0f172a;
   color: white;
   padding: 12px 20px;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
+  gap: 16px;
 }
 
 .app-header .logo {
   font-weight: bold;
+}
+
+.app-header .empresa-header-nombre {
+  text-align: center;
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
 .app-header nav {

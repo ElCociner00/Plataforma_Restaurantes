@@ -81,6 +81,10 @@ export const WEBHOOK_CONSULTAR_GASTOS_VISUALIZACION =
 export const WEBHOOK_HISTORICO_CIERRE_INVENTARIOS_DATOS =
   "https://n8n.globalnexoshop.com/webhook/cierre_inventarios_historico";
 
+// cierre_turno y cierre_inventarios (alerta de posible manipulacion tras generar constancia visual)
+export const WEBHOOK_ALERTA_MANIPULACION_CIERRE =
+  "https://tu-n8n-instancia.com/webhook/alerta-manipulacion-cierre";
+
 
 // siigo/subir_facturas_siigo/index.html (consultar facturas desde correo)
 export const WEBHOOK_CARGAR_FACTURAS_CORREO =
