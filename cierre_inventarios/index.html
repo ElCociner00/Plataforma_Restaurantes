@@ -67,7 +67,17 @@
       <button id="consultar">Consultar Loggro</button>
       <button id="verificar" disabled>Verificar</button>
       <button id="subir" disabled>Subir datos</button>
+      <button id="descargarImagenInventario" class="button-icon-only" type="button" title="Descargar imagen del cierre inventarios" aria-label="Descargar imagen del cierre inventarios">⤓</button>
       <button id="limpiar" type="button">Limpiar datos</button>
+      <div class="correccion-wrap is-hidden" id="correccionWrapInventario">
+        <button id="solicitarCorreccionInventario" type="button" class="btn-correccion">Me equivoqué y necesito corregir algo</button>
+      </div>
+      <div class="modal-alerta is-hidden" id="modalCorreccionInventario" role="dialog" aria-modal="true">
+        <div class="modal-alerta-card">
+          <p>Manipular los datos de forma malintencionada despues de generar una constancia visual es un delito, tu empleador a sido informado de que estás realizando un cambio, ten en cuenta que todos los datos sean veridicos y revisa varias veces los datos antes de descargar el resumen y darle a subir cierre.</p>
+          <button id="aceptarCorreccionInventario" type="button">Entiendo y Acepto</button>
+        </div>
+      </div>
       <div id="status"></div>
     </section>
   </div>
