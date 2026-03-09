@@ -17,8 +17,8 @@ function ensureBannerStyles() {
   document.head.appendChild(link);
 }
 
-function getSessionOnceKey({ userId, empresaId }) {
-  return `${STORAGE_KEY}:${userId || "anon"}:${empresaId || "sin_empresa"}`;
+function getSessionOnceKey({ empresaId }) {
+  return `${STORAGE_KEY}:${empresaId || "sin_empresa"}`;
 }
 
 function markAsShown(key) {
@@ -90,9 +90,13 @@ async function mostrarAnuncio({ storageKey }) {
   });
 
   const btnPagar = modal.querySelector("#impagoModalPagar");
-  btnPagar?.addEventListener("click", () => {
+  btnPagar?.addEventListener("click", (event) => {
+    event.preventDefault();
     markAsShown(storageKey);
     ocultarAnuncio();
+    setTimeout(() => {
+      window.location.href = FACTURACION_URL;
+    }, 0);
   });
   if (btnPagar) btnPagar.setAttribute("href", FACTURACION_URL);
 
@@ -111,7 +115,12 @@ export async function verificarYMostrarAnuncio() {
     return;
   }
 
-  const storageKey = getSessionOnceKey({ userId, empresaId: empresa.id });
+  const storageKey = getSessionOnceKey({ empresaId: empresa.id });
+  if (wasAlreadyShown(storageKey)) {
+    ocultarAnuncio();
+    return;
+  }
+
   await mostrarAnuncio({ storageKey });
 }
 
