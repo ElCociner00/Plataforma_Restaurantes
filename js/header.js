@@ -3,6 +3,23 @@ import { getUserContext } from "./session.js";
 import { verificarYMostrarAnuncio } from "./anuncio_impago.js";
 import { ENV_LOGGRO, ENV_SIIGO, getActiveEnvironment, setActiveEnvironment } from "./environment.js";
 
+
+const obtenerNombreEmpresa = async (empresaId) => {
+  if (!empresaId) return "";
+  try {
+    const { data, error } = await supabase
+      .from("empresas")
+      .select("nombre_comercial")
+      .eq("id", empresaId)
+      .maybeSingle();
+
+    if (error) return "";
+    return String(data?.nombre_comercial || "").trim();
+  } catch (_error) {
+    return "";
+  }
+};
+
 document.addEventListener("DOMContentLoaded", async () => {
   verificarYMostrarAnuncio().catch(() => {});
   const context = await getUserContext();
@@ -18,6 +35,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const environmentForMenu = activeEnvironment || (isGlobalNoTenantPage ? ENV_LOGGRO : "");
   const header = document.createElement("header");
   header.className = "app-header";
+  const nombreEmpresa = await obtenerNombreEmpresa(context.empresa_id);
 
   const userName = context.user?.email?.split("@")[0] || "Usuario";
   const avatarLabel = userName.charAt(0).toUpperCase() || "U";
@@ -82,6 +100,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   header.innerHTML = `
     <div class="logo">AXIOMA</div>
+    <div class="empresa-header-nombre">${nombreEmpresa || ""}</div>
     <nav>${menu}</nav>
   `;
 
