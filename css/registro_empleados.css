@@ -1,5 +1,19 @@
+.main {
+  max-width: min(1100px, 96vw);
+}
+
 form {
-  max-width: 520px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+form label {
+  text-align: center;
+  display: block;
+}
+
+form input {
+  text-align: center;
 }
 
 input[type="text"],
@@ -47,6 +61,7 @@ button[type="submit"] {
 
 .usuarios-tabla {
   width: 100%;
+  min-width: 720px;
   border-collapse: collapse;
   font-size: 14px;
 }
@@ -55,7 +70,7 @@ button[type="submit"] {
 .usuarios-tabla td {
   padding: 8px;
   border-bottom: 1px solid #e5e7eb;
-  text-align: left;
+  text-align: center;
 }
 
 .usuarios-estado,
@@ -63,6 +78,22 @@ button[type="submit"] {
   margin-top: 10px;
   font-size: 13px;
 }
+
+
+@media (max-width: 700px) {
+  .main {
+    max-width: 100%;
+  }
+
+  form {
+    max-width: 100%;
+  }
+
+  .usuarios-tabla {
+    min-width: 560px;
+  }
+}
+
 
 .switch-cell {
   position: relative;
@@ -79,8 +110,8 @@ button[type="submit"] {
 
 .switch-slider {
   position: absolute;
-  cursor: pointer;
   inset: 0;
+  cursor: pointer;
   background: #d1d5db;
   border-radius: 999px;
   transition: .2s ease;
@@ -89,8 +120,8 @@ button[type="submit"] {
 .switch-slider::before {
   content: "";
   position: absolute;
-  height: 18px;
   width: 18px;
+  height: 18px;
   left: 3px;
   top: 3px;
   border-radius: 999px;
@@ -104,9 +135,4 @@ button[type="submit"] {
 
 .switch-cell input:checked + .switch-slider::before {
   transform: translateX(22px);
-}
-
-.switch-cell.disabled .switch-slider {
-  background: #e5e7eb;
-  cursor: not-allowed;
 }

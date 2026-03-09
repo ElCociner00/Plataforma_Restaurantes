@@ -15,10 +15,7 @@ const filtroFechaDesde = document.getElementById("filtroFechaDesde");
 const filtroFechaHasta = document.getElementById("filtroFechaHasta");
 const filtroHoraInicio = document.getElementById("filtroHoraInicio");
 const filtroHoraFin = document.getElementById("filtroHoraFin");
-const filtroFila = document.getElementById("filtroFila");
-const filtroNombreTurno = document.getElementById("filtroNombreTurno");
 const filtroNumeroTurno = document.getElementById("filtroNumeroTurno");
-const filtroBusquedaGeneral = document.getElementById("filtroBusquedaGeneral");
 const coincidenciasSimilares = document.getElementById("coincidenciasSimilares");
 
 const btnAplicarFiltros = document.getElementById("aplicarFiltros");
@@ -246,8 +243,28 @@ const getCandidateColumn = (columns, candidates) => {
 
 const toDateValue = (value) => {
   if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    const [, y, m, d] = isoMatch;
+    return new Date(Number(y), Number(m) - 1, Number(d));
+  }
+
+  const latamMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (latamMatch) {
+    const [, d, m, y] = latamMatch;
+    return new Date(Number(y), Number(m) - 1, Number(d));
+  }
+
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? null : new Date(date.getFullYear(), date.getMonth(), date.getDate());
 };
 
 const getPaginatedRows = () => {
@@ -510,22 +527,16 @@ const applyFilters = () => {
   const fechaHasta = filtroFechaHasta.value;
   const horaInicio = filtroHoraInicio.value;
   const horaFin = filtroHoraFin.value;
-  const filaExacta = Number(filtroFila.value || 0);
-  const nombreTurno = filtroNombreTurno?.value?.trim() || "";
   const numeroTurno = filtroNumeroTurno?.value?.trim() || "";
-  const busquedaGeneral = filtroBusquedaGeneral?.value?.trim() || "";
 
   const fechaCol = getCandidateColumn(state.allGeneralColumns, ["fecha", "date"]);
   const horaInicioCol = getCandidateColumn(state.allGeneralColumns, ["hora_inicio", "inicio"]);
   const horaFinCol = getCandidateColumn(state.allGeneralColumns, ["hora_fin", "fin"]);
-  const nombreCol = getCandidateColumn(state.allGeneralColumns, ["nombre_turno", "turno_nombre", "nombre"]);
   const numeroCol = getCandidateColumn(state.allGeneralColumns, ["numero_turno", "turno", "numero"]);
 
   const similarRows = [];
 
-  state.filteredRows = state.allRows.filter((row, index) => {
-    const rowNumber = index + 1;
-    if (filaExacta > 0 && rowNumber !== filaExacta) return false;
+  state.filteredRows = state.allRows.filter((row) => {
 
     if (fechaCol && (fechaDesde || fechaHasta)) {
       const rowDate = toDateValue(row.general[fechaCol]);
@@ -542,7 +553,7 @@ const applyFilters = () => {
 
     if (horaInicio && horaInicioCol) {
       const value = String(row.general[horaInicioCol] ?? "").slice(0, 5);
-      if (value !== horaInicio) {
+      if (value && value < horaInicio) {
         if (fuzzyMatches(horaInicio, value, 0.6)) similarRows.push(row);
         return false;
       }
@@ -550,28 +561,15 @@ const applyFilters = () => {
 
     if (horaFin && horaFinCol) {
       const value = String(row.general[horaFinCol] ?? "").slice(0, 5);
-      if (value !== horaFin) {
+      if (value && value > horaFin) {
         if (fuzzyMatches(horaFin, value, 0.6)) similarRows.push(row);
         return false;
       }
     }
 
-    if (nombreTurno) {
-      const value = getDisplayValue(row.general[nombreCol] || row.general.turno_nombre || row.id);
-      if (!fuzzyMatches(nombreTurno, value, 0.8)) return false;
-    }
-
     if (numeroTurno) {
       const value = getDisplayValue(row.general[numeroCol] || row.general.numero_turno || "");
-      if (!fuzzyMatches(numeroTurno, value, 0.8)) return false;
-    }
-
-    if (busquedaGeneral) {
-      const hayMatchGeneral = state.allGeneralColumns.some((col) => {
-        const value = getDisplayValue(row.general[col]);
-        return fuzzyMatches(busquedaGeneral, value, 0.8);
-      });
-      if (!hayMatchGeneral) return false;
+      if (!value.toLowerCase().includes(numeroTurno.toLowerCase())) return false;
     }
 
     return true;
@@ -634,7 +632,7 @@ const buildDifferenceSummary = (rows) => {
       base,
       sistema: totals.sistema,
       real: totals.real,
-      diferencia: totals.sistema - totals.real
+      diferencia: totals.real - totals.sistema
     }));
 };
 
@@ -702,6 +700,44 @@ const downloadExcel = (rows, fileName) => {
   a.download = fileName;
   a.click();
   URL.revokeObjectURL(url);
+};
+
+
+const downloadTurnoPng = (row) => {
+  if (!row) return setStatus("Selecciona un turno para descargar en PNG.");
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = 1600;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return setStatus("No se pudo generar PNG del turno.");
+
+  ctx.fillStyle = "#f3edff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(40, 40, 1000, 1520);
+  ctx.strokeStyle = "#c4b5fd";
+  ctx.strokeRect(40, 40, 1000, 1520);
+
+  let y = 100;
+  ctx.fillStyle = "#4c1d95";
+  ctx.font = "bold 40px Arial";
+  ctx.fillText("HISTORICO CIERRE TURNO", 70, y);
+
+  y += 50;
+  ctx.fillStyle = "#1f2937";
+  ctx.font = "24px Arial";
+  state.visibleGeneralColumns.forEach((col) => {
+    if (y > 1480) return;
+    ctx.fillText(`${col}: ${formatCellValue(row.general?.[col])}`, 70, y);
+    y += 34;
+  });
+
+  const link = document.createElement("a");
+  link.download = `turno_historico_${row.id || Date.now()}.png`;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+  setStatus("PNG del turno descargado.");
 };
 
 const downloadCsv = (rows, fileName) => {
@@ -817,10 +853,7 @@ btnLimpiarFiltros.addEventListener("click", () => {
   filtroFechaHasta.value = "";
   filtroHoraInicio.value = "";
   filtroHoraFin.value = "";
-  filtroFila.value = "";
-  if (filtroNombreTurno) filtroNombreTurno.value = "";
   if (filtroNumeroTurno) filtroNumeroTurno.value = "";
-  if (filtroBusquedaGeneral) filtroBusquedaGeneral.value = "";
   if (coincidenciasSimilares) coincidenciasSimilares.innerHTML = "";
   state.filteredRows = [...state.allRows];
   state.currentPage = 1;
@@ -833,6 +866,7 @@ btnDescargarDatos.addEventListener("click", () => {
   const selected = state.allRows.filter((row) => state.selectedRowIds.has(row.id));
 
   if (value === "turno_seleccionado") return downloadExcel(current ? [current] : [], "turno_seleccionado.xls");
+  if (value === "turno_seleccionado_png") return downloadTurnoPng(current);
   if (value === "turnos_marcados") return downloadExcel(selected, "turnos_marcados.xls");
   if (value === "turnos_filtrados") return downloadExcel(state.filteredRows, "turnos_filtrados.xls");
   if (value === "turnos_pagina") return downloadExcel(getPaginatedRows(), `turnos_pagina_${state.currentPage}.xls`);

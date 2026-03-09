@@ -17,8 +17,8 @@ function ensureBannerStyles() {
   document.head.appendChild(link);
 }
 
-function getSessionOnceKey({ userId, empresaId }) {
-  return `${STORAGE_KEY}:${userId || "anon"}:${empresaId || "sin_empresa"}`;
+function getSessionOnceKey({ empresaId }) {
+  return `${STORAGE_KEY}:${empresaId || "sin_empresa"}`;
 }
 
 function markAsShown(key) {
@@ -42,7 +42,7 @@ async function getModalTemplateHtml() {
 }
 
 function getMensajeHtml() {
-  return `Muchas gracias por utilizar nuestra plataforma, esperamos la estés disfrutando, la seguiremos mejorando poco a poco para que el control de tu negocio esté en tus manos, recuerda que el 15 de cada mes es la fecha de expedicion de tu factura electronica, podrás encontrarla en el modulo de facturacion o si quieres pagarla inmediatamente haz click aqui.`;
+  return `Gracias por usar AXIOMA. Recuerda que el <strong>15 de cada mes</strong> es la fecha de <strong>vencimiento</strong> de tu factura; después de esa fecha el servicio puede <strong>suspenderse</strong>. Puedes revisarla en <strong>Facturación</strong> o pagar de inmediato.`;
 }
 
 function ocultarAnuncio() {
@@ -81,7 +81,7 @@ async function mostrarAnuncio({ storageKey }) {
   if (title) title.textContent = "Aviso importante de facturación";
 
   const message = modal.querySelector("#impagoModalMessage");
-  if (message) message.textContent = getMensajeHtml();
+  if (message) message.innerHTML = getMensajeHtml();
 
   const btnAceptar = modal.querySelector("#impagoModalAceptar");
   btnAceptar?.addEventListener("click", () => {
@@ -90,14 +90,20 @@ async function mostrarAnuncio({ storageKey }) {
   });
 
   const btnPagar = modal.querySelector("#impagoModalPagar");
-  btnPagar?.addEventListener("click", () => {
+  btnPagar?.addEventListener("click", (event) => {
+    event.preventDefault();
     markAsShown(storageKey);
+    ocultarAnuncio();
+    setTimeout(() => {
+      window.location.href = FACTURACION_URL;
+    }, 0);
   });
   if (btnPagar) btnPagar.setAttribute("href", FACTURACION_URL);
 
   document.body.appendChild(modal);
   document.body.classList.add("has-impago-banner");
   anuncioInyectado = true;
+  markAsShown(storageKey);
 }
 
 export async function verificarYMostrarAnuncio() {
@@ -109,7 +115,7 @@ export async function verificarYMostrarAnuncio() {
     return;
   }
 
-  const storageKey = getSessionOnceKey({ userId, empresaId: empresa.id });
+  const storageKey = getSessionOnceKey({ empresaId: empresa.id });
   if (wasAlreadyShown(storageKey)) {
     ocultarAnuncio();
     return;
