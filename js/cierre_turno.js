@@ -813,7 +813,9 @@ document.addEventListener("DOMContentLoaded", () => {
       ["Transferencias", inputsFinanzas.transferencias.sistema.value, inputsFinanzas.transferencias.real.value, inputsDiferencias.transferencias.input.value],
       ["Bono regalo", inputsFinanzas.bono_regalo.sistema.value, inputsFinanzas.bono_regalo.real.value, inputsDiferencias.bono_regalo.input.value],
       ["Propina", inputsSoloVista.propina.value, "-", "-"],
-      ["Domicilios", inputsSoloVista.domicilios.value, "-", "-"]
+      ["Domicilios", inputsSoloVista.domicilios.value, "-", "-"],
+      ["Bolsa", "-", bolsa?.value || "0", "-"],
+      ["Caja", "-", caja?.value || "0", "-"]
     ];
 
     const gastos = Array.from(extrasRows.values())

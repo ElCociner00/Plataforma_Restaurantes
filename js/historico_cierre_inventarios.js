@@ -214,11 +214,17 @@ const applyFilters = () => {
     const productos = Array.isArray(row.productos) ? row.productos : [];
     if (hi) {
       const hiNorm = normalizeTime(hi);
-      if (!productos.some((p) => normalizeTime(p.hora_inicio) === hiNorm)) return false;
+      if (!productos.some((p) => {
+        const ini = normalizeTime(p.hora_inicio);
+        return ini && ini >= hiNorm;
+      })) return false;
     }
     if (hf) {
       const hfNorm = normalizeTime(hf);
-      if (!productos.some((p) => normalizeTime(p.hora_fin) === hfNorm)) return false;
+      if (!productos.some((p) => {
+        const fin = normalizeTime(p.hora_fin);
+        return fin && fin <= hfNorm;
+      })) return false;
     }
     if (producto && !productos.some((p) => String(p.producto_nombre || "").toLowerCase().includes(producto))) return false;
 
@@ -255,6 +261,41 @@ const exportCsv = (rows) => {
   downloadFile(lines.join("\n"), `historico_inventarios_${Date.now()}.csv`, "text/csv;charset=utf-8;");
 };
 
+
+const exportPng = (row) => {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = 1600;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return setStatus("No se pudo generar PNG.");
+
+  ctx.fillStyle = "#eef2ff";
+  ctx.fillRect(0, 0, 1080, 1600);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(40, 40, 1000, 1520);
+  ctx.strokeStyle = "#93c5fd";
+  ctx.strokeRect(40, 40, 1000, 1520);
+
+  let y = 100;
+  ctx.fillStyle = "#1e3a8a";
+  ctx.font = "bold 40px Arial";
+  ctx.fillText("HISTORICO CIERRE INVENTARIOS", 70, y);
+  y += 50;
+  ctx.fillStyle = "#1f2937";
+  ctx.font = "24px Arial";
+  state.visibleGeneralColumns.forEach((col) => {
+    if (y > 1480) return;
+    ctx.fillText(`${col}: ${formatValue(row[col])}`, 70, y);
+    y += 34;
+  });
+
+  const a = document.createElement("a");
+  a.download = `inventarios_${row.id || Date.now()}.png`;
+  a.href = canvas.toDataURL("image/png");
+  a.click();
+  setStatus("PNG del turno descargado.");
+};
+
 const exportExcel = (rows) => {
   const headers = [...state.visibleGeneralColumns, ...state.visibleDetailColumns];
   const trs = buildExportRows(rows).map((item) => `<tr>${headers.map((h) => `<td>${formatValue(item[h])}</td>`).join("")}</tr>`).join("");
@@ -267,6 +308,7 @@ const getRowsByDownloadMode = () => {
   const selected = state.allRows.filter((row) => state.selectedRowIds.has(row.id));
   const paged = getPagedRows();
   const mode = tipoDescarga.value;
+  if (mode === "abierto_png") return current ? [current] : [];
   if (mode.includes("abierto")) return current ? [current] : [];
   if (mode.includes("marcados")) return selected;
   if (mode.includes("pagina")) return paged;
@@ -329,7 +371,8 @@ btnLimpiarFiltros.addEventListener("click", () => {
 btnDescargarDatos.addEventListener("click", () => {
   const rows = getRowsByDownloadMode();
   if (!rows.length) return setStatus("No hay datos para descargar.");
-  if (tipoDescarga.value.endsWith("csv")) exportCsv(rows);
+  if (tipoDescarga.value === "abierto_png") exportPng(rows[0]);
+  else if (tipoDescarga.value.endsWith("csv")) exportCsv(rows);
   else exportExcel(rows);
   setStatus(`Descarga generada (${rows.length} turno(s)).`);
 });
