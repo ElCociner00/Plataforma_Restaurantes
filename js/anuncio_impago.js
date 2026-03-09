@@ -92,6 +92,7 @@ async function mostrarAnuncio({ storageKey }) {
   const btnPagar = modal.querySelector("#impagoModalPagar");
   btnPagar?.addEventListener("click", () => {
     markAsShown(storageKey);
+    ocultarAnuncio();
   });
   if (btnPagar) btnPagar.setAttribute("href", FACTURACION_URL);
 
