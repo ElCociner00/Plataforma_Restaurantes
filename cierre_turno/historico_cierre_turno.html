@@ -29,16 +29,8 @@
           <input type="date" id="filtroFechaDesde">
         </label>
         <label>
-          Nombre del turno
-          <input type="text" id="filtroNombreTurno" placeholder="Ej: turno mañana">
-        </label>
-        <label>
           Número de turno
           <input type="text" id="filtroNumeroTurno" placeholder="Ej: 2">
-        </label>
-        <label>
-          Búsqueda general
-          <input type="text" id="filtroBusquedaGeneral" placeholder="Busca por texto o número">
         </label>
         <label>
           Fecha hasta
@@ -52,10 +44,6 @@
           Hora fin
           <input type="time" id="filtroHoraFin">
         </label>
-        <label>
-          Fila exacta
-          <input type="number" id="filtroFila" min="1" placeholder="Ej: 105">
-        </label>
       </div>
       <div class="acciones-filtros">
         <button id="aplicarFiltros" type="button">Aplicar filtros</button>
@@ -68,6 +56,7 @@
         Tipo de descarga
         <select id="tipoDescarga">
           <option value="turno_seleccionado">Turno abierto (Excel)</option>
+          <option value="turno_seleccionado_png">Turno abierto (PNG)</option>
           <option value="turnos_marcados">Turnos marcados (Excel)</option>
           <option value="turnos_filtrados">Turnos filtrados (Excel)</option>
           <option value="turnos_pagina">Turnos de la página (Excel)</option>

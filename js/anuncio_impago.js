@@ -110,11 +110,6 @@ export async function verificarYMostrarAnuncio() {
   }
 
   const storageKey = getSessionOnceKey({ userId, empresaId: empresa.id });
-  if (wasAlreadyShown(storageKey)) {
-    ocultarAnuncio();
-    return;
-  }
-
   await mostrarAnuncio({ storageKey });
 }
 

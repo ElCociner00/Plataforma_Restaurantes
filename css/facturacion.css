@@ -103,6 +103,7 @@
 
 .tabla-grid.header > div {
   font-weight: 700;
+  font-size: 0.92rem;
   border-bottom: 1px solid #d8ccff;
 }
 
@@ -117,7 +118,7 @@
   border-radius: 10px;
   padding: 14px;
   display: grid;
-  justify-items: start;
+  justify-items: center;
   gap: 8px;
 }
 
@@ -125,13 +126,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 170px;
-  padding: 10px 16px;
-  border-radius: 10px;
+  min-width: 148px;
+  padding: 8px 16px;
+  border-radius: 8px;
   border: 1px solid #c4b5fd;
   background: #6d28d9;
   color: #fff;
   font-weight: 700;
+  font-size: 0.92rem;
   text-decoration: none;
 }
 
