@@ -54,3 +54,47 @@
 body.has-impago-banner {
   overflow: hidden;
 }
+
+
+.impago-msg {
+  text-align: center;
+}
+
+.impago-msg-title {
+  font-weight: 800;
+  color: #312e81;
+  margin-bottom: 6px;
+}
+
+.impago-msg-days {
+  font-size: clamp(1.3rem, 4vw, 1.9rem);
+  font-weight: 900;
+  color: #7c3aed;
+  margin-bottom: 8px;
+}
+
+.impago-msg-body {
+  font-size: 0.95rem;
+  color: #1f2937;
+}
+
+@media (max-width: 700px) {
+  .impago-modal {
+    padding: 12px;
+  }
+
+  .impago-modal-card {
+    width: min(560px, 96vw);
+    padding: 16px;
+  }
+
+  .impago-modal-actions {
+    flex-direction: column;
+  }
+
+  #impagoModalPagar,
+  #impagoModalAceptar {
+    width: 100%;
+    min-width: 0;
+  }
+}

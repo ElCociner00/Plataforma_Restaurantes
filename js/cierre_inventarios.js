@@ -6,7 +6,8 @@ import {
   WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS,
   WEBHOOK_CIERRE_INVENTARIOS_CONSULTAR,
   WEBHOOK_CIERRE_INVENTARIOS_SUBIR,
-  WEBHOOK_LISTAR_RESPONSABLES
+  WEBHOOK_LISTAR_RESPONSABLES,
+  WEBHOOK_ALERTA_MANIPULACION_CIERRE
 } from "../js/webhooks.js";
 
 const fecha = document.getElementById("fecha");
@@ -21,8 +22,17 @@ const btnConsultar = document.getElementById("consultar");
 const btnVerificar = document.getElementById("verificar");
 const btnSubir = document.getElementById("subir");
 const btnLimpiar = document.getElementById("limpiar");
+const btnDescargarImagen = document.getElementById("descargarImagenInventario");
+const correccionWrap = document.getElementById("correccionWrapInventario");
+const btnSolicitarCorreccion = document.getElementById("solicitarCorreccionInventario");
+const modalCorreccion = document.getElementById("modalCorreccionInventario");
+const btnAceptarCorreccion = document.getElementById("aceptarCorreccionInventario");
+const mainContainer = document.querySelector(".main");
 
 let loadingSafetyTimeoutId = null;
+let nombreEmpresaActual = "";
+let resumenDescargado = false;
+let bloqueoConstanciaActivo = false;
 
 const setStatus = (message) => {
   status.textContent = message;
@@ -94,6 +104,27 @@ const cargarPoliticaEmpresa = async () => {
   if (!context?.empresa_id) return;
   empresaPolicy = await getEmpresaPolicy(context.empresa_id).catch((error) => { setStatus("Error del sistema validando el plan. Recarga la pagina."); console.error("Error cargando politica de plan:", error); return { ...empresaPolicy, plan: "free", solo_lectura: true }; });
   aplicarPoliticaSoloLectura();
+};
+
+
+
+const cargarNombreEmpresa = async () => {
+  try {
+    const contextPayload = await getContextPayload();
+    const empresaId = contextPayload?.empresa_id || contextPayload?.tenant_id;
+    if (!empresaId) return;
+
+    const { data, error } = await supabase
+      .from("empresas")
+      .select("nombre_comercial")
+      .eq("id", empresaId)
+      .maybeSingle();
+
+    if (error) return;
+    nombreEmpresaActual = String(data?.nombre_comercial || "").trim();
+  } catch (_error) {
+    nombreEmpresaActual = "";
+  }
 };
 
 const normalizeList = (raw, keys = []) => {
@@ -290,11 +321,75 @@ const aplicarPoliticaSoloLectura = () => {
   } else {
     btnSubir.title = "";
   }
+  refreshEstadoSubir();
 };
 
 const resetVerification = () => {
   verified = false;
+  resumenDescargado = false;
   setButtonState({ subir: false });
+  refreshEstadoSubir();
+};
+
+const enviarAlertaManipulacion = (motivo) => {
+  const payload = {
+    modulo: "cierre_inventarios",
+    motivo,
+    responsable_id: responsable?.value || "",
+    responsable_nombre: responsable?.selectedOptions?.[0]?.textContent || "",
+    empresa_nombre: nombreEmpresaActual || "",
+    fecha_turno: fecha?.value || "",
+    timestamp: getTimestamp()
+  };
+
+  try {
+    const body = JSON.stringify(payload);
+    if (navigator.sendBeacon) {
+      const blob = new Blob([body], { type: "application/json" });
+      navigator.sendBeacon(WEBHOOK_ALERTA_MANIPULACION_CIERRE, blob);
+      return;
+    }
+    fetch(WEBHOOK_ALERTA_MANIPULACION_CIERRE, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+      keepalive: true
+    }).catch(() => {});
+  } catch (_error) {
+    // no-op
+  }
+};
+
+const refreshEstadoSubir = () => {
+  const habilitar = verified && resumenDescargado && empresaPolicy?.solo_lectura !== true;
+  btnSubir.disabled = !habilitar;
+};
+
+const aplicarBloqueoConstancia = (activo) => {
+  bloqueoConstanciaActivo = activo;
+
+  const controlesBloqueables = [
+    btnConsultar,
+    btnVerificar,
+    btnLimpiar,
+    btnDescargarImagen,
+    fecha,
+    responsable,
+    horaInicio,
+    horaFin
+  ].filter(Boolean);
+
+  controlesBloqueables.forEach((control) => {
+    control.disabled = activo;
+  });
+
+  productRows.forEach((rowData) => {
+    rowData.gastadoInput.disabled = activo;
+  });
+
+  correccionWrap?.classList.toggle("is-hidden", !activo);
+  mainContainer?.classList.toggle("snapshot-locked", activo);
+  refreshEstadoSubir();
 };
 
 const readRowsForWebhook = ({ includeHiddenAsZero = true } = {}) => {
@@ -564,11 +659,16 @@ btnVerificar.addEventListener("click", () => {
   }
 
   verified = true;
-  setButtonState({ subir: true });
-  setStatus("Verificación completada.");
+  setButtonState({ subir: false });
+  refreshEstadoSubir();
+  setStatus("Verificación completada. Descarga el resumen (⤓) para habilitar Subir datos.");
 });
 
 btnSubir.addEventListener("click", async () => {
+  if (!resumenDescargado) {
+    setStatus("Debes descargar el resumen (⤓) antes de subir datos.");
+    return;
+  }
   if (empresaPolicy?.solo_lectura === true) {
     setStatus("Plan FREE: no se permite subir cierres de inventario.");
     return;
@@ -618,9 +718,164 @@ btnSubir.addEventListener("click", async () => {
     }
 
     setStatus(data.message || (data.ok ? "Datos subidos correctamente." : "El webhook devolvio error."));
+    aplicarBloqueoConstancia(false);
   } catch (error) {
     setStatus("Error subiendo datos.");
   }
+});
+
+
+
+const descargarImagenInventario = () => {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = 1920;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    setStatus("No se pudo generar la imagen del cierre inventarios.");
+    return;
+  }
+
+  const empresaNombre = nombreEmpresaActual || "Empresa";
+  const responsableTexto = responsable?.selectedOptions?.[0]?.textContent || "-";
+  const marcaAxioma = "AXIOMA by Global Nexo Shop";
+  const fechaExpedicion = new Date().toLocaleDateString("es-CO");
+
+  ctx.fillStyle = "#eef2ff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const cardX = 46;
+  const cardY = 46;
+  const cardW = canvas.width - 92;
+  const cardH = canvas.height - 92;
+
+  ctx.fillStyle = "#ffffff";
+  ctx.strokeStyle = "#93c5fd";
+  ctx.lineWidth = 4;
+  ctx.fillRect(cardX, cardY, cardW, cardH);
+  ctx.strokeRect(cardX, cardY, cardW, cardH);
+
+  let y = cardY + 54;
+  ctx.fillStyle = "#1e3a8a";
+  ctx.font = "bold 42px Arial";
+  ctx.fillText("CIERRE INVENTARIOS", cardX + 36, y);
+
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#1d4ed8";
+  ctx.font = "bold 34px Arial";
+  ctx.fillText(empresaNombre, cardX + cardW - 36, y);
+  ctx.font = "bold 20px Arial";
+  ctx.fillStyle = "#4338ca";
+  ctx.fillText(marcaAxioma, cardX + cardW - 36, y + 34);
+  ctx.textAlign = "left";
+
+  y += 52;
+  ctx.fillStyle = "#334155";
+  ctx.font = "28px Arial";
+  ctx.fillText(`Fecha: ${fecha.value || "-"}`, cardX + 36, y);
+  y += 38;
+  ctx.fillText(`Responsable: ${responsableTexto}`, cardX + 36, y);
+  y += 38;
+  ctx.fillText(`Inicio/Fin: ${horaInicio.value || "-"} / ${horaFin.value || "-"}`, cardX + 36, y);
+
+  y += 52;
+  const tableX = cardX + 28;
+  const tableW = cardW - 56;
+  const cols = [0.42, 0.19, 0.19, 0.20].map((r) => Math.floor(tableW * r));
+  const rowH = 40;
+
+  const drawRow = (rowY, values, header = false) => {
+    let x = tableX;
+    ctx.fillStyle = header ? "#dbeafe" : "#ffffff";
+    ctx.strokeStyle = "#bfdbfe";
+    ctx.fillRect(tableX, rowY, tableW, rowH);
+    ctx.strokeRect(tableX, rowY, tableW, rowH);
+
+    values.forEach((value, index) => {
+      if (index > 0) {
+        ctx.beginPath();
+        ctx.moveTo(x, rowY);
+        ctx.lineTo(x, rowY + rowH);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "#1f2937";
+      ctx.font = header ? "bold 19px Arial" : "18px Arial";
+      ctx.fillText(String(value), x + 8, rowY + 26);
+      x += cols[index];
+    });
+  };
+
+  drawRow(y, ["Producto", "Sistema", "Stock actual", "Restante"], true);
+  y += rowH;
+
+  const rows = Array.from(productRows.values());
+  (rows.length ? rows : [{ nombre: "Sin productos", stockInput: { value: 0 }, gastadoInput: { value: 0 }, restanteInput: { value: 0 } }])
+    .forEach((row) => {
+      drawRow(y, [
+        row.nombre || "Producto",
+        row.stockInput?.value || 0,
+        row.gastadoInput?.value || 0,
+        row.restanteInput?.value || 0
+      ]);
+      y += rowH;
+    });
+
+  const selloY = cardY + cardH - 30;
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#4338ca";
+  ctx.font = "bold 20px Arial";
+  ctx.fillText(`Expedido por AXIOMA by Global Nexo Shop (${fechaExpedicion})`, cardX + (cardW / 2), selloY);
+  ctx.textAlign = "left";
+
+  const link = document.createElement("a");
+  const fechaNombre = (fecha.value || new Date().toISOString().slice(0, 10));
+  link.download = `cierre_inventarios_${fechaNombre}.png`;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+
+  resumenDescargado = true;
+  aplicarBloqueoConstancia(true);
+  setStatus("Imagen del cierre inventarios descargada. Campos bloqueados hasta corregir o subir.");
+};
+
+btnDescargarImagen?.addEventListener("click", () => {
+  descargarImagenInventario();
+});
+
+btnSolicitarCorreccion?.addEventListener("click", () => {
+  if (!bloqueoConstanciaActivo) return;
+  enviarAlertaManipulacion("solicita_correccion");
+  modalCorreccion?.classList.remove("is-hidden");
+});
+
+btnAceptarCorreccion?.addEventListener("click", () => {
+  modalCorreccion?.classList.add("is-hidden");
+  resumenDescargado = false;
+  verified = false;
+  aplicarBloqueoConstancia(false);
+  setStatus("Modo corrección habilitado. Revisa datos, verifica y descarga nuevamente antes de subir.");
+});
+
+document.addEventListener("contextmenu", (event) => {
+  if (!bloqueoConstanciaActivo || !resumenDescargado) return;
+  event.preventDefault();
+  enviarAlertaManipulacion("click_derecho_bloqueado");
+});
+
+window.addEventListener("keydown", (event) => {
+  const key = String(event.key || "").toLowerCase();
+  const recarga = key === "f5" || ((event.ctrlKey || event.metaKey) && key === "r");
+  if (!recarga || !bloqueoConstanciaActivo || !resumenDescargado) return;
+  event.preventDefault();
+  enviarAlertaManipulacion("intento_recarga_teclado");
+  setStatus("Recarga bloqueada por seguridad luego de generar constancia visual.");
+});
+
+window.addEventListener("beforeunload", (event) => {
+  if (!bloqueoConstanciaActivo || !resumenDescargado) return;
+  enviarAlertaManipulacion("intento_recarga_beforeunload");
+  event.preventDefault();
+  event.returnValue = "";
 });
 
 btnLimpiar.addEventListener("click", () => {
@@ -642,4 +897,5 @@ setButtonState({ consultar: true, verificar: false, subir: false });
 cargarPoliticaEmpresa();
 loadResponsables();
 renderProducts();
+cargarNombreEmpresa();
 

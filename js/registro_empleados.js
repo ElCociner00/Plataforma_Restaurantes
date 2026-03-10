@@ -6,7 +6,6 @@ import { supabase } from "./supabase.js";
 const form = document.getElementById("registroEmpleadoForm");
 const btnRegistrar = document.getElementById("btnRegistrar");
 const statusDiv = document.getElementById("status");
-const nitInput = document.getElementById("nit_empresa");
 const cedulaInput = document.getElementById("cedula");
 const emailInput = document.getElementById("email");
 
@@ -15,7 +14,7 @@ const usuariosEstado = document.getElementById("usuariosSistemaEstado");
 
 const getTimestamp = () => new Date().toISOString();
 
-enforceNumericInput([nitInput, cedulaInput]);
+enforceNumericInput([cedulaInput]);
 
 const setSubmitting = (isSubmitting) => {
   if (!btnRegistrar) return;
@@ -56,29 +55,26 @@ function renderUsuarios(rows) {
       <table class="usuarios-tabla">
         <thead>
           <tr>
-            <th>Nombre</th>
-            <th>Correo/ID</th>
+            <th>Usuario</th>
+            <th>Correo</th>
             <th>Rol</th>
-            <th>Activo</th>
+            <th>Acceso</th>
           </tr>
         </thead>
         <tbody>
-          ${rows.map((row) => {
-    const bloqueado = String(row.rol || "").toLowerCase() === "admin_root";
-    return `
+          ${rows.map((row) => `
               <tr>
                 <td>${escapeHtml(row.nombre_completo || "Sin nombre")}</td>
-                <td>${escapeHtml(row.id)}</td>
+                <td>${escapeHtml(row.email || "-")}</td>
                 <td>${escapeHtml(row.rol || "-")}</td>
                 <td>
-                  <label class="switch-cell ${bloqueado ? "disabled" : ""}">
-                    <input type="checkbox" data-action="toggleUsuario" data-user-id="${row.id}" ${row.activo ? "checked" : ""} ${bloqueado ? "disabled" : ""}>
+                  <label class="switch-cell">
+                    <input type="checkbox" data-action="toggleUsuario" data-user-id="${escapeHtml(row.id)}" ${row.activo ? "checked" : ""}>
                     <span class="switch-slider"></span>
                   </label>
                 </td>
               </tr>
-            `;
-  }).join("")}
+            `).join("")}
         </tbody>
       </table>
     </div>
@@ -95,7 +91,7 @@ async function cargarUsuariosGestion() {
   setUsuariosEstado("Cargando usuarios...");
   const { data, error } = await supabase
     .from("usuarios_sistema")
-    .select("id,nombre_completo,rol,activo")
+    .select("id,nombre_completo,email,rol,activo")
     .eq("empresa_id", context.empresa_id)
     .order("created_at", { ascending: true });
 
@@ -104,10 +100,12 @@ async function cargarUsuariosGestion() {
     return;
   }
 
-  const rows = Array.isArray(data) ? data : [];
+  const rows = (Array.isArray(data) ? data : []).filter((item) => String(item.rol || "").toLowerCase() !== "admin_root");
   renderUsuarios(rows);
-  setUsuariosEstado(`Usuarios gestionables: ${rows.filter((item) => String(item.rol || "").toLowerCase() !== "admin_root").length}.`);
+  setUsuariosEstado(`Usuarios visibles: ${rows.length}.`);
 }
+
+
 
 usuariosPanel?.addEventListener("change", async (event) => {
   const input = event.target.closest('input[data-action="toggleUsuario"]');
@@ -127,7 +125,6 @@ usuariosPanel?.addEventListener("change", async (event) => {
 
   if (error) {
     setUsuariosEstado(`No se pudo actualizar: ${error.message || "sin detalle"}`);
-    input.disabled = false;
     await cargarUsuariosGestion();
     return;
   }

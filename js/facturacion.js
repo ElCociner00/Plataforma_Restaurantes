@@ -68,14 +68,8 @@ function getFacturaCode(factura) {
 }
 
 function render(empresa, factura) {
-  const nombreEmpresa = empresa?.nombre_comercial || empresa?.razon_social || "-";
-  const nit = empresa?.nit || factura?.nit || "-";
-  const correo = empresa?.correo_empresa || factura?.correo || "-";
 
   const facturaCode = getFacturaCode(factura);
-  const fechaExpedicion = factura?.fecha_expedicion || new Date().toISOString();
-  const fechaVencimiento = factura?.fecha_corte || factura?.fecha_vencimiento || "-";
-  const expedidoPor = factura?.expedido_por || "Axioma by Global Nexo Shop SAS";
 
   const cantidad = Number(factura?.cantidad || 1);
   const descripcion = factura?.descripcion_producto || "Servicio plataforma AXIOMA";
@@ -101,20 +95,6 @@ function render(empresa, factura) {
             <span>Factura:</span>
             <strong>${escapeHtml(facturaCode)}</strong>
           </div>
-        </div>
-      </section>
-
-      <section class="factura-datos-row">
-        <div class="bloque bloque-datos-cliente">
-          <p><strong>Nombre:</strong> ${escapeHtml(nombreEmpresa)}</p>
-          <p><strong>NIT/CC:</strong> ${escapeHtml(nit)}</p>
-          <p><strong>correo:</strong> ${escapeHtml(correo)}</p>
-        </div>
-
-        <div class="bloque bloque-datos-fecha">
-          <p><strong>Fecha de expedicion:</strong> ${fmtDate(fechaExpedicion)}</p>
-          <p><strong>Vencimiento:</strong> ${fmtDate(fechaVencimiento)}</p>
-          <p><strong>Expedido por:</strong> ${escapeHtml(expedidoPor)}</p>
         </div>
       </section>
 
