@@ -47,6 +47,29 @@ const loadJson = (key, fallback) => {
 const setStatus = (message) => { status.textContent = message; };
 const formatValue = (value) => value === null || value === undefined || value === "" ? "-" : String(value);
 
+const toDateValue = (value) => {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    const [, y, m, d] = isoMatch;
+    return new Date(Number(y), Number(m) - 1, Number(d));
+  }
+
+  const latamMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (latamMatch) {
+    const [, d, m, y] = latamMatch;
+    return new Date(Number(y), Number(m) - 1, Number(d));
+  }
+
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? null : new Date(date.getFullYear(), date.getMonth(), date.getDate());
+};
+
+const normalizeTime = (value) => String(value || "").trim().slice(0, 5);
+
 const normalizeRows = (raw) => {
   if (Array.isArray(raw)) return raw;
   if (!raw || typeof raw !== "object") return [];
@@ -178,13 +201,31 @@ const applyFilters = () => {
   const producto = filtroProducto.value.trim().toLowerCase();
 
   state.filteredRows = state.allRows.filter((row) => {
-    const f = String(row.fecha_cierre || "");
-    if (desde && f < desde) return false;
-    if (hasta && f > hasta) return false;
+    const rowDate = toDateValue(row.fecha_cierre);
+    if (desde) {
+      const from = toDateValue(desde);
+      if (!rowDate || (from && rowDate < from)) return false;
+    }
+    if (hasta) {
+      const to = toDateValue(hasta);
+      if (!rowDate || (to && rowDate > to)) return false;
+    }
 
     const productos = Array.isArray(row.productos) ? row.productos : [];
-    if (hi && !productos.some((p) => String(p.hora_inicio || "") >= hi)) return false;
-    if (hf && !productos.some((p) => String(p.hora_fin || "") <= hf)) return false;
+    if (hi) {
+      const hiNorm = normalizeTime(hi);
+      if (!productos.some((p) => {
+        const ini = normalizeTime(p.hora_inicio);
+        return ini && ini >= hiNorm;
+      })) return false;
+    }
+    if (hf) {
+      const hfNorm = normalizeTime(hf);
+      if (!productos.some((p) => {
+        const fin = normalizeTime(p.hora_fin);
+        return fin && fin <= hfNorm;
+      })) return false;
+    }
     if (producto && !productos.some((p) => String(p.producto_nombre || "").toLowerCase().includes(producto))) return false;
 
     return true;
@@ -220,6 +261,41 @@ const exportCsv = (rows) => {
   downloadFile(lines.join("\n"), `historico_inventarios_${Date.now()}.csv`, "text/csv;charset=utf-8;");
 };
 
+
+const exportPng = (row) => {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = 1600;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return setStatus("No se pudo generar PNG.");
+
+  ctx.fillStyle = "#eef2ff";
+  ctx.fillRect(0, 0, 1080, 1600);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(40, 40, 1000, 1520);
+  ctx.strokeStyle = "#93c5fd";
+  ctx.strokeRect(40, 40, 1000, 1520);
+
+  let y = 100;
+  ctx.fillStyle = "#1e3a8a";
+  ctx.font = "bold 40px Arial";
+  ctx.fillText("HISTORICO CIERRE INVENTARIOS", 70, y);
+  y += 50;
+  ctx.fillStyle = "#1f2937";
+  ctx.font = "24px Arial";
+  state.visibleGeneralColumns.forEach((col) => {
+    if (y > 1480) return;
+    ctx.fillText(`${col}: ${formatValue(row[col])}`, 70, y);
+    y += 34;
+  });
+
+  const a = document.createElement("a");
+  a.download = `inventarios_${row.id || Date.now()}.png`;
+  a.href = canvas.toDataURL("image/png");
+  a.click();
+  setStatus("PNG del turno descargado.");
+};
+
 const exportExcel = (rows) => {
   const headers = [...state.visibleGeneralColumns, ...state.visibleDetailColumns];
   const trs = buildExportRows(rows).map((item) => `<tr>${headers.map((h) => `<td>${formatValue(item[h])}</td>`).join("")}</tr>`).join("");
@@ -232,6 +308,7 @@ const getRowsByDownloadMode = () => {
   const selected = state.allRows.filter((row) => state.selectedRowIds.has(row.id));
   const paged = getPagedRows();
   const mode = tipoDescarga.value;
+  if (mode === "abierto_png") return current ? [current] : [];
   if (mode.includes("abierto")) return current ? [current] : [];
   if (mode.includes("marcados")) return selected;
   if (mode.includes("pagina")) return paged;
@@ -294,7 +371,8 @@ btnLimpiarFiltros.addEventListener("click", () => {
 btnDescargarDatos.addEventListener("click", () => {
   const rows = getRowsByDownloadMode();
   if (!rows.length) return setStatus("No hay datos para descargar.");
-  if (tipoDescarga.value.endsWith("csv")) exportCsv(rows);
+  if (tipoDescarga.value === "abierto_png") exportPng(rows[0]);
+  else if (tipoDescarga.value.endsWith("csv")) exportCsv(rows);
   else exportExcel(rows);
   setStatus(`Descarga generada (${rows.length} turno(s)).`);
 });

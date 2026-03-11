@@ -3,7 +3,52 @@ import { getUserContext } from "./session.js";
 import { verificarYMostrarAnuncio } from "./anuncio_impago.js";
 import { ENV_LOGGRO, ENV_SIIGO, getActiveEnvironment, setActiveEnvironment } from "./environment.js";
 
+
+const ensureViewportMeta = () => {
+  if (document.querySelector('meta[name="viewport"]')) return;
+  const meta = document.createElement("meta");
+  meta.name = "viewport";
+  meta.content = "width=device-width, initial-scale=1.0";
+  document.head.appendChild(meta);
+};
+
+const getLogoSrc = () => {
+  const path = window.location.pathname || "";
+  return path.startsWith("/Plataforma_Restaurantes/")
+    ? "/Plataforma_Restaurantes/images/Logo.webp"
+    : "/images/Logo.webp";
+};
+
+
+
+const resolveRouteForEnv = (env, context) => {
+  const rol = String(context?.rol || "").toLowerCase();
+  if (env === ENV_SIIGO) {
+    if (rol === "operativo") return "/Plataforma_Restaurantes/cierre_turno/";
+    return "/Plataforma_Restaurantes/siigo/subir_facturas_siigo/";
+  }
+  if (rol === "operativo") return "/Plataforma_Restaurantes/cierre_turno/";
+  return "/Plataforma_Restaurantes/dashboard/";
+};
+
+const obtenerNombreEmpresa = async (empresaId) => {
+  if (!empresaId) return "";
+  try {
+    const { data, error } = await supabase
+      .from("empresas")
+      .select("nombre_comercial")
+      .eq("id", empresaId)
+      .maybeSingle();
+
+    if (error) return "";
+    return String(data?.nombre_comercial || "").trim();
+  } catch (_error) {
+    return "";
+  }
+};
+
 document.addEventListener("DOMContentLoaded", async () => {
+  ensureViewportMeta();
   verificarYMostrarAnuncio().catch(() => {});
   const context = await getUserContext();
   if (!context) return;
@@ -18,6 +63,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const environmentForMenu = activeEnvironment || (isGlobalNoTenantPage ? ENV_LOGGRO : "");
   const header = document.createElement("header");
   header.className = "app-header";
+  const nombreEmpresa = await obtenerNombreEmpresa(context.empresa_id);
 
   const userName = context.user?.email?.split("@")[0] || "Usuario";
   const avatarLabel = userName.charAt(0).toUpperCase() || "U";
@@ -81,7 +127,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   `;
 
   header.innerHTML = `
-    <div class="logo">AXIOMA</div>
+    <div class="logo"><span class="logo-mark-wrap"><img src="${getLogoSrc()}" alt="Logo AXIOMA-tech" class="logo-mark" onerror="this.style.display='none'"/></span><span>AXIOMA-tech</span></div>
+    <div class="empresa-header-nombre">${nombreEmpresa || ""}</div>
     <nav>${menu}</nav>
   `;
 
@@ -100,7 +147,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       event.preventDefault();
       const nextEnv = link.getAttribute("data-switch-env");
       setActiveEnvironment(nextEnv);
-      window.location.href = "/Plataforma_Restaurantes/entorno/";
+      window.location.href = resolveRouteForEnv(nextEnv, context);
     });
   });
 
@@ -116,6 +163,5 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.location.href = "/Plataforma_Restaurantes/index.html";
   };
 });
-
 
 
