@@ -41,8 +41,27 @@ async function getModalTemplateHtml() {
   }
 }
 
+function getDiasParaVencimiento() {
+  const hoy = new Date();
+  const dia = hoy.getDate();
+  return 15 - dia;
+}
+
 function getMensajeHtml() {
-  return `Gracias por usar AXIOMA. Recuerda que el <strong>15 de cada mes</strong> es la fecha de <strong>vencimiento</strong> de tu factura; después de esa fecha el servicio puede <strong>suspenderse</strong>. Puedes revisarla en <strong>Facturación</strong> o pagar de inmediato.`;
+  const dias = getDiasParaVencimiento();
+  const textoDias = dias > 0
+    ? `${dias} día${dias === 1 ? "" : "s"}`
+    : dias === 0
+      ? "Hoy vence"
+      : `${Math.abs(dias)} día${Math.abs(dias) === 1 ? "" : "s"} de atraso`;
+
+  return `
+    <div class="impago-msg">
+      <div class="impago-msg-title">¡Información importante!</div>
+      <div class="impago-msg-days">${textoDias}</div>
+      <div class="impago-msg-body">Recuerda pagar tu servicio para seguir disfrutándolo. Gracias por elegirnos.</div>
+    </div>
+  `;
 }
 
 function ocultarAnuncio() {
@@ -78,7 +97,7 @@ async function mostrarAnuncio({ storageKey }) {
   if (!modal) return;
 
   const title = modal.querySelector("#impagoModalTitle");
-  if (title) title.textContent = "Aviso importante de facturación";
+  if (title) title.textContent = "Aviso importante";
 
   const message = modal.querySelector("#impagoModalMessage");
   if (message) message.innerHTML = getMensajeHtml();

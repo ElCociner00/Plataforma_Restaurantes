@@ -13,6 +13,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
 /* =========================
@@ -340,3 +341,31 @@ body.has-legal-footer {
 
 
 
+
+
+@media (max-width: 900px) {
+  .app-header {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 10px 12px;
+    justify-items: center;
+  }
+
+  .app-header .empresa-header-nombre {
+    font-size: 0.95rem;
+  }
+
+  .app-header nav {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .main {
+    width: min(100%, 100vw - 16px);
+    margin: 16px auto;
+    padding: 16px;
+    border-radius: 8px;
+  }
+}

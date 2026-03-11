@@ -4,6 +4,15 @@ import { verificarYMostrarAnuncio } from "./anuncio_impago.js";
 import { ENV_LOGGRO, ENV_SIIGO, getActiveEnvironment, setActiveEnvironment } from "./environment.js";
 
 
+const ensureViewportMeta = () => {
+  if (document.querySelector('meta[name="viewport"]')) return;
+  const meta = document.createElement("meta");
+  meta.name = "viewport";
+  meta.content = "width=device-width, initial-scale=1.0";
+  document.head.appendChild(meta);
+};
+
+
 const obtenerNombreEmpresa = async (empresaId) => {
   if (!empresaId) return "";
   try {
@@ -21,6 +30,7 @@ const obtenerNombreEmpresa = async (empresaId) => {
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
+  ensureViewportMeta();
   verificarYMostrarAnuncio().catch(() => {});
   const context = await getUserContext();
   if (!context) return;
