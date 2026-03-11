@@ -129,9 +129,10 @@ button[type="submit"] {
   transition: .2s ease;
 }
 
-.switch-cell input:checked + .switch-slider {
-  background: #4f46e5;
-}
+@media (max-width: 700px) {
+  .main {
+    max-width: 100%;
+  }
 
 .switch-cell input:checked + .switch-slider::before {
   transform: translateX(22px);
