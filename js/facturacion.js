@@ -73,10 +73,9 @@ function render(empresa, factura) {
 
   const cantidad = Number(factura?.cantidad || 1);
   const descripcion = factura?.descripcion_producto || "Servicio plataforma AXIOMA";
-  const ivaValor = Number(factura?.iva || 0);
-  const valorUnitario = Number(factura?.valor_unitario || factura?.valor_plan || 0);
-  const deuda = Number(factura?.deuda || empresa?.deuda_actual || 0);
-  const valorTotal = Number(factura?.valor_total || valorUnitario + ivaValor + deuda);
+  const ivaValor = 0;
+  const valorUnitario = 59900;
+  const valorTotal = 59900;
 
   rootEl.innerHTML = `
     <article class="factura-sheet">

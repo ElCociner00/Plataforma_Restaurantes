@@ -12,6 +12,24 @@ const ensureViewportMeta = () => {
   document.head.appendChild(meta);
 };
 
+const getLogoSrc = () => {
+  const path = window.location.pathname || "";
+  return path.startsWith("/Plataforma_Restaurantes/")
+    ? "/Plataforma_Restaurantes/images/Logo.webp"
+    : "/images/Logo.webp";
+};
+
+
+
+const resolveRouteForEnv = (env, context) => {
+  const rol = String(context?.rol || "").toLowerCase();
+  if (env === ENV_SIIGO) {
+    if (rol === "operativo") return "/Plataforma_Restaurantes/cierre_turno/";
+    return "/Plataforma_Restaurantes/siigo/subir_facturas_siigo/";
+  }
+  if (rol === "operativo") return "/Plataforma_Restaurantes/cierre_turno/";
+  return "/Plataforma_Restaurantes/dashboard/";
+};
 
 const obtenerNombreEmpresa = async (empresaId) => {
   if (!empresaId) return "";
@@ -109,7 +127,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   `;
 
   header.innerHTML = `
-    <div class="logo">AXIOMA</div>
+    <div class="logo"><span class="logo-mark-wrap"><img src="${getLogoSrc()}" alt="Logo AXIOMA-tech" class="logo-mark" onerror="this.style.display='none'"/></span><span>AXIOMA-tech</span></div>
     <div class="empresa-header-nombre">${nombreEmpresa || ""}</div>
     <nav>${menu}</nav>
   `;
@@ -129,7 +147,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       event.preventDefault();
       const nextEnv = link.getAttribute("data-switch-env");
       setActiveEnvironment(nextEnv);
-      window.location.href = "/Plataforma_Restaurantes/entorno/";
+      window.location.href = resolveRouteForEnv(nextEnv, context);
     });
   });
 
@@ -145,6 +163,5 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.location.href = "/Plataforma_Restaurantes/index.html";
   };
 });
-
 
 

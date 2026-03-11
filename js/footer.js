@@ -29,7 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   footer.innerHTML = `
     <div class="legal-footer-inner">
-      <p class="legal-copy">© 2026 AXIOMA by Global Nexo SAS</p>
+      <p class="legal-copy">© 2026 AXIOMA-tech by Global Nexo SAS</p>
       <nav class="legal-links" aria-label="Legal">
         ${linksHtml}
       </nav>

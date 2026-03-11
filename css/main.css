@@ -20,7 +20,7 @@ body {
    HEADER GLOBAL
 ========================= */
 .app-header {
-  background: #0f172a;
+  background: #2c1f47;
   color: white;
   padding: 12px 20px;
   display: grid;
@@ -31,6 +31,43 @@ body {
 
 .app-header .logo {
   font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logo-mark-wrap {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+}
+
+.logo-mark {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.app-header.public-header {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}
+
+.app-header.public-header .public-logo {
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+
+.app-header .empresa-header-nombre {
+  text-align: center;
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
 .app-header .empresa-header-nombre {
@@ -133,12 +170,12 @@ button {
   border-radius: 6px;
   border: none;
   cursor: pointer;
-  background: #334155;
+  background: #5b3a8f;
   color: white;
 }
 
 button:hover {
-  background: #0f172a;
+  background: #2c1f47;
 }
 
 /* =========================
@@ -191,7 +228,7 @@ button:hover {
   top: calc(100% + 6px);
   right: 0;
   min-width: 220px;
-  background: #0f172a;
+  background: #2c1f47;
   border: 1px solid #374151;
   border-radius: 8px;
   padding: 8px;
@@ -276,7 +313,7 @@ body.has-legal-footer {
 
 .legal-footer {
   margin-top: 0;
-  background: #0f172a;
+  background: #2c1f47;
   color: #e5e7eb;
   padding: 16px 20px;
   position: fixed;
@@ -367,5 +404,16 @@ body.has-legal-footer {
     margin: 16px auto;
     padding: 16px;
     border-radius: 8px;
+  }
+}
+
+
+@media (min-width: 1200px) {
+  .main {
+    box-shadow: 0 14px 30px rgba(59, 40, 99, 0.18);
+  }
+
+  .app-header nav {
+    gap: 10px;
   }
 }
