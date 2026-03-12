@@ -118,39 +118,135 @@ function cycleStatusLabel(status) {
   return map[String(status || "").toLowerCase()] || String(status || "-");
 }
 
+
+
+function amountInWordsEs(value) {
+  const n = Math.round(Number(value || 0));
+  if (!Number.isFinite(n) || n <= 0) return "CERO PESOS M/CTE";
+  if (n === 59900) return "CINCUENTA Y NUEVE MIL NOVECIENTOS PESOS M/CTE";
+  return `${n.toLocaleString("es-CO")} PESOS M/CTE`;
+}
+
 async function resolveComprobanteUrl(path) {
   if (!path) return "";
   const { data } = await supabase.storage.from("comprobantes_pago").createSignedUrl(path, 60 * 20);
   return data?.signedUrl || "";
 }
 
-function renderFactura({ facturaCode, descripcion, valorTotal }) {
+function renderFactura({ empresa, facturaCode, descripcion, valorTotal }) {
+  const fecha = new Date();
+  const issueDate = fecha.toLocaleDateString("es-CO");
+  const issueTime = fecha.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+  const companyName = "AXIOMA by Global Nexo Shop";
+  const customerName = empresa?.nombre_comercial || empresa?.razon_social || "Cliente";
+  const customerId = empresa?.nit || "-";
+
   return `
   <article class="factura-sheet">
-    <section class="factura-top-row">
-      <div class="bloque bloque-empresa">
-        <h2>AXIOMA</h2>
-        <p>by Global Nexo Shop</p>
-        <p>Barranquilla, Atlántico, Colombia</p>
+    <section class="factura-header">
+      <div class="factura-block">
+        <h3 class="factura-title">Información del Emisor</h3>
+        <dl class="kv-list">
+          <div class="kv-line"><dt>Empresa</dt><dd>${escapeHtml(companyName)}</dd></div>
+          <div class="kv-line"><dt>NIT</dt><dd>901234567-8</dd></div>
+          <div class="kv-line"><dt>Dirección</dt><dd>Barranquilla, Atlántico, Colombia</dd></div>
+          <div class="kv-line"><dt>Teléfono</dt><dd>304 439 4874</dd></div>
+          <div class="kv-line"><dt>Correo</dt><dd>facturacion@globalnexoshop.com</dd></div>
+          <div class="kv-line"><dt>Régimen</dt><dd>Responsable de IVA</dd></div>
+          <div class="kv-line"><dt>Actividad</dt><dd>Servicios de software</dd></div>
+          <div class="kv-line"><dt>ICA</dt><dd>Régimen común</dd></div>
+        </dl>
       </div>
 
-      <div class="bloque bloque-cabecera-factura">
-        <h3>FACTURA ELECTRÓNICA DE VENTA</h3>
-        <div class="linea-factura"></div>
-        <div class="factura-codigo-row">
-          <span>Factura:</span>
-          <strong>${escapeHtml(facturaCode)}</strong>
-        </div>
+      <div class="factura-block">
+        <h3 class="factura-title">Factura Electrónica de Venta</h3>
+        <dl class="kv-list">
+          <div class="kv-line"><dt>Prefijo</dt><dd>AX</dd></div>
+          <div class="kv-line"><dt>Número</dt><dd>${escapeHtml(facturaCode)}</dd></div>
+          <div class="kv-line"><dt>Fecha expedición</dt><dd>${issueDate}</dd></div>
+          <div class="kv-line"><dt>Hora generación</dt><dd>${issueTime}</dd></div>
+          <div class="kv-line"><dt>Autorización DIAN</dt><dd>18764012345678</dd></div>
+          <div class="kv-line"><dt>Rango autorizado</dt><dd>AX-1 a AX-999999</dd></div>
+          <div class="kv-line"><dt>Forma de pago</dt><dd>Transferencia / Link</dd></div>
+        </dl>
       </div>
     </section>
 
-    <section class="bloque bloque-tabla-producto">
-      <div class="tabla-grid header">
-        <div>Cantidad</div><div>Medida</div><div>Descripción</div><div>IVA</div><div>Valor Unitario</div><div>Valor Total</div>
+    <section class="factura-block">
+      <h3 class="factura-title">Información del Cliente</h3>
+      <dl class="kv-list">
+        <div class="kv-line"><dt>Nombre</dt><dd>${escapeHtml(customerName)}</dd></div>
+        <div class="kv-line"><dt>NIT / C.C.</dt><dd>${escapeHtml(customerId)}</dd></div>
+        <div class="kv-line"><dt>Ciudad</dt><dd>Barranquilla</dd></div>
+        <div class="kv-line"><dt>Teléfono</dt><dd>-</dd></div>
+        <div class="kv-line"><dt>Código</dt><dd>${escapeHtml(empresa?.id || "-")}</dd></div>
+        <div class="kv-line"><dt>Vendedor</dt><dd>AXIOMA</dd></div>
+        <div class="kv-line"><dt>Elaborada por</dt><dd>Sistema</dd></div>
+        <div class="kv-line"><dt>Pág.</dt><dd>1/1</dd></div>
+      </dl>
+    </section>
+
+    <section class="factura-block factura-table-wrap">
+      <h3 class="factura-title">Detalle de Productos</h3>
+      <table class="factura-table">
+        <thead>
+          <tr>
+            <th class="is-num">Cantidad</th>
+            <th class="is-num">Valor Unitario</th>
+            <th>Descripción del Producto</th>
+            <th class="is-num">Total</th>
+            <th>Código</th>
+            <th>Unidad</th>
+            <th class="is-num">IVA</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="is-num">1</td>
+            <td class="is-num">${fmtMoney(valorTotal)}</td>
+            <td>${escapeHtml(descripcion)}</td>
+            <td class="is-num">${fmtMoney(valorTotal)}</td>
+            <td>AX-SUSC</td>
+            <td>MES</td>
+            <td class="is-num">0%</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="factura-block factura-tax-line">
+      <strong>Líneas:</strong> 1
+      <strong>Base gravable:</strong> ${fmtMoney(valorTotal)}
+      <strong>IVA:</strong> ${fmtMoney(0)}
+    </section>
+
+    <section class="factura-bottom">
+      <div class="factura-block factura-signature">
+        <h3 class="factura-title">Firma y sello del cliente</h3>
+        <dl class="kv-list">
+          <div class="kv-line"><dt>Nombre</dt><dd></dd></div>
+          <div class="kv-line"><dt>C.C.</dt><dd></dd></div>
+          <div class="kv-line"><dt>Fecha recibe</dt><dd></dd></div>
+          <div class="kv-line"><dt>No. cajas empaque</dt><dd></dd></div>
+        </dl>
       </div>
-      <div class="tabla-grid body">
-        <div>1</div><div>mes</div><div>${escapeHtml(descripcion)}</div><div>0</div><div>${fmtMoney(valorTotal)}</div><div>${fmtMoney(valorTotal)}</div>
+
+      <div class="factura-totals">
+        <div class="row"><strong>IVA</strong><strong>${fmtMoney(0)}</strong></div>
+        <div class="row"><strong>SUBTOTAL</strong><strong>${fmtMoney(valorTotal)}</strong></div>
+        <div class="row"><strong>RETENCIONES</strong><strong>${fmtMoney(0)}</strong></div>
+        <div class="row"><strong>TOTAL A PAGAR</strong><strong>${fmtMoney(valorTotal)}</strong></div>
       </div>
+    </section>
+
+    <section class="factura-block">
+      <strong>SON:</strong> ${escapeHtml(amountInWordsEs(valorTotal))}
+    </section>
+
+    <section class="factura-block factura-legal">
+      <div><strong>CUFE:</strong> 7f8d9a10-billing-cufe-demo</div>
+      <div><strong>Proveedor software:</strong> Global Nexo Shop S.A.S. NIT 901234567-8</div>
+      <div>La firma del cliente implica aceptación del servicio y reconocimiento de la obligación de pago.</div>
     </section>
 
     <section class="factura-payment">
@@ -308,7 +404,7 @@ export async function cargarFactura() {
   })));
 
   rootEl.innerHTML = [
-    renderFactura({ facturaCode, descripcion, valorTotal }),
+    renderFactura({ empresa, facturaCode, descripcion, valorTotal }),
     renderUploadForm(valorTotal, Boolean(billingCycle?.id)),
     renderHistory(attemptsWithUrls, cycles)
   ].join("\n");

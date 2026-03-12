@@ -25,7 +25,7 @@ const btnDescargarDatos = document.getElementById("descargarDatos");
 
 const PAGE_SIZE = 20;
 const MAX_LOADING_MS = 5000;
-const EXCLUDED_GENERAL_FIELDS = new Set(["empresa_id", "registrado_por", "total_variables", "diferencia_caja", "variables_detalle"]);
+const EXCLUDED_GENERAL_FIELDS = new Set(["empresa_id", "registrado_por", "responsable_id", "total_variables", "diferencia_caja", "variables_detalle"]);
 const EXCLUDED_DETAIL_FIELDS = new Set(["id"]);
 const getTimestamp = () => new Date().toISOString();
 

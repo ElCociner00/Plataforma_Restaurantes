@@ -256,14 +256,14 @@ th.dragging {
 }
 
 
-.tabla-wrap td,
-.tabla-wrap th {
-  white-space: normal;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+.tabla-wrap td {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .tabla-wrap th {
+  white-space: normal;
   overflow-wrap: break-word;
   word-break: normal;
 }
