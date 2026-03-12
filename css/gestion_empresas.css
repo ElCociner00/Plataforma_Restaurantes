@@ -56,3 +56,64 @@
 @media (max-width: 920px) {
   .override-grid { grid-template-columns: 1fr; }
 }
+.override-card {
+  margin: 16px 0 24px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.override-card h2 {
+  margin: 0 0 12px;
+  font-size: 1.05rem;
+  color: #111827;
+}
+
+.override-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.override-grid label {
+  font-weight: 600;
+  color: #374151;
+}
+
+.override-grid select,
+.override-grid input[type="date"] {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+}
+
+.override-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
+#btnAplicarOverride {
+  grid-column: 1 / -1;
+  justify-self: start;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid #1d4ed8;
+  background: #1d4ed8;
+  color: #fff;
+  font-weight: 600;
+}
+
+#btnAplicarOverride:hover {
+  background: #1e40af;
+}
+
+@media (max-width: 900px) {
+  .override-grid {
+    grid-template-columns: 1fr;
+  }
+}

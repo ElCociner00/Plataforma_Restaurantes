@@ -6,6 +6,27 @@ import { WEBHOOKS } from "./webhooks.js";
 const bodyEl = document.getElementById("revisionBody");
 const statusEl = document.getElementById("statusRevision");
 const btnReload = document.getElementById("btnRecargarRevision");
+const state = {
+  rows: []
+};
+
+const setStatus = (message) => {
+  if (statusEl) statusEl.textContent = message || "";
+};
+
+const fmtMoney = (value) => Number(value || 0).toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+const fmtDateTime = (value) => {
+  if (!value) return "-";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? "-" : d.toLocaleString("es-CO");
+};
+
+const escapeHtml = (value) => String(value || "")
+  .replaceAll("&", "&amp;")
+  .replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;")
+  .replaceAll('"', "&quot;")
+  .replaceAll("'", "&#39;");
 
 const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ""; };
 const fmtMoney = (v) => Number(v || 0).toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
@@ -166,6 +187,69 @@ async function notificarWebhook({ tipo, attemptId, observaciones }) {
   }).catch(() => {});
 }
 
+async function aprobarPago(row, observaciones, revisadoPor) {
+  const { error: attemptError } = await supabase
+    .from("payment_attempts")
+    .update({
+      estado: "aprobado",
+      revisado_por: revisadoPor || null,
+      observaciones: observaciones || null
+    })
+    .eq("id", row.id);
+
+  if (attemptError) throw attemptError;
+
+  const { error: cycleError } = await supabase
+    .from("billing_cycles")
+    .update({
+      estado: "paid_verified",
+      banner_activo: false
+    })
+    .eq("id", row.billing_cycle_id);
+
+  if (cycleError) throw cycleError;
+
+  await registrarEvento({
+    empresaId: row.empresa_id,
+    billingCycleId: row.billing_cycle_id,
+    tipo: "pago_aprobado",
+    actor: revisadoPor,
+    payload: {
+      attempt_id: row.id,
+      observaciones: observaciones || null
+    }
+  });
+}
+
+async function rechazarPago(row, observaciones, revisadoPor) {
+  const { error: attemptError } = await supabase
+    .from("payment_attempts")
+    .update({
+      estado: "rechazado",
+      revisado_por: revisadoPor || null,
+      observaciones: observaciones || null
+    })
+    .eq("id", row.id);
+
+  if (attemptError) throw attemptError;
+
+  await registrarEvento({
+    empresaId: row.empresa_id,
+    billingCycleId: row.billing_cycle_id,
+    tipo: "pago_rechazado",
+    actor: revisadoPor,
+    payload: {
+      attempt_id: row.id,
+      observaciones: observaciones || null
+    }
+  });
+}
+
+function getObservaciones(id) {
+  const input = bodyEl?.querySelector(`textarea[data-obs-id="${id}"]`);
+  return input?.value?.trim() || null;
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   const ok = await esSuperAdmin().catch(() => false);
   if (!ok) {
@@ -176,8 +260,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadRows();
   btnReload?.addEventListener("click", loadRows);
 
-  bodyEl?.addEventListener("click", async (ev) => {
-    const btn = ev.target.closest("button[data-action]");
+  bodyEl?.addEventListener("click", async (event) => {
+    const btn = event.target.closest("button[data-action]");
     if (!btn) return;
 
     const id = btn.dataset.id;
