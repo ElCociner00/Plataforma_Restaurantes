@@ -41,19 +41,12 @@ async function getModalTemplateHtml() {
   }
 }
 
-function getDiasParaVencimiento() {
-  const hoy = new Date();
-  const dia = hoy.getDate();
-  return 15 - dia;
-}
-
-function getMensajeHtml() {
-  const dias = getDiasParaVencimiento();
+function getMensajeHtml(dias) {
   const textoDias = dias > 0
-    ? `${dias} día${dias === 1 ? "" : "s"}`
+    ? `Faltan ${dias} día${dias === 1 ? "" : "s"}`
     : dias === 0
-      ? "Hoy vence"
-      : `${Math.abs(dias)} día${Math.abs(dias) === 1 ? "" : "s"} de atraso`;
+      ? "Vence hoy"
+      : "Atrasado";
 
   return `
     <div class="impago-msg">
@@ -71,24 +64,44 @@ function ocultarAnuncio() {
   anuncioInyectado = false;
 }
 
-async function getEmpresaActual() {
+const getCurrentPeriod = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+async function getBannerState() {
   const context = await getUserContext().catch(() => null);
   const empresaId = context?.empresa_id;
-  const userId = context?.user?.id || null;
+  if (!empresaId) return { empresaId: null, bannerActivo: false, diasRestantes: null };
 
-  if (!empresaId) return { empresa: null, userId };
+  const periodo = getCurrentPeriod();
+  const { data: cycle } = await supabase
+    .from("billing_cycles")
+    .select("id, banner_activo, dias_restantes_cache")
+    .eq("empresa_id", empresaId)
+    .eq("periodo", periodo)
+    .maybeSingle();
 
-  const { data, error } = await supabase
+  if (cycle) {
+    return {
+      empresaId,
+      bannerActivo: cycle.banner_activo === true,
+      diasRestantes: Number.isInteger(cycle.dias_restantes_cache) ? cycle.dias_restantes_cache : null
+    };
+  }
+
+  const { data: empresa } = await supabase
     .from("empresas")
     .select("id, mostrar_anuncio_impago")
     .eq("id", empresaId)
     .maybeSingle();
 
-  if (error) return { empresa: null, userId };
-  return { empresa: data || null, userId };
+  const fallbackDias = 15 - new Date().getDate();
+  return {
+    empresaId,
+    bannerActivo: empresa?.mostrar_anuncio_impago === true,
+    diasRestantes: fallbackDias
+  };
 }
 
-async function mostrarAnuncio({ storageKey }) {
+async function mostrarAnuncio({ storageKey, diasRestantes }) {
   ocultarAnuncio();
 
   const container = document.createElement("div");
@@ -100,7 +113,7 @@ async function mostrarAnuncio({ storageKey }) {
   if (title) title.textContent = "Aviso importante";
 
   const message = modal.querySelector("#impagoModalMessage");
-  if (message) message.innerHTML = getMensajeHtml();
+  if (message) message.innerHTML = getMensajeHtml(diasRestantes ?? 0);
 
   const btnAceptar = modal.querySelector("#impagoModalAceptar");
   btnAceptar?.addEventListener("click", () => {
@@ -128,19 +141,19 @@ async function mostrarAnuncio({ storageKey }) {
 export async function verificarYMostrarAnuncio() {
   ensureBannerStyles();
 
-  const { empresa, userId } = await getEmpresaActual();
-  if (!empresa || empresa.mostrar_anuncio_impago !== true) {
+  const { empresaId, bannerActivo, diasRestantes } = await getBannerState();
+  if (!empresaId || bannerActivo !== true) {
     ocultarAnuncio();
     return;
   }
 
-  const storageKey = getSessionOnceKey({ empresaId: empresa.id });
+  const storageKey = getSessionOnceKey({ empresaId });
   if (wasAlreadyShown(storageKey)) {
     ocultarAnuncio();
     return;
   }
 
-  await mostrarAnuncio({ storageKey });
+  await mostrarAnuncio({ storageKey, diasRestantes });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
