@@ -176,3 +176,105 @@
     border-bottom: 1px solid #e9e4ff;
   }
 }
+
+.pago-shell {
+  margin-top: 24px;
+  background: #f6f3ff;
+  border: 1px solid #ddd6fe;
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.pago-card {
+  background: #ffffff;
+  border: 1px solid #d8ccff;
+  border-radius: 12px;
+  padding: 18px;
+  display: grid;
+  gap: 16px;
+}
+
+.pago-card h2 {
+  margin: 0;
+  color: #312e81;
+  font-size: 1.1rem;
+}
+
+.pago-form {
+  display: grid;
+  gap: 12px;
+}
+
+.pago-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pago-field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #312e81;
+}
+
+.pago-field input,
+.pago-field select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d8ccff;
+  background: #ffffff;
+  font-size: 0.95rem;
+}
+
+.pago-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pago-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 180px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid #c4b5fd;
+  background: #6d28d9;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.92rem;
+  line-height: 1;
+}
+
+.pago-btn:hover {
+  background: #5b21b6;
+}
+
+.pago-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pago-msg {
+  min-height: 20px;
+  font-size: 0.9rem;
+}
+
+.pago-msg.success {
+  color: #047857;
+}
+
+.pago-msg.error {
+  color: #b91c1c;
+}
+
+@media (max-width: 900px) {
+  .pago-grid {
+    grid-template-columns: 1fr;
+  }
+}

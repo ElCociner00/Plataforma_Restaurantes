@@ -1,10 +1,13 @@
+﻿
 import { supabase } from "./supabase.js";
 import { buildRequestHeaders, getSessionConEmpresa } from "./session.js";
 import { WEBHOOKS } from "./webhooks.js";
 
 const rootEl = document.getElementById("factura-contenido");
+const pagoEl = document.getElementById("pago-comprobante");
 
 let currentFactura = null;
+let isUploading = false;
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
 const fmtDate = (v) => {
@@ -19,6 +22,26 @@ const escapeHtml = (value) => String(value || "")
   .replaceAll(">", "&gt;")
   .replaceAll('"', "&quot;")
   .replaceAll("'", "&#39;");
+
+const getCurrentPeriodo = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  return year + "-" + month;
+};
+
+const sanitizeFilename = (name) => String(name || "archivo")
+  .replace(/[^a-zA-Z0-9._-]+/g, "_")
+  .replace(/^_+|_+$/g, "");
+
+const setPagoMessage = (message, type) => {
+  if (!pagoEl) return;
+  const msgEl = pagoEl.querySelector("[data-pago-msg]");
+  if (!msgEl) return;
+  msgEl.textContent = message || "";
+  msgEl.classList.remove("success", "error");
+  if (type) msgEl.classList.add(type);
+};
 
 async function loadFacturaSupabase(empresaId) {
   const { data, error } = await supabase
@@ -45,7 +68,7 @@ async function loadFacturaByWebhook(empresaId) {
     body: JSON.stringify({ empresa_id: empresaId })
   });
 
-  if (!res.ok) throw new Error(`Webhook facturacion fallo: ${res.status}`);
+  if (!res.ok) throw new Error("Webhook facturacion fallo: " + res.status);
   const data = await res.json().catch(() => null);
   return data?.factura || data || null;
 }
@@ -64,11 +87,23 @@ function getFacturaCode(factura) {
   if (factura?.numero_factura) return String(factura.numero_factura);
   const prefijo = factura?.prefijo_factura || "AX";
   const consecutivo = Number(factura?.consecutivo_actual || 1);
-  return `${prefijo}-${consecutivo}`;
+  return prefijo + "-" + consecutivo;
+}
+
+async function getCurrentBillingCycle(empresaId) {
+  const periodo = getCurrentPeriodo();
+  const { data, error } = await supabase
+    .from("billing_cycles")
+    .select("id, estado, periodo")
+    .eq("empresa_id", empresaId)
+    .eq("periodo", periodo)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
 }
 
 function render(empresa, factura) {
-
   const facturaCode = getFacturaCode(factura);
 
   const cantidad = Number(factura?.cantidad || 1);
@@ -83,12 +118,12 @@ function render(empresa, factura) {
         <div class="bloque bloque-empresa">
           <h2>AXIOMA</h2>
           <p>by Global Nexo Shop</p>
-          <p>DIR: Barranquilla, Atlántico, Colombia</p>
+          <p>DIR: Barranquilla, AtlÃ¡ntico, Colombia</p>
           <p>Tlf: 3044394874</p>
         </div>
 
         <div class="bloque bloque-cabecera-factura">
-          <h3>FACTURA ELECTRÓNICA DE VENTA</h3>
+          <h3>FACTURA ELECTRÃ“NICA DE VENTA</h3>
           <div class="linea-factura"></div>
           <div class="factura-codigo-row">
             <span>Factura:</span>
@@ -101,7 +136,7 @@ function render(empresa, factura) {
         <div class="tabla-grid header">
           <div>Cantidad</div>
           <div>Medida</div>
-          <div>Descripción del Producto</div>
+          <div>DescripciÃ³n del Producto</div>
           <div>IVA</div>
           <div>Valor Unitario</div>
           <div>Valor Total</div>
@@ -124,22 +159,124 @@ function render(empresa, factura) {
   `;
 }
 
+function renderPagoSection(empresa) {
+  if (!pagoEl) return;
+  if (!empresa?.id) {
+    pagoEl.innerHTML = "";
+    return;
+  }
+
+  pagoEl.innerHTML = `
+    <div class="pago-card">
+      <h2>Subir comprobante de pago</h2>
+      <form class="pago-form" id="pago-form">
+        <div class="pago-grid">
+          <div class="pago-field">
+            <label for="pago-monto">Monto</label>
+            <input id="pago-monto" name="monto" type="number" min="0" step="0.01" required>
+          </div>
+          <div class="pago-field">
+            <label for="pago-referencia">Referencia (opcional)</label>
+            <input id="pago-referencia" name="referencia" type="text" maxlength="120" placeholder="Ej: TRANSF-1234">
+          </div>
+          <div class="pago-field">
+            <label for="pago-canal">Canal</label>
+            <select id="pago-canal" name="canal" required>
+              <option value="transferencia">Transferencia</option>
+              <option value="efectivo">Efectivo</option>
+              <option value="otros">Otro</option>
+            </select>
+          </div>
+          <div class="pago-field">
+            <label for="pago-comprobante-input">Comprobante (imagen o PDF)</label>
+            <input id="pago-comprobante-input" name="comprobante" type="file" accept="image/*,application/pdf" required>
+          </div>
+        </div>
+        <div class="pago-actions">
+          <button class="pago-btn" type="submit" data-pago-submit>Enviar comprobante</button>
+          <span class="pago-msg" data-pago-msg></span>
+        </div>
+      </form>
+    </div>
+  `;
+
+  const form = pagoEl.querySelector("#pago-form");
+  if (form) form.addEventListener("submit", handlePagoSubmit);
+}
+
+async function handlePagoSubmit(event) {
+  event.preventDefault();
+  if (isUploading) return;
+  const form = event.currentTarget;
+  const submitBtn = form.querySelector("[data-pago-submit]");
+  const montoValue = Number(form.monto.value);
+  const canal = form.canal.value;
+  const referencia = form.referencia.value.trim();
+  const file = form.comprobante.files?.[0];
+  if (!montoValue || montoValue <= 0) {
+    setPagoMessage("Ingresa un monto valido.", "error");
+    return;
+  }
+  if (!file) {
+    setPagoMessage("Selecciona un comprobante.", "error");
+    return;
+  }
+  isUploading = true;
+  if (submitBtn) submitBtn.disabled = true;
+  setPagoMessage("Enviando comprobante...", "");
+  try {
+    const session = await getSessionConEmpresa().catch(() => null);
+    const empresa = session?.empresa;
+    if (!empresa?.id) {
+      throw new Error("No se encontro empresa activa.");
+    }
+    const billingCycle = await getCurrentBillingCycle(empresa.id);
+    if (!billingCycle?.id) {
+      throw new Error("No hay ciclo de facturacion activo para este mes.");
+    }
+    const safeName = sanitizeFilename(file.name) || "comprobante";
+    const filePath = empresa.id + "/" + Date.now() + "_" + safeName;
+    const { error: uploadError } = await supabase.storage
+      .from("comprobantes_pago")
+      .upload(filePath, file, { upsert: false });
+    if (uploadError) throw uploadError;
+    const { error: insertError } = await supabase
+      .from("payment_attempts")
+      .insert({
+        billing_cycle_id: billingCycle.id,
+        empresa_id: empresa.id,
+        canal,
+        referencia_externa: referencia || null,
+        monto_reportado: montoValue,
+        comprobante_url: filePath,
+        estado: "pendiente"
+      });
+    if (insertError) throw insertError;
+    form.reset();
+    setPagoMessage("Comprobante enviado. Te avisaremos cuando sea revisado.", "success");
+  } catch (err) {
+    const message = err?.message || "No fue posible enviar el comprobante.";
+    setPagoMessage(message, "error");
+  } finally {
+    isUploading = false;
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
 export async function cargarFactura() {
   if (!rootEl) return;
-
   const session = await getSessionConEmpresa().catch(() => null);
   const empresa = session?.empresa || {};
-
   currentFactura = empresa?.id
     ? await loadFactura(empresa.id).catch(() => null)
     : null;
   render(empresa, currentFactura || {});
+  renderPagoSection(empresa);
 }
-
 document.addEventListener("DOMContentLoaded", () => {
   cargarFactura();
 });
-
 window.addEventListener("empresaCambiada", () => {
   cargarFactura();
 });
+
