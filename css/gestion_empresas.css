@@ -1,4 +1,3 @@
-﻿
 .gestion-empresas-main {
   max-width: 1320px;
   margin: 0 auto;
@@ -12,10 +11,24 @@
   margin: 12px 0 16px;
 }
 
-#estadoAccion {
-  font-size: 14px;
-  color: #374151;
+#estadoAccion { font-size: 14px; color: #374151; }
+
+.override-panel {
+  margin-bottom: 14px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 14px;
 }
+
+.override-panel h3 { margin: 0 0 10px; }
+.override-grid { display: grid; grid-template-columns: repeat(3, minmax(200px, 1fr)); gap: 10px; align-items: end; }
+.override-grid label { display: grid; gap: 4px; font-size: 0.9rem; }
+.override-grid select,
+.override-grid input,
+.override-grid button { height: 38px; padding: 0 10px; }
+.inline-check { display: inline-flex !important; align-items: center; gap: 8px; height: 38px; }
+.inline-check input { width: auto; height: auto; }
 
 .table-wrap {
   overflow-x: auto;
@@ -24,85 +37,24 @@
   border-radius: 8px;
 }
 
-#tablaEmpresas {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 1200px;
-}
-
+#tablaEmpresas { width: 100%; border-collapse: collapse; min-width: 1200px; }
 #tablaEmpresas th,
-#tablaEmpresas td {
-  padding: 10px 12px;
-  border-bottom: 1px solid #e5e7eb;
-  text-align: left;
-  vertical-align: middle;
-}
+#tablaEmpresas td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: middle; }
+#tablaEmpresas th { background: #f8fafc; font-weight: 600; }
+.plan-select { min-width: 120px; }
 
-#tablaEmpresas th {
-  background: #f8fafc;
-  font-weight: 600;
-}
+.switch-cell { position: relative; display: inline-block; width: 44px; height: 24px; vertical-align: middle; }
+.switch-cell input { opacity: 0; width: 0; height: 0; }
+.switch-slider { position: absolute; inset: 0; background: #d1d5db; border-radius: 999px; transition: all .2s ease; }
+.switch-slider::before { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; border-radius: 50%; background: #fff; transition: all .2s ease; }
+.switch-cell input:checked + .switch-slider { background: #2563eb; }
+.switch-cell input:checked + .switch-slider::before { transform: translateX(20px); }
+.badge { display: inline-block; margin-left: 8px; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.badge.activo { background: #dcfce7; color: #166534; }
+.badge.inactivo { background: #fee2e2; color: #991b1b; }
 
-.plan-select {
-  min-width: 120px;
-}
-.switch-cell {
-  position: relative;
-  display: inline-block;
-  width: 44px;
-  height: 24px;
-  vertical-align: middle;
-}
-
-.switch-cell input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.switch-slider {
-  position: absolute;
-  inset: 0;
-  background: #d1d5db;
-  border-radius: 999px;
-  transition: all .2s ease;
-}
-.switch-slider::before {
-  content: "";
-  position: absolute;
-  width: 18px;
-  height: 18px;
-  left: 3px;
-  top: 3px;
-  border-radius: 50%;
-  background: #fff;
-  transition: all .2s ease;
-}
-
-.switch-cell input:checked + .switch-slider {
-  background: #2563eb;
-}
-
-.switch-cell input:checked + .switch-slider::before {
-  transform: translateX(20px);
-}
-.badge {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.badge.activo {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.badge.inactivo {
-  background: #fee2e2;
-  color: #991b1b;
+@media (max-width: 920px) {
+  .override-grid { grid-template-columns: 1fr; }
 }
 .override-card {
   margin: 16px 0 24px;

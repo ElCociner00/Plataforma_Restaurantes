@@ -7,21 +7,17 @@ const rootEl = document.getElementById("factura-contenido");
 const pagoEl = document.getElementById("pago-comprobante");
 const historialEl = document.getElementById("historial-pagos");
 
-let currentFactura = null;
-let isUploading = false;
 const fmtMoney = (v) => Number(v || 0).toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
 const fmtDate = (v) => {
   if (!v) return "-";
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? "-" : d.toLocaleDateString("es-CO");
 };
-
 const fmtDateTime = (v) => {
   if (!v) return "-";
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? "-" : d.toLocaleString("es-CO");
 };
-
 const escapeHtml = (value) => String(value || "")
   .replaceAll("&", "&amp;")
   .replaceAll("<", "&lt;")
@@ -29,36 +25,7 @@ const escapeHtml = (value) => String(value || "")
   .replaceAll('"', "&quot;")
   .replaceAll("'", "&#39;");
 
-const getCurrentPeriodo = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  return year + "-" + month;
-};
-
-const sanitizeFilename = (name) => String(name || "archivo")
-  .replace(/[^a-zA-Z0-9._-]+/g, "_")
-  .replace(/^_+|_+$/g, "");
-
-const setPagoMessage = (message, type) => {
-  if (!pagoEl) return;
-  const msgEl = pagoEl.querySelector("[data-pago-msg]");
-  if (!msgEl) return;
-  msgEl.textContent = message || "";
-  msgEl.classList.remove("success", "error");
-  if (type) msgEl.classList.add(type);
-};
-
-async function loadFacturaSupabase(empresaId) {
-  const { data, error } = await supabase
-    .from("facturacion")
-    .select("*")
-    .eq("empresa_id", empresaId)
-    .maybeSingle();
-
-  if (error) throw error;
-  return data;
-}
+const getCurrentPeriod = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 
 async function loadFacturaByWebhook(empresaId) {
   const webhook = WEBHOOKS?.FACTURACION_RESUMEN;
@@ -79,14 +46,51 @@ async function loadFacturaByWebhook(empresaId) {
   return data?.factura || data || null;
 }
 
-async function loadFactura(empresaId) {
-  try {
-    const fromSupabase = await loadFacturaSupabase(empresaId);
-    if (fromSupabase) return fromSupabase;
-  } catch {
-    // fallback webhook
-  }
-  return loadFacturaByWebhook(empresaId).catch(() => null);
+async function loadBillingCycle(empresaId, periodo) {
+  const { data, error } = await supabase
+    .from("billing_cycles")
+    .select("*")
+    .eq("empresa_id", empresaId)
+    .eq("periodo", periodo)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+async function loadLegacyFactura(empresaId) {
+  const { data, error } = await supabase
+    .from("facturacion")
+    .select("*")
+    .eq("empresa_id", empresaId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+async function loadPaymentAttempts(empresaId, limit = 20) {
+  const { data, error } = await supabase
+    .from("payment_attempts")
+    .select("id, billing_cycle_id, canal, referencia_externa, monto_reportado, fecha_reportada, comprobante_url, estado, observaciones, created_at")
+    .eq("empresa_id", empresaId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return data || [];
+}
+
+async function loadBillingHistory(empresaId, limit = 12) {
+  const { data, error } = await supabase
+    .from("billing_cycles")
+    .select("id, periodo, fecha_vencimiento, monto, estado, banner_activo, dias_restantes_cache")
+    .eq("empresa_id", empresaId)
+    .order("periodo", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return data || [];
 }
 
 function getFacturaCode(factura) {
@@ -96,311 +100,219 @@ function getFacturaCode(factura) {
   return prefijo + "-" + consecutivo;
 }
 
-async function getCurrentBillingCycle(empresaId) {
-  const periodo = getCurrentPeriodo();
-  const { data, error } = await supabase
-    .from("billing_cycles")
-    .select("id, estado, periodo")
-    .eq("empresa_id", empresaId)
-    .eq("periodo", periodo)
-    .maybeSingle();
-
-  if (error) throw error;
-  return data;
+function attemptStatusBadge(status) {
+  const normalized = String(status || "pendiente").toLowerCase();
+  if (normalized === "aprobado") return { klass: "badge ok", label: "Aprobado" };
+  if (normalized === "rechazado") return { klass: "badge bad", label: "Rechazado" };
+  return { klass: "badge warn", label: "Pendiente" };
 }
 
-async function loadPaymentAttempts(empresaId) {
-  const { data, error } = await supabase
-    .from("payment_attempts")
-    .select("id, monto_reportado, estado, canal, referencia_externa, comprobante_url, created_at")
-    .eq("empresa_id", empresaId)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return Array.isArray(data) ? data : [];
+function cycleStatusLabel(status) {
+  const map = {
+    draft: "Borrador",
+    pending_payment: "Pendiente",
+    proof_submitted: "Comprobante enviado",
+    paid_verified: "Pago verificado",
+    past_due: "Vencido",
+    suspended: "Suspendido",
+    grace_manual: "Gracia manual"
+  };
+  return map[String(status || "").toLowerCase()] || String(status || "-");
 }
 
-async function loadBillingCycles(empresaId) {
-  const { data, error } = await supabase
-    .from("billing_cycles")
-    .select("id, periodo, estado, monto, fecha_emision, fecha_vencimiento")
-    .eq("empresa_id", empresaId)
-    .order("periodo", { ascending: false });
-  if (error) throw error;
-  return Array.isArray(data) ? data : [];
+async function resolveComprobanteUrl(path) {
+  if (!path) return "";
+  const { data } = await supabase.storage.from("comprobantes_pago").createSignedUrl(path, 60 * 20);
+  return data?.signedUrl || "";
 }
 
-function createStatusBadge(status) {
-  const safeStatus = String(status || "").toLowerCase() || "pendiente";
-  return `<span class="status-badge ${escapeHtml(safeStatus)}">${escapeHtml(safeStatus)}</span>`;
+function renderFactura({ facturaCode, descripcion, valorTotal }) {
+  return `
+  <article class="factura-sheet">
+    <section class="factura-top-row">
+      <div class="bloque bloque-empresa">
+        <h2>AXIOMA</h2>
+        <p>by Global Nexo Shop</p>
+        <p>Barranquilla, Atlántico, Colombia</p>
+      </div>
+
+      <div class="bloque bloque-cabecera-factura">
+        <h3>FACTURA ELECTRÓNICA DE VENTA</h3>
+        <div class="linea-factura"></div>
+        <div class="factura-codigo-row">
+          <span>Factura:</span>
+          <strong>${escapeHtml(facturaCode)}</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="bloque bloque-tabla-producto">
+      <div class="tabla-grid header">
+        <div>Cantidad</div><div>Medida</div><div>Descripción</div><div>IVA</div><div>Valor Unitario</div><div>Valor Total</div>
+      </div>
+      <div class="tabla-grid body">
+        <div>1</div><div>mes</div><div>${escapeHtml(descripcion)}</div><div>0</div><div>${fmtMoney(valorTotal)}</div><div>${fmtMoney(valorTotal)}</div>
+      </div>
+    </section>
+
+    <section class="factura-payment">
+      <a class="btn-pago" href="https://mpago.li/15d6BkC" target="_blank" rel="noopener noreferrer">Pagar ahora</a>
+      <p>Si ya pagaste, sube aquí tu comprobante para revisión.</p>
+    </section>
+  </article>`;
 }
 
-async function getSignedComprobanteUrl(path) {
-  if (!path) return null;
-  const { data, error } = await supabase
-    .storage
-    .from("comprobantes_pago")
-    .createSignedUrl(path, 60 * 10);
-  if (error) return null;
-  return data?.signedUrl || null;
-}
-
-function render(empresa, factura) {
-  const facturaCode = getFacturaCode(factura);
-
-  const cantidad = Number(factura?.cantidad || 1);
-  const descripcion = factura?.descripcion_producto || "Servicio plataforma AXIOMA";
-  const ivaValor = 0;
-  const valorUnitario = 59900;
-  const valorTotal = 59900;
-
-  rootEl.innerHTML = `
-    <article class="factura-sheet">
-      <section class="factura-top-row">
-        <div class="bloque bloque-empresa">
-          <h2>AXIOMA</h2>
-          <p>by Global Nexo Shop</p>
-          <p>DIR: Barranquilla, Atlantico, Colombia</p>
-          <p>Tlf: 3044394874</p>
-        </div>
-
-        <div class="bloque bloque-cabecera-factura">
-          <h3>FACTURA ELECTRONICA DE VENTA</h3>
-          <div class="linea-factura"></div>
-          <div class="factura-codigo-row">
-            <span>Factura:</span>
-            <strong>${escapeHtml(facturaCode)}</strong>
-          </div>
-        </div>
-      </section>
-
-      <section class="bloque bloque-tabla-producto">
-        <div class="tabla-grid header">
-          <div>Cantidad</div>
-          <div>Medida</div>
-          <div>Descripcion del Producto</div>
-          <div>IVA</div>
-          <div>Valor Unitario</div>
-          <div>Valor Total</div>
-        </div>
-        <div class="tabla-grid body">
-          <div>${escapeHtml(cantidad)}</div>
-          <div>mes</div>
-          <div>${escapeHtml(descripcion)}</div>
-          <div>0</div>
-          <div>${fmtMoney(valorUnitario)}</div>
-          <div>${fmtMoney(valorTotal)}</div>
-        </div>
-      </section>
-
-      <section class="factura-payment">
-        <a class="btn-pago" href="https://mpago.li/15d6BkC" target="_blank" rel="noopener noreferrer">Paga aqui</a>
-        <p>Link de Mercado Pago</p>
-      </section>
-    </article>
-  `;
-}
-
-function renderPagoSection(empresa) {
-  if (!pagoEl) return;
-  if (!empresa?.id) {
-    pagoEl.innerHTML = "";
-    return;
-  }
-
-  pagoEl.innerHTML = `
-    <div class="pago-card">
-      <h2>Subir comprobante de pago</h2>
-      <form class="pago-form" id="pago-form">
-        <div class="pago-grid">
-          <div class="pago-field">
-            <label for="pago-monto">Monto</label>
-            <input id="pago-monto" name="monto" type="number" min="0" step="0.01" required>
-          </div>
-          <div class="pago-field">
-            <label for="pago-referencia">Referencia (opcional)</label>
-            <input id="pago-referencia" name="referencia" type="text" maxlength="120" placeholder="Ej: TRANSF-1234">
-          </div>
-          <div class="pago-field">
-            <label for="pago-canal">Canal</label>
-            <select id="pago-canal" name="canal" required>
-              <option value="transferencia">Transferencia</option>
-              <option value="efectivo">Efectivo</option>
-              <option value="otros">Otro</option>
-            </select>
-          </div>
-          <div class="pago-field">
-            <label for="pago-comprobante-input">Comprobante (imagen o PDF)</label>
-            <input id="pago-comprobante-input" name="comprobante" type="file" accept="image/*,application/pdf" required>
-          </div>
-        </div>
-        <div class="pago-actions">
-          <button class="pago-btn" type="submit" data-pago-submit>Enviar comprobante</button>
-          <span class="pago-msg" data-pago-msg></span>
-        </div>
+function renderUploadForm(defaultAmount) {
+  return `
+    <section class="billing-panel">
+      <h3>Subir comprobante de pago</h3>
+      <form id="formComprobante" class="billing-form">
+        <label>Monto pagado <input type="number" name="monto" min="1" step="1" value="${Number(defaultAmount || 59900)}" required></label>
+        <label>Referencia externa <input type="text" name="referencia" placeholder="Ej: comprobante banco"></label>
+        <label>Canal
+          <select name="canal" required>
+            <option value="transferencia">Transferencia</option>
+            <option value="mercadopago_link">Mercado Pago</option>
+            <option value="efectivo">Efectivo</option>
+            <option value="otros">Otros</option>
+          </select>
+        </label>
+        <label>Comprobante (PDF/Imagen)
+          <input type="file" name="comprobante" accept="application/pdf,image/*" required>
+        </label>
+        <button id="btnEnviarComprobante" type="submit">Enviar comprobante</button>
       </form>
-    </div>
+      <p id="estadoComprobante" class="helper-text"></p>
+    </section>
   `;
-
-  const form = pagoEl.querySelector("#pago-form");
-  if (form) form.addEventListener("submit", handlePagoSubmit);
 }
 
-async function renderHistorialSection(empresa) {
-  if (!historialEl) return;
-  if (!empresa?.id) {
-    historialEl.innerHTML = "";
-    return;
-  }
-
-  historialEl.innerHTML = `
-    <div class="historial-card">
-      <h2>Historial de pagos</h2>
-      <div class="historial-section" data-historial-attempts>
-        <h3>Comprobantes enviados</h3>
-        <div class="historial-list">
-          <p class="historial-empty">Cargando comprobantes...</p>
-        </div>
-      </div>
-      <div class="historial-section" data-historial-cycles>
-        <h3>Ciclos de facturacion</h3>
-        <div class="historial-list">
-          <p class="historial-empty">Cargando ciclos...</p>
-        </div>
-      </div>
-    </div>
-  `;
-
-  try {
-    const [attempts, cycles] = await Promise.all([
-      loadPaymentAttempts(empresa.id),
-      loadBillingCycles(empresa.id)
-    ]);
-
-    const attemptsContainer = historialEl.querySelector("[data-historial-attempts] .historial-list");
-    if (attemptsContainer) {
-      if (!attempts.length) {
-        attemptsContainer.innerHTML = '<p class="historial-empty">No hay comprobantes enviados.</p>';
-      } else {
-        const attemptItems = await Promise.all(attempts.map(async (item) => {
-          const estado = String(item.estado || "pendiente").toLowerCase();
-          let linkHtml = "<span>-</span>";
-          if (estado === "aprobado" && item.comprobante_url) {
-            const signed = await getSignedComprobanteUrl(item.comprobante_url);
-            if (signed) {
-              linkHtml = `<a class="historial-link" href="${escapeHtml(signed)}" target="_blank" rel="noopener noreferrer">Ver comprobante</a>`;
-            }
-          }
-          return `
-            <div class="historial-item">
-              <span><span class="historial-label">Fecha:</span> ${escapeHtml(fmtDateTime(item.created_at))}</span>
-              <span><span class="historial-label">Monto:</span> ${escapeHtml(fmtMoney(item.monto_reportado))}</span>
-              <span><span class="historial-label">Canal:</span> ${escapeHtml(item.canal || "-")}</span>
-              <span><span class="historial-label">Estado:</span> ${createStatusBadge(estado)}</span>
-              <span><span class="historial-label">Referencia:</span> ${escapeHtml(item.referencia_externa || "-")}</span>
-              <span><span class="historial-label">Comprobante:</span> ${linkHtml}</span>
-            </div>
-          `;
-        }));
-        attemptsContainer.innerHTML = attemptItems.join("");
-      }
-    }
-
-    const cyclesContainer = historialEl.querySelector("[data-historial-cycles] .historial-list");
-    if (cyclesContainer) {
-      if (!cycles.length) {
-        cyclesContainer.innerHTML = '<p class="historial-empty">No hay ciclos registrados.</p>';
-      } else {
-        cyclesContainer.innerHTML = cycles.map((item) => `
-          <div class="historial-item">
-            <span><span class="historial-label">Periodo:</span> ${escapeHtml(item.periodo || "-")}</span>
-            <span><span class="historial-label">Monto:</span> ${escapeHtml(fmtMoney(item.monto))}</span>
-            <span><span class="historial-label">Emision:</span> ${escapeHtml(fmtDate(item.fecha_emision))}</span>
-            <span><span class="historial-label">Vencimiento:</span> ${escapeHtml(fmtDate(item.fecha_vencimiento))}</span>
-            <span><span class="historial-label">Estado:</span> ${createStatusBadge(item.estado || "pendiente")}</span>
-          </div>
-        `).join("");
-      }
-    }
-  } catch (_error) {
-    historialEl.innerHTML = `
-      <div class="historial-card">
-        <h2>Historial de pagos</h2>
-        <p class="historial-empty">No se pudo cargar el historial.</p>
-      </div>
+function renderHistory(attempts, cycles) {
+  const attemptsHtml = attempts.length
+    ? attempts.map((a) => {
+      const badge = attemptStatusBadge(a.estado);
+      return `
+      <tr>
+        <td>${fmtDateTime(a.fecha_reportada || a.created_at)}</td>
+        <td>${fmtMoney(a.monto_reportado)}</td>
+        <td>${escapeHtml(a.canal || "-")}</td>
+        <td><span class="${badge.klass}">${badge.label}</span></td>
+        <td>${a.comprobante_signed_url ? `<a href="${a.comprobante_signed_url}" target="_blank" rel="noopener noreferrer">Ver</a>` : "-"}</td>
+      </tr>
     `;
-  }
+    }).join("")
+    : "<tr><td colspan='5'>No hay pagos reportados.</td></tr>";
+
+  const cyclesHtml = cycles.length
+    ? cycles.map((c) => `
+      <tr>
+        <td>${escapeHtml(c.periodo)}</td>
+        <td>${fmtMoney(c.monto)}</td>
+        <td>${fmtDate(c.fecha_vencimiento)}</td>
+        <td>${escapeHtml(cycleStatusLabel(c.estado))}</td>
+        <td>${c.banner_activo ? "Sí" : "No"}</td>
+      </tr>
+    `).join("")
+    : "<tr><td colspan='5'>No hay ciclos de facturación.</td></tr>";
+
+  return `
+    <section class="billing-panel">
+      <h3>Historial de pagos</h3>
+      <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Monto</th><th>Canal</th><th>Estado</th><th>Comprobante</th></tr></thead><tbody>${attemptsHtml}</tbody></table></div>
+    </section>
+    <section class="billing-panel">
+      <h3>Historial de ciclos</h3>
+      <div class="table-wrap"><table><thead><tr><th>Periodo</th><th>Monto</th><th>Vence</th><th>Estado</th><th>Banner</th></tr></thead><tbody>${cyclesHtml}</tbody></table></div>
+    </section>
+  `;
 }
 
-async function handlePagoSubmit(event) {
-  event.preventDefault();
-  if (isUploading) return;
-  const form = event.currentTarget;
-  const submitBtn = form.querySelector("[data-pago-submit]");
-  const montoValue = Number(form.monto.value);
-  const canal = form.canal.value;
-  const referencia = form.referencia.value.trim();
-  const file = form.comprobante.files?.[0];
-  if (!montoValue || montoValue <= 0) {
-    setPagoMessage("Ingresa un monto valido.", "error");
-    return;
-  }
-  if (!file) {
-    setPagoMessage("Selecciona un comprobante.", "error");
-    return;
-  }
-  isUploading = true;
-  if (submitBtn) submitBtn.disabled = true;
-  setPagoMessage("Enviando comprobante...", "");
-  try {
-    const session = await getSessionConEmpresa().catch(() => null);
-    const empresa = session?.empresa;
-    if (!empresa?.id) {
-      throw new Error("No se encontro empresa activa.");
+async function attachUploadHandler({ empresaId, cycleId }) {
+  const form = document.getElementById("formComprobante");
+  const statusEl = document.getElementById("estadoComprobante");
+  const btn = document.getElementById("btnEnviarComprobante");
+  if (!form || !empresaId) return;
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const fd = new FormData(form);
+    const file = fd.get("comprobante");
+    const monto = Number(fd.get("monto") || 0);
+
+    if (!(file instanceof File) || !file.size) {
+      if (statusEl) statusEl.textContent = "Selecciona un comprobante válido.";
+      return;
     }
-    const billingCycle = await getCurrentBillingCycle(empresa.id);
-    if (!billingCycle?.id) {
-      throw new Error("No hay ciclo de facturacion activo para este mes.");
-    }
-    const safeName = sanitizeFilename(file.name) || "comprobante";
-    const filePath = empresa.id + "/" + Date.now() + "_" + safeName;
-    const { error: uploadError } = await supabase.storage
-      .from("comprobantes_pago")
-      .upload(filePath, file, { upsert: false });
-    if (uploadError) throw uploadError;
-    const { error: insertError } = await supabase
-      .from("payment_attempts")
-      .insert({
-        billing_cycle_id: billingCycle.id,
-        empresa_id: empresa.id,
-        canal,
-        referencia_externa: referencia || null,
-        monto_reportado: montoValue,
-        comprobante_url: filePath,
+
+    btn.disabled = true;
+    if (statusEl) statusEl.textContent = "Enviando comprobante...";
+
+    try {
+      const safeName = String(file.name || "comprobante").replace(/\s+/g, "_");
+      const storagePath = `${empresaId}/${Date.now()}_${safeName}`;
+      const { error: uploadError } = await supabase.storage
+        .from("comprobantes_pago")
+        .upload(storagePath, file, { upsert: false, contentType: file.type || "application/octet-stream" });
+      if (uploadError) throw uploadError;
+
+      const payload = {
+        billing_cycle_id: cycleId,
+        empresa_id: empresaId,
+        canal: fd.get("canal") || "otros",
+        referencia_externa: String(fd.get("referencia") || "").trim() || null,
+        monto_reportado: monto,
+        comprobante_url: storagePath,
         estado: "pendiente"
-      });
-    if (insertError) throw insertError;
-    form.reset();
-    setPagoMessage("Comprobante enviado. Te avisaremos cuando sea revisado.", "success");
-    await renderHistorialSection(empresa);
-  } catch (err) {
-    const message = err?.message || "No fue posible enviar el comprobante.";
-    setPagoMessage(message, "error");
-  } finally {
-    isUploading = false;
-    if (submitBtn) submitBtn.disabled = false;
-  }
+      };
+
+      const { error: insertError } = await supabase.from("payment_attempts").insert(payload);
+      if (insertError) throw insertError;
+
+      if (statusEl) statusEl.textContent = "Comprobante enviado. Lo revisaremos pronto.";
+      form.reset();
+      window.setTimeout(() => window.location.reload(), 700);
+    } catch (error) {
+      if (statusEl) statusEl.textContent = `No se pudo enviar el comprobante: ${error?.message || "error"}`;
+    } finally {
+      btn.disabled = false;
+    }
+  });
 }
 
 export async function cargarFactura() {
   if (!rootEl) return;
   const session = await getSessionConEmpresa().catch(() => null);
   const empresa = session?.empresa || {};
-  currentFactura = empresa?.id
-    ? await loadFactura(empresa.id).catch(() => null)
-    : null;
-  render(empresa, currentFactura || {});
-  renderPagoSection(empresa);
-  await renderHistorialSection(empresa);
+  if (!empresa?.id) {
+    rootEl.innerHTML = "<p>No se pudo identificar la empresa actual.</p>";
+    return;
+  }
+
+  const periodo = getCurrentPeriod();
+  const [billingCycle, legacyFactura, attempts, cycles] = await Promise.all([
+    loadBillingCycle(empresa.id, periodo).catch(() => null),
+    loadLegacyFactura(empresa.id).catch(() => null),
+    loadPaymentAttempts(empresa.id).catch(() => []),
+    loadBillingHistory(empresa.id).catch(() => [])
+  ]);
+
+  const facturaSource = billingCycle || legacyFactura || await loadFacturaByWebhook(empresa.id).catch(() => null) || {};
+  const facturaCode = getFacturaCode(facturaSource);
+  const descripcion = facturaSource?.descripcion_producto || "Servicio plataforma AXIOMA";
+  const valorTotal = Number(facturaSource?.monto || facturaSource?.valor_total || 59900);
+
+  const attemptsWithUrls = await Promise.all((attempts || []).map(async (item) => ({
+    ...item,
+    comprobante_signed_url: item?.estado === "aprobado" ? await resolveComprobanteUrl(item.comprobante_url).catch(() => "") : ""
+  })));
+
+  rootEl.innerHTML = [
+    renderFactura({ facturaCode, descripcion, valorTotal }),
+    renderUploadForm(valorTotal),
+    renderHistory(attemptsWithUrls, cycles)
+  ].join("\n");
+
+  attachUploadHandler({ empresaId: empresa.id, cycleId: billingCycle?.id || null });
 }
 document.addEventListener("DOMContentLoaded", () => {
   cargarFactura();

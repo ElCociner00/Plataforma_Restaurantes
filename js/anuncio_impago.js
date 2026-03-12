@@ -42,28 +42,13 @@ async function getModalTemplateHtml() {
   }
 }
 
-function getCurrentPeriodo() {
-  const ahora = new Date();
-  const year = ahora.getFullYear();
-  const month = String(ahora.getMonth() + 1).padStart(2, "0");
-  return year + "-" + month;
-}
-
-function getMensajeHtml(diasRestantes) {
-  if (typeof diasRestantes !== "number") {
-    return `
-      <div class="impago-msg">
-        <div class="impago-msg-title">Â¡InformaciÃ³n importante!</div>
-        <div class="impago-msg-days">Estado en actualizaciÃ³n</div>
-        <div class="impago-msg-body">Estamos actualizando tu estado de facturaciÃ³n. Intenta de nuevo en unos minutos.</div>
-      </div>
-    `;
-  }
-  const textoDias = diasRestantes > 0
-    ? `Faltan ${diasRestantes} dÃ­a${diasRestantes === 1 ? "" : "s"}`
-    : diasRestantes === 0
+function getMensajeHtml(dias) {
+  const textoDias = dias > 0
+    ? `Faltan ${dias} día${dias === 1 ? "" : "s"}`
+    : dias === 0
       ? "Vence hoy"
       : "Atrasado";
+
   return `
     <div class="impago-msg">
       <div class="impago-msg-title">Â¡InformaciÃ³n importante!</div>
@@ -80,17 +65,43 @@ function ocultarAnuncio() {
   anuncioInyectado = false;
 }
 
-async function getBillingCycleActual(empresaId) {
-  const periodo = getCurrentPeriodo();
-  const { data, error } = await supabase
+const getCurrentPeriod = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+async function getBannerState() {
+  const context = await getUserContext().catch(() => null);
+  const empresaId = context?.empresa_id;
+  if (!empresaId) return { empresaId: null, bannerActivo: false, diasRestantes: null };
+
+  const periodo = getCurrentPeriod();
+  const { data: cycle } = await supabase
     .from("billing_cycles")
-    .select("id, empresa_id, periodo, banner_activo, dias_restantes_cache")
+    .select("id, banner_activo, dias_restantes_cache")
     .eq("empresa_id", empresaId)
     .eq("periodo", periodo)
     .maybeSingle();
-  if (error) return null;
-  return data || null;
+
+  if (cycle) {
+    return {
+      empresaId,
+      bannerActivo: cycle.banner_activo === true,
+      diasRestantes: Number.isInteger(cycle.dias_restantes_cache) ? cycle.dias_restantes_cache : null
+    };
+  }
+
+  const { data: empresa } = await supabase
+    .from("empresas")
+    .select("id, mostrar_anuncio_impago")
+    .eq("id", empresaId)
+    .maybeSingle();
+
+  const fallbackDias = 15 - new Date().getDate();
+  return {
+    empresaId,
+    bannerActivo: empresa?.mostrar_anuncio_impago === true,
+    diasRestantes: fallbackDias
+  };
 }
+
 async function mostrarAnuncio({ storageKey, diasRestantes }) {
   ocultarAnuncio();
   const container = document.createElement("div");
@@ -100,7 +111,8 @@ async function mostrarAnuncio({ storageKey, diasRestantes }) {
   const title = modal.querySelector("#impagoModalTitle");
   if (title) title.textContent = "Aviso importante";
   const message = modal.querySelector("#impagoModalMessage");
-  if (message) message.innerHTML = getMensajeHtml(diasRestantes);
+  if (message) message.innerHTML = getMensajeHtml(diasRestantes ?? 0);
+
   const btnAceptar = modal.querySelector("#impagoModalAceptar");
   btnAceptar?.addEventListener("click", () => {
     markAsShown(storageKey);
@@ -123,23 +135,20 @@ async function mostrarAnuncio({ storageKey, diasRestantes }) {
 }
 export async function verificarYMostrarAnuncio() {
   ensureBannerStyles();
-  const context = await getUserContext().catch(() => null);
-  const empresaId = context?.empresa_id;
-  if (!empresaId) {
+
+  const { empresaId, bannerActivo, diasRestantes } = await getBannerState();
+  if (!empresaId || bannerActivo !== true) {
     ocultarAnuncio();
     return;
   }
-  const ciclo = await getBillingCycleActual(empresaId);
-  if (!ciclo || ciclo.banner_activo !== true) {
-    ocultarAnuncio();
-    return;
-  }
+
   const storageKey = getSessionOnceKey({ empresaId });
   if (wasAlreadyShown(storageKey)) {
     ocultarAnuncio();
     return;
   }
-  await mostrarAnuncio({ storageKey, diasRestantes: ciclo.dias_restantes_cache });
+
+  await mostrarAnuncio({ storageKey, diasRestantes });
 }
 document.addEventListener("DOMContentLoaded", () => {
   setTimeout(() => {

@@ -1,4 +1,3 @@
-﻿
 import { supabase } from "./supabase.js";
 import { esSuperAdmin } from "./permisos.core.js";
 import { getSessionConEmpresa } from "./session.js";
@@ -9,12 +8,13 @@ const bodyEl = document.getElementById("empresasBody");
 const statusEl = document.getElementById("estadoAccion");
 const btnRecargar = document.getElementById("btnRecargar");
 const btnRevisionPagos = document.getElementById("btnRevisionPagos");
-const overrideEmpresaEl = document.getElementById("overrideEmpresa");
-const overrideHastaEl = document.getElementById("overrideHasta");
-const overrideManualEl = document.getElementById("overrideManual");
-const overrideBannerEl = document.getElementById("overrideBanner");
-const overrideSuspensionEl = document.getElementById("overrideSuspension");
-const btnAplicarOverride = document.getElementById("btnAplicarOverride");
+const overrideEmpresaSelect = document.getElementById("overrideEmpresaId");
+const overrideUntilInput = document.getElementById("overrideUntil");
+const overridePauseCheck = document.getElementById("overridePause");
+const forceBannerCheck = document.getElementById("forceBanner");
+const forceSuspendCheck = document.getElementById("forceSuspend");
+const btnApplyOverride = document.getElementById("btnApplyOverride");
+
 const state = {
   empresas: [],
   planes: [],
@@ -50,6 +50,7 @@ const escapeHtml = (value) => String(value || "")
   .replaceAll(">", "&gt;")
   .replaceAll('"', "&quot;")
   .replaceAll("'", "&#39;");
+const getCurrentPeriod = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 
 const getPlanes = async () => {
   const { data, error } = await supabase
@@ -81,6 +82,15 @@ const getPlanOptions = (planActual) => {
   return options;
 };
 
+const hydrateOverrideSelect = () => {
+  if (!overrideEmpresaSelect) return;
+  const options = (state.empresas || []).map((empresa) => {
+    const nombre = empresa.nombre_comercial || empresa.razon_social || empresa.id;
+    return `<option value="${empresa.id}">${escapeHtml(nombre)}</option>`;
+  }).join("");
+  overrideEmpresaSelect.innerHTML = `<option value="">Selecciona una empresa</option>${options}`;
+};
+
 const renderRows = () => {
   if (!bodyEl) return;
   if (!state.empresas.length) {
@@ -102,16 +112,12 @@ const renderRows = () => {
         <td>${escapeHtml(nombre)}</td>
         <td>${escapeHtml(empresa.nit || "-")}</td>
         <td>${escapeHtml(empresa.correo_empresa || "-")}</td>
-        <td>
-          <select class="plan-select" data-action="changePlan" data-id="${empresa.id}">${options}</select>
-        </td>
+        <td><select class="plan-select" data-action="changePlan" data-id="${empresa.id}">${options}</select></td>
         <td>
           <label class="switch-cell"><input type="checkbox" data-action="toggleEstado" data-id="${empresa.id}" ${activa ? "checked" : ""}><span class="switch-slider"></span></label>
           <span class="badge ${activa ? "activo" : "inactivo"}">${estado}</span>
         </td>
-        <td>
-          <label class="switch-cell"><input type="checkbox" data-action="toggleAnuncio" data-id="${empresa.id}" ${empresa.mostrar_anuncio_impago ? "checked" : ""}><span class="switch-slider"></span></label>
-        </td>
+        <td><label class="switch-cell"><input type="checkbox" data-action="toggleAnuncio" data-id="${empresa.id}" ${empresa.mostrar_anuncio_impago ? "checked" : ""}><span class="switch-slider"></span></label></td>
         <td>${fmtMoney(empresa.deuda_actual)}</td><td>${fmtDate(empresa.fecha_corte)}</td><td>${fmtDate(empresa.fecha_suspension)}</td>
         <td>${fmtDate(empresa.created_at)}</td>
         <td><code>${empresa.id}</code></td>
@@ -132,31 +138,9 @@ async function loadEmpresas() {
     return;
   }
 
-  const empresas = Array.isArray(data) ? data : [];
-  const empresaIds = empresas.map((empresa) => empresa.id).filter(Boolean);
-
-  let hydratedEmpresas = empresas;
-  if (empresaIds.length) {
-    const { data: facturacionRows } = await supabase
-      .from("facturacion")
-      .select("empresa_id, deuda, fecha_corte, fecha_suspension")
-      .in("empresa_id", empresaIds);
-
-    const facturacionMap = new Map((facturacionRows || []).map((row) => [String(row.empresa_id), row]));
-    hydratedEmpresas = empresas.map((empresa) => {
-      const billing = facturacionMap.get(String(empresa.id));
-      return {
-        ...empresa,
-        deuda_actual: billing?.deuda ?? empresa.deuda_actual ?? 0,
-        fecha_corte: billing?.fecha_corte ?? null,
-        fecha_suspension: billing?.fecha_suspension ?? null
-      };
-    });
-  }
-
-  state.empresas = hydratedEmpresas;
-  renderOverrideOptions();
+  state.empresas = Array.isArray(data) ? data : [];
   renderRows();
+  hydrateOverrideSelect();
   setStatus(`${state.empresas.length} empresa(s) cargada(s).`);
 }
 
@@ -204,6 +188,70 @@ async function onChangePlan(select) {
   if (empresaId === state.empresaActualId) window.dispatchEvent(new Event("empresaCambiada"));
 }
 
+async function applyManualOverride() {
+  const empresaId = String(overrideEmpresaSelect?.value || "");
+  if (!empresaId) {
+    setStatus("Selecciona una empresa para aplicar la excepción.");
+    return;
+  }
+
+  const pauseAuto = overridePauseCheck?.checked === true;
+  const manualUntil = pauseAuto && overrideUntilInput?.value ? new Date(`${overrideUntilInput.value}T23:59:59`).toISOString() : null;
+  const forceBanner = forceBannerCheck?.checked === true;
+  const forceSuspend = forceSuspendCheck?.checked === true;
+  const periodo = getCurrentPeriod();
+
+  setStatus("Aplicando excepción manual...");
+
+  const { data: cycle, error: cycleError } = await supabase
+    .from("billing_cycles")
+    .select("id")
+    .eq("empresa_id", empresaId)
+    .eq("periodo", periodo)
+    .maybeSingle();
+
+  if (cycleError || !cycle?.id) {
+    setStatus("No se encontró billing_cycle del periodo actual para esa empresa.");
+    return;
+  }
+
+  const cyclePayload = {
+    manual_override: pauseAuto,
+    manual_override_until: manualUntil,
+    banner_activo: forceBanner,
+    suspension_aplicada: forceSuspend,
+    updated_at: new Date().toISOString()
+  };
+  if (forceSuspend) cyclePayload.estado = "suspended";
+
+  const { error: updateCycleError } = await supabase
+    .from("billing_cycles")
+    .update(cyclePayload)
+    .eq("id", cycle.id);
+
+  if (updateCycleError) {
+    setStatus("No se pudo actualizar el ciclo de facturación.");
+    return;
+  }
+
+  await updateEmpresa(empresaId, {
+    mostrar_anuncio_impago: forceBanner,
+    activa: !forceSuspend,
+    activo: !forceSuspend
+  }).catch(() => {});
+
+  await supabase.from("billing_events").insert({
+    empresa_id: empresaId,
+    billing_cycle_id: cycle.id,
+    tipo_evento: "override_manual_aplicado",
+    actor: "superadmin",
+    payload_json: { pauseAuto, manualUntil, forceBanner, forceSuspend }
+  }).catch(() => {});
+
+  setStatus("Excepción manual aplicada.");
+  await loadEmpresas();
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   const allowed = await esSuperAdmin().catch(() => false);
   if (!allowed) {
@@ -222,20 +270,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.location.assign("/Plataforma_Restaurantes/facturacion/revision_pagos.html");
   });
 
-  if (overrideHastaEl && overrideManualEl) {
-    overrideHastaEl.disabled = !overrideManualEl.checked;
-    overrideManualEl.addEventListener("change", () => {
-      overrideHastaEl.disabled = !overrideManualEl.checked;
-    });
-  }
-
-  btnAplicarOverride?.addEventListener("click", async () => {
-    try {
-      await applyOverride();
-    } catch (_error) {
-      setStatus("No se pudo aplicar la excepcion.");
-    }
-  });
+  btnApplyOverride?.addEventListener("click", applyManualOverride);
 
   bodyEl?.addEventListener("change", async (event) => {
     const el = event.target;
