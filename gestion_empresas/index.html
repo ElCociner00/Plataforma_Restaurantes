@@ -24,7 +24,23 @@
       <button id="btnRecargar" type="button">Recargar</button>
       <button id="btnRevisionPagos" type="button">Revision pagos</button>
       <span id="estadoAccion" aria-live="polite"></span>
-    </div>
+    $insert</div>
+
+    <section class="override-panel">
+      <h3>Excepcion manual / Override</h3>
+      <div class="override-grid">
+        <label>Empresa
+          <select id="overrideEmpresaId"></select>
+        </label>
+        <label class="inline-check"><input type="checkbox" id="overridePause"> Pausar automatizacion</label>
+        <label>Hasta fecha
+          <input type="date" id="overrideUntil">
+        </label>
+        <label class="inline-check"><input type="checkbox" id="forceBanner"> Forzar banner ON</label>
+        <label class="inline-check"><input type="checkbox" id="forceSuspend"> Forzar suspension</label>
+        <button id="btnApplyOverride" type="button">Aplicar excepcion</button>
+      </div>
+    </section>
 
     <section class="override-panel">
       <h3>Excepcion manual / Override</h3>
@@ -69,3 +85,4 @@
   <script type="module" src="../js/footer.js"></script>
 </body>
 </html>
+

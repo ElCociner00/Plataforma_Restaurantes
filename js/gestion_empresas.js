@@ -37,6 +37,13 @@ const fmtMoney = (value) => {
   if (!Number.isFinite(n)) return "$0";
   return n.toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
 };
+
+const getCurrentPeriodo = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  return year + "-" + month;
+};
 const escapeHtml = (value) => String(value || "")
   .replaceAll("&", "&amp;")
   .replaceAll("<", "&lt;")
@@ -282,3 +289,71 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 });
+
+
+
+function renderOverrideOptions() {
+  if (!overrideEmpresaEl) return;
+  const options = (state.empresas || []).map((empresa) => {
+    const nombre = empresa.nombre_comercial || empresa.razon_social || "(Sin nombre)";
+    return `<option value="${empresa.id}">${escapeHtml(nombre)}</option>`;
+  }).join("");
+
+  overrideEmpresaEl.innerHTML = `<option value="">Selecciona empresa</option>${options}`;
+}
+
+async function applyOverride() {
+  if (!overrideEmpresaEl) return;
+  const empresaId = overrideEmpresaEl.value;
+  if (!empresaId) {
+    setStatus("Selecciona una empresa.");
+    return;
+  }
+
+  const updates = {};
+  const manual = overrideManualEl?.checked === true;
+  const untilValue = overrideHastaEl?.value || "";
+
+  if (manual && !untilValue) {
+    setStatus("Selecciona la fecha limite para pausar automatizacion.");
+    return;
+  }
+
+  updates.manual_override = manual;
+  updates.manual_override_until = manual ? new Date(untilValue + "T00:00:00").toISOString() : null;
+
+  const bannerValue = overrideBannerEl?.value || "none";
+  if (bannerValue === "on") updates.banner_activo = true;
+  if (bannerValue === "off") updates.banner_activo = false;
+
+  const suspensionValue = overrideSuspensionEl?.value || "none";
+  if (suspensionValue === "on") updates.suspension_aplicada = true;
+  if (suspensionValue === "off") updates.suspension_aplicada = false;
+
+  if (!Object.keys(updates).length) {
+    setStatus("No hay cambios para aplicar.");
+    return;
+  }
+
+  const periodo = getCurrentPeriodo();
+  const { error } = await supabase
+    .from("billing_cycles")
+    .update(updates)
+    .eq("empresa_id", empresaId)
+    .eq("periodo", periodo);
+
+  if (error) {
+    setStatus("No se pudo aplicar la excepcion.");
+    return;
+  }
+
+  setStatus("Excepcion aplicada.");
+  await loadEmpresas();
+}
+
+
+
+
+
+
+
