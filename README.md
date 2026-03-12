@@ -43,3 +43,7 @@ Ejemplo de estructura enviada:
   "domicilios": 0
 }
 ```
+
+## Facturación escalable
+
+- Ver propuesta de arquitectura y automatización en `docs/facturacion_escalable.md`.
