@@ -25,7 +25,7 @@ const btnDescargarDatos = document.getElementById("descargarDatos");
 
 const PAGE_SIZE = 20;
 const MAX_LOADING_MS = 5000;
-const EXCLUDED_GENERAL_FIELDS = new Set(["empresa_id", "registrado_por", "total_variables", "diferencia_caja", "variables_detalle"]);
+const EXCLUDED_GENERAL_FIELDS = new Set(["empresa_id", "registrado_por", "responsable_id", "total_variables", "diferencia_caja", "variables_detalle"]);
 const EXCLUDED_DETAIL_FIELDS = new Set(["id"]);
 const getTimestamp = () => new Date().toISOString();
 
@@ -126,7 +126,7 @@ const toReadableLabel = (value) => String(value || "")
 
 const normalizeSearchText = (value) => String(value || "")
   .normalize("NFD")
-  .replace(/[Ì€-Í¯]/g, "")
+  .replace(/[̀-ͯ]/g, "")
   .toLowerCase()
   .trim();
 
@@ -788,21 +788,43 @@ const loadInitialData = async () => {
     let rowsData = null;
     let sourceLabel = "supabase";
 
-    const { data: directRows, error: rowsError } = await supabase
+    const query = supabase
       .from("turnos_agrupados")
       .select("*")
-      .eq("empresa_id", state.context.empresa_id)
       .order("fecha_turno", { ascending: false })
       .order("numero_turno", { ascending: false });
 
-    if (!rowsError) {
+    if (state.context.empresa_id) {
+      query.eq("empresa_id", state.context.empresa_id);
+    }
+
+    const { data: directRows, error: rowsError } = await query;
+    const hasDirectRows = Array.isArray(directRows) && directRows.length > 0;
+
+    if (!rowsError && hasDirectRows) {
       rowsData = directRows;
     } else {
       const headers = await buildRequestHeaders({ includeTenant: true });
-      const webhookResponse = await fetchWithTimeout(WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(payload) });
-      if (!webhookResponse.ok) throw new Error("Fallo Supabase y webhook historico (" + webhookResponse.status + "). " + (rowsError.message || rowsError.code || "Sin detalle."));
-      rowsData = await webhookResponse.json();
-      sourceLabel = "webhook";
+      const webhookResponse = await fetchWithTimeout(
+        WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...headers },
+          body: JSON.stringify(payload)
+        }
+      );
+
+      if (webhookResponse.ok) {
+        rowsData = await webhookResponse.json();
+        sourceLabel = "webhook";
+      } else if (!rowsError) {
+        rowsData = directRows || [];
+      } else {
+        throw new Error(
+          "Fallo Supabase y webhook historico (" + webhookResponse.status + "). " +
+          (rowsError.message || rowsError.code || "Sin detalle.")
+        );
+      }
     }
 
     state.allRows = normalizeRows(rowsData).map(sanitizeRow);

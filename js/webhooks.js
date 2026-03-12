@@ -145,3 +145,25 @@ WEBHOOKS.FACTURACION_RESUMEN = {
   metodo: "POST",
   descripcion: "Fuente opcional para obtener datos de factura por tenant cuando Supabase no responda o se quiera usar intermediario"
 };
+
+
+WEBHOOKS.BILLING_DAILY_ENFORCER = {
+  url: "https://n8n.globalnexoshop.com/webhook/billing_daily_enforcer",
+  archivos_que_usan: ["n8n workflow", "docs/operacion"],
+  metodo: "POST",
+  descripcion: "Enforcer diario de facturación (banner, suspension, restauracion)"
+};
+
+WEBHOOKS.BILLING_NOTIFICACIONES_PAGOS = {
+  url: "https://n8n.globalnexoshop.com/webhook/notificaciones_pagos",
+  archivos_que_usan: ["js/revision_pagos.js"],
+  metodo: "POST",
+  descripcion: "Dispara notificaciones cuando pagos son aprobados/rechazados"
+};
+
+WEBHOOKS.BILLING_CREAR_CICLOS = {
+  url: "https://n8n.globalnexoshop.com/webhook/crear_ciclos_mensuales",
+  archivos_que_usan: ["n8n workflow", "docs/operacion"],
+  metodo: "POST",
+  descripcion: "Crea ciclos mensuales de facturacion"
+};

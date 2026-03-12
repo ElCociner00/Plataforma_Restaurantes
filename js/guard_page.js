@@ -1,4 +1,4 @@
-﻿import { getUserContext } from "./session.js";
+import { getUserContext } from "./session.js";
 import { PAGE_ENVIRONMENT } from "./permissions.js";
 import { esSuperAdmin, getPermisosEfectivos, permisosCacheGet, permisosCacheSet, tienePermiso } from "./permisos.core.js";
 

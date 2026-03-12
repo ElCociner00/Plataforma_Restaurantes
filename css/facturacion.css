@@ -1,5 +1,5 @@
 .facturacion-main {
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -7,110 +7,143 @@
   background: #f6f3ff;
   border: 1px solid #ddd6fe;
   border-radius: 14px;
-  padding: 24px;
-}
-
-.factura-sheet {
-  width: min(760px, 100%);
-  min-height: 1200px;
-  margin: 0 auto;
-  background: #fffefe;
-  border: 2px solid #c4b5fd;
-  border-radius: 16px;
-  padding: 28px;
+  padding: 18px;
   display: grid;
   gap: 16px;
-  box-shadow: 0 16px 34px rgba(79, 70, 229, 0.14);
-  aspect-ratio: 9 / 16;
 }
 
-.bloque {
-  border: 1px solid #d8ccff;
-  background: #ffffff;
-  border-radius: 10px;
-  padding: 12px 14px;
-}
-
-.factura-top-row {
+/* Documento factura */
+.factura-sheet {
+  width: min(920px, 100%);
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid #d7d7d7;
+  border-radius: 8px;
+  padding: 14px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  align-items: start;
+  gap: 10px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
 }
 
-.bloque-empresa {
-  text-align: center;
+.factura-block {
+  border: 1px solid #dcdcdc;
+  border-radius: 6px;
+  padding: 10px;
 }
 
-.bloque-empresa h2 {
-  margin: 0;
-  color: #312e81;
-  letter-spacing: 0.03em;
+.factura-header {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 10px;
 }
 
-.bloque-empresa p {
-  margin: 6px 0 0;
-}
-
-.bloque-cabecera-factura {
-  text-align: center;
-}
-
-.bloque-cabecera-factura h3 {
-  margin: 0;
+.factura-title {
+  margin: 0 0 8px;
   font-size: 1rem;
-  color: #312e81;
+  color: #1f2937;
 }
 
-.linea-factura {
-  margin-top: 16px;
-  border-top: 1px solid #c4b5fd;
+.kv-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
 }
 
-.factura-codigo-row {
-  margin-top: 8px;
-  display: flex;
-  justify-content: space-between;
+.kv-line {
+  display: grid;
+  grid-template-columns: 150px 1fr;
   gap: 8px;
+  font-size: 0.9rem;
+}
+
+.kv-line dt,
+.kv-line dd {
+  margin: 0;
+}
+
+.kv-line dt {
+  color: #374151;
+  font-weight: 600;
+}
+
+.kv-line dd {
+  color: #111827;
+  word-break: break-word;
+}
+
+.factura-table-wrap {
+  overflow-x: auto;
+}
+
+.factura-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+.factura-table th,
+.factura-table td {
+  border: 1px solid #e5e7eb;
+  padding: 8px;
+  font-size: 0.88rem;
   text-align: left;
 }
 
-.factura-datos-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.bloque-datos-cliente p,
-.bloque-datos-fecha p {
-  margin: 6px 0;
-}
-
-.tabla-grid {
-  display: grid;
-  grid-template-columns: 0.7fr 0.8fr 2fr 0.6fr 1.1fr 1.1fr;
-}
-
-.tabla-grid > div {
-  padding: 10px 8px;
-  text-align: center;
-  border-right: 1px solid #d8ccff;
-}
-
-.tabla-grid > div:last-child {
-  border-right: 0;
-}
-
-.tabla-grid.header > div {
+.factura-table th {
+  background: #f9fafb;
   font-weight: 700;
-  font-size: 0.92rem;
-  border-bottom: 1px solid #d8ccff;
 }
 
-.tabla-grid.body > div {
-  min-height: 58px;
+.factura-table td.is-num,
+.factura-table th.is-num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.factura-tax-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 0.9rem;
+}
+
+.factura-bottom {
   display: grid;
-  place-items: center;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 10px;
+}
+
+.factura-totals {
+  margin-left: auto;
+  width: min(360px, 100%);
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.factura-totals .row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.factura-totals .row:last-child {
+  border-bottom: 0;
+}
+
+.factura-totals .row strong:last-child {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.factura-signature {
+  min-height: 120px;
+}
+
+.factura-legal {
+  font-size: 0.8rem;
+  color: #4b5563;
 }
 
 .factura-payment {
@@ -126,7 +159,6 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: auto;
   min-width: 168px;
   height: 40px;
   padding: 0 18px;
@@ -135,44 +167,42 @@
   background: #6d28d9;
   color: #fff;
   font-weight: 700;
-  font-size: 0.92rem;
-  line-height: 1;
-  white-space: nowrap;
   text-decoration: none;
 }
 
-.btn-pago:hover {
-  background: #5b21b6;
+/* Paneles existentes */
+.billing-panel {
+  background: #fff;
+  border: 1px solid #ddd6fe;
+  border-radius: 12px;
+  padding: 16px;
 }
 
-.factura-payment p {
-  margin: 0;
-  color: #6b7280;
-  font-size: 0.88rem;
-}
+.billing-panel h3 { margin-top: 0; }
+.billing-form { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 10px; align-items: end; }
+.billing-form label { display: grid; gap: 4px; font-size: 0.9rem; }
+.billing-form input,
+.billing-form select,
+.billing-form button { height: 38px; padding: 0 10px; }
+.billing-form input[type="file"] { height: auto; padding: 6px 0; }
+.billing-form button { border: 1px solid #c4b5fd; background: #4f46e5; color: #fff; border-radius: 8px; font-weight: 600; }
+
+.table-wrap { overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
+.table-wrap table { width: 100%; border-collapse: collapse; min-width: 680px; }
+.table-wrap th, .table-wrap td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+.table-wrap th { background: #f8fafc; }
+
+.badge { display: inline-flex; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.badge.ok { background: #dcfce7; color: #166534; }
+.badge.bad { background: #fee2e2; color: #991b1b; }
+.badge.warn { background: #fef3c7; color: #92400e; }
 
 @media (max-width: 900px) {
-  .factura-shell {
-    padding: 10px;
-  }
-
-  .factura-sheet {
-    min-height: auto;
-    aspect-ratio: auto;
-    padding: 14px;
-  }
-
-  .factura-top-row,
-  .factura-datos-row {
-    grid-template-columns: 1fr;
-  }
-
-  .tabla-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .tabla-grid > div {
-    border-right: 0;
-    border-bottom: 1px solid #e9e4ff;
-  }
+  .factura-shell { padding: 10px; }
+  .factura-sheet { padding: 10px; }
+  .factura-header,
+  .factura-bottom,
+  .billing-form { grid-template-columns: 1fr; }
+  .kv-line { grid-template-columns: 1fr; }
+  .factura-totals { margin-left: 0; }
 }
