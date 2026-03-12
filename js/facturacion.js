@@ -1,3 +1,4 @@
+﻿
 import { supabase } from "./supabase.js";
 import { buildRequestHeaders, getSessionConEmpresa } from "./session.js";
 import { WEBHOOKS } from "./webhooks.js";
@@ -38,7 +39,7 @@ async function loadFacturaByWebhook(empresaId) {
     body: JSON.stringify({ empresa_id: empresaId })
   });
 
-  if (!res.ok) throw new Error(`Webhook facturacion fallo: ${res.status}`);
+  if (!res.ok) throw new Error("Webhook facturacion fallo: " + res.status);
   const data = await res.json().catch(() => null);
   return data?.factura || data || null;
 }
@@ -94,7 +95,7 @@ function getFacturaCode(factura) {
   if (factura?.numero_factura) return String(factura.numero_factura);
   const prefijo = factura?.prefijo_factura || "AX";
   const consecutivo = Number(factura?.consecutivo_actual || 1);
-  return `${prefijo}-${consecutivo}`;
+  return prefijo + "-" + consecutivo;
 }
 
 function attemptStatusBadge(status) {
@@ -377,7 +378,6 @@ async function attachUploadHandler({ empresaId, cycleId }) {
 
 export async function cargarFactura() {
   if (!rootEl) return;
-
   const session = await getSessionConEmpresa().catch(() => null);
   const empresa = session?.empresa || {};
   if (!empresa?.id) {
@@ -412,10 +412,18 @@ export async function cargarFactura() {
   attachUploadHandler({ empresaId: empresa.id, cycleId: billingCycle?.id || null });
 }
 
+  rootEl.innerHTML = [
+    renderFactura({ facturaCode, descripcion, valorTotal }),
+    renderUploadForm(valorTotal),
+    renderHistory(attemptsWithUrls, cycles)
+  ].join("\n");
+
+  attachUploadHandler({ empresaId: empresa.id, cycleId: billingCycle?.id || null });
+}
 document.addEventListener("DOMContentLoaded", () => {
   cargarFactura();
 });
-
 window.addEventListener("empresaCambiada", () => {
   cargarFactura();
 });
+

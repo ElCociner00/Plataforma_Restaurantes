@@ -1,3 +1,4 @@
+﻿
 import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 
@@ -37,7 +38,7 @@ async function getModalTemplateHtml() {
     if (!res.ok) throw new Error("template not found");
     return await res.text();
   } catch {
-    return "<div id='anuncio-impago' class='impago-modal' role='dialog' aria-modal='true'><div class='impago-modal-card'><h3 id='impagoModalTitle'>Aviso importante</h3><p id='impagoModalMessage'></p><div class='impago-modal-actions'><button id='impagoModalAceptar' type='button'>Aceptar</button><a id='impagoModalPagar' href='/Plataforma_Restaurantes/facturacion/'>Pagar inmediatamente</a></div></div></div>";
+    return "<div id=\"anuncio-impago\" class=\"impago-modal\" role=\"dialog\" aria-modal=\"true\"><div class=\"impago-modal-card\"><h3 id=\"impagoModalTitle\">Aviso importante</h3><p id=\"impagoModalMessage\"></p><div class=\"impago-modal-actions\"><button id=\"impagoModalAceptar\" type=\"button\">Aceptar</button><a id=\"impagoModalPagar\" href=\"/Plataforma_Restaurantes/facturacion/\">Pagar inmediatamente</a></div></div></div>";
   }
 }
 
@@ -50,9 +51,9 @@ function getMensajeHtml(dias) {
 
   return `
     <div class="impago-msg">
-      <div class="impago-msg-title">¡Información importante!</div>
+      <div class="impago-msg-title">Â¡InformaciÃ³n importante!</div>
       <div class="impago-msg-days">${textoDias}</div>
-      <div class="impago-msg-body">Recuerda pagar tu servicio para seguir disfrutándolo. Gracias por elegirnos.</div>
+      <div class="impago-msg-body">Recuerda pagar tu servicio para seguir disfrutÃ¡ndolo. Gracias por elegirnos.</div>
     </div>
   `;
 }
@@ -103,15 +104,12 @@ async function getBannerState() {
 
 async function mostrarAnuncio({ storageKey, diasRestantes }) {
   ocultarAnuncio();
-
   const container = document.createElement("div");
   container.innerHTML = await getModalTemplateHtml();
   const modal = container.querySelector("#anuncio-impago");
   if (!modal) return;
-
   const title = modal.querySelector("#impagoModalTitle");
   if (title) title.textContent = "Aviso importante";
-
   const message = modal.querySelector("#impagoModalMessage");
   if (message) message.innerHTML = getMensajeHtml(diasRestantes ?? 0);
 
@@ -120,7 +118,6 @@ async function mostrarAnuncio({ storageKey, diasRestantes }) {
     markAsShown(storageKey);
     ocultarAnuncio();
   });
-
   const btnPagar = modal.querySelector("#impagoModalPagar");
   btnPagar?.addEventListener("click", (event) => {
     event.preventDefault();
@@ -131,13 +128,11 @@ async function mostrarAnuncio({ storageKey, diasRestantes }) {
     }, 0);
   });
   if (btnPagar) btnPagar.setAttribute("href", FACTURACION_URL);
-
   document.body.appendChild(modal);
   document.body.classList.add("has-impago-banner");
   anuncioInyectado = true;
   markAsShown(storageKey);
 }
-
 export async function verificarYMostrarAnuncio() {
   ensureBannerStyles();
 
@@ -155,7 +150,6 @@ export async function verificarYMostrarAnuncio() {
 
   await mostrarAnuncio({ storageKey, diasRestantes });
 }
-
 document.addEventListener("DOMContentLoaded", () => {
   setTimeout(() => {
     verificarYMostrarAnuncio().catch(() => {
@@ -163,7 +157,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }, 50);
 });
-
 window.addEventListener("empresaCambiada", () => {
   verificarYMostrarAnuncio().catch(() => {
     if (!anuncioInyectado) ocultarAnuncio();
