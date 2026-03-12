@@ -4,8 +4,6 @@ import { buildRequestHeaders, getSessionConEmpresa } from "./session.js";
 import { WEBHOOKS } from "./webhooks.js";
 
 const rootEl = document.getElementById("factura-contenido");
-const pagoEl = document.getElementById("pago-comprobante");
-const historialEl = document.getElementById("historial-pagos");
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
 const fmtDate = (v) => {
@@ -162,15 +160,18 @@ function renderFactura({ facturaCode, descripcion, valorTotal }) {
   </article>`;
 }
 
-function renderUploadForm(defaultAmount) {
+function renderUploadForm(defaultAmount, hasCycle) {
+  const blockedMessage = hasCycle ? "" : '<p class="helper-text">No hay ciclo de facturación activo para este periodo. Contacta al administrador antes de subir comprobante.</p>';
+  const disabledAttr = hasCycle ? "" : "disabled";
   return `
     <section class="billing-panel">
       <h3>Subir comprobante de pago</h3>
+      ${blockedMessage}
       <form id="formComprobante" class="billing-form">
-        <label>Monto pagado <input type="number" name="monto" min="1" step="1" value="${Number(defaultAmount || 59900)}" required></label>
-        <label>Referencia externa <input type="text" name="referencia" placeholder="Ej: comprobante banco"></label>
+        <label>Monto pagado <input type="number" name="monto" min="1" step="1" value="${Number(defaultAmount || 59900)}" required ${disabledAttr}></label>
+        <label>Referencia externa <input type="text" name="referencia" placeholder="Ej: comprobante banco" ${disabledAttr}></label>
         <label>Canal
-          <select name="canal" required>
+          <select name="canal" required ${disabledAttr}>
             <option value="transferencia">Transferencia</option>
             <option value="mercadopago_link">Mercado Pago</option>
             <option value="efectivo">Efectivo</option>
@@ -178,9 +179,9 @@ function renderUploadForm(defaultAmount) {
           </select>
         </label>
         <label>Comprobante (PDF/Imagen)
-          <input type="file" name="comprobante" accept="application/pdf,image/*" required>
+          <input type="file" name="comprobante" accept="application/pdf,image/*" required ${disabledAttr}>
         </label>
-        <button id="btnEnviarComprobante" type="submit">Enviar comprobante</button>
+        <button id="btnEnviarComprobante" type="submit" ${disabledAttr}>Enviar comprobante</button>
       </form>
       <p id="estadoComprobante" class="helper-text"></p>
     </section>
@@ -231,7 +232,7 @@ async function attachUploadHandler({ empresaId, cycleId }) {
   const form = document.getElementById("formComprobante");
   const statusEl = document.getElementById("estadoComprobante");
   const btn = document.getElementById("btnEnviarComprobante");
-  if (!form || !empresaId) return;
+  if (!form || !empresaId || !cycleId) return;
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -305,6 +306,15 @@ export async function cargarFactura() {
     ...item,
     comprobante_signed_url: item?.estado === "aprobado" ? await resolveComprobanteUrl(item.comprobante_url).catch(() => "") : ""
   })));
+
+  rootEl.innerHTML = [
+    renderFactura({ facturaCode, descripcion, valorTotal }),
+    renderUploadForm(valorTotal, Boolean(billingCycle?.id)),
+    renderHistory(attemptsWithUrls, cycles)
+  ].join("\n");
+
+  attachUploadHandler({ empresaId: empresa.id, cycleId: billingCycle?.id || null });
+}
 
   rootEl.innerHTML = [
     renderFactura({ facturaCode, descripcion, valorTotal }),

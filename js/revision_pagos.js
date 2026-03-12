@@ -187,69 +187,6 @@ async function notificarWebhook({ tipo, attemptId, observaciones }) {
   }).catch(() => {});
 }
 
-async function aprobarPago(row, observaciones, revisadoPor) {
-  const { error: attemptError } = await supabase
-    .from("payment_attempts")
-    .update({
-      estado: "aprobado",
-      revisado_por: revisadoPor || null,
-      observaciones: observaciones || null
-    })
-    .eq("id", row.id);
-
-  if (attemptError) throw attemptError;
-
-  const { error: cycleError } = await supabase
-    .from("billing_cycles")
-    .update({
-      estado: "paid_verified",
-      banner_activo: false
-    })
-    .eq("id", row.billing_cycle_id);
-
-  if (cycleError) throw cycleError;
-
-  await registrarEvento({
-    empresaId: row.empresa_id,
-    billingCycleId: row.billing_cycle_id,
-    tipo: "pago_aprobado",
-    actor: revisadoPor,
-    payload: {
-      attempt_id: row.id,
-      observaciones: observaciones || null
-    }
-  });
-}
-
-async function rechazarPago(row, observaciones, revisadoPor) {
-  const { error: attemptError } = await supabase
-    .from("payment_attempts")
-    .update({
-      estado: "rechazado",
-      revisado_por: revisadoPor || null,
-      observaciones: observaciones || null
-    })
-    .eq("id", row.id);
-
-  if (attemptError) throw attemptError;
-
-  await registrarEvento({
-    empresaId: row.empresa_id,
-    billingCycleId: row.billing_cycle_id,
-    tipo: "pago_rechazado",
-    actor: revisadoPor,
-    payload: {
-      attempt_id: row.id,
-      observaciones: observaciones || null
-    }
-  });
-}
-
-function getObservaciones(id) {
-  const input = bodyEl?.querySelector(`textarea[data-obs-id="${id}"]`);
-  return input?.value?.trim() || null;
-}
-
 document.addEventListener("DOMContentLoaded", async () => {
   const ok = await esSuperAdmin().catch(() => false);
   if (!ok) {
