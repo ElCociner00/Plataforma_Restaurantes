@@ -61,14 +61,14 @@ button[type="submit"] {
 
 .usuarios-tabla {
   width: 100%;
-  min-width: 720px;
+  min-width: 420px;
   border-collapse: collapse;
   font-size: 14px;
 }
 
 .usuarios-tabla th,
 .usuarios-tabla td {
-  padding: 8px;
+  padding: 10px;
   border-bottom: 1px solid #e5e7eb;
   text-align: center;
 }
@@ -78,22 +78,6 @@ button[type="submit"] {
   margin-top: 10px;
   font-size: 13px;
 }
-
-
-@media (max-width: 700px) {
-  .main {
-    max-width: 100%;
-  }
-
-  form {
-    max-width: 100%;
-  }
-
-  .usuarios-tabla {
-    min-width: 560px;
-  }
-}
-
 
 .switch-cell {
   position: relative;
@@ -129,11 +113,17 @@ button[type="submit"] {
   transition: .2s ease;
 }
 
-@media (max-width: 700px) {
-  .main {
-    max-width: 100%;
-  }
+.switch-cell input:checked + .switch-slider {
+  background: #2563eb;
+}
 
 .switch-cell input:checked + .switch-slider::before {
   transform: translateX(22px);
+}
+
+@media (max-width: 700px) {
+  .main,
+  form {
+    max-width: 100%;
+  }
 }

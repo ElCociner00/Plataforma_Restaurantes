@@ -12,7 +12,6 @@
   gap: 16px;
 }
 
-/* Documento factura */
 .factura-sheet {
   width: min(920px, 100%);
   margin: 0 auto;
@@ -49,6 +48,10 @@
   margin: 0;
 }
 
+.customer-list .kv-line {
+  grid-template-columns: 180px 1fr;
+}
+
 .kv-line {
   display: grid;
   grid-template-columns: 150px 1fr;
@@ -78,7 +81,7 @@
 .factura-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 760px;
+  min-width: 840px;
 }
 
 .factura-table th,
@@ -98,6 +101,7 @@
 .factura-table th.is-num {
   text-align: right;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .factura-tax-line {
@@ -111,6 +115,10 @@
   display: grid;
   grid-template-columns: 1.2fr 1fr;
   gap: 10px;
+}
+
+.factura-bottom-only-totals {
+  grid-template-columns: 1fr;
 }
 
 .factura-totals {
@@ -135,6 +143,7 @@
 .factura-totals .row strong:last-child {
   text-align: right;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .factura-signature {
@@ -146,9 +155,16 @@
   color: #4b5563;
 }
 
-.historial-empty {
+.factura-payment {
+  border: 1px dashed #c4b5fd;
+  border-radius: 8px;
+  padding: 12px;
+  background: #faf8ff;
+}
+
+.factura-payment p {
+  margin: 8px 0 0;
   font-size: 0.9rem;
-  color: #6b7280;
 }
 
 .btn-pago {
@@ -162,12 +178,18 @@
   border: 1px solid #c4b5fd;
   background: #6d28d9;
   color: #fff;
-  font-weight: 700;
   text-decoration: none;
   font-weight: 600;
 }
 
-/* Paneles existentes */
+.factura-payment .btn-pago {
+  margin: 0 auto;
+}
+
+.factura-payment {
+  text-align: center;
+}
+
 .billing-panel {
   background: #fff;
   border: 1px solid #ddd6fe;
@@ -200,6 +222,7 @@
   .factura-header,
   .factura-bottom,
   .billing-form { grid-template-columns: 1fr; }
-  .kv-line { grid-template-columns: 1fr; }
+  .kv-line,
+  .customer-list .kv-line { grid-template-columns: 1fr; }
   .factura-totals { margin-left: 0; }
 }
