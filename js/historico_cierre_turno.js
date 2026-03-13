@@ -119,16 +119,6 @@ const formatCellValue = (value) => {
   return String(value);
 };
 
-const normalizeInlineText = (value) => String(value || "")
-  .replace(/\r\n/g, " ")
-  .replace(/\n/g, " ")
-  .replace(/\r/g, " ")
-  .replace(/\\r\\n/g, " ")
-  .replace(/\\n/g, " ")
-  .replace(/\\r/g, " ")
-  .replace(/\s+/g, " ")
-  .trim();
-
 const toReadableLabel = (value) => String(value || "")
   .replace(/[_-]+/g, " ")
   .replace(/\s+/g, " ")
@@ -304,35 +294,27 @@ const renderDetailSection = () => {
     return;
   }
 
-  const headerRows = state.visibleGeneralColumns
-    .map((key) => `<tr><th>${toReadableLabel(key)}</th><td>${escapeHtml(normalizeInlineText(formatCellValue(selected.general[key])))}</td></tr>`)
+  const generalHtml = state.visibleGeneralColumns
+    .map((key) => `<div class="kv"><strong>${toReadableLabel(key)}</strong><span>${formatCellValue(selected.general[key])}</span></div>`)
     .join("");
 
   const detailRows = getDetailRowsFor(selected);
-  const detailHead = state.visibleDetailColumns.map((col) => `<th>${toReadableLabel(col)}</th>`).join("");
+
+  const detailHead = ["#", ...state.visibleDetailColumns].map((col) => `<th>${toReadableLabel(col)}</th>`).join("");
   const detailBody = detailRows.map((detail) => {
     const detailKey = getDetailItemKey(detail);
-    const cells = state.visibleDetailColumns
-      .map((col) => `<td>${escapeHtml(normalizeInlineText(formatCellValue(detail[col])))}</td>`)
-      .join("");
-    return `<tr draggable="true" data-detail-key="${detailKey}">${cells}</tr>`;
+    const cells = state.visibleDetailColumns.map((col) => `<td>${formatCellValue(detail[col])}</td>`).join("");
+    return `<tr draggable="true" data-detail-key="${detailKey}"><td class="drag-col">::</td>${cells}</tr>`;
   }).join("");
 
   detalleTurno.innerHTML = `
-    <h3>${escapeHtml(normalizeInlineText(formatCellValue(selected.general.turno_nombre || selected.id)))}</h3>
-    <div class="detalle-card-grid">
-      <div class="tabla-wrap detalle-resumen-wrap">
-        <table class="detalle-resumen-table">
-          <thead><tr><th colspan="2">Resumen del turno seleccionado</th></tr></thead>
-          <tbody>${headerRows || "<tr><td colspan='2'>Sin datos generales visibles.</td></tr>"}</tbody>
-        </table>
-      </div>
-      <div class="tabla-wrap detalle-wrap">
-        <table>
-          <thead><tr>${detailHead}</tr></thead>
-          <tbody id="detalleBodyRows">${detailBody || `<tr><td colspan="${Math.max(1, state.visibleDetailColumns.length)}">Sin detalle visible.</td></tr>`}</tbody>
-        </table>
-      </div>
+    <h3>${formatCellValue(selected.general.turno_nombre || selected.id)}</h3>
+    <div class="kv-grid">${generalHtml || "<p>Sin datos generales visibles.</p>"}</div>
+    <div class="tabla-wrap detalle-wrap">
+      <table>
+        <thead><tr>${detailHead}</tr></thead>
+        <tbody id="detalleBodyRows">${detailBody || "<tr><td colspan='10'>Sin detalle visible.</td></tr>"}</tbody>
+      </table>
     </div>
   `;
 
@@ -726,106 +708,29 @@ const downloadTurnoPng = (row) => {
 
   const canvas = document.createElement("canvas");
   canvas.width = 1080;
-  canvas.height = 1920;
+  canvas.height = 1600;
   const ctx = canvas.getContext("2d");
   if (!ctx) return setStatus("No se pudo generar PNG del turno.");
 
-  const details = getDetailRowsFor(row);
-
   ctx.fillStyle = "#f3edff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(40, 40, 1000, 1520);
+  ctx.strokeStyle = "#c4b5fd";
+  ctx.strokeRect(40, 40, 1000, 1520);
 
-  const cardX = 46;
-  const cardY = 46;
-  const cardW = canvas.width - 92;
-  const cardH = canvas.height - 92;
-
-  ctx.fillStyle = "#ffffff";
-  ctx.strokeStyle = "#b8a6f8";
-  ctx.lineWidth = 4;
-  ctx.fillRect(cardX, cardY, cardW, cardH);
-  ctx.strokeRect(cardX, cardY, cardW, cardH);
-
-  let y = cardY + 54;
+  let y = 100;
   ctx.fillStyle = "#4c1d95";
   ctx.font = "bold 40px Arial";
-  ctx.fillText("RESUMEN CIERRE DE TURNO", cardX + 28, y);
+  ctx.fillText("HISTORICO CIERRE TURNO", 70, y);
 
-  y += 36;
-  ctx.fillStyle = "#6d28d9";
+  y += 50;
+  ctx.fillStyle = "#1f2937";
   ctx.font = "24px Arial";
-  ctx.fillText(String(row.general?.turno_nombre || row.id || "Turno"), cardX + 28, y);
-
-  y += 30;
-  ctx.strokeStyle = "#ddd6fe";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(cardX + 24, y);
-  ctx.lineTo(cardX + cardW - 24, y);
-  ctx.stroke();
-
-  y += 28;
-  ctx.fillStyle = "#1f2937";
-  ctx.font = "bold 22px Arial";
-  ctx.fillText("Datos generales", cardX + 28, y);
-
-  y += 16;
-  const generalCols = state.visibleGeneralColumns.slice(0, 14);
-  ctx.font = "18px Arial";
-  generalCols.forEach((col) => {
-    if (y > cardY + cardH - 360) return;
-    const label = toReadableLabel(col);
-    const value = normalizeInlineText(formatCellValue(row.general?.[col]));
-    const line = `${label}: ${value}`;
-    ctx.fillStyle = "#374151";
-    ctx.fillText(line.slice(0, 100), cardX + 30, y);
-    y += 30;
-  });
-
-  y += 12;
-  ctx.fillStyle = "#1f2937";
-  ctx.font = "bold 22px Arial";
-  ctx.fillText("Detalle tabular", cardX + 28, y);
-
-  y += 20;
-  const tableX = cardX + 24;
-  const tableW = cardW - 48;
-  const rowH = 30;
-  const cols = ["variable", "categoria", "sistema", "real", "diferencia"];
-  const colW = [0.28, 0.18, 0.18, 0.18, 0.18].map((x) => x * tableW);
-
-  ctx.fillStyle = "#ede9fe";
-  ctx.fillRect(tableX, y, tableW, rowH);
-  ctx.strokeStyle = "#d1d5db";
-  ctx.strokeRect(tableX, y, tableW, rowH);
-
-  let x = tableX;
-  ctx.fillStyle = "#1f2937";
-  ctx.font = "bold 16px Arial";
-  cols.forEach((col, i) => {
-    const title = toReadableLabel(col).toUpperCase();
-    ctx.fillText(title, x + 8, y + 20);
-    x += colW[i];
-  });
-
-  y += rowH;
-  ctx.font = "15px Arial";
-  details.slice(0, 24).forEach((detail) => {
-    if (y > cardY + cardH - 80) return;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(tableX, y, tableW, rowH);
-    ctx.strokeStyle = "#e5e7eb";
-    ctx.strokeRect(tableX, y, tableW, rowH);
-
-    let cx = tableX;
-    cols.forEach((col, i) => {
-      const raw = normalizeInlineText(formatCellValue(detail[col]));
-      const txt = raw.length > 22 ? `${raw.slice(0, 22)}…` : raw;
-      ctx.fillStyle = "#111827";
-      ctx.fillText(txt, cx + 8, y + 20);
-      cx += colW[i];
-    });
-    y += rowH;
+  state.visibleGeneralColumns.forEach((col) => {
+    if (y > 1480) return;
+    ctx.fillText(`${col}: ${formatCellValue(row.general?.[col])}`, 70, y);
+    y += 34;
   });
 
   const link = document.createElement("a");

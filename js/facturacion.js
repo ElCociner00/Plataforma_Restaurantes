@@ -23,18 +23,6 @@ const escapeHtml = (value) => String(value || "")
   .replaceAll('"', "&quot;")
   .replaceAll("'", "&#39;");
 
-function normalizeInlineText(value) {
-  return String(value || "")
-    .replace(/\r\n/g, " ")
-    .replace(/\n/g, " ")
-    .replace(/\r/g, " ")
-    .replace(/\\r\\n/g, " ")
-    .replace(/\\n/g, " ")
-    .replace(/\\r/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 const getCurrentPeriod = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 
 async function loadFacturaByWebhook(empresaId) {
@@ -107,7 +95,7 @@ function getFacturaCode(factura) {
   if (factura?.numero_factura) return String(factura.numero_factura);
   const prefijo = factura?.prefijo_factura || "AX";
   const consecutivo = Number(factura?.consecutivo_actual || 1);
-  return `${prefijo}-${consecutivo}`;
+  return prefijo + "-" + consecutivo;
 }
 
 function attemptStatusBadge(status) {
@@ -150,8 +138,8 @@ function renderFactura({ empresa, facturaCode, descripcion, valorTotal }) {
   const issueDate = fecha.toLocaleDateString("es-CO");
   const issueTime = fecha.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
   const companyName = "AXIOMA by Global Nexo Shop";
-  const customerName = normalizeInlineText(empresa?.nombre_comercial || empresa?.razon_social || "Cliente");
-  const customerId = normalizeInlineText(empresa?.nit || "-");
+  const customerName = empresa?.nombre_comercial || empresa?.razon_social || "Cliente";
+  const customerId = empresa?.nit || "-";
 
   return `
   <article class="factura-sheet">
@@ -216,7 +204,7 @@ function renderFactura({ empresa, facturaCode, descripcion, valorTotal }) {
           <tr>
             <td class="is-num">1</td>
             <td class="is-num">${fmtMoney(valorTotal)}</td>
-            <td>${escapeHtml(normalizeInlineText(descripcion))}</td>
+            <td>${escapeHtml(descripcion)}</td>
             <td class="is-num">${fmtMoney(valorTotal)}</td>
             <td>AX-SUSC</td>
             <td>MES</td>
@@ -262,8 +250,7 @@ function renderFactura({ empresa, facturaCode, descripcion, valorTotal }) {
     </section>
 
     <section class="factura-payment">
-      <a class="btn-pago" href="https://mpago.li/15d6BkC" target="_blank" rel="noopener noreferrer">Ingresa al link para pagar</a>
-      <p>https://mpago.li/15d6BkC</p>
+      <a class="btn-pago" href="https://mpago.li/15d6BkC" target="_blank" rel="noopener noreferrer">Pagar ahora</a>
       <p>Si ya pagaste, sube aquí tu comprobante para revisión.</p>
     </section>
   </article>`;
@@ -393,19 +380,20 @@ export async function cargarFactura() {
   if (!rootEl) return;
   const session = await getSessionConEmpresa().catch(() => null);
   const empresa = session?.empresa || {};
-  const empresaId = empresa?.id || null;
+  if (!empresa?.id) {
+    rootEl.innerHTML = "<p>No se pudo identificar la empresa actual.</p>";
+    return;
+  }
 
   const periodo = getCurrentPeriod();
-  const [billingCycle, legacyFactura, attempts, cycles] = empresaId
-    ? await Promise.all([
-      loadBillingCycle(empresaId, periodo).catch(() => null),
-      loadLegacyFactura(empresaId).catch(() => null),
-      loadPaymentAttempts(empresaId).catch(() => []),
-      loadBillingHistory(empresaId).catch(() => [])
-    ])
-    : [null, null, [], []];
+  const [billingCycle, legacyFactura, attempts, cycles] = await Promise.all([
+    loadBillingCycle(empresa.id, periodo).catch(() => null),
+    loadLegacyFactura(empresa.id).catch(() => null),
+    loadPaymentAttempts(empresa.id).catch(() => []),
+    loadBillingHistory(empresa.id).catch(() => [])
+  ]);
 
-  const facturaSource = billingCycle || legacyFactura || (empresaId ? await loadFacturaByWebhook(empresaId).catch(() => null) : null) || {};
+  const facturaSource = billingCycle || legacyFactura || await loadFacturaByWebhook(empresa.id).catch(() => null) || {};
   const facturaCode = getFacturaCode(facturaSource);
   const descripcion = facturaSource?.descripcion_producto || "Servicio plataforma AXIOMA";
   const valorTotal = Number(facturaSource?.monto || facturaSource?.valor_total || 59900);
@@ -417,12 +405,11 @@ export async function cargarFactura() {
 
   rootEl.innerHTML = [
     renderFactura({ empresa, facturaCode, descripcion, valorTotal }),
-    !empresaId ? `<section class="billing-panel"><p class="helper-text">Vista estática disponible. Inicia sesión de empresa para habilitar carga e historial dinámico.</p></section>` : "",
-    renderUploadForm(valorTotal, Boolean(billingCycle?.id) && Boolean(empresaId)),
+    renderUploadForm(valorTotal, Boolean(billingCycle?.id)),
     renderHistory(attemptsWithUrls, cycles)
   ].join("\n");
 
-  attachUploadHandler({ empresaId, cycleId: billingCycle?.id || null });
+  attachUploadHandler({ empresaId: empresa.id, cycleId: billingCycle?.id || null });
 }
 
   rootEl.innerHTML = [
