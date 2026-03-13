@@ -27,6 +27,8 @@ const PAGE_SIZE = 20;
 const MAX_LOADING_MS = 5000;
 const EXCLUDED_GENERAL_FIELDS = new Set(["empresa_id", "registrado_por", "responsable_id", "total_variables", "diferencia_caja", "variables_detalle"]);
 const EXCLUDED_DETAIL_FIELDS = new Set(["id"]);
+const normalizeFieldKey = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const shouldExcludeGeneralField = (key) => EXCLUDED_GENERAL_FIELDS.has(key) || normalizeFieldKey(key).includes("responsableid");
 const getTimestamp = () => new Date().toISOString();
 
 const state = {
@@ -206,7 +208,7 @@ const sortDetailsBase = (details) => [...details].sort((a, b) => {
 const sanitizeRow = (rawRow, index) => {
   const general = {};
   Object.entries(rawRow || {}).forEach(([key, value]) => {
-    if (!EXCLUDED_GENERAL_FIELDS.has(key)) general[key] = value;
+    if (!shouldExcludeGeneralField(key)) general[key] = value;
   });
 
   const detailsRaw = Array.isArray(rawRow?.variables_detalle) ? rawRow.variables_detalle : (typeof rawRow?.variables_detalle === "string" ? (() => { try { const parsed = JSON.parse(rawRow.variables_detalle); return Array.isArray(parsed) ? parsed : []; } catch { return []; } })() : []);
@@ -427,7 +429,7 @@ const renderBody = () => {
 
     state.visibleGeneralColumns.forEach((column) => {
       const td = document.createElement("td");
-      td.textContent = formatCellValue(row.general[column]);
+      td.textContent = normalizeInlineText(formatCellValue(row.general[column]));
       tr.appendChild(td);
     });
 
