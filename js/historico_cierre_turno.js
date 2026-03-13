@@ -21,14 +21,13 @@ const coincidenciasSimilares = document.getElementById("coincidenciasSimilares")
 const btnAplicarFiltros = document.getElementById("aplicarFiltros");
 const btnLimpiarFiltros = document.getElementById("limpiarFiltros");
 const btnDescargarTurnoSeleccionado = document.getElementById("descargarTurnoSeleccionado");
-const btnDescargarTurnoSeleccionadoPng = document.getElementById("descargarTurnoSeleccionadoPng");
 const btnDescargarTurnosSeleccionados = document.getElementById("descargarTurnosSeleccionados");
 const btnDescargarTurnosFiltrados = document.getElementById("descargarTurnosFiltrados");
 const btnDescargarTodosTurnos = document.getElementById("descargarTodosTurnos");
 
 const PAGE_SIZE = 20;
 const MAX_LOADING_MS = 5000;
-const EXCLUDED_GENERAL_FIELDS = new Set(["empresa_id", "registrado_por", "responsable_id", "total_variables", "diferencia_caja", "variables_detalle"]);
+const EXCLUDED_GENERAL_FIELDS = new Set(["empresa_id", "registrado_por", "responsable_id", "total_variables", "diferencia_caja", "variables_detalle", "created_at", "turno_nombre"]);
 const EXCLUDED_DETAIL_FIELDS = new Set(["id"]);
 const normalizeFieldKey = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 const shouldExcludeGeneralField = (key) => EXCLUDED_GENERAL_FIELDS.has(key) || normalizeFieldKey(key).includes("responsableid");
@@ -208,15 +207,34 @@ const sortDetailsBase = (details) => [...details].sort((a, b) => {
   return detailCategoryWeight(a.categoria) - detailCategoryWeight(b.categoria);
 });
 
+const getGeneralValue = (obj, candidates = []) => {
+  for (const key of candidates) {
+    if (obj && obj[key] !== undefined && obj[key] !== null && String(obj[key]).trim() !== "") return obj[key];
+  }
+  return "";
+};
+
+const resolveResponsableName = (rawRow = {}) => {
+  const direct = getGeneralValue(rawRow, ["responsable", "responsable_nombre", "nombre_responsable", "responsableName"]);
+  if (direct) return direct;
+
+  for (const [key, value] of Object.entries(rawRow)) {
+    const normalized = normalizeFieldKey(key);
+    if (normalized.includes("responsable") && !normalized.includes("id") && String(value || "").trim()) {
+      return value;
+    }
+  }
+
+  return "";
+};
+
 const sanitizeRow = (rawRow, index) => {
   const general = {};
   Object.entries(rawRow || {}).forEach(([key, value]) => {
     if (!shouldExcludeGeneralField(key)) general[key] = value;
   });
 
-  if (!general.responsable) {
-    general.responsable = rawRow?.responsable || rawRow?.responsable_nombre || rawRow?.nombre_responsable || "";
-  }
+  general.responsable = resolveResponsableName(rawRow);
 
   const detailsRaw = Array.isArray(rawRow?.variables_detalle) ? rawRow.variables_detalle : (typeof rawRow?.variables_detalle === "string" ? (() => { try { const parsed = JSON.parse(rawRow.variables_detalle); return Array.isArray(parsed) ? parsed : []; } catch { return []; } })() : []);
   const details = sortDetailsBase(detailsRaw.map((item) => {
@@ -342,9 +360,18 @@ const renderDetailSection = () => {
     return;
   }
 
-  const headerRows = state.visibleGeneralColumns
-    .map((key) => `<tr><th>${toReadableLabel(key)}</th><td>${escapeHtml(normalizeInlineText(formatCellValue(selected.general[key])))}</td></tr>`)
+  const financialKeys = ["domicilios", "propinas", "efectivo_inicial", "ventas_brutas", "bolsa", "caja_final"];
+  const hiddenInSummary = new Set(["created_at", "turno_nombre", ...financialKeys]);
+
+  const summaryRows = state.visibleGeneralColumns
+    .filter((key) => !hiddenInSummary.has(key))
+    .map((key) => `<div class="resumen-kv-item"><span>${toReadableLabel(key)}</span><strong>${escapeHtml(normalizeInlineText(formatCellValue(selected.general[key])))}</strong></div>`)
     .join("");
+
+  const finCells = financialKeys.map((key) => {
+    const val = selected.general[key];
+    return `<div class="fin-kpi"><span>${toReadableLabel(key)}</span><strong>${escapeHtml(normalizeInlineText(formatCellValue(val)))}</strong></div>`;
+  }).join("");
 
   const groupedDetails = summarizeDetailByVariable(selected);
   const groupedBody = groupedDetails.map((item) => `
@@ -361,13 +388,12 @@ const renderDetailSection = () => {
       <h3>${escapeHtml(normalizeInlineText(formatCellValue(selected.general.turno_nombre || selected.id)))}</h3>
       <button type="button" class="icon-download-btn" id="descargarResumenActual" aria-label="Descargar resumen del turno" title="Descargar resumen PNG">⬇</button>
     </div>
+
+    <div class="resumen-kv-grid">${summaryRows || "<p class='hint'>Sin datos de resumen.</p>"}</div>
+
+    <div class="fin-kpi-grid">${finCells}</div>
+
     <div class="detalle-card-grid">
-      <div class="tabla-wrap detalle-resumen-wrap">
-        <table class="detalle-resumen-table">
-          <thead><tr><th colspan="2">Resumen del turno seleccionado</th></tr></thead>
-          <tbody>${headerRows || "<tr><td colspan='2'>Sin datos generales visibles.</td></tr>"}</tbody>
-        </table>
-      </div>
       <div class="tabla-wrap detalle-wrap detalle-comparativo-wrap">
         <table>
           <thead>
@@ -1004,11 +1030,6 @@ const getSelectedRows = () => state.allRows.filter((row) => state.selectedRowIds
 btnDescargarTurnoSeleccionado?.addEventListener("click", () => {
   const current = getCurrentRow();
   return downloadExcel(current ? [current] : [], "turno_seleccionado.xls");
-});
-
-btnDescargarTurnoSeleccionadoPng?.addEventListener("click", () => {
-  const current = getCurrentRow();
-  return downloadTurnoPng(current);
 });
 
 btnDescargarTurnosSeleccionados?.addEventListener("click", () => {
