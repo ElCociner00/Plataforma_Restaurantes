@@ -117,10 +117,6 @@
   gap: 10px;
 }
 
-.factura-bottom-only-totals {
-  grid-template-columns: 1fr;
-}
-
 .factura-totals {
   margin-left: auto;
   width: min(360px, 100%);
@@ -180,14 +176,6 @@
   color: #fff;
   text-decoration: none;
   font-weight: 600;
-}
-
-.factura-payment .btn-pago {
-  margin: 0 auto;
-}
-
-.factura-payment {
-  text-align: center;
 }
 
 .billing-panel {

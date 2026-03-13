@@ -97,8 +97,11 @@ async function loadBillingHistory(empresaId, limit = 12) {
   return data || [];
 }
 
-function amountInWordsEs() {
-  return "CINCUENTA Y NUEVE MIL NOVECIENTOS PESOS COLOMBIANOS";
+function getFacturaCode(factura) {
+  if (factura?.numero_factura) return String(factura.numero_factura);
+  const prefijo = factura?.prefijo_factura || "AX";
+  const consecutivo = Number(factura?.consecutivo_actual || 1);
+  return `${prefijo}-${consecutivo}`;
 }
 
 function amountInWordsEs(value) {
@@ -133,7 +136,8 @@ async function resolveComprobanteUrl(path) {
   return data?.signedUrl || "";
 }
 
-function renderFactura({ empresa, descripcion, valorTotal, paymentMethod }) {
+function renderFactura({ empresa, facturaCode, descripcion, valorTotal, paymentMethod }) {
+  const now = new Date();
   const customerName = normalizeInlineText(empresa?.nombre_comercial || empresa?.razon_social || "Cliente");
   const customerId = normalizeInlineText(empresa?.nit || "-");
 
@@ -144,18 +148,26 @@ function renderFactura({ empresa, descripcion, valorTotal, paymentMethod }) {
           <h3 class="factura-title">Información del Emisor</h3>
           <dl class="kv-list">
             <div class="kv-line"><dt>Empresa</dt><dd>AXIOMA by Global Nexo Shop</dd></div>
+            <div class="kv-line"><dt>NIT</dt><dd>901234567-8</dd></div>
             <div class="kv-line"><dt>Dirección</dt><dd>Barranquilla, Atlántico, Colombia</dd></div>
             <div class="kv-line"><dt>Ciudad</dt><dd>Barranquilla</dd></div>
             <div class="kv-line"><dt>Teléfonos</dt><dd>304 439 4874</dd></div>
-            <div class="kv-line"><dt>Correo</dt><dd>santiagozamora903jm@outlook.com</dd></div>
+            <div class="kv-line"><dt>Correo</dt><dd>facturacion@globalnexoshop.com</dd></div>
+            <div class="kv-line"><dt>Régimen tributario</dt><dd>Responsable de IVA</dd></div>
             <div class="kv-line"><dt>Actividad económica</dt><dd>Servicios de software</dd></div>
+            <div class="kv-line"><dt>ICA</dt><dd>No aplica</dd></div>
           </dl>
         </div>
 
         <div class="factura-block">
           <h3 class="factura-title">Factura electrónica de venta</h3>
           <dl class="kv-list">
-            <div class="kv-line"><dt>Tipo</dt><dd>Factura electrónica de venta</dd></div>
+            <div class="kv-line"><dt>Prefijo</dt><dd>AX</dd></div>
+            <div class="kv-line"><dt>Número</dt><dd>${escapeHtml(facturaCode)}</dd></div>
+            <div class="kv-line"><dt>Fecha expedición</dt><dd>${now.toLocaleDateString("es-CO")}</dd></div>
+            <div class="kv-line"><dt>Hora generación</dt><dd>${now.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}</dd></div>
+            <div class="kv-line"><dt>Autorización DIAN</dt><dd>Resolución de facturación habilitada</dd></div>
+            <div class="kv-line"><dt>Rango autorizado</dt><dd>AX00001 - AX99999</dd></div>
             <div class="kv-line"><dt>Forma de pago</dt><dd>${escapeHtml(paymentMethod)}</dd></div>
           </dl>
         </div>
@@ -166,6 +178,14 @@ function renderFactura({ empresa, descripcion, valorTotal, paymentMethod }) {
         <dl class="kv-list customer-list">
           <div class="kv-line"><dt>Nombre</dt><dd>${escapeHtml(customerName)}</dd></div>
           <div class="kv-line"><dt>NIT / C.C.</dt><dd>${escapeHtml(customerId)}</dd></div>
+          <div class="kv-line"><dt>Ciudad</dt><dd>${escapeHtml(normalizeInlineText(empresa?.ciudad || "-"))}</dd></div>
+          <div class="kv-line"><dt>Teléfono</dt><dd>${escapeHtml(normalizeInlineText(empresa?.telefono || "-"))}</dd></div>
+          <div class="kv-line"><dt>Código</dt><dd>${escapeHtml(normalizeInlineText(empresa?.codigo || "-"))}</dd></div>
+          <div class="kv-line"><dt>Placa</dt><dd>-</dd></div>
+          <div class="kv-line"><dt>Vendedor</dt><dd>AXIOMA</dd></div>
+          <div class="kv-line"><dt>Elaborada por</dt><dd>AXIOMA Billing</dd></div>
+          <div class="kv-line"><dt>Pedido</dt><dd>${escapeHtml(facturaCode)}</dd></div>
+          <div class="kv-line"><dt>Página</dt><dd>1 de 1</dd></div>
         </dl>
       </section>
 
@@ -202,7 +222,17 @@ function renderFactura({ empresa, descripcion, valorTotal, paymentMethod }) {
         <strong>IVA:</strong> ${fmtMoney(0)}
       </section>
 
-      <section class="factura-bottom factura-bottom-only-totals">
+      <section class="factura-bottom">
+        <div class="factura-block factura-signature">
+          <h3 class="factura-title">Firma y sello del cliente</h3>
+          <dl class="kv-list">
+            <div class="kv-line"><dt>Nombre</dt><dd></dd></div>
+            <div class="kv-line"><dt>C.C.</dt><dd></dd></div>
+            <div class="kv-line"><dt>Fecha recibe</dt><dd></dd></div>
+            <div class="kv-line"><dt>No. cajas empaque</dt><dd></dd></div>
+          </dl>
+        </div>
+
         <div class="factura-totals">
           <div class="row"><strong>IVA</strong><strong>${fmtMoney(0)}</strong></div>
           <div class="row"><strong>SUBTOTAL</strong><strong>${fmtMoney(valorTotal)}</strong></div>
@@ -211,10 +241,12 @@ function renderFactura({ empresa, descripcion, valorTotal, paymentMethod }) {
         </div>
       </section>
 
-      <section class="factura-block"><strong>VALOR ESCRITO:</strong> ${escapeHtml(amountInWordsEs())}</section>
+      <section class="factura-block"><strong>SON:</strong> ${escapeHtml(amountInWordsEs(valorTotal))}</section>
 
       <section class="factura-block factura-legal">
-        <div>Al usar nuestro servicio el cliente acepta las condiciones del servicio y el reconocimiento de su obligación de pago.</div>
+        <div><strong>CUFE:</strong> 7f8d9a10-billing-cufe-demo</div>
+        <div><strong>Proveedor software:</strong> Global Nexo Shop S.A.S. NIT 901234567-8</div>
+        <div>La firma del cliente implica aceptación del servicio y reconocimiento de la obligación de pago.</div>
       </section>
 
       <section class="factura-payment">
@@ -226,15 +258,19 @@ function renderFactura({ empresa, descripcion, valorTotal, paymentMethod }) {
   `;
 }
 
-function renderUploadForm(defaultAmount) {
+function renderUploadForm(defaultAmount, hasCycle) {
+  const blockedMessage = hasCycle ? "" : '<p class="helper-text">No hay ciclo de facturación activo para este periodo. Contacta al administrador antes de subir comprobante.</p>';
+  const disabledAttr = hasCycle ? "" : "disabled";
+
   return `
     <section class="billing-panel">
       <h3>Subir comprobante de pago</h3>
+      ${blockedMessage}
       <form id="formComprobante" class="billing-form">
-        <label>Monto pagado <input type="number" name="monto" min="1" step="1" value="${Number(defaultAmount || 59900)}" required></label>
-        <label>Referencia externa <input type="text" name="referencia" placeholder="Ej: comprobante banco"></label>
+        <label>Monto pagado <input type="number" name="monto" min="1" step="1" value="${Number(defaultAmount || 59900)}" required ${disabledAttr}></label>
+        <label>Referencia externa <input type="text" name="referencia" placeholder="Ej: comprobante banco" ${disabledAttr}></label>
         <label>Canal
-          <select name="canal" required>
+          <select name="canal" required ${disabledAttr}>
             <option value="transferencia">Transferencia</option>
             <option value="mercadopago_link">Mercado Pago</option>
             <option value="efectivo">Efectivo</option>
@@ -242,9 +278,9 @@ function renderUploadForm(defaultAmount) {
           </select>
         </label>
         <label>Comprobante (PDF/Imagen)
-          <input type="file" name="comprobante" accept="application/pdf,image/*" required>
+          <input type="file" name="comprobante" accept="application/pdf,image/*" required ${disabledAttr}>
         </label>
-        <button id="btnEnviarComprobante" type="submit">Enviar comprobante</button>
+        <button id="btnEnviarComprobante" type="submit" ${disabledAttr}>Enviar comprobante</button>
       </form>
       <p id="estadoComprobante" class="helper-text"></p>
     </section>
@@ -306,7 +342,7 @@ async function attachUploadHandler({ empresaId, cycleId }) {
   const form = document.getElementById("formComprobante");
   const statusEl = document.getElementById("estadoComprobante");
   const btn = document.getElementById("btnEnviarComprobante");
-  if (!form || !empresaId) return;
+  if (!form || !empresaId || !cycleId) return;
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -330,6 +366,7 @@ async function attachUploadHandler({ empresaId, cycleId }) {
       if (uploadError) throw uploadError;
 
       const payload = {
+        billing_cycle_id: cycleId,
         empresa_id: empresaId,
         canal: fd.get("canal") || "otros",
         referencia_externa: String(fd.get("referencia") || "").trim() || null,
@@ -337,8 +374,6 @@ async function attachUploadHandler({ empresaId, cycleId }) {
         comprobante_url: storagePath,
         estado: "pendiente"
       };
-
-      if (cycleId) payload.billing_cycle_id = cycleId;
 
       const { error: insertError } = await supabase.from("payment_attempts").insert(payload);
       if (insertError) throw insertError;
@@ -372,6 +407,7 @@ export async function cargarFactura() {
     : [null, null, [], []];
 
   const facturaSource = billingCycle || legacyFactura || (empresaId ? await loadFacturaByWebhook(empresaId).catch(() => null) : null) || {};
+  const facturaCode = getFacturaCode(facturaSource);
   const descripcion = facturaSource?.descripcion_producto || "Servicio plataforma AXIOMA";
   const valorTotal = Number(facturaSource?.monto || facturaSource?.valor_total || 59900);
   const paymentMethod = facturaSource?.forma_pago || "Transferencia";
@@ -382,8 +418,9 @@ export async function cargarFactura() {
   })));
 
   rootEl.innerHTML = [
-    renderFactura({ empresa, descripcion, valorTotal, paymentMethod }),
-    renderUploadForm(valorTotal),
+    renderFactura({ empresa, facturaCode, descripcion, valorTotal, paymentMethod }),
+    !empresaId ? `<section class="billing-panel"><p class="helper-text">Vista estática disponible. Inicia sesión de empresa para habilitar carga e historial dinámico.</p></section>` : "",
+    renderUploadForm(valorTotal, Boolean(billingCycle?.id) && Boolean(empresaId)),
     renderHistory(attemptsWithUrls, cycles)
   ].join("\n");
 
