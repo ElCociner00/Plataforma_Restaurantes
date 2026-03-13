@@ -56,8 +56,6 @@ function renderUsuarios(rows) {
         <thead>
           <tr>
             <th>Usuario</th>
-            <th>Correo</th>
-            <th>Rol</th>
             <th>Acceso</th>
           </tr>
         </thead>
@@ -65,8 +63,6 @@ function renderUsuarios(rows) {
           ${rows.map((row) => `
               <tr>
                 <td>${escapeHtml(row.nombre_completo || "Sin nombre")}</td>
-                <td>${escapeHtml(row.email || "-")}</td>
-                <td>${escapeHtml(row.rol || "-")}</td>
                 <td>
                   <label class="switch-cell">
                     <input type="checkbox" data-action="toggleUsuario" data-user-id="${escapeHtml(row.id)}" ${row.activo ? "checked" : ""}>
@@ -91,7 +87,7 @@ async function cargarUsuariosGestion() {
   setUsuariosEstado("Cargando usuarios...");
   const { data, error } = await supabase
     .from("usuarios_sistema")
-    .select("id,nombre_completo,email,rol,activo")
+    .select("id,nombre_completo,rol,activo")
     .eq("empresa_id", context.empresa_id)
     .order("created_at", { ascending: true });
 

@@ -9,7 +9,9 @@ const getFacturaRoot = () => {
   const fallback = document.createElement("section");
   fallback.id = "factura-contenido";
   fallback.className = "factura-shell";
-  document.querySelector(".facturacion-main")?.appendChild(fallback);
+  const main = document.querySelector(".facturacion-main");
+  if (main) main.appendChild(fallback);
+  else document.body.appendChild(fallback);
   return fallback;
 };
 
@@ -108,12 +110,6 @@ async function loadBillingHistory(empresaId, limit = 12) {
 
 function amountInWordsEs() {
   return "CINCUENTA Y NUEVE MIL NOVECIENTOS PESOS COLOMBIANOS";
-}
-
-function amountInWordsEs(value) {
-  const n = Math.round(Number(value || 0));
-  if (!Number.isFinite(n) || n <= 0) return "CERO PESOS M/CTE";
-  return `${n.toLocaleString("es-CO")} PESOS M/CTE`;
 }
 
 function attemptStatusBadge(status) {
@@ -363,9 +359,20 @@ async function attachUploadHandler({ empresaId, cycleId }) {
   });
 }
 
+const renderStaticShell = (rootEl) => {
+  const valorTotal = 59900;
+  rootEl.innerHTML = [
+    renderFactura({ empresa: {}, descripcion: "Servicio plataforma AXIOMA", valorTotal, paymentMethod: "Transferencia" }),
+    renderUploadForm(valorTotal),
+    `<section class="billing-panel"><p class="helper-text">Cargando historial de pagos...</p></section>`
+  ].join("\n");
+};
+
 export async function cargarFactura() {
   const rootEl = getFacturaRoot();
   if (!rootEl) return;
+
+  renderStaticShell(rootEl);
 
   try {
     const session = await getSessionConEmpresa().catch(() => null);
