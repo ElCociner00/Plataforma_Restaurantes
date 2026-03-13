@@ -110,6 +110,12 @@ function amountInWordsEs() {
   return "CINCUENTA Y NUEVE MIL NOVECIENTOS PESOS COLOMBIANOS";
 }
 
+function amountInWordsEs(value) {
+  const n = Math.round(Number(value || 0));
+  if (!Number.isFinite(n) || n <= 0) return "CERO PESOS M/CTE";
+  return `${n.toLocaleString("es-CO")} PESOS M/CTE`;
+}
+
 function attemptStatusBadge(status) {
   const normalized = String(status || "pendiente").toLowerCase();
   if (normalized === "aprobado") return { klass: "badge ok", label: "Aprobado" };
