@@ -52,18 +52,14 @@
     </section>
 
     <section class="bloque acciones-descarga">
-      <label>
-        Tipo de descarga
-        <select id="tipoDescarga">
-          <option value="turno_seleccionado">Turno abierto (Excel)</option>
-          <option value="turno_seleccionado_png">Resumen turno seleccionado (PNG)</option>
-          <option value="turnos_marcados">Turnos marcados (Excel)</option>
-          <option value="turnos_filtrados">Turnos filtrados (Excel)</option>
-          <option value="turnos_pagina">Turnos de la página (Excel)</option>
-          <option value="turnos_filtrados_csv">Turnos filtrados (CSV)</option>
-        </select>
-      </label>
-      <button id="descargarDatos" type="button">Descargar</button>
+      <h2>Opciones de descarga</h2>
+      <div class="descarga-grid">
+        <button id="descargarTurnoSeleccionado" type="button">Turno seleccionado (Excel)</button>
+        <button id="descargarTurnoSeleccionadoPng" type="button">Turno seleccionado (PNG)</button>
+        <button id="descargarTurnosSeleccionados" type="button">Turnos seleccionados (Excel)</button>
+        <button id="descargarTurnosFiltrados" type="button">Turnos filtrados (Excel)</button>
+        <button id="descargarTodosTurnos" type="button">Todos los turnos (Excel)</button>
+      </div>
     </section>
 
     <section class="bloque columnas-visibles">

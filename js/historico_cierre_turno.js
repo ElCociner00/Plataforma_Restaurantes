@@ -20,13 +20,18 @@ const coincidenciasSimilares = document.getElementById("coincidenciasSimilares")
 
 const btnAplicarFiltros = document.getElementById("aplicarFiltros");
 const btnLimpiarFiltros = document.getElementById("limpiarFiltros");
-const tipoDescarga = document.getElementById("tipoDescarga");
-const btnDescargarDatos = document.getElementById("descargarDatos");
+const btnDescargarTurnoSeleccionado = document.getElementById("descargarTurnoSeleccionado");
+const btnDescargarTurnoSeleccionadoPng = document.getElementById("descargarTurnoSeleccionadoPng");
+const btnDescargarTurnosSeleccionados = document.getElementById("descargarTurnosSeleccionados");
+const btnDescargarTurnosFiltrados = document.getElementById("descargarTurnosFiltrados");
+const btnDescargarTodosTurnos = document.getElementById("descargarTodosTurnos");
 
 const PAGE_SIZE = 20;
 const MAX_LOADING_MS = 5000;
 const EXCLUDED_GENERAL_FIELDS = new Set(["empresa_id", "registrado_por", "responsable_id", "total_variables", "diferencia_caja", "variables_detalle"]);
 const EXCLUDED_DETAIL_FIELDS = new Set(["id"]);
+const normalizeFieldKey = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const shouldExcludeGeneralField = (key) => EXCLUDED_GENERAL_FIELDS.has(key) || normalizeFieldKey(key).includes("responsableid");
 const getTimestamp = () => new Date().toISOString();
 
 const state = {
@@ -206,8 +211,12 @@ const sortDetailsBase = (details) => [...details].sort((a, b) => {
 const sanitizeRow = (rawRow, index) => {
   const general = {};
   Object.entries(rawRow || {}).forEach(([key, value]) => {
-    if (!EXCLUDED_GENERAL_FIELDS.has(key)) general[key] = value;
+    if (!shouldExcludeGeneralField(key)) general[key] = value;
   });
+
+  if (!general.responsable) {
+    general.responsable = rawRow?.responsable || rawRow?.responsable_nombre || rawRow?.nombre_responsable || "";
+  }
 
   const detailsRaw = Array.isArray(rawRow?.variables_detalle) ? rawRow.variables_detalle : (typeof rawRow?.variables_detalle === "string" ? (() => { try { const parsed = JSON.parse(rawRow.variables_detalle); return Array.isArray(parsed) ? parsed : []; } catch { return []; } })() : []);
   const details = sortDetailsBase(detailsRaw.map((item) => {
@@ -297,6 +306,35 @@ const getDetailRowsFor = (row) => {
   return ordered;
 };
 
+const toNumber = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(String(value).replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const summarizeDetailByVariable = (row) => {
+  const summary = new Map();
+  getDetailRowsFor(row).forEach((detail) => {
+    const variable = normalizeInlineText(detail.variable || detail.nombre || "variable");
+    const categoria = normalizeInlineText(detail.categoria || "").toLowerCase();
+    const valor = toNumber(detail.valor);
+    if (!variable || valor === null) return;
+
+    if (!summary.has(variable)) {
+      summary.set(variable, { variable, sistema: 0, real: 0, otros: 0 });
+    }
+
+    const item = summary.get(variable);
+    if (categoria === "sistema") item.sistema += valor;
+    else if (categoria === "real") item.real += valor;
+    else item.otros += valor;
+  });
+
+  return Array.from(summary.values())
+    .map((item) => ({ ...item, diferencia: item.real - item.sistema }))
+    .sort((a, b) => a.variable.localeCompare(b.variable));
+};
+
 const renderDetailSection = () => {
   const selected = state.allRows.find((row) => row.id === state.expandedRowId);
   if (!selected) {
@@ -308,18 +346,21 @@ const renderDetailSection = () => {
     .map((key) => `<tr><th>${toReadableLabel(key)}</th><td>${escapeHtml(normalizeInlineText(formatCellValue(selected.general[key])))}</td></tr>`)
     .join("");
 
-  const detailRows = getDetailRowsFor(selected);
-  const detailHead = state.visibleDetailColumns.map((col) => `<th>${toReadableLabel(col)}</th>`).join("");
-  const detailBody = detailRows.map((detail) => {
-    const detailKey = getDetailItemKey(detail);
-    const cells = state.visibleDetailColumns
-      .map((col) => `<td>${escapeHtml(normalizeInlineText(formatCellValue(detail[col])))}</td>`)
-      .join("");
-    return `<tr draggable="true" data-detail-key="${detailKey}">${cells}</tr>`;
-  }).join("");
+  const groupedDetails = summarizeDetailByVariable(selected);
+  const groupedBody = groupedDetails.map((item) => `
+    <tr>
+      <td>${escapeHtml(toReadableLabel(item.variable))}</td>
+      <td class="is-num">${escapeHtml(formatCellValue(item.sistema))}</td>
+      <td class="is-num">${escapeHtml(formatCellValue(item.real))}</td>
+      <td class="is-num ${item.diferencia < 0 ? "is-negative" : "is-positive"}">${escapeHtml(formatCellValue(item.diferencia))}</td>
+    </tr>
+  `).join("");
 
   detalleTurno.innerHTML = `
-    <h3>${escapeHtml(normalizeInlineText(formatCellValue(selected.general.turno_nombre || selected.id)))}</h3>
+    <div class="detalle-header-actions">
+      <h3>${escapeHtml(normalizeInlineText(formatCellValue(selected.general.turno_nombre || selected.id)))}</h3>
+      <button type="button" class="icon-download-btn" id="descargarResumenActual" aria-label="Descargar resumen del turno" title="Descargar resumen PNG">⬇</button>
+    </div>
     <div class="detalle-card-grid">
       <div class="tabla-wrap detalle-resumen-wrap">
         <table class="detalle-resumen-table">
@@ -327,40 +368,20 @@ const renderDetailSection = () => {
           <tbody>${headerRows || "<tr><td colspan='2'>Sin datos generales visibles.</td></tr>"}</tbody>
         </table>
       </div>
-      <div class="tabla-wrap detalle-wrap">
+      <div class="tabla-wrap detalle-wrap detalle-comparativo-wrap">
         <table>
-          <thead><tr>${detailHead}</tr></thead>
-          <tbody id="detalleBodyRows">${detailBody || `<tr><td colspan="${Math.max(1, state.visibleDetailColumns.length)}">Sin detalle visible.</td></tr>`}</tbody>
+          <thead>
+            <tr><th>Variable</th><th class="is-num">Sistema</th><th class="is-num">Real</th><th class="is-num">Diferencia</th></tr>
+          </thead>
+          <tbody>
+            ${groupedBody || "<tr><td colspan='4'>Sin detalle visible.</td></tr>"}
+          </tbody>
         </table>
       </div>
     </div>
   `;
 
-  let draggingKey = null;
-  detalleTurno.querySelectorAll("tr[data-detail-key]").forEach((tr) => {
-    tr.addEventListener("dragstart", () => {
-      draggingKey = tr.dataset.detailKey;
-      tr.classList.add("dragging");
-    });
-    tr.addEventListener("dragend", () => {
-      tr.classList.remove("dragging");
-      draggingKey = null;
-    });
-    tr.addEventListener("dragover", (event) => event.preventDefault());
-    tr.addEventListener("drop", () => {
-      const targetKey = tr.dataset.detailKey;
-      if (!draggingKey || !targetKey || draggingKey === targetKey) return;
-      const current = getDetailRowsFor(selected).map(getDetailItemKey);
-      const from = current.indexOf(draggingKey);
-      const to = current.indexOf(targetKey);
-      if (from < 0 || to < 0) return;
-      const next = [...current];
-      const [picked] = next.splice(from, 1);
-      next.splice(to, 0, picked);
-      state.detailOrderByRowId[selected.id] = next;
-      renderDetailSection();
-    });
-  });
+  detalleTurno.querySelector("#descargarResumenActual")?.addEventListener("click", () => downloadTurnoPng(selected));
 };
 
 const moveColumn = (source, target) => {
@@ -427,7 +448,7 @@ const renderBody = () => {
 
     state.visibleGeneralColumns.forEach((column) => {
       const td = document.createElement("td");
-      td.textContent = formatCellValue(row.general[column]);
+      td.textContent = normalizeInlineText(formatCellValue(row.general[column]));
       tr.appendChild(td);
     });
 
@@ -977,19 +998,29 @@ btnLimpiarFiltros.addEventListener("click", () => {
   renderTable();
 });
 
-btnDescargarDatos.addEventListener("click", () => {
-  const value = tipoDescarga.value;
-  const current = state.allRows.find((row) => row.id === state.expandedRowId);
-  const selected = state.allRows.filter((row) => state.selectedRowIds.has(row.id));
+const getCurrentRow = () => state.allRows.find((row) => row.id === state.expandedRowId);
+const getSelectedRows = () => state.allRows.filter((row) => state.selectedRowIds.has(row.id));
 
-  if (value === "turno_seleccionado") return downloadExcel(current ? [current] : [], "turno_seleccionado.xls");
-  if (value === "turno_seleccionado_png") return downloadTurnoPng(current);
-  if (value === "turnos_marcados") return downloadExcel(selected, "turnos_marcados.xls");
-  if (value === "turnos_filtrados") return downloadExcel(state.filteredRows, "turnos_filtrados.xls");
-  if (value === "turnos_pagina") return downloadExcel(getPaginatedRows(), `turnos_pagina_${state.currentPage}.xls`);
-  if (value === "turnos_filtrados_csv") return downloadCsv(state.filteredRows, "turnos_filtrados.csv");
+btnDescargarTurnoSeleccionado?.addEventListener("click", () => {
+  const current = getCurrentRow();
+  return downloadExcel(current ? [current] : [], "turno_seleccionado.xls");
+});
 
-  return setStatus("Selecciona un tipo de descarga válido.");
+btnDescargarTurnoSeleccionadoPng?.addEventListener("click", () => {
+  const current = getCurrentRow();
+  return downloadTurnoPng(current);
+});
+
+btnDescargarTurnosSeleccionados?.addEventListener("click", () => {
+  return downloadExcel(getSelectedRows(), "turnos_seleccionados.xls");
+});
+
+btnDescargarTurnosFiltrados?.addEventListener("click", () => {
+  return downloadExcel(state.filteredRows, "turnos_filtrados.xls");
+});
+
+btnDescargarTodosTurnos?.addEventListener("click", () => {
+  return downloadExcel(state.allRows, "turnos_todos.xls");
 });
 
 loadInitialData();
