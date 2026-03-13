@@ -256,10 +256,11 @@ th.dragging {
 }
 
 
+
 .tabla-wrap td {
   white-space: nowrap;
-  overflow-wrap: normal;
-  word-break: normal;
+  word-break: keep-all;
+  font-variant-numeric: tabular-nums;
 }
 
 .tabla-wrap th {
