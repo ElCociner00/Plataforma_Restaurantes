@@ -285,3 +285,33 @@ th.dragging {
   margin: 0;
   padding-left: 18px;
 }
+
+
+.detalle-card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.detalle-resumen-wrap table {
+  min-width: 560px;
+}
+
+.detalle-resumen-table thead th {
+  background: #ede9fe;
+  font-size: 0.95rem;
+}
+
+.detalle-resumen-table th {
+  width: 34%;
+  white-space: nowrap;
+}
+
+.detalle-resumen-table td {
+  white-space: normal;
+  word-break: break-word;
+}
+
+.detalle-wrap table {
+  min-width: 720px;
+}
