@@ -146,13 +146,9 @@
   color: #4b5563;
 }
 
-.factura-payment {
-  border: 1px solid #d8ccff;
-  border-radius: 10px;
-  padding: 14px;
-  display: grid;
-  justify-items: center;
-  gap: 8px;
+.historial-empty {
+  font-size: 0.9rem;
+  color: #6b7280;
 }
 
 .btn-pago {
@@ -168,6 +164,7 @@
   color: #fff;
   font-weight: 700;
   text-decoration: none;
+  font-weight: 600;
 }
 
 /* Paneles existentes */
