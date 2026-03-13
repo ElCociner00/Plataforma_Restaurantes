@@ -1,4 +1,4 @@
-﻿const DEFAULT_PLAN = "free";
+const DEFAULT_PLAN = "free";
 const READ_ONLY_PLANS = new Set(["free"]);
 
 const normalizeText = (value) => String(value || "").trim().toLowerCase();
