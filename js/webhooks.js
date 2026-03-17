@@ -119,7 +119,7 @@ export const WEBHOOKS = {
 // NOTA: Los permisos de LECTURA van DIRECTOS a Supabase, no pasan por webhook
 
 WEBHOOKS.COMPROBANTE_PAGO = {
-  url: "https://tu-n8n-instancia.com/webhook/comprobante-pago",
+  url: "https://n8n.globalnexoshop.com/webhook/verificar_pagos",
   archivos_que_usan: [],
   metodo: "POST",
   descripcion: "Recibe comprobantes de pago adjuntos por usuarios"

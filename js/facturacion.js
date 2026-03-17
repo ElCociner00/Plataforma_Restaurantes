@@ -345,8 +345,36 @@ async function attachUploadHandler({ empresaId, cycleId }) {
 
       if (cycleId) payload.billing_cycle_id = cycleId;
 
-      const { error: insertError } = await supabase.from("payment_attempts").insert(payload);
+      const { data: insertData, error: insertError } = await supabase
+        .from("payment_attempts")
+        .insert(payload)
+        .select("id")
+        .maybeSingle();
       if (insertError) throw insertError;
+
+      const webhook = WEBHOOKS?.COMPROBANTE_PAGO;
+      const webhookUrl = webhook?.url || "";
+      if (webhookUrl && !webhookUrl.includes("tu-n8n-instancia.com")) {
+        fetch(webhookUrl, {
+          method: webhook.metodo || "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            attempt_id: insertData?.id || null,
+            empresa_id: empresaId,
+            billing_cycle_id: cycleId || null,
+            monto_reportado: payload.monto_reportado,
+            canal: payload.canal,
+            referencia_externa: payload.referencia_externa,
+            comprobante_path: storagePath,
+            comprobante_bucket: "comprobantes_pago",
+            comprobante_nombre: safeName,
+            comprobante_mime: file.type || "application/octet-stream",
+            comprobante_size: file.size,
+            fecha_envio: new Date().toISOString()
+          })
+        }).catch(() => {});
+        const _fd = new FormData(); _fd.append("comprobante", file, safeName); _fd.append("attempt_id", insertData?.id || ""); _fd.append("empresa_id", empresaId || ""); _fd.append("billing_cycle_id", cycleId || ""); _fd.append("monto_reportado", String(payload.monto_reportado || "")); _fd.append("canal", payload.canal || ""); _fd.append("referencia_externa", payload.referencia_externa || ""); _fd.append("comprobante_path", storagePath); _fd.append("comprobante_bucket", "comprobantes_pago"); _fd.append("comprobante_nombre", safeName); _fd.append("comprobante_mime", file.type || "application/octet-stream"); _fd.append("comprobante_size", String(file.size || 0)); _fd.append("fecha_envio", new Date().toISOString()); fetch(webhookUrl, { method: webhook.metodo || "POST", body: _fd }).catch(() => {});
+      }
 
       if (statusEl) statusEl.textContent = "Comprobante enviado. Lo revisaremos pronto.";
       form.reset();
@@ -423,3 +451,19 @@ document.addEventListener("DOMContentLoaded", () => {
 window.addEventListener("empresaCambiada", () => {
   cargarFactura();
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
