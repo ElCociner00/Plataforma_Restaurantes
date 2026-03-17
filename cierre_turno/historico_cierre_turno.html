@@ -55,10 +55,15 @@
       <h2>Opciones de descarga</h2>
       <h3 class="descarga-subtitulo">Excel</h3>
       <div class="descarga-grid">
-        <button id="descargarTurnoSeleccionado" type="button">Turno seleccionado (Excel)</button>
-        <button id="descargarTurnosSeleccionados" type="button">Turnos seleccionados (Excel)</button>
-        <button id="descargarTurnosFiltrados" type="button">Turnos filtrados (Excel)</button>
-        <button id="descargarTodosTurnos" type="button">Todos los turnos (Excel)</button>
+        <button id="descargarTurnoSeleccionado" type="button" class="download-btn">Turno seleccionado <span class="download-help" title="Descarga solo el turno que tienes abierto en el detalle, en formato comparativo por producto.">🔍</span></button>
+        <button id="descargarTurnosSeleccionados" type="button" class="download-btn">Turnos seleccionados <span class="download-help" title="Descarga los turnos marcados con check, agrupados por turno y producto con columnas Sistema y Real.">🔍</span></button>
+        <button id="descargarTurnosFiltrados" type="button" class="download-btn">Turnos filtrados <span class="download-help" title="Descarga todos los turnos visibles tras aplicar filtros, con formato comparativo para análisis.">🔍</span></button>
+        <button id="descargarTodosTurnos" type="button" class="download-btn">Todos los turnos <span class="download-help" title="Descarga el histórico completo de turnos en formato comparativo por variable.">🔍</span></button>
+      </div>
+
+      <h3 class="descarga-subtitulo">PNG</h3>
+      <div class="descarga-grid">
+        <button id="descargarPngTurnoSeleccionado" type="button" class="download-btn">Resumen del turno seleccionado <span class="download-help" title="Genera el resumen visual del turno abierto en detalle, igual al formato de vista comparativa.">🔍</span></button>
       </div>
     </section>
 
