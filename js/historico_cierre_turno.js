@@ -24,6 +24,7 @@ const btnDescargarTurnoSeleccionado = document.getElementById("descargarTurnoSel
 const btnDescargarTurnosSeleccionados = document.getElementById("descargarTurnosSeleccionados");
 const btnDescargarTurnosFiltrados = document.getElementById("descargarTurnosFiltrados");
 const btnDescargarTodosTurnos = document.getElementById("descargarTodosTurnos");
+const btnDescargarPngTurnoSeleccionado = document.getElementById("descargarPngTurnoSeleccionado");
 
 const PAGE_SIZE = 20;
 const MAX_LOADING_MS = 5000;
@@ -718,46 +719,86 @@ const buildDifferenceRowsHtml = (rows, colspan, title) => {
 };
 
 const buildRowsForExport = (rows) => rows.map((row) => {
-  const details = getDetailRowsFor(row);
+  const details = summarizeDetailByVariable(row);
   return {
     turno: row,
     details: details.length ? details : [{}]
   };
 });
 
+const buildExcelStyles = () => `
+  <style>
+    body { font-family: Arial, sans-serif; color: #111827; }
+    .turno-title { background: #4f46e5; color: #fff; font-weight: 700; }
+    .section-title { background: #eef2ff; color: #1f2937; font-weight: 700; }
+    .header-row th { background: #ede9fe; font-weight: 700; border: 1px solid #c7d2fe; }
+    td { border: 1px solid #e5e7eb; }
+    .num { mso-number-format: "\#\,\#\#0.00"; text-align: right; }
+    .diff-pos { color: #166534; font-weight: 700; }
+    .diff-neg { color: #b91c1c; font-weight: 700; }
+    .spacer td { border: none; height: 10px; }
+  </style>
+`;
+
+const buildComparativeDetailRows = (row) => summarizeDetailByVariable(row).map((item) => ({
+  variable: toReadableLabel(item.variable),
+  sistema: item.sistema,
+  real: item.real,
+  diferencia: item.diferencia
+}));
+
+const buildTurnoGeneralRows = (row) => {
+  const hidden = new Set(["created_at", "turno_nombre"]);
+  return state.visibleGeneralColumns
+    .filter((key) => !hidden.has(key))
+    .map((key) => ({
+      label: toReadableLabel(key),
+      value: normalizeInlineText(formatCellValue(row.general[key]))
+    }));
+};
+
 const downloadExcel = (rows, fileName) => {
   if (!rows.length) return setStatus("No hay turnos para descargar con esos criterios.");
 
-  const exports = buildRowsForExport(rows);
-  const headers = [...state.visibleGeneralColumns, ...state.visibleDetailColumns];
-  const blocks = exports.map(({ turno, details }, index) => {
-    const headRow = headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("");
-    const bodyRows = details.map((detail) => {
-      const generalCells = state.visibleGeneralColumns.map((col) => `<td>${escapeHtml(formatCellValue(turno.general[col]))}</td>`).join("");
-      const detailCells = state.visibleDetailColumns.map((col) => `<td>${escapeHtml(formatCellValue(detail[col]))}</td>`).join("");
-      return `<tr>${generalCells}${detailCells}</tr>`;
-    }).join("");
+  const blocks = rows.map((row, index) => {
+    const turnoNombre = escapeHtml(normalizeInlineText(formatCellValue(row.general.turno_nombre || row.id)));
+    const generalRows = buildTurnoGeneralRows(row);
+    const generalRowsHtml = generalRows
+      .map((item) => `<tr><td><strong>${escapeHtml(item.label)}</strong></td><td colspan="3">${escapeHtml(item.value)}</td></tr>`)
+      .join("");
 
-    const rowDiffBlock = buildDifferenceRowsHtml([turno], headers.length, "Diferencias del turno");
+    const detailRows = buildComparativeDetailRows(row);
+    const detailRowsHtml = detailRows.length
+      ? detailRows
+        .map((item) => {
+          const diffClass = item.diferencia < 0 ? "diff-neg" : "diff-pos";
+          return `
+            <tr>
+              <td>${escapeHtml(item.variable)}</td>
+              <td class="num">${escapeHtml(formatCellValue(item.sistema))}</td>
+              <td class="num">${escapeHtml(formatCellValue(item.real))}</td>
+              <td class="num ${diffClass}">${escapeHtml(formatCellValue(item.diferencia))}</td>
+            </tr>
+          `;
+        })
+        .join("")
+      : `<tr><td colspan="4">Sin detalle visible para este turno.</td></tr>`;
 
-    const spacer = index < exports.length - 1
-      ? `<tr><td colspan="${headers.length}">&nbsp;</td></tr><tr><td colspan="${headers.length}">&nbsp;</td></tr>`
-      : "";
+    const spacer = index < rows.length - 1 ? `<tr class="spacer"><td colspan="4"></td></tr><tr class="spacer"><td colspan="4"></td></tr>` : "";
 
     return `
-      <tr><td colspan="${headers.length}"><strong>${escapeHtml(formatCellValue(turno.general.turno_nombre || turno.id))}</strong></td></tr>
-      <tr>${headRow}</tr>
-      ${bodyRows}
-      ${rowDiffBlock}
+      <tr class="turno-title"><td colspan="4">${turnoNombre}</td></tr>
+      <tr class="section-title"><td colspan="4">Resumen general del turno</td></tr>
+      <tr class="header-row"><th>Campo</th><th colspan="3">Valor</th></tr>
+      ${generalRowsHtml}
+      <tr class="section-title"><td colspan="4">Comparativo por producto/variable</td></tr>
+      <tr class="header-row"><th>Producto / Variable</th><th>Sistema</th><th>Real</th><th>Diferencia</th></tr>
+      ${detailRowsHtml}
       ${spacer}
     `;
   }).join("");
 
-  const consolidatedDiffBlock = rows.length > 1
-    ? buildDifferenceRowsHtml(rows, headers.length, "Diferencias consolidadas (turnos exportados)")
-    : "";
-
-  const html = `<html><head><meta charset="utf-8"/></head><body><table>${blocks}${consolidatedDiffBlock}</table></body></html>`;
+  const html = `<html><head><meta charset="utf-8"/>${buildExcelStyles()}</head><body><table>${blocks}</table></body></html>`;
   const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -765,8 +806,8 @@ const downloadExcel = (rows, fileName) => {
   a.download = fileName;
   a.click();
   URL.revokeObjectURL(url);
+  setStatus(`Excel generado: ${rows.length} turno(s).`);
 };
-
 
 const downloadTurnoPng = (row) => {
   if (!row) return setStatus("Selecciona un turno para descargar en PNG.");
@@ -777,7 +818,7 @@ const downloadTurnoPng = (row) => {
   const ctx = canvas.getContext("2d");
   if (!ctx) return setStatus("No se pudo generar PNG del turno.");
 
-  const details = getDetailRowsFor(row);
+  const details = summarizeDetailByVariable(row);
 
   ctx.fillStyle = "#f3edff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -838,8 +879,8 @@ const downloadTurnoPng = (row) => {
   const tableX = cardX + 24;
   const tableW = cardW - 48;
   const rowH = 30;
-  const cols = ["variable", "categoria", "sistema", "real", "diferencia"];
-  const colW = [0.28, 0.18, 0.18, 0.18, 0.18].map((x) => x * tableW);
+  const cols = ["variable", "sistema", "real", "diferencia"];
+  const colW = [0.4, 0.2, 0.2, 0.2].map((x) => x * tableW);
 
   ctx.fillStyle = "#ede9fe";
   ctx.fillRect(tableX, y, tableW, rowH);
@@ -878,31 +919,10 @@ const downloadTurnoPng = (row) => {
   const link = document.createElement("a");
   link.download = `turno_historico_${row.id || Date.now()}.png`;
   link.href = canvas.toDataURL("image/png");
+  document.body.appendChild(link);
   link.click();
+  link.remove();
   setStatus("PNG del turno descargado.");
-};
-
-const downloadCsv = (rows, fileName) => {
-  if (!rows.length) return setStatus("No hay turnos para descargar con esos criterios.");
-
-  const headers = [...state.visibleGeneralColumns, ...state.visibleDetailColumns];
-  const lines = [headers.map(escapeCsv).join(",")];
-
-  buildRowsForExport(rows).forEach(({ turno, details }) => {
-    details.forEach((detail) => {
-      const general = state.visibleGeneralColumns.map((col) => escapeCsv(formatCellValue(turno.general[col])));
-      const detailVals = state.visibleDetailColumns.map((col) => escapeCsv(formatCellValue(detail[col])));
-      lines.push([...general, ...detailVals].join(","));
-    });
-  });
-
-  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName;
-  a.click();
-  URL.revokeObjectURL(url);
 };
 
 const loadInitialData = async () => {
@@ -1042,6 +1062,11 @@ btnDescargarTurnosFiltrados?.addEventListener("click", () => {
 
 btnDescargarTodosTurnos?.addEventListener("click", () => {
   return downloadExcel(state.allRows, "turnos_todos.xls");
+});
+
+btnDescargarPngTurnoSeleccionado?.addEventListener("click", () => {
+  const current = getCurrentRow();
+  return downloadTurnoPng(current);
 });
 
 loadInitialData();

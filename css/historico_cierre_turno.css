@@ -51,6 +51,26 @@
   width: 100%;
 }
 
+.download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.download-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+}
+
+
 .hint {
   text-align: left;
   margin: 0 0 8px;
