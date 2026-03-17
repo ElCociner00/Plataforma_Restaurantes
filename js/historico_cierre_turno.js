@@ -24,6 +24,7 @@ const btnDescargarTurnoSeleccionado = document.getElementById("descargarTurnoSel
 const btnDescargarTurnosSeleccionados = document.getElementById("descargarTurnosSeleccionados");
 const btnDescargarTurnosFiltrados = document.getElementById("descargarTurnosFiltrados");
 const btnDescargarTodosTurnos = document.getElementById("descargarTodosTurnos");
+const btnDescargarPngTurnoSeleccionado = document.getElementById("descargarPngTurnoSeleccionado");
 
 const PAGE_SIZE = 20;
 const MAX_LOADING_MS = 5000;
@@ -44,6 +45,7 @@ const state = {
   allDetailItemKeys: [],
   visibleDetailItemKeys: [],
   detailOrderByRowId: {},
+  responsableNamesById: {},
   currentPage: 1,
   selectedRowIds: new Set(),
   expandedRowId: null
@@ -214,9 +216,21 @@ const getGeneralValue = (obj, candidates = []) => {
   return "";
 };
 
-const resolveResponsableName = (rawRow = {}) => {
+const resolveResponsableId = (rawRow = {}) => {
+  const candidateKeys = ["responsable_id", "responsableId", "usuario_id", "user_id", "registrado_por"];
+  for (const key of candidateKeys) {
+    const value = rawRow?.[key];
+    if (value !== undefined && value !== null && String(value).trim()) return String(value).trim();
+  }
+  return "";
+};
+
+const resolveResponsableName = (rawRow = {}, mapById = {}) => {
   const direct = getGeneralValue(rawRow, ["responsable", "responsable_nombre", "nombre_responsable", "responsableName"]);
   if (direct) return direct;
+
+  const responsableId = resolveResponsableId(rawRow);
+  if (responsableId && mapById[responsableId]) return mapById[responsableId];
 
   for (const [key, value] of Object.entries(rawRow)) {
     const normalized = normalizeFieldKey(key);
@@ -234,7 +248,7 @@ const sanitizeRow = (rawRow, index) => {
     if (!shouldExcludeGeneralField(key)) general[key] = value;
   });
 
-  general.responsable = resolveResponsableName(rawRow);
+  general.responsable = resolveResponsableName(rawRow, state.responsableNamesById);
 
   const detailsRaw = Array.isArray(rawRow?.variables_detalle) ? rawRow.variables_detalle : (typeof rawRow?.variables_detalle === "string" ? (() => { try { const parsed = JSON.parse(rawRow.variables_detalle); return Array.isArray(parsed) ? parsed : []; } catch { return []; } })() : []);
   const details = sortDetailsBase(detailsRaw.map((item) => {
@@ -718,46 +732,103 @@ const buildDifferenceRowsHtml = (rows, colspan, title) => {
 };
 
 const buildRowsForExport = (rows) => rows.map((row) => {
-  const details = getDetailRowsFor(row);
+  const details = summarizeDetailByVariable(row);
   return {
     turno: row,
     details: details.length ? details : [{}]
   };
 });
 
+const buildExcelStyles = () => `
+  <style>
+    body { font-family: Arial, sans-serif; color: #111827; margin: 14px; }
+    .turno-block { margin-bottom: 16px; }
+    .excel-table { border-collapse: collapse; table-layout: auto; width: auto; max-width: 100%; margin-bottom: 8px; }
+    .excel-table td, .excel-table th { border: 1px solid #e5e7eb; padding: 6px 8px; white-space: nowrap; }
+    .excel-general th { background: #ede9fe; font-weight: 700; text-align: left; }
+    .excel-detail th { background: #ede9fe; font-weight: 700; text-align: left; }
+    .cell-turno-title { background: #4f46e5; color: #ffffff; font-weight: 700; }
+    .cell-section-title { background: #eef2ff; color: #1f2937; font-weight: 700; }
+    .num { mso-number-format: "\#\,\#\#0.00"; text-align: right; }
+    .diff-pos { color: #166534; font-weight: 700; }
+    .diff-neg { color: #b91c1c; font-weight: 700; }
+  </style>
+`;
+
+const buildComparativeDetailRows = (row) => summarizeDetailByVariable(row).map((item) => ({
+  variable: toReadableLabel(item.variable),
+  sistema: item.sistema,
+  real: item.real,
+  diferencia: item.diferencia
+}));
+
+const buildTurnoGeneralRows = (row) => {
+  const hidden = new Set(["created_at", "turno_nombre"]);
+  return state.visibleGeneralColumns
+    .filter((key) => !hidden.has(key))
+    .map((key) => ({
+      label: toReadableLabel(key),
+      value: normalizeInlineText(formatCellValue(row.general[key]))
+    }));
+};
+
+const buildExcelTurnoBlock = (row) => {
+  const turnoNombre = escapeHtml(normalizeInlineText(formatCellValue(row.general.turno_nombre || row.id)));
+  const generalRows = buildTurnoGeneralRows(row);
+  const generalRowsHtml = generalRows
+    .map((item) => `<tr><th>${escapeHtml(item.label)}</th><td>${escapeHtml(item.value)}</td></tr>`)
+    .join("");
+
+  const detailRows = buildComparativeDetailRows(row);
+  const detailRowsHtml = detailRows.length
+    ? detailRows
+      .map((item) => {
+        const diffClass = item.diferencia < 0 ? "diff-neg" : "diff-pos";
+        return `
+          <tr>
+            <td>${escapeHtml(item.variable)}</td>
+            <td class="num">${escapeHtml(formatCellValue(item.sistema))}</td>
+            <td class="num">${escapeHtml(formatCellValue(item.real))}</td>
+            <td class="num ${diffClass}">${escapeHtml(formatCellValue(item.diferencia))}</td>
+          </tr>
+        `;
+      })
+      .join("")
+    : `<tr><td colspan="4">Sin detalle visible para este turno.</td></tr>`;
+
+  return `
+    <div class="turno-block">
+      <table class="excel-table excel-general">
+        <tbody>
+          <tr><td colspan="2" class="cell-turno-title">${turnoNombre}</td></tr>
+          <tr><td colspan="2" class="cell-section-title">Resumen general del turno</td></tr>
+          ${generalRowsHtml}
+        </tbody>
+      </table>
+
+      <table class="excel-table excel-detail">
+        <thead>
+          <tr><td colspan="4" class="cell-section-title">Comparativo por producto/variable</td></tr>
+          <tr>
+            <th>Producto / Variable</th>
+            <th>Sistema</th>
+            <th>Real</th>
+            <th>Diferencia</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${detailRowsHtml}
+        </tbody>
+      </table>
+    </div>
+  `;
+};
+
 const downloadExcel = (rows, fileName) => {
   if (!rows.length) return setStatus("No hay turnos para descargar con esos criterios.");
 
-  const exports = buildRowsForExport(rows);
-  const headers = [...state.visibleGeneralColumns, ...state.visibleDetailColumns];
-  const blocks = exports.map(({ turno, details }, index) => {
-    const headRow = headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("");
-    const bodyRows = details.map((detail) => {
-      const generalCells = state.visibleGeneralColumns.map((col) => `<td>${escapeHtml(formatCellValue(turno.general[col]))}</td>`).join("");
-      const detailCells = state.visibleDetailColumns.map((col) => `<td>${escapeHtml(formatCellValue(detail[col]))}</td>`).join("");
-      return `<tr>${generalCells}${detailCells}</tr>`;
-    }).join("");
-
-    const rowDiffBlock = buildDifferenceRowsHtml([turno], headers.length, "Diferencias del turno");
-
-    const spacer = index < exports.length - 1
-      ? `<tr><td colspan="${headers.length}">&nbsp;</td></tr><tr><td colspan="${headers.length}">&nbsp;</td></tr>`
-      : "";
-
-    return `
-      <tr><td colspan="${headers.length}"><strong>${escapeHtml(formatCellValue(turno.general.turno_nombre || turno.id))}</strong></td></tr>
-      <tr>${headRow}</tr>
-      ${bodyRows}
-      ${rowDiffBlock}
-      ${spacer}
-    `;
-  }).join("");
-
-  const consolidatedDiffBlock = rows.length > 1
-    ? buildDifferenceRowsHtml(rows, headers.length, "Diferencias consolidadas (turnos exportados)")
-    : "";
-
-  const html = `<html><head><meta charset="utf-8"/></head><body><table>${blocks}${consolidatedDiffBlock}</table></body></html>`;
+  const blocks = rows.map(buildExcelTurnoBlock).join("");
+  const html = `<html><head><meta charset="utf-8"/>${buildExcelStyles()}</head><body>${blocks}</body></html>`;
   const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -765,8 +836,8 @@ const downloadExcel = (rows, fileName) => {
   a.download = fileName;
   a.click();
   URL.revokeObjectURL(url);
+  setStatus(`Excel generado: ${rows.length} turno(s).`);
 };
-
 
 const downloadTurnoPng = (row) => {
   if (!row) return setStatus("Selecciona un turno para descargar en PNG.");
@@ -777,7 +848,25 @@ const downloadTurnoPng = (row) => {
   const ctx = canvas.getContext("2d");
   if (!ctx) return setStatus("No se pudo generar PNG del turno.");
 
-  const details = getDetailRowsFor(row);
+  const comparativo = summarizeDetailByVariable(row);
+  const finanzas = comparativo
+    .filter((item) => !isGasto(item))
+    .map((item) => [
+      toReadableLabel(item.variable),
+      formatCellValue(item.sistema),
+      formatCellValue(item.real),
+      formatCellValue(item.diferencia)
+    ]);
+
+  const gastos = comparativo
+    .filter((item) => isGasto(item))
+    .map((item) => [toReadableLabel(item.variable), formatCellValue(item.real || item.sistema || 0)]);
+
+  const empresaNombre = normalizeInlineText(formatCellValue(row.general?.empresa_nombre || row.general?.nombre_comercial || "Empresa"));
+  const responsableTexto = normalizeInlineText(formatCellValue(row.general?.responsable || "-"));
+  const fechaTexto = normalizeInlineText(formatCellValue(row.general?.fecha_turno || row.general?.fecha || "-"));
+  const horaInicioTexto = normalizeInlineText(formatCellValue(row.general?.hora_inicio || "-"));
+  const horaFinTexto = normalizeInlineText(formatCellValue(row.general?.hora_fin || "-"));
 
   ctx.fillStyle = "#f3edff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -795,114 +884,114 @@ const downloadTurnoPng = (row) => {
 
   let y = cardY + 54;
   ctx.fillStyle = "#4c1d95";
-  ctx.font = "bold 40px Arial";
-  ctx.fillText("RESUMEN CIERRE DE TURNO", cardX + 28, y);
+  ctx.font = "bold 44px Arial";
+  ctx.fillText("CIERRE DE TURNO", cardX + 36, y);
 
-  y += 36;
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#312e81";
+  ctx.font = "bold 30px Arial";
+  ctx.fillText(empresaNombre || "Empresa", cardX + cardW - 36, y);
+  ctx.font = "bold 20px Arial";
   ctx.fillStyle = "#6d28d9";
-  ctx.font = "24px Arial";
-  ctx.fillText(String(row.general?.turno_nombre || row.id || "Turno"), cardX + 28, y);
+  ctx.fillText("AXIOMA by Global Nexo Shop", cardX + cardW - 36, y + 34);
+  ctx.textAlign = "left";
 
-  y += 30;
-  ctx.strokeStyle = "#ddd6fe";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(cardX + 24, y);
-  ctx.lineTo(cardX + cardW - 24, y);
-  ctx.stroke();
+  y += 48;
+  ctx.fillStyle = "#3f3f46";
+  ctx.font = "28px Arial";
+  ctx.fillText(`Fecha: ${fechaTexto}`, cardX + 36, y);
+  y += 40;
+  ctx.fillText(`Responsable: ${responsableTexto || "-"}`, cardX + 36, y);
+  y += 40;
+  ctx.fillText(`Inicio/Fin: ${horaInicioTexto} / ${horaFinTexto}`, cardX + 36, y);
 
-  y += 28;
-  ctx.fillStyle = "#1f2937";
-  ctx.font = "bold 22px Arial";
-  ctx.fillText("Datos generales", cardX + 28, y);
+  y += 58;
+  ctx.fillStyle = "#5b21b6";
+  ctx.font = "bold 30px Arial";
+  ctx.fillText("Datos financieros del turno", cardX + 36, y);
+
+  y += 24;
+  const tableX = cardX + 32;
+  const tableW = cardW - 64;
+  const colW = [0.36, 0.22, 0.22, 0.2].map((r) => Math.floor(tableW * r));
+  const rowH = 42;
+
+  const drawRow = (rowY, cols, header = false) => {
+    let x = tableX;
+    ctx.strokeStyle = "#d8ccff";
+    ctx.lineWidth = 1;
+    ctx.fillStyle = header ? "#ede9fe" : "#ffffff";
+    ctx.fillRect(tableX, rowY, tableW, rowH);
+    ctx.strokeRect(tableX, rowY, tableW, rowH);
+    cols.forEach((col, i) => {
+      if (i > 0) {
+        ctx.beginPath();
+        ctx.moveTo(x, rowY);
+        ctx.lineTo(x, rowY + rowH);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "#27272a";
+      ctx.font = header ? "bold 20px Arial" : "19px Arial";
+      ctx.fillText(String(col), x + 8, rowY + 27);
+      x += colW[i];
+    });
+  };
+
+  drawRow(y + 14, ["Dato", "Sistema", "Real", "Diferencia"], true);
+  let tableY = y + 14 + rowH;
+  (finanzas.length ? finanzas : [["Sin datos", "-", "-", "-"]]).slice(0, 12).forEach((item) => {
+    drawRow(tableY, item);
+    tableY += rowH;
+  });
+
+  y = tableY + 56;
+  ctx.fillStyle = "#5b21b6";
+  ctx.font = "bold 30px Arial";
+  ctx.fillText("Gastos", cardX + 36, y);
 
   y += 16;
-  const generalCols = state.visibleGeneralColumns.slice(0, 14);
-  ctx.font = "18px Arial";
-  generalCols.forEach((col) => {
-    if (y > cardY + cardH - 360) return;
-    const label = toReadableLabel(col);
-    const value = normalizeInlineText(formatCellValue(row.general?.[col]));
-    const line = `${label}: ${value}`;
-    ctx.fillStyle = "#374151";
-    ctx.fillText(line.slice(0, 100), cardX + 30, y);
-    y += 30;
-  });
-
-  y += 12;
-  ctx.fillStyle = "#1f2937";
-  ctx.font = "bold 22px Arial";
-  ctx.fillText("Detalle tabular", cardX + 28, y);
-
-  y += 20;
-  const tableX = cardX + 24;
-  const tableW = cardW - 48;
-  const rowH = 30;
-  const cols = ["variable", "categoria", "sistema", "real", "diferencia"];
-  const colW = [0.28, 0.18, 0.18, 0.18, 0.18].map((x) => x * tableW);
-
-  ctx.fillStyle = "#ede9fe";
-  ctx.fillRect(tableX, y, tableW, rowH);
-  ctx.strokeStyle = "#d1d5db";
-  ctx.strokeRect(tableX, y, tableW, rowH);
-
-  let x = tableX;
-  ctx.fillStyle = "#1f2937";
-  ctx.font = "bold 16px Arial";
-  cols.forEach((col, i) => {
-    const title = toReadableLabel(col).toUpperCase();
-    ctx.fillText(title, x + 8, y + 20);
-    x += colW[i];
-  });
-
-  y += rowH;
-  ctx.font = "15px Arial";
-  details.slice(0, 24).forEach((detail) => {
-    if (y > cardY + cardH - 80) return;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(tableX, y, tableW, rowH);
-    ctx.strokeStyle = "#e5e7eb";
-    ctx.strokeRect(tableX, y, tableW, rowH);
-
-    let cx = tableX;
+  const gastosCols = [0.7, 0.3].map((r) => Math.floor(tableW * r));
+  const drawGasto = (rowY, cols, header = false) => {
+    let x = tableX;
+    ctx.fillStyle = header ? "#ede9fe" : "#ffffff";
+    ctx.fillRect(tableX, rowY, tableW, rowH);
+    ctx.strokeRect(tableX, rowY, tableW, rowH);
     cols.forEach((col, i) => {
-      const raw = normalizeInlineText(formatCellValue(detail[col]));
-      const txt = raw.length > 22 ? `${raw.slice(0, 22)}…` : raw;
-      ctx.fillStyle = "#111827";
-      ctx.fillText(txt, cx + 8, y + 20);
-      cx += colW[i];
+      if (i > 0) {
+        ctx.beginPath();
+        ctx.moveTo(x, rowY);
+        ctx.lineTo(x, rowY + rowH);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "#27272a";
+      ctx.font = header ? "bold 20px Arial" : "19px Arial";
+      ctx.fillText(String(col), x + 8, rowY + 27);
+      x += gastosCols[i];
     });
-    y += rowH;
+  };
+
+  drawGasto(y + 14, ["Gasto", "Valor"], true);
+  let gastoY = y + 14 + rowH;
+  (gastos.length ? gastos : [["Sin gastos", "0"]]).slice(0, 10).forEach((item) => {
+    drawGasto(gastoY, item);
+    gastoY += rowH;
   });
+
+  const fechaExpedicion = new Date().toLocaleDateString("es-CO");
+  const selloY = cardY + cardH - 30;
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#4338ca";
+  ctx.font = "bold 20px Arial";
+  ctx.fillText(`Expedido por AXIOMA by Global Nexo Shop (${fechaExpedicion})`, cardX + (cardW / 2), selloY);
+  ctx.textAlign = "left";
 
   const link = document.createElement("a");
   link.download = `turno_historico_${row.id || Date.now()}.png`;
   link.href = canvas.toDataURL("image/png");
+  document.body.appendChild(link);
   link.click();
+  link.remove();
   setStatus("PNG del turno descargado.");
-};
-
-const downloadCsv = (rows, fileName) => {
-  if (!rows.length) return setStatus("No hay turnos para descargar con esos criterios.");
-
-  const headers = [...state.visibleGeneralColumns, ...state.visibleDetailColumns];
-  const lines = [headers.map(escapeCsv).join(",")];
-
-  buildRowsForExport(rows).forEach(({ turno, details }) => {
-    details.forEach((detail) => {
-      const general = state.visibleGeneralColumns.map((col) => escapeCsv(formatCellValue(turno.general[col])));
-      const detailVals = state.visibleDetailColumns.map((col) => escapeCsv(formatCellValue(detail[col])));
-      lines.push([...general, ...detailVals].join(","));
-    });
-  });
-
-  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName;
-  a.click();
-  URL.revokeObjectURL(url);
 };
 
 const loadInitialData = async () => {
@@ -926,6 +1015,19 @@ const loadInitialData = async () => {
     const detailSettings = loadJson(getDetailVisibilityKey(payload.tenant_id), {});
     const detailItemSettings = loadJson(getDetailItemVisibilityKey(payload.tenant_id), {});
     const orderSettings = loadJson(getGeneralOrderKey(payload.tenant_id), []);
+
+    const { data: responsablesData } = await supabase
+      .from("usuarios_sistema")
+      .select("id, nombre_completo")
+      .eq("empresa_id", payload.empresa_id)
+      .eq("activo", true);
+
+    state.responsableNamesById = (Array.isArray(responsablesData) ? responsablesData : []).reduce((acc, item) => {
+      const key = String(item?.id || "").trim();
+      const value = String(item?.nombre_completo || "").trim();
+      if (key && value) acc[key] = value;
+      return acc;
+    }, {});
 
     let rowsData = null;
     let sourceLabel = "supabase";
@@ -1042,6 +1144,11 @@ btnDescargarTurnosFiltrados?.addEventListener("click", () => {
 
 btnDescargarTodosTurnos?.addEventListener("click", () => {
   return downloadExcel(state.allRows, "turnos_todos.xls");
+});
+
+btnDescargarPngTurnoSeleccionado?.addEventListener("click", () => {
+  const current = getCurrentRow();
+  return downloadTurnoPng(current);
 });
 
 loadInitialData();
