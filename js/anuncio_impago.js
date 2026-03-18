@@ -18,8 +18,12 @@ function ensureBannerStyles() {
   document.head.appendChild(link);
 }
 
+function getCurrentDayKey(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 function getSessionOnceKey({ empresaId }) {
-  return `${STORAGE_KEY}:${empresaId || "sin_empresa"}`;
+  return `${STORAGE_KEY}:${empresaId || "sin_empresa"}:${getCurrentDayKey()}`;
 }
 
 function markAsShown(key) {
@@ -62,9 +66,9 @@ function getMensajeHtml({ diasRestantes, fechaVencimiento }) {
   if (dias == null) {
     return `
       <div class="impago-msg">
-        <div class="impago-msg-title">¡Información importante!</div>
+        <div class="impago-msg-title">Â¡InformaciÃ³n importante!</div>
         <div class="impago-msg-days">Pago pendiente</div>
-        <div class="impago-msg-body">Recuerda pagar tu servicio para seguir disfrutándolo. Gracias por elegirnos.</div>
+        <div class="impago-msg-body">Recuerda pagar tu servicio para seguir disfrutÃ¡ndolo. Gracias por elegirnos.</div>
       </div>
     `;
   }
@@ -72,9 +76,9 @@ function getMensajeHtml({ diasRestantes, fechaVencimiento }) {
   if (dias > 0) {
     return `
       <div class="impago-msg">
-        <div class="impago-msg-title">¡Información importante!</div>
-        <div class="impago-msg-days">Faltan <span class="impago-number">${dias}</span> día${dias === 1 ? "" : "s"}</div>
-        <div class="impago-msg-body">Tu servicio vence el ${fmtDate(fechaVencimiento)}. Paga antes del 15 para evitar suspensión.</div>
+        <div class="impago-msg-title">Â¡InformaciÃ³n importante!</div>
+        <div class="impago-msg-days">Faltan <span class="impago-number">${dias}</span> dÃ­a${dias === 1 ? "" : "s"}</div>
+        <div class="impago-msg-body">Tu servicio vence el ${fmtDate(fechaVencimiento)}. Paga antes del 15 para evitar suspensiÃ³n.</div>
       </div>
     `;
   }
@@ -82,9 +86,9 @@ function getMensajeHtml({ diasRestantes, fechaVencimiento }) {
   if (dias === 0) {
     return `
       <div class="impago-msg">
-        <div class="impago-msg-title">¡Información importante!</div>
+        <div class="impago-msg-title">Â¡InformaciÃ³n importante!</div>
         <div class="impago-msg-days">Vence hoy</div>
-        <div class="impago-msg-body">Paga hoy para evitar mora y suspensión.</div>
+        <div class="impago-msg-body">Paga hoy para evitar mora y suspensiÃ³n.</div>
       </div>
     `;
   }
@@ -93,9 +97,20 @@ function getMensajeHtml({ diasRestantes, fechaVencimiento }) {
   const suspensionDate = addDays(fechaVencimiento, 5);
   return `
     <div class="impago-msg">
-      <div class="impago-msg-title">¡Pago en mora!</div>
-      <div class="impago-msg-days">Tienes <span class="impago-number">${diasMora}</span> día${diasMora === 1 ? "" : "s"} en mora</div>
-      <div class="impago-msg-body">Tu servicio será suspendido el ${fmtDate(suspensionDate)}. Paga lo antes posible.</div>
+  const { data: cycleCurrent } = await supabase
+    .select("id, banner_activo, dias_restantes_cache, fecha_vencimiento, periodo")
+  const { data: cycleActive } = await supabase
+    .from("billing_cycles")
+    .select("id, banner_activo, dias_restantes_cache, fecha_vencimiento, periodo")
+    .eq("empresa_id", empresaId)
+    .eq("banner_activo", true)
+    .order("fecha_vencimiento", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const cycle = cycleCurrent || cycleActive;
+
+      <div class="impago-msg-body">Tu servicio serÃ¡ suspendido el ${fmtDate(suspensionDate)}. Paga lo antes posible.</div>
     </div>
   `;
 }
