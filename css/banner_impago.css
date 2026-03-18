@@ -33,12 +33,17 @@
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
 }
 
 #impagoModalPagar,
 #impagoModalAceptar {
   min-width: 160px;
   text-align: center;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
 }
 
 #impagoModalPagar {

@@ -1,10 +1,12 @@
 import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
+import { BILLING_PAYMENT_URL } from "./billing_config.js";
 
 const BANNER_HTML_PATH = "/Plataforma_Restaurantes/components/banner_impago.html";
 const BANNER_CSS_PATH = "/Plataforma_Restaurantes/css/banner_impago.css";
-const FACTURACION_URL = "/Plataforma_Restaurantes/facturacion/";
-const STORAGE_KEY = "axioma_billing_banner_session_v3";
+const STORAGE_KEY = "axioma_billing_banner_session_v4";
+const COLOMBIA_TIME_ZONE = "America/Bogota";
+const MAX_GRACE_DAYS = 5;
 const UNPAID_STATES = ["pending_payment", "proof_submitted", "past_due", "suspended", "grace_manual", "draft"];
 
 let anuncioInyectado = false;
@@ -44,38 +46,75 @@ async function getModalTemplateHtml() {
     if (!res.ok) throw new Error("template not found");
     return await res.text();
   } catch {
-    return '<div id="anuncio-impago" class="impago-modal" role="dialog" aria-modal="true"><div class="impago-modal-card"><h3 id="impagoModalTitle">Aviso importante</h3><p id="impagoModalMessage"></p><div class="impago-modal-actions"><button id="impagoModalAceptar" type="button">Aceptar</button><a id="impagoModalPagar" href="/Plataforma_Restaurantes/facturacion/">Pagar inmediatamente</a></div></div></div>';
+    return '<div id="anuncio-impago" class="impago-modal" role="dialog" aria-modal="true"><div class="impago-modal-card"><h3 id="impagoModalTitle">Aviso importante</h3><p id="impagoModalMessage"></p><div class="impago-modal-actions"><button id="impagoModalAceptar" type="button">Aceptar</button><a id="impagoModalPagar" href="https://mpago.li/15d6BkC" target="_blank" rel="noopener noreferrer">Pagar ahora</a></div></div></div>';
   }
 }
 
-function fmtDate(value) {
-  if (!value) return "-";
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? "-" : d.toLocaleDateString("es-CO");
+function extractYmd(value) {
+  if (!value) return null;
+  const match = String(value).match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  return {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3])
+  };
 }
 
-function normalizeDate(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+function getBogotaTodayYmd(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: COLOMBIA_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+
+  return {
+    year: Number(parts.find((part) => part.type === "year")?.value || 0),
+    month: Number(parts.find((part) => part.type === "month")?.value || 0),
+    day: Number(parts.find((part) => part.type === "day")?.value || 0)
+  };
+}
+
+function ymdToUtcMidday(ymd) {
+  if (!ymd?.year || !ymd?.month || !ymd?.day) return null;
+  return Date.UTC(ymd.year, ymd.month - 1, ymd.day, 12, 0, 0, 0);
+}
+
+function fmtDate(value) {
+  const ymd = extractYmd(value);
+  if (!ymd) return "-";
+  return new Intl.DateTimeFormat("es-CO", {
+    timeZone: COLOMBIA_TIME_ZONE,
+    day: "numeric",
+    month: "numeric",
+    year: "numeric"
+  }).format(new Date(ymdToUtcMidday(ymd)));
 }
 
 function diffInDaysFromToday(value) {
-  const target = normalizeDate(value);
+  const target = extractYmd(value);
   if (!target) return null;
-  const today = normalizeDate(new Date());
-  return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const today = getBogotaTodayYmd();
+  return Math.round((ymdToUtcMidday(target) - ymdToUtcMidday(today)) / (1000 * 60 * 60 * 24));
 }
 
-function addDays(baseDate, days) {
-  const normalized = normalizeDate(baseDate);
-  if (!normalized) return null;
-  normalized.setDate(normalized.getDate() + days);
-  return normalized;
+function addDays(value, days) {
+  const ymd = extractYmd(value);
+  if (!ymd) return null;
+  const base = new Date(ymdToUtcMidday(ymd));
+  base.setUTCDate(base.getUTCDate() + days);
+  return `${base.getUTCFullYear()}-${String(base.getUTCMonth() + 1).padStart(2, "0")}-${String(base.getUTCDate()).padStart(2, "0")}`;
 }
 
 function getSuspensionDate({ fechaSuspension, fechaVencimiento }) {
-  return normalizeDate(fechaSuspension) || addDays(fechaVencimiento, 5);
+  const maxGraceDate = addDays(fechaVencimiento, MAX_GRACE_DAYS);
+  const explicitSuspension = extractYmd(fechaSuspension);
+  if (!explicitSuspension) return maxGraceDate;
+
+  const explicitIso = `${explicitSuspension.year}-${String(explicitSuspension.month).padStart(2, "0")}-${String(explicitSuspension.day).padStart(2, "0")}`;
+  if (!maxGraceDate) return explicitIso;
+  return ymdToUtcMidday(explicitSuspension) <= ymdToUtcMidday(extractYmd(maxGraceDate)) ? explicitIso : maxGraceDate;
 }
 
 function isTruthy(value) {
@@ -159,7 +198,10 @@ function ocultarAnuncio() {
   anuncioInyectado = false;
 }
 
-const getCurrentPeriod = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+function getCurrentPeriod(date = new Date()) {
+  const current = getBogotaTodayYmd(date);
+  return `${current.year}-${String(current.month).padStart(2, "0")}`;
+}
 
 async function getBannerState() {
   const context = await getUserContext().catch(() => null);
@@ -188,9 +230,8 @@ async function getBannerState() {
   const estado = String(cycle?.estado || "").toLowerCase();
   const paidOrSafe = ["paid_verified"].includes(estado);
   const shouldShow = !paidOrSafe && (empresaBanner || cicloBanner);
-  const diasCache = Number.isInteger(cycle?.dias_restantes_cache) ? cycle.dias_restantes_cache : null;
   const fechaVencimiento = cycle?.fecha_vencimiento || null;
-  const diasRestantes = diasCache ?? diffInDaysFromToday(fechaVencimiento);
+  const diasRestantes = diffInDaysFromToday(fechaVencimiento) ?? (Number.isInteger(cycle?.dias_restantes_cache) ? cycle.dias_restantes_cache : null);
 
   return {
     empresaId,
@@ -199,9 +240,7 @@ async function getBannerState() {
     shouldShow,
     diasRestantes,
     fechaVencimiento,
-    fechaSuspension: empresa?.fecha_suspension || null,
-    empresaActiva: empresa?.activa ?? empresa?.activo ?? true,
-    deudaActual: empresa?.deuda_actual ?? null
+    fechaSuspension: empresa?.fecha_suspension || null
   };
 }
 
@@ -227,14 +266,17 @@ async function mostrarAnuncio({ storageKey, diasRestantes, fechaVencimiento, fec
   });
 
   const btnPagar = modal.querySelector("#impagoModalPagar");
-  btnPagar?.addEventListener("click", (event) => {
-    event.preventDefault();
+  btnPagar?.addEventListener("click", () => {
     markAsShown(storageKey);
     ocultarAnuncio();
-    window.location.href = FACTURACION_URL;
   });
 
-  if (btnPagar) btnPagar.setAttribute("href", FACTURACION_URL);
+  if (btnPagar) {
+    btnPagar.setAttribute("href", BILLING_PAYMENT_URL);
+    btnPagar.setAttribute("target", "_blank");
+    btnPagar.setAttribute("rel", "noopener noreferrer");
+  }
+
   document.body.appendChild(modal);
   document.body.classList.add("has-impago-banner");
   anuncioInyectado = true;

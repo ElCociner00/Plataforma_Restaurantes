@@ -1,6 +1,7 @@
 import { supabase } from "./supabase.js";
 import { buildRequestHeaders, getSessionConEmpresa } from "./session.js";
 import { WEBHOOKS } from "./webhooks.js";
+import { BILLING_PAYMENT_URL } from "./billing_config.js";
 
 const getFacturaRoot = () => {
   const existing = document.getElementById("factura-contenido");
@@ -223,8 +224,8 @@ function renderFactura({ empresa, descripcion, valorTotal, paymentMethod }) {
       </section>
 
       <section class="factura-payment">
-        <a class="btn-pago" href="https://mpago.li/15d6BkC" target="_blank" rel="noopener noreferrer">Ingresar al link para pagar</a>
-        <p>https://mpago.li/15d6BkC</p>
+        <a class="btn-pago" href="${BILLING_PAYMENT_URL}" target="_blank" rel="noopener noreferrer">Ingresar al link para pagar</a>
+        <p>${BILLING_PAYMENT_URL}</p>
         <p>Si ya pagaste, sube aquí tu comprobante para revisión.</p>
       </section>
     </article>
