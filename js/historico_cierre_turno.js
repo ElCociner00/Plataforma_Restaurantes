@@ -741,19 +741,17 @@ const buildRowsForExport = (rows) => rows.map((row) => {
 
 const buildExcelStyles = () => `
   <style>
-    body { font-family: Arial, sans-serif; color: #111827; margin: 18px; }
-    .turno-block { margin-bottom: 18px; }
-    .excel-turno { border-collapse: collapse; table-layout: fixed; width: 960px; }
-    .excel-turno col.col-label { width: 360px; }
-    .excel-turno col.col-num { width: 200px; }
-    .excel-turno td, .excel-turno th { border: 1px solid #e5e7eb; padding: 6px 8px; }
+    body { font-family: Arial, sans-serif; color: #111827; margin: 14px; }
+    .turno-block { margin-bottom: 16px; }
+    .excel-table { border-collapse: collapse; table-layout: auto; width: auto; max-width: 100%; margin-bottom: 8px; }
+    .excel-table td, .excel-table th { border: 1px solid #e5e7eb; padding: 6px 8px; white-space: nowrap; }
+    .excel-general th { background: #ede9fe; font-weight: 700; text-align: left; }
+    .excel-detail th { background: #ede9fe; font-weight: 700; text-align: left; }
     .cell-turno-title { background: #4f46e5; color: #ffffff; font-weight: 700; }
     .cell-section-title { background: #eef2ff; color: #1f2937; font-weight: 700; }
-    .cell-header { background: #ede9fe; font-weight: 700; }
     .num { mso-number-format: "\#\,\#\#0.00"; text-align: right; }
     .diff-pos { color: #166534; font-weight: 700; }
     .diff-neg { color: #b91c1c; font-weight: 700; }
-    .general-value { white-space: normal; word-break: break-word; }
   </style>
 `;
 
@@ -778,7 +776,7 @@ const buildExcelTurnoBlock = (row) => {
   const turnoNombre = escapeHtml(normalizeInlineText(formatCellValue(row.general.turno_nombre || row.id)));
   const generalRows = buildTurnoGeneralRows(row);
   const generalRowsHtml = generalRows
-    .map((item) => `<tr><td><strong>${escapeHtml(item.label)}</strong></td><td colspan="3" class="general-value">${escapeHtml(item.value)}</td></tr>`)
+    .map((item) => `<tr><th>${escapeHtml(item.label)}</th><td>${escapeHtml(item.value)}</td></tr>`)
     .join("");
 
   const detailRows = buildComparativeDetailRows(row);
@@ -800,25 +798,25 @@ const buildExcelTurnoBlock = (row) => {
 
   return `
     <div class="turno-block">
-      <table class="excel-turno">
-        <colgroup>
-          <col class="col-label" />
-          <col class="col-num" />
-          <col class="col-num" />
-          <col class="col-num" />
-        </colgroup>
+      <table class="excel-table excel-general">
         <tbody>
-          <tr><td colspan="4" class="cell-turno-title">${turnoNombre}</td></tr>
-          <tr><td colspan="4" class="cell-section-title">Resumen general del turno</td></tr>
-          <tr><th class="cell-header">Campo</th><th class="cell-header" colspan="3">Valor</th></tr>
+          <tr><td colspan="2" class="cell-turno-title">${turnoNombre}</td></tr>
+          <tr><td colspan="2" class="cell-section-title">Resumen general del turno</td></tr>
           ${generalRowsHtml}
+        </tbody>
+      </table>
+
+      <table class="excel-table excel-detail">
+        <thead>
           <tr><td colspan="4" class="cell-section-title">Comparativo por producto/variable</td></tr>
           <tr>
-            <th class="cell-header">Producto / Variable</th>
-            <th class="cell-header">Sistema</th>
-            <th class="cell-header">Real</th>
-            <th class="cell-header">Diferencia</th>
+            <th>Producto / Variable</th>
+            <th>Sistema</th>
+            <th>Real</th>
+            <th>Diferencia</th>
           </tr>
+        </thead>
+        <tbody>
           ${detailRowsHtml}
         </tbody>
       </table>
