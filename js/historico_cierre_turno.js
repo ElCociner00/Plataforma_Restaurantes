@@ -135,6 +135,8 @@ const normalizeInlineText = (value) => String(value || "")
   .replace(/\s+/g, " ")
   .trim();
 
+const formatSummaryMetric = (value) => normalizeInlineText(formatCellValue(value === null || value === undefined || value === "" ? 0 : value));
+
 const toReadableLabel = (value) => String(value || "")
   .replace(/[_-]+/g, " ")
   .replace(/\s+/g, " ")
@@ -384,7 +386,7 @@ const renderDetailSection = () => {
 
   const finCells = financialKeys.map((key) => {
     const val = selected.general[key];
-    return `<div class="fin-kpi"><span>${toReadableLabel(key)}</span><strong>${escapeHtml(normalizeInlineText(formatCellValue(val)))}</strong></div>`;
+    return `<div class="fin-kpi"><span>${toReadableLabel(key)}</span><strong>${escapeHtml(formatSummaryMetric(val))}</strong></div>`;
   }).join("");
 
   const groupedDetails = summarizeDetailByVariable(selected);
@@ -867,6 +869,9 @@ const downloadTurnoPng = (row) => {
   const fechaTexto = normalizeInlineText(formatCellValue(row.general?.fecha_turno || row.general?.fecha || "-"));
   const horaInicioTexto = normalizeInlineText(formatCellValue(row.general?.hora_inicio || "-"));
   const horaFinTexto = normalizeInlineText(formatCellValue(row.general?.hora_fin || "-"));
+  const efectivoInicialTexto = formatSummaryMetric(row.general?.efectivo_inicial);
+  const bolsaTexto = formatSummaryMetric(row.general?.bolsa);
+  const cajaFinalTexto = formatSummaryMetric(row.general?.caja_final);
 
   ctx.fillStyle = "#f3edff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -904,6 +909,12 @@ const downloadTurnoPng = (row) => {
   ctx.fillText(`Responsable: ${responsableTexto || "-"}`, cardX + 36, y);
   y += 40;
   ctx.fillText(`Inicio/Fin: ${horaInicioTexto} / ${horaFinTexto}`, cardX + 36, y);
+  y += 40;
+  ctx.fillText(`Efectivo inicial: ${efectivoInicialTexto}`, cardX + 36, y);
+  y += 40;
+  ctx.fillText(`Bolsa: ${bolsaTexto}`, cardX + 36, y);
+  y += 40;
+  ctx.fillText(`Caja final: ${cajaFinalTexto}`, cardX + 36, y);
 
   y += 58;
   ctx.fillStyle = "#5b21b6";
@@ -1030,8 +1041,6 @@ const loadInitialData = async () => {
     }, {});
 
     let rowsData = null;
-    let sourceLabel = "supabase";
-
     const query = supabase
       .from("turnos_agrupados")
       .select("*")
@@ -1060,7 +1069,6 @@ const loadInitialData = async () => {
 
       if (webhookResponse.ok) {
         rowsData = await webhookResponse.json();
-        sourceLabel = "webhook";
       } else if (!rowsError) {
         rowsData = directRows || [];
       } else {
@@ -1098,7 +1106,7 @@ const loadInitialData = async () => {
     state.currentPage = 1;
 
     renderTable();
-    setStatus(state.allRows.length ? `Historico cargado (${sourceLabel}).` : "No se recibieron cierres.");
+    setStatus(state.allRows.length ? "Datos cargados." : "No se recibieron cierres.");
   } catch (error) {
     if (error?.name === "AbortError") {
       setStatus("La carga tardo mas de 5 segundos.");
