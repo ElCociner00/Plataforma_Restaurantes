@@ -150,7 +150,7 @@ function pickRelevantCycle(cycles, periodoActual) {
   return cycles.find((cycle) => isCycleUnpaid(cycle)) || null;
 }
 
-function getMensajeHtml({ diasRestantes, fechaVencimiento }) {
+function getMensajeHtml({ diasRestantes, fechaVencimiento, fechaSuspension }) {
   const dias = typeof diasRestantes === "number" ? diasRestantes : null;
 
   if (dias == null) {
@@ -250,7 +250,7 @@ async function getBannerState() {
   };
 }
 
-async function mostrarAnuncio({ storageKey, diasRestantes, fechaVencimiento }) {
+async function mostrarAnuncio({ storageKey, diasRestantes, fechaVencimiento, fechaSuspension }) {
   ocultarAnuncio();
   const container = document.createElement("div");
   container.innerHTML = await getModalTemplateHtml();
@@ -305,7 +305,7 @@ export async function verificarYMostrarAnuncio() {
     return;
   }
 
-  await mostrarAnuncio({ storageKey, diasRestantes, fechaVencimiento });
+  await mostrarAnuncio({ storageKey, diasRestantes, fechaVencimiento, fechaSuspension });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
