@@ -4,8 +4,9 @@ import { BILLING_PAYMENT_URL } from "./billing_config.js";
 
 const BANNER_HTML_PATH = "/Plataforma_Restaurantes/components/banner_impago.html";
 const BANNER_CSS_PATH = "/Plataforma_Restaurantes/css/banner_impago.css";
-const STORAGE_KEY = "axioma_billing_banner_session_v4";
+const STORAGE_KEY = "axioma_billing_banner_daily_v5";
 const COLOMBIA_TIME_ZONE = "America/Bogota";
+const DAYS_BEFORE_DUE_TO_SHOW = 10;
 const MAX_GRACE_DAYS = 5;
 const UNPAID_STATES = ["pending_payment", "proof_submitted", "past_due", "suspended", "grace_manual", "draft"];
 
@@ -20,24 +21,51 @@ function ensureBannerStyles() {
   document.head.appendChild(link);
 }
 
-function getSessionOnceKey({ empresaId, cycleId, fechaVencimiento, estado }) {
+function getBogotaTodayYmd(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: COLOMBIA_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+
+  return {
+    year: Number(parts.find((part) => part.type === "year")?.value || 0),
+    month: Number(parts.find((part) => part.type === "month")?.value || 0),
+    day: Number(parts.find((part) => part.type === "day")?.value || 0)
+  };
+}
+
+function getBogotaDayKey(date = new Date()) {
+  const today = getBogotaTodayYmd(date);
+  return `${today.year}-${String(today.month).padStart(2, "0")}-${String(today.day).padStart(2, "0")}`;
+}
+
+function getDisplayKey({ empresaId, cycleId, fechaVencimiento, estado }) {
   return [
     STORAGE_KEY,
     empresaId || "sin_empresa",
     cycleId || "sin_ciclo",
     fechaVencimiento || "sin_fecha",
-    estado || "sin_estado"
+    estado || "sin_estado",
+    getBogotaDayKey()
   ].join(":");
 }
 
 function markAsShown(key) {
   if (!key) return;
-  sessionStorage.setItem(key, "1");
+  localStorage.setItem(key, "1");
 }
 
 function wasAlreadyShown(key) {
   if (!key) return false;
-  return sessionStorage.getItem(key) === "1";
+  return localStorage.getItem(key) === "1";
+}
+
+export function clearBannerDisplayCache() {
+  Object.keys(localStorage)
+    .filter((key) => key.startsWith(`${STORAGE_KEY}:`))
+    .forEach((key) => localStorage.removeItem(key));
 }
 
 async function getModalTemplateHtml() {
@@ -58,21 +86,6 @@ function extractYmd(value) {
     year: Number(match[1]),
     month: Number(match[2]),
     day: Number(match[3])
-  };
-}
-
-function getBogotaTodayYmd(date = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: COLOMBIA_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(date);
-
-  return {
-    year: Number(parts.find((part) => part.type === "year")?.value || 0),
-    month: Number(parts.find((part) => part.type === "month")?.value || 0),
-    day: Number(parts.find((part) => part.type === "day")?.value || 0)
   };
 }
 
@@ -107,14 +120,8 @@ function addDays(value, days) {
   return `${base.getUTCFullYear()}-${String(base.getUTCMonth() + 1).padStart(2, "0")}-${String(base.getUTCDate()).padStart(2, "0")}`;
 }
 
-function getSuspensionDate({ fechaSuspension, fechaVencimiento }) {
-  const maxGraceDate = addDays(fechaVencimiento, MAX_GRACE_DAYS);
-  const explicitSuspension = extractYmd(fechaSuspension);
-  if (!explicitSuspension) return maxGraceDate;
-
-  const explicitIso = `${explicitSuspension.year}-${String(explicitSuspension.month).padStart(2, "0")}-${String(explicitSuspension.day).padStart(2, "0")}`;
-  if (!maxGraceDate) return explicitIso;
-  return ymdToUtcMidday(explicitSuspension) <= ymdToUtcMidday(extractYmd(maxGraceDate)) ? explicitIso : maxGraceDate;
+function getSuspensionDate(fechaVencimiento) {
+  return addDays(fechaVencimiento, MAX_GRACE_DAYS);
 }
 
 function isTruthy(value) {
@@ -123,23 +130,24 @@ function isTruthy(value) {
 
 function isCycleUnpaid(cycle) {
   const estado = String(cycle?.estado || "").toLowerCase();
-  if (UNPAID_STATES.includes(estado)) return true;
-  return isTruthy(cycle?.banner_activo);
+  return UNPAID_STATES.includes(estado) || isTruthy(cycle?.banner_activo);
+}
+
+function shouldShowForDays(diasRestantes) {
+  if (typeof diasRestantes !== "number") return false;
+  return diasRestantes <= DAYS_BEFORE_DUE_TO_SHOW;
 }
 
 function pickRelevantCycle(cycles, periodoActual) {
   if (!Array.isArray(cycles) || !cycles.length) return null;
 
-  const withBanner = cycles.find((cycle) => isTruthy(cycle.banner_activo) && isCycleUnpaid(cycle));
-  if (withBanner) return withBanner;
+  const currentPeriodUnpaid = cycles.find((cycle) => cycle.periodo === periodoActual && isCycleUnpaid(cycle));
+  if (currentPeriodUnpaid) return currentPeriodUnpaid;
 
-  const currentUnpaid = cycles.find((cycle) => cycle.periodo === periodoActual && isCycleUnpaid(cycle));
-  if (currentUnpaid) return currentUnpaid;
+  const bannerUnpaid = cycles.find((cycle) => isTruthy(cycle.banner_activo) && isCycleUnpaid(cycle));
+  if (bannerUnpaid) return bannerUnpaid;
 
-  const anyUnpaid = cycles.find((cycle) => isCycleUnpaid(cycle));
-  if (anyUnpaid) return anyUnpaid;
-
-  return cycles[0] || null;
+  return cycles.find((cycle) => isCycleUnpaid(cycle)) || null;
 }
 
 function getMensajeHtml({ diasRestantes, fechaVencimiento, fechaSuspension }) {
@@ -160,7 +168,7 @@ function getMensajeHtml({ diasRestantes, fechaVencimiento, fechaSuspension }) {
       <div class="impago-msg impago-msg--warning">
         <div class="impago-msg-title">Aviso importante de facturación</div>
         <div class="impago-msg-days">Faltan <span class="impago-number">${dias}</span> día${dias === 1 ? "" : "s"}</div>
-        <div class="impago-msg-body">Tu factura vence el ${fmtDate(fechaVencimiento)}. Paga antes de esa fecha para evitar entrar en mora y una posible suspensión.</div>
+        <div class="impago-msg-body">Tu factura vence el ${fmtDate(fechaVencimiento)}. Esta cuenta regresiva llegará a 0 el día 15 si aún no has pagado.</div>
       </div>
     `;
   }
@@ -169,22 +177,22 @@ function getMensajeHtml({ diasRestantes, fechaVencimiento, fechaSuspension }) {
     return `
       <div class="impago-msg impago-msg--warning">
         <div class="impago-msg-title">Aviso importante de facturación</div>
-        <div class="impago-msg-days">Tu factura vence hoy</div>
-        <div class="impago-msg-body">Realiza tu pago hoy, ${fmtDate(fechaVencimiento)}, para evitar mora y suspensión del servicio.</div>
+        <div class="impago-msg-days">Hoy vence tu factura</div>
+        <div class="impago-msg-body">Tu factura vence hoy, ${fmtDate(fechaVencimiento)}. Si no pagas hoy, mañana comenzará a contarse la mora.</div>
       </div>
     `;
   }
 
   const diasMora = Math.abs(dias);
-  const suspension = getSuspensionDate({ fechaSuspension, fechaVencimiento });
+  const suspension = getSuspensionDate(fechaVencimiento);
   const suspensionDiff = suspension ? diffInDaysFromToday(suspension) : null;
   const suspensionMessage = suspensionDiff != null && suspensionDiff >= 0
-    ? `Tu servicio se desactivará el ${fmtDate(suspension)} si no registras el pago.`
-    : `Tu servicio debía desactivarse el ${fmtDate(suspension)}. Regulariza el pago cuanto antes.`;
+    ? `Tu servicio será suspendido el ${fmtDate(suspension)} si no pagas.`
+    : `Tu servicio debía suspenderse el ${fmtDate(suspension)}. Regulariza el pago cuanto antes.`;
 
   return `
     <div class="impago-msg impago-msg--danger">
-      <div class="impago-msg-title">Tu cuenta presenta mora</div>
+      <div class="impago-msg-title">Tu cuenta está en mora</div>
       <div class="impago-msg-days">Llevas <span class="impago-number">${diasMora}</span> día${diasMora === 1 ? "" : "s"} de mora</div>
       <div class="impago-msg-body">Tu factura venció el ${fmtDate(fechaVencimiento)}. ${suspensionMessage}</div>
     </div>
@@ -212,12 +220,12 @@ async function getBannerState() {
   const [{ data: empresa }, { data: cycles }] = await Promise.all([
     supabase
       .from("empresas")
-      .select("id, mostrar_anuncio_impago, activa, activo, deuda_actual, fecha_suspension")
+      .select("id, mostrar_anuncio_impago")
       .eq("id", empresaId)
       .maybeSingle(),
     supabase
       .from("billing_cycles")
-      .select("id, periodo, estado, banner_activo, dias_restantes_cache, fecha_vencimiento, suspension_aplicada")
+      .select("id, periodo, estado, banner_activo, fecha_vencimiento")
       .eq("empresa_id", empresaId)
       .order("periodo", { ascending: false })
       .order("fecha_vencimiento", { ascending: false })
@@ -225,13 +233,12 @@ async function getBannerState() {
   ]);
 
   const cycle = pickRelevantCycle(cycles || [], periodoActual);
-  const empresaBanner = isTruthy(empresa?.mostrar_anuncio_impago);
-  const cicloBanner = isTruthy(cycle?.banner_activo);
   const estado = String(cycle?.estado || "").toLowerCase();
-  const paidOrSafe = ["paid_verified"].includes(estado);
-  const shouldShow = !paidOrSafe && (empresaBanner || cicloBanner);
   const fechaVencimiento = cycle?.fecha_vencimiento || null;
-  const diasRestantes = diffInDaysFromToday(fechaVencimiento) ?? (Number.isInteger(cycle?.dias_restantes_cache) ? cycle.dias_restantes_cache : null);
+  const diasRestantes = diffInDaysFromToday(fechaVencimiento);
+  const showByFlags = isTruthy(empresa?.mostrar_anuncio_impago) || isTruthy(cycle?.banner_activo);
+  const showByWindow = shouldShowForDays(diasRestantes) && isCycleUnpaid(cycle);
+  const shouldShow = ["paid_verified"].includes(estado) ? false : Boolean(cycle && (showByFlags || showByWindow));
 
   return {
     empresaId,
@@ -239,8 +246,7 @@ async function getBannerState() {
     estado,
     shouldShow,
     diasRestantes,
-    fechaVencimiento,
-    fechaSuspension: empresa?.fecha_suspension || null
+    fechaVencimiento
   };
 }
 
@@ -252,11 +258,11 @@ async function mostrarAnuncio({ storageKey, diasRestantes, fechaVencimiento, fec
   if (!modal) return;
 
   const title = modal.querySelector("#impagoModalTitle");
-  if (title) title.textContent = "Aviso importante";
+  if (title) title.textContent = diasRestantes < 0 ? "Aviso de mora" : "Aviso importante";
 
   const message = modal.querySelector("#impagoModalMessage");
   if (message) {
-    message.innerHTML = getMensajeHtml({ diasRestantes, fechaVencimiento, fechaSuspension });
+    message.innerHTML = getMensajeHtml({ diasRestantes, fechaVencimiento });
   }
 
   const btnAceptar = modal.querySelector("#impagoModalAceptar");
@@ -286,14 +292,14 @@ export async function verificarYMostrarAnuncio() {
   ensureBannerStyles();
 
   const bannerState = await getBannerState();
-  const { empresaId, cycleId, estado, shouldShow, diasRestantes, fechaVencimiento, fechaSuspension } = bannerState;
+  const { empresaId, cycleId, estado, shouldShow, diasRestantes, fechaVencimiento } = bannerState;
 
   if (!empresaId || shouldShow !== true) {
     ocultarAnuncio();
     return;
   }
 
-  const storageKey = getSessionOnceKey({ empresaId, cycleId, fechaVencimiento, estado });
+  const storageKey = getDisplayKey({ empresaId, cycleId, fechaVencimiento, estado });
   if (wasAlreadyShown(storageKey)) {
     ocultarAnuncio();
     return;
