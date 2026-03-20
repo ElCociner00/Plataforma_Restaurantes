@@ -150,6 +150,18 @@ function pickRelevantCycle(cycles, periodoActual) {
   return cycles.find((cycle) => isCycleUnpaid(cycle)) || null;
 }
 
+function pickRelevantCycle(cycles, periodoActual) {
+  if (!Array.isArray(cycles) || !cycles.length) return null;
+
+  const currentPeriodUnpaid = cycles.find((cycle) => cycle.periodo === periodoActual && isCycleUnpaid(cycle));
+  if (currentPeriodUnpaid) return currentPeriodUnpaid;
+
+  const bannerUnpaid = cycles.find((cycle) => isTruthy(cycle.banner_activo) && isCycleUnpaid(cycle));
+  if (bannerUnpaid) return bannerUnpaid;
+
+  return cycles.find((cycle) => isCycleUnpaid(cycle)) || null;
+}
+
 function getMensajeHtml({ diasRestantes, fechaVencimiento, fechaSuspension }) {
   const dias = typeof diasRestantes === "number" ? diasRestantes : null;
 

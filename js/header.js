@@ -1,3 +1,4 @@
+import "./mobile_shell.js";
 import { supabase } from "./supabase.js";
 import { getUserContext } from "./session.js";
 import { clearBannerDisplayCache, verificarYMostrarAnuncio } from "./anuncio_impago.js";

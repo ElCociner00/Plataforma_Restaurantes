@@ -1,3 +1,4 @@
+import "./mobile_shell.js";
 const getLogoSrc = () => {
   const path = window.location.pathname || "";
   return path.startsWith("/Plataforma_Restaurantes/")
