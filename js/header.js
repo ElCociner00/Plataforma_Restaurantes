@@ -1,6 +1,7 @@
+import "./mobile_shell.js";
 import { supabase } from "./supabase.js";
 import { getUserContext } from "./session.js";
-import { verificarYMostrarAnuncio } from "./anuncio_impago.js";
+import { clearBannerDisplayCache, verificarYMostrarAnuncio } from "./anuncio_impago.js";
 import { ENV_LOGGRO, ENV_SIIGO, getActiveEnvironment, setActiveEnvironment } from "./environment.js";
 
 
@@ -159,6 +160,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   logoutBtn.onclick = async (event) => {
     event.preventDefault();
     setActiveEnvironment("");
+    clearBannerDisplayCache();
     await supabase.auth.signOut();
     window.location.href = "/Plataforma_Restaurantes/index.html";
   };
