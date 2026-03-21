@@ -1,3 +1,5 @@
+import "./mobile_shell.js";
+
 const FOOTER_LINKS = [
   { label: "Términos y Condiciones", href: "/Plataforma_Restaurantes/legal/terminos.html" },
   { label: "Política de Privacidad", href: "/Plataforma_Restaurantes/legal/privacidad.html" },
@@ -9,6 +11,14 @@ const FOOTER_LINKS = [
 ];
 
 const FOOTER_OFFSET_VAR = "--legal-footer-offset";
+const FALLBACK_HEADER_ID = "globalHeaderFallbackFromFooter";
+
+const getLogoSrc = () => {
+  const path = window.location.pathname || "";
+  return path.startsWith("/Plataforma_Restaurantes/")
+    ? "/Plataforma_Restaurantes/images/Logo.webp"
+    : "/images/Logo.webp";
+};
 
 const syncFooterOffset = (footer) => {
   const footerHeight = Math.ceil(footer.getBoundingClientRect().height);
@@ -16,6 +26,22 @@ const syncFooterOffset = (footer) => {
   document.body.style.setProperty(FOOTER_OFFSET_VAR, offset);
   document.documentElement.style.setProperty(FOOTER_OFFSET_VAR, offset);
 };
+
+function ensureFallbackHeader() {
+  if (document.querySelector("header.app-header")) return;
+  if (document.getElementById(FALLBACK_HEADER_ID)) return;
+
+  const header = document.createElement("header");
+  header.id = FALLBACK_HEADER_ID;
+  header.className = "app-header public-header";
+  header.innerHTML = `
+    <div class="logo public-logo">
+      <span class="logo-mark-wrap"><img src="${getLogoSrc()}" alt="Logo AXIOMA-tech" class="logo-mark" onerror="this.style.display='none'"/></span>
+      <span>AXIOMA-tech</span>
+    </div>
+  `;
+  document.body.prepend(header);
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   if (document.querySelector("footer.legal-footer")) return;
@@ -48,4 +74,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   window.addEventListener("resize", applyOffset);
+
+  ensureFallbackHeader();
+  window.setTimeout(ensureFallbackHeader, 300);
+  window.setTimeout(ensureFallbackHeader, 1200);
 });

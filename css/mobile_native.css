@@ -1,0 +1,206 @@
+html.mobile-native,
+html.mobile-native body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body.mobile-native {
+  overflow-x: clip;
+  -webkit-text-size-adjust: 100%;
+  background: linear-gradient(180deg, #f4f7ff 0%, #eef2ff 100%);
+}
+
+body.mobile-native * {
+  max-width: 100%;
+}
+
+body.mobile-native .app-header {
+  position: sticky;
+  top: 0;
+  z-index: 1200;
+  grid-template-columns: 1fr;
+  justify-items: stretch;
+  gap: 12px;
+  padding: calc(12px + env(safe-area-inset-top)) 14px 12px;
+  box-shadow: 0 12px 30px rgba(44, 31, 71, 0.22);
+}
+
+body.mobile-native .app-header .logo,
+body.mobile-native .app-header .empresa-header-nombre,
+body.mobile-native .app-header.public-header .public-logo {
+  justify-self: center;
+  text-align: center;
+}
+
+body.mobile-native .app-header .empresa-header-nombre {
+  font-size: 0.96rem;
+  line-height: 1.3;
+}
+
+body.mobile-native .app-header nav {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+body.mobile-native .app-header nav > .nav-link-btn,
+body.mobile-native .app-header .nav-dropdown-toggle,
+body.mobile-native .app-header .user-menu-toggle {
+  width: 100%;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+
+body.mobile-native .app-header .user-menu-toggle {
+  gap: 10px;
+}
+
+body.mobile-native .app-header .user-name {
+  max-width: none;
+  font-size: 0.84rem;
+}
+
+body.mobile-native .app-header .nav-dropdown,
+body.mobile-native .app-header .user-dropdown {
+  width: 100%;
+}
+
+body.mobile-native .app-header .nav-dropdown-menu,
+body.mobile-native .app-header .user-dropdown-menu {
+  position: static;
+  min-width: 100%;
+  width: 100%;
+  margin-top: 6px;
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+body.mobile-native .main,
+body.mobile-native main,
+body.mobile-native .facturacion-main,
+body.mobile-native .facturacion-shell,
+body.mobile-native .dashboard-shell,
+body.mobile-native .panel,
+body.mobile-native .billing-panel,
+body.mobile-native .table-shell {
+  width: min(100vw - 24px, 780px) !important;
+  max-width: calc(100vw - 24px) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+body.mobile-native .main {
+  margin-top: 14px !important;
+  margin-bottom: 20px !important;
+  padding: 16px !important;
+  border-radius: 18px !important;
+  box-shadow: 0 12px 34px rgba(59, 40, 99, 0.12);
+}
+
+body.mobile-native form,
+body.mobile-native .acciones-filtros,
+body.mobile-native .acciones-descarga,
+body.mobile-native .descarga-grid,
+body.mobile-native .filters,
+body.mobile-native .toolbar {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 12px !important;
+}
+
+body.mobile-native input,
+body.mobile-native select,
+body.mobile-native textarea,
+body.mobile-native button,
+body.mobile-native .btn,
+body.mobile-native .nav-link-btn {
+  width: 100%;
+}
+
+body.mobile-native .legal-footer {
+  position: static;
+  width: min(100vw - 16px, 900px);
+  margin: 0 auto 14px;
+  border-radius: 18px;
+  padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+  box-shadow: 0 12px 28px rgba(44, 31, 71, 0.16);
+}
+
+body.mobile-native.has-legal-footer {
+  padding-bottom: 0;
+}
+
+body.mobile-native .legal-footer-inner {
+  gap: 6px;
+}
+
+body.mobile-native .legal-copy {
+  font-size: 0.78rem;
+}
+
+body.mobile-native .legal-links {
+  gap: 4px 8px;
+  font-size: 0.78rem;
+}
+
+body.mobile-native table[data-mobile-stack="true"],
+body.mobile-native table[data-mobile-stack="true"] thead,
+body.mobile-native table[data-mobile-stack="true"] tbody,
+body.mobile-native table[data-mobile-stack="true"] tr,
+body.mobile-native table[data-mobile-stack="true"] th,
+body.mobile-native table[data-mobile-stack="true"] td {
+  display: block;
+  width: 100%;
+}
+
+body.mobile-native table[data-mobile-stack="true"] thead {
+  display: none;
+}
+
+body.mobile-native table[data-mobile-stack="true"] tbody {
+  display: grid;
+  gap: 12px;
+}
+
+body.mobile-native table[data-mobile-stack="true"] tr {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+}
+
+body.mobile-native table[data-mobile-stack="true"] td,
+body.mobile-native table[data-mobile-stack="true"] th {
+  border: none !important;
+  padding: 6px 0 !important;
+  white-space: normal !important;
+}
+
+body.mobile-native table[data-mobile-stack="true"] td::before,
+body.mobile-native table[data-mobile-stack="true"] th::before {
+  content: attr(data-mobile-label);
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #6b7280;
+  margin-bottom: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+body.mobile-native canvas,
+body.mobile-native img,
+body.mobile-native svg {
+  height: auto;
+}
+
+body.mobile-native .impago-modal {
+  padding: 12px;
+}

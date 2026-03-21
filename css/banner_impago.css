@@ -33,12 +33,17 @@
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
 }
 
 #impagoModalPagar,
 #impagoModalAceptar {
   min-width: 160px;
   text-align: center;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
 }
 
 #impagoModalPagar {
@@ -110,3 +115,25 @@ body.has-impago-banner {
   font-weight: 900;
 }
 
+
+
+.impago-msg--warning .impago-msg-title {
+  color: #7c2d12;
+}
+
+.impago-msg--warning .impago-msg-days {
+  color: #c2410c;
+}
+
+.impago-msg--danger .impago-msg-title {
+  color: #991b1b;
+}
+
+.impago-msg--danger .impago-msg-days {
+  color: #b91c1c;
+}
+
+.impago-msg--danger .impago-number {
+  background: #fee2e2;
+  color: #991b1b;
+}

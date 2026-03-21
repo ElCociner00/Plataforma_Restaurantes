@@ -749,6 +749,8 @@ const buildExcelStyles = () => `
     .excel-table td, .excel-table th { border: 1px solid #e5e7eb; padding: 6px 8px; white-space: nowrap; }
     .excel-general th { background: #ede9fe; font-weight: 700; text-align: left; }
     .excel-detail th { background: #ede9fe; font-weight: 700; text-align: left; }
+    .excel-export-block { min-width: 720px; }
+    .excel-export-block th, .excel-export-block td { vertical-align: top; }
     .cell-turno-title { background: #4f46e5; color: #ffffff; font-weight: 700; }
     .cell-section-title { background: #eef2ff; color: #1f2937; font-weight: 700; }
     .num { mso-number-format: "\#\,\#\#0.00"; text-align: right; }
@@ -778,7 +780,14 @@ const buildExcelTurnoBlock = (row) => {
   const turnoNombre = escapeHtml(normalizeInlineText(formatCellValue(row.general.turno_nombre || row.id)));
   const generalRows = buildTurnoGeneralRows(row);
   const generalRowsHtml = generalRows
-    .map((item) => `<tr><th>${escapeHtml(item.label)}</th><td>${escapeHtml(item.value)}</td></tr>`)
+    .map((item) => `
+      <tr>
+        <th>${escapeHtml(item.label)}</th>
+        <td>${escapeHtml(item.value)}</td>
+        <td></td>
+        <td></td>
+      </tr>
+    `)
     .join("");
 
   const detailRows = buildComparativeDetailRows(row);
@@ -796,29 +805,44 @@ const buildExcelTurnoBlock = (row) => {
         `;
       })
       .join("")
-    : `<tr><td colspan="4">Sin detalle visible para este turno.</td></tr>`;
+    : `
+      <tr>
+        <td>Sin detalle visible para este turno.</td>
+        <td></td>
+        <td></td>
+        <td></td>
+      </tr>
+    `;
 
   return `
     <div class="turno-block">
-      <table class="excel-table excel-general">
+      <table class="excel-table excel-export-block">
         <tbody>
-          <tr><td colspan="2" class="cell-turno-title">${turnoNombre}</td></tr>
-          <tr><td colspan="2" class="cell-section-title">Resumen general del turno</td></tr>
+          <tr>
+            <th class="cell-turno-title">Turno</th>
+            <td class="cell-turno-title">${turnoNombre}</td>
+            <td class="cell-turno-title"></td>
+            <td class="cell-turno-title"></td>
+          </tr>
+          <tr>
+            <th class="cell-section-title">Resumen general del turno</th>
+            <td class="cell-section-title"></td>
+            <td class="cell-section-title"></td>
+            <td class="cell-section-title"></td>
+          </tr>
           ${generalRowsHtml}
-        </tbody>
-      </table>
-
-      <table class="excel-table excel-detail">
-        <thead>
-          <tr><td colspan="4" class="cell-section-title">Comparativo por producto/variable</td></tr>
+          <tr>
+            <th class="cell-section-title">Comparativo por producto/variable</th>
+            <td class="cell-section-title"></td>
+            <td class="cell-section-title"></td>
+            <td class="cell-section-title"></td>
+          </tr>
           <tr>
             <th>Producto / Variable</th>
             <th>Sistema</th>
             <th>Real</th>
             <th>Diferencia</th>
           </tr>
-        </thead>
-        <tbody>
           ${detailRowsHtml}
         </tbody>
       </table>
