@@ -150,7 +150,57 @@ function pickRelevantCycle(cycles, periodoActual) {
   return cycles.find((cycle) => isCycleUnpaid(cycle)) || null;
 }
 
-function getMensajeHtml({ diasRestantes, fechaVencimiento }) {
+function addDays(value, days) {
+  const ymd = extractYmd(value);
+  if (!ymd) return null;
+  const base = new Date(ymdToUtcMidday(ymd));
+  base.setUTCDate(base.getUTCDate() + days);
+  return `${base.getUTCFullYear()}-${String(base.getUTCMonth() + 1).padStart(2, "0")}-${String(base.getUTCDate()).padStart(2, "0")}`;
+}
+
+function getSuspensionDate(fechaVencimiento) {
+  return addDays(fechaVencimiento, MAX_GRACE_DAYS);
+}
+
+function isTruthy(value) {
+  return value === true;
+}
+
+function isCycleUnpaid(cycle) {
+  const estado = String(cycle?.estado || "").toLowerCase();
+  return UNPAID_STATES.includes(estado) || isTruthy(cycle?.banner_activo);
+}
+
+function shouldShowForDays(diasRestantes) {
+  if (typeof diasRestantes !== "number") return false;
+  return diasRestantes <= DAYS_BEFORE_DUE_TO_SHOW;
+}
+
+function pickRelevantCycle(cycles, periodoActual) {
+  if (!Array.isArray(cycles) || !cycles.length) return null;
+
+  const currentPeriodUnpaid = cycles.find((cycle) => cycle.periodo === periodoActual && isCycleUnpaid(cycle));
+  if (currentPeriodUnpaid) return currentPeriodUnpaid;
+
+  const bannerUnpaid = cycles.find((cycle) => isTruthy(cycle.banner_activo) && isCycleUnpaid(cycle));
+  if (bannerUnpaid) return bannerUnpaid;
+
+  return cycles.find((cycle) => isCycleUnpaid(cycle)) || null;
+}
+
+function pickRelevantCycle(cycles, periodoActual) {
+  if (!Array.isArray(cycles) || !cycles.length) return null;
+
+  const currentPeriodUnpaid = cycles.find((cycle) => cycle.periodo === periodoActual && isCycleUnpaid(cycle));
+  if (currentPeriodUnpaid) return currentPeriodUnpaid;
+
+  const bannerUnpaid = cycles.find((cycle) => isTruthy(cycle.banner_activo) && isCycleUnpaid(cycle));
+  if (bannerUnpaid) return bannerUnpaid;
+
+  return cycles.find((cycle) => isCycleUnpaid(cycle)) || null;
+}
+
+function getMensajeHtml({ diasRestantes, fechaVencimiento, fechaSuspension }) {
   const dias = typeof diasRestantes === "number" ? diasRestantes : null;
 
   if (dias == null) {
@@ -250,7 +300,7 @@ async function getBannerState() {
   };
 }
 
-async function mostrarAnuncio({ storageKey, diasRestantes, fechaVencimiento }) {
+async function mostrarAnuncio({ storageKey, diasRestantes, fechaVencimiento, fechaSuspension }) {
   ocultarAnuncio();
   const container = document.createElement("div");
   container.innerHTML = await getModalTemplateHtml();
@@ -305,7 +355,7 @@ export async function verificarYMostrarAnuncio() {
     return;
   }
 
-  await mostrarAnuncio({ storageKey, diasRestantes, fechaVencimiento });
+  await mostrarAnuncio({ storageKey, diasRestantes, fechaVencimiento, fechaSuspension });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
