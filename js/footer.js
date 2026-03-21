@@ -1,3 +1,4 @@
+import "./mobile_shell.js";
 const FOOTER_LINKS = [
   { label: "Términos y Condiciones", href: "/Plataforma_Restaurantes/legal/terminos.html" },
   { label: "Política de Privacidad", href: "/Plataforma_Restaurantes/legal/privacidad.html" },
