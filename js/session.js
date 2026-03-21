@@ -113,55 +113,59 @@ export async function obtenerUsuarioActual() {
   return context?.user || null;
 }
 
+async function loadEmpresaById(empresaId) {
+  if (!empresaId) return null;
+  const { data, error } = await supabase
+    .from("empresas")
+    .select("id, nombre_comercial, razon_social, nit, plan, plan_actual, activo, activa, mostrar_anuncio_impago, deuda_actual, correo_empresa")
+    .eq("id", empresaId)
+    .maybeSingle();
+
+  if (error) return null;
+  return data || null;
+}
+
 export async function getSessionConEmpresa() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
   const { data: usuarioSistema, error } = await supabase
     .from("usuarios_sistema")
-    .select(`
-      id,
-      rol,
-      empresa_id,
-      activo,
-      empresas (
-        id,
-        nombre_comercial,
-        razon_social,
-        nit,
-        plan,
-        plan_actual,
-        activo,
-        activa,
-        mostrar_anuncio_impago,
-        deuda_actual,
-        correo_empresa
-      )
-    `)
+    .select("id, rol, empresa_id, activo")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (error) return null;
-  if (!usuarioSistema || usuarioSistema.activo === false) {
-    const superAdminContext = await getSuperAdminContext(user);
-    if (!superAdminContext) return null;
+  if (!error && usuarioSistema && usuarioSistema.activo !== false) {
     return {
       user,
-      usuarioSistema: null,
-      empresa: null,
-      superAdmin: true
+      usuarioSistema,
+      empresa: await loadEmpresaById(usuarioSistema.empresa_id),
+      superAdmin: false
     };
   }
 
-  const empresa = Array.isArray(usuarioSistema.empresas)
-    ? usuarioSistema.empresas[0]
-    : usuarioSistema.empresas || null;
+  const { data: otroUsuario, error: otroUsuarioError } = await supabase
+    .from("otros_usuarios")
+    .select("id, empresa_id, estado")
+    .eq("id", user.id)
+    .maybeSingle();
 
+  if (!otroUsuarioError && otroUsuario && isRecordActive(otroUsuario)) {
+    return {
+      user,
+      usuarioSistema: { ...otroUsuario, rol: "revisor" },
+      empresa: await loadEmpresaById(otroUsuario.empresa_id),
+      superAdmin: false
+    };
+  }
+
+  const superAdminContext = await getSuperAdminContext(user);
+  if (!superAdminContext) return null;
   return {
     user,
-    usuarioSistema,
-    empresa,
-    superAdmin: false
+    usuarioSistema: null,
+    empresa: null,
+    superAdmin: true
   };
 }
 

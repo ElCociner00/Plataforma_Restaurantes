@@ -139,10 +139,7 @@ async function resolveComprobanteUrl(path) {
   return data?.signedUrl || "";
 }
 
-function renderFactura({ empresa, descripcion, valorTotal, paymentMethod }) {
-  const customerName = normalizeInlineText(empresa?.nombre_comercial || empresa?.razon_social || "Cliente");
-  const customerId = normalizeInlineText(empresa?.nit || "-");
-
+function renderFactura({ descripcion, valorTotal, paymentMethod }) {
   return `
     <article class="factura-sheet">
       <section class="factura-header">
@@ -166,15 +163,6 @@ function renderFactura({ empresa, descripcion, valorTotal, paymentMethod }) {
           </dl>
         </div>
       </section>
-
-      <section class="factura-block">
-        <h3 class="factura-title">Información del Cliente</h3>
-        <dl class="kv-list customer-list">
-          <div class="kv-line"><dt>Nombre</dt><dd>${escapeHtml(customerName)}</dd></div>
-          <div class="kv-line"><dt>NIT / C.C.</dt><dd>${escapeHtml(customerId)}</dd></div>
-        </dl>
-      </section>
-
       <section class="factura-block factura-table-wrap">
         <table class="factura-table">
           <thead>
@@ -232,27 +220,17 @@ function renderFactura({ empresa, descripcion, valorTotal, paymentMethod }) {
   `;
 }
 
-function renderUploadForm(defaultAmount) {
+function renderUploadForm() {
   return `
     <section class="billing-panel">
-      <h3>Subir comprobante de pago</h3>
-      <form id="formComprobante" class="billing-form">
-        <label>Monto pagado <input type="number" name="monto" min="1" step="1" value="${Number(defaultAmount || 59900)}" required></label>
-        <label>Referencia externa <input type="text" name="referencia" placeholder="Ej: comprobante banco"></label>
-        <label>Canal
-          <select name="canal" required>
-            <option value="transferencia">Transferencia</option>
-            <option value="mercadopago_link">Mercado Pago</option>
-            <option value="efectivo">Efectivo</option>
-            <option value="otros">Otros</option>
-          </select>
-        </label>
-        <label>Comprobante (PDF/Imagen)
+      <h3>Adjuntar comprobante de pago</h3>
+      <form id="formComprobante" class="billing-form billing-form--simple">
+        <label>Comprobante (PDF o imagen)
           <input type="file" name="comprobante" accept="application/pdf,image/*" required>
         </label>
-        <button id="btnEnviarComprobante" type="submit">Enviar comprobante</button>
+        <button id="btnEnviarComprobante" type="submit">Adjuntar y enviar</button>
       </form>
-      <p id="estadoComprobante" class="helper-text"></p>
+      <p id="estadoComprobante" class="helper-text">Nosotros validaremos el valor, el medio de pago y la referencia con el soporte que adjuntes.</p>
     </section>
   `;
 }
@@ -337,9 +315,9 @@ async function attachUploadHandler({ empresaId, cycleId }) {
 
       const payload = {
         empresa_id: empresaId,
-        canal: fd.get("canal") || "otros",
-        referencia_externa: String(fd.get("referencia") || "").trim() || null,
-        monto_reportado: Number(fd.get("monto") || 0),
+        canal: "transferencia",
+        referencia_externa: null,
+        monto_reportado: 0,
         comprobante_url: storagePath,
         estado: "pendiente"
       };
@@ -391,8 +369,8 @@ async function attachUploadHandler({ empresaId, cycleId }) {
 const renderStaticShell = (rootEl) => {
   const valorTotal = 59900;
   rootEl.innerHTML = [
-    renderFactura({ empresa: {}, descripcion: "Servicio plataforma AXIOMA", valorTotal, paymentMethod: "Transferencia" }),
-    renderUploadForm(valorTotal),
+    renderFactura({ descripcion: "Servicio plataforma AXIOMA", valorTotal, paymentMethod: "Transferencia" }),
+    renderUploadForm(),
     `<section class="billing-panel"><p class="helper-text">Cargando historial de pagos...</p></section>`
   ].join("\n");
 };
@@ -429,8 +407,8 @@ export async function cargarFactura() {
     })));
 
     rootEl.innerHTML = [
-      renderFactura({ empresa, descripcion, valorTotal, paymentMethod }),
-      renderUploadForm(valorTotal),
+      renderFactura({ descripcion, valorTotal, paymentMethod }),
+      renderUploadForm(),
       renderHistory(attemptsWithUrls, cycles)
     ].join("\n");
 
@@ -438,8 +416,8 @@ export async function cargarFactura() {
   } catch (error) {
     const valorTotal = 59900;
     rootEl.innerHTML = [
-      renderFactura({ empresa: {}, descripcion: "Servicio plataforma AXIOMA", valorTotal, paymentMethod: "Transferencia" }),
-      renderUploadForm(valorTotal),
+      renderFactura({ descripcion: "Servicio plataforma AXIOMA", valorTotal, paymentMethod: "Transferencia" }),
+      renderUploadForm(),
       `<section class="billing-panel"><p class="helper-text">No pudimos cargar tu historial en este momento. Puedes intentar nuevamente en unos minutos.</p></section>`
     ].join("\n");
   }

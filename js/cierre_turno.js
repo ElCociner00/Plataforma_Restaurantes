@@ -284,16 +284,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const aplicarPoliticaSoloLectura = () => {
     const isReadOnly = empresaPolicy?.solo_lectura === true;
+    const blockedByBilling = empresaPolicy?.motivo_solo_lectura === "facturacion_suspendida";
+    const title = blockedByBilling
+      ? "Servicio suspendido por falta de pago: solo consulta y facturación"
+      : (isReadOnly ? "Plan FREE: solo visualizacion" : "");
     if (btnEnviar) {
       btnEnviar.disabled = isReadOnly;
-      btnEnviar.title = isReadOnly ? "Plan FREE: solo visualizacion" : "";
+      btnEnviar.title = title;
     }
     if (btnConfirmarEnvio) {
       btnConfirmarEnvio.disabled = isReadOnly;
-      btnConfirmarEnvio.title = isReadOnly ? "Plan FREE: envio bloqueado" : "";
+      btnConfirmarEnvio.title = blockedByBilling
+        ? "Servicio suspendido por falta de pago"
+        : (isReadOnly ? "Plan FREE: envio bloqueado" : "");
     }
     if (isReadOnly) {
-      setStatus("Plan FREE activo: puedes consultar y visualizar, pero no enviar cierres.");
+      setStatus(blockedByBilling
+        ? "Servicio suspendido por falta de pago: puedes consultar la plataforma, pero no subir cierres hasta pagar en facturación."
+        : "Plan FREE activo: puedes consultar y visualizar, pero no enviar cierres.");
     }
   };
 

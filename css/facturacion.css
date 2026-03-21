@@ -199,6 +199,7 @@
 
 .billing-panel h3 { margin-top: 0; }
 .billing-form { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 10px; align-items: end; }
+.billing-form--simple { grid-template-columns: minmax(260px, 1fr); max-width: 520px; }
 .billing-form label { display: grid; gap: 4px; font-size: 0.9rem; }
 .billing-form input,
 .billing-form select,

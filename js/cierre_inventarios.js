@@ -314,10 +314,15 @@ const setButtonState = ({ consultar, verificar, subir }) => {
 
 const aplicarPoliticaSoloLectura = () => {
   const isReadOnly = empresaPolicy?.solo_lectura === true;
+  const blockedByBilling = empresaPolicy?.motivo_solo_lectura === "facturacion_suspendida";
   if (isReadOnly) {
     btnSubir.disabled = true;
-    btnSubir.title = "Plan FREE: envio bloqueado";
-    setStatus("Plan FREE activo: puedes consultar y visualizar, pero no subir cierres.");
+    btnSubir.title = blockedByBilling
+      ? "Servicio suspendido por falta de pago: solo consulta y facturación"
+      : "Plan FREE: envio bloqueado";
+    setStatus(blockedByBilling
+      ? "Servicio suspendido por falta de pago: puedes consultar inventarios, pero no subir cierres hasta pagar en facturación."
+      : "Plan FREE activo: puedes consultar y visualizar, pero no subir cierres.");
   } else {
     btnSubir.title = "";
   }
@@ -670,7 +675,9 @@ btnSubir.addEventListener("click", async () => {
     return;
   }
   if (empresaPolicy?.solo_lectura === true) {
-    setStatus("Plan FREE: no se permite subir cierres de inventario.");
+    setStatus(empresaPolicy?.motivo_solo_lectura === "facturacion_suspendida"
+      ? "Servicio suspendido por falta de pago: usa facturación para restablecerlo."
+      : "Plan FREE: no se permite subir cierres de inventario.");
     return;
   }
 
