@@ -3,6 +3,9 @@ const MOBILE_SHELL_CSS_PATH = "/Plataforma_Restaurantes/css/mobile_native.css";
 const MOBILE_QUERY = "(max-width: 900px), (pointer: coarse)";
 
 const getViewportMeta = () => document.querySelector('meta[name="viewport"]');
+const safeMatchMedia = () => (typeof window !== "undefined" && typeof window.matchMedia === "function"
+  ? window.matchMedia(MOBILE_QUERY)
+  : { matches: false });
 
 const ensureViewportMeta = () => {
   const desired = "width=device-width, initial-scale=1.0, viewport-fit=cover";
@@ -59,14 +62,14 @@ const enhanceTableForMobile = (table) => {
 };
 
 const enhanceTables = (root = document) => {
-  root.querySelectorAll?.("table").forEach((table) => enhanceTableForMobile(table));
+  if (typeof root.querySelectorAll !== "function") return;
+  root.querySelectorAll("table").forEach((table) => enhanceTableForMobile(table));
 };
-
-const isMobileLikeDevice = () => window.matchMedia(MOBILE_QUERY).matches;
 
 const syncMobileMode = () => {
   ensureViewportMeta();
-  if (!isMobileLikeDevice()) {
+  const mediaQuery = safeMatchMedia();
+  if (!mediaQuery.matches) {
     document.documentElement.classList.remove("mobile-native");
     document.body?.classList.remove("mobile-native");
     return;
@@ -79,39 +82,56 @@ const syncMobileMode = () => {
 };
 
 let observerStarted = false;
+let listenersAttached = false;
 
 export function initMobileNativeShell() {
-  syncMobileMode();
+  try {
+    syncMobileMode();
 
-  if (!observerStarted && typeof MutationObserver === "function") {
-    observerStarted = true;
-    const observer = new MutationObserver((mutations) => {
-      if (!document.body?.classList.contains("mobile-native")) return;
-      for (const mutation of mutations) {
-        mutation.addedNodes.forEach((node) => {
-          if (!(node instanceof HTMLElement)) return;
-          if (node.matches?.("table")) enhanceTableForMobile(node);
-          enhanceTables(node);
-        });
+    if (!observerStarted && typeof MutationObserver === "function") {
+      observerStarted = true;
+      const observer = new MutationObserver((mutations) => {
+        if (!document.body?.classList.contains("mobile-native")) return;
+        for (const mutation of mutations) {
+          mutation.addedNodes.forEach((node) => {
+            if (!(node instanceof HTMLElement)) return;
+            if (node.matches?.("table")) enhanceTableForMobile(node);
+            enhanceTables(node);
+          });
+        }
+      });
+
+      const start = () => {
+        if (!document.body) return;
+        observer.observe(document.body, { childList: true, subtree: true });
+        enhanceTables(document);
+      };
+
+      if (document.body) start();
+      else document.addEventListener("DOMContentLoaded", start, { once: true });
+    }
+
+    if (!listenersAttached) {
+      listenersAttached = true;
+      const mediaQuery = safeMatchMedia();
+      if (typeof mediaQuery.addEventListener === "function") {
+        mediaQuery.addEventListener("change", syncMobileMode);
+      } else if (typeof mediaQuery.addListener === "function") {
+        mediaQuery.addListener(syncMobileMode);
       }
-    });
+      window.addEventListener("resize", syncMobileMode);
+    }
 
-    const start = () => {
-      if (!document.body) return;
-      observer.observe(document.body, { childList: true, subtree: true });
-      enhanceTables(document);
-    };
-
-    if (document.body) start();
-    else document.addEventListener("DOMContentLoaded", start, { once: true });
-  }
-
-  window.matchMedia(MOBILE_QUERY).addEventListener?.("change", syncMobileMode);
-  window.addEventListener("resize", syncMobileMode);
-
-  if (!document.body) {
-    document.addEventListener("DOMContentLoaded", syncMobileMode, { once: true });
+    if (!document.body) {
+      document.addEventListener("DOMContentLoaded", syncMobileMode, { once: true });
+    }
+  } catch (error) {
+    console.error("[mobile_shell] No se pudo inicializar la capa móvil:", error);
   }
 }
 
-initMobileNativeShell();
+try {
+  initMobileNativeShell();
+} catch (error) {
+  console.error("[mobile_shell] Fallo de arranque:", error);
+}
