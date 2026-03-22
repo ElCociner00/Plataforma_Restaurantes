@@ -4,10 +4,10 @@ import { BILLING_PAYMENT_URL } from "./billing_config.js";
 
 const BANNER_HTML_PATH = "/Plataforma_Restaurantes/components/banner_impago.html";
 const BANNER_CSS_PATH = "/Plataforma_Restaurantes/css/banner_impago.css";
-const STORAGE_KEY = "axioma_billing_banner_daily_v5";
+const STORAGE_KEY = "axioma_billing_banner_daily_v6";
 const COLOMBIA_TIME_ZONE = "America/Bogota";
 const DAYS_BEFORE_DUE_TO_SHOW = 10;
-const MAX_GRACE_DAYS = 5;
+const SUSPENSION_DAY_OF_MONTH = 20;
 const UNPAID_STATES = ["pending_payment", "proof_submitted", "past_due", "suspended", "grace_manual", "draft"];
 
 let anuncioInyectado = false;
@@ -39,43 +39,6 @@ function getBogotaTodayYmd(date = new Date()) {
 function getBogotaDayKey(date = new Date()) {
   const today = getBogotaTodayYmd(date);
   return `${today.year}-${String(today.month).padStart(2, "0")}-${String(today.day).padStart(2, "0")}`;
-}
-
-function getDisplayKey({ empresaId, cycleId, fechaVencimiento, estado }) {
-  return [
-    STORAGE_KEY,
-    empresaId || "sin_empresa",
-    cycleId || "sin_ciclo",
-    fechaVencimiento || "sin_fecha",
-    estado || "sin_estado",
-    getBogotaDayKey()
-  ].join(":");
-}
-
-function markAsShown(key) {
-  if (!key) return;
-  localStorage.setItem(key, "1");
-}
-
-function wasAlreadyShown(key) {
-  if (!key) return false;
-  return localStorage.getItem(key) === "1";
-}
-
-export function clearBannerDisplayCache() {
-  Object.keys(localStorage)
-    .filter((key) => key.startsWith(`${STORAGE_KEY}:`))
-    .forEach((key) => localStorage.removeItem(key));
-}
-
-async function getModalTemplateHtml() {
-  try {
-    const res = await fetch(BANNER_HTML_PATH, { cache: "no-store" });
-    if (!res.ok) throw new Error("template not found");
-    return await res.text();
-  } catch {
-    return '<div id="anuncio-impago" class="impago-modal" role="dialog" aria-modal="true"><div class="impago-modal-card"><h3 id="impagoModalTitle">Aviso importante</h3><p id="impagoModalMessage"></p><div class="impago-modal-actions"><button id="impagoModalAceptar" type="button">Aceptar</button><a id="impagoModalPagar" href="https://mpago.li/15d6BkC" target="_blank" rel="noopener noreferrer">Pagar ahora</a></div></div></div>';
-  }
 }
 
 function extractYmd(value) {
@@ -112,16 +75,11 @@ function diffInDaysFromToday(value) {
   return Math.round((ymdToUtcMidday(target) - ymdToUtcMidday(today)) / (1000 * 60 * 60 * 24));
 }
 
-function addDays(value, days) {
-  const ymd = extractYmd(value);
-  if (!ymd) return null;
-  const base = new Date(ymdToUtcMidday(ymd));
-  base.setUTCDate(base.getUTCDate() + days);
-  return `${base.getUTCFullYear()}-${String(base.getUTCMonth() + 1).padStart(2, "0")}-${String(base.getUTCDate()).padStart(2, "0")}`;
-}
-
 function getSuspensionDate(fechaVencimiento) {
-  return addDays(fechaVencimiento, MAX_GRACE_DAYS);
+  const due = extractYmd(fechaVencimiento);
+  if (!due) return null;
+  const day = Math.max(due.day, SUSPENSION_DAY_OF_MONTH);
+  return `${due.year}-${String(due.month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
 function isTruthy(value) {
@@ -134,8 +92,7 @@ function isCycleUnpaid(cycle) {
 }
 
 function shouldShowForDays(diasRestantes) {
-  if (typeof diasRestantes !== "number") return false;
-  return diasRestantes <= DAYS_BEFORE_DUE_TO_SHOW;
+  return typeof diasRestantes === "number" && diasRestantes <= DAYS_BEFORE_DUE_TO_SHOW;
 }
 
 function pickRelevantCycle(cycles, periodoActual) {
@@ -150,65 +107,66 @@ function pickRelevantCycle(cycles, periodoActual) {
   return cycles.find((cycle) => isCycleUnpaid(cycle)) || null;
 }
 
-function addDays(value, days) {
-  const ymd = extractYmd(value);
-  if (!ymd) return null;
-  const base = new Date(ymdToUtcMidday(ymd));
-  base.setUTCDate(base.getUTCDate() + days);
-  return `${base.getUTCFullYear()}-${String(base.getUTCMonth() + 1).padStart(2, "0")}-${String(base.getUTCDate()).padStart(2, "0")}`;
+function getCurrentPeriod(date = new Date()) {
+  const current = getBogotaTodayYmd(date);
+  return `${current.year}-${String(current.month).padStart(2, "0")}`;
 }
 
-function getSuspensionDate(fechaVencimiento) {
-  return addDays(fechaVencimiento, MAX_GRACE_DAYS);
+function getDisplayKey({ empresaId, cycleId, fechaVencimiento, estado }) {
+  return [
+    STORAGE_KEY,
+    empresaId || "sin_empresa",
+    cycleId || "sin_ciclo",
+    fechaVencimiento || "sin_fecha",
+    estado || "sin_estado",
+    getBogotaDayKey()
+  ].join(":");
 }
 
-function isTruthy(value) {
-  return value === true;
+function markAsShown(key) {
+  if (key) localStorage.setItem(key, "1");
 }
 
-function isCycleUnpaid(cycle) {
-  const estado = String(cycle?.estado || "").toLowerCase();
-  return UNPAID_STATES.includes(estado) || isTruthy(cycle?.banner_activo);
+function wasAlreadyShown(key) {
+  return key ? localStorage.getItem(key) === "1" : false;
 }
 
-function shouldShowForDays(diasRestantes) {
-  if (typeof diasRestantes !== "number") return false;
-  return diasRestantes <= DAYS_BEFORE_DUE_TO_SHOW;
+export function clearBannerDisplayCache() {
+  Object.keys(localStorage)
+    .filter((key) => key.startsWith(`${STORAGE_KEY}:`))
+    .forEach((key) => localStorage.removeItem(key));
 }
 
-function pickRelevantCycle(cycles, periodoActual) {
-  if (!Array.isArray(cycles) || !cycles.length) return null;
-
-  const currentPeriodUnpaid = cycles.find((cycle) => cycle.periodo === periodoActual && isCycleUnpaid(cycle));
-  if (currentPeriodUnpaid) return currentPeriodUnpaid;
-
-  const bannerUnpaid = cycles.find((cycle) => isTruthy(cycle.banner_activo) && isCycleUnpaid(cycle));
-  if (bannerUnpaid) return bannerUnpaid;
-
-  return cycles.find((cycle) => isCycleUnpaid(cycle)) || null;
+async function getModalTemplateHtml() {
+  try {
+    const res = await fetch(BANNER_HTML_PATH, { cache: "no-store" });
+    if (!res.ok) throw new Error("template not found");
+    return await res.text();
+  } catch {
+    return '<div id="anuncio-impago" class="impago-modal" role="dialog" aria-modal="true"><div class="impago-modal-card"><h3 id="impagoModalTitle">Aviso importante</h3><p id="impagoModalMessage"></p><div class="impago-modal-actions"><button id="impagoModalAceptar" type="button">Aceptar</button><a id="impagoModalPagar" href="https://mpago.li/15d6BkC" target="_blank" rel="noopener noreferrer">Pagar ahora</a></div></div></div>';
+  }
 }
 
-function pickRelevantCycle(cycles, periodoActual) {
-  if (!Array.isArray(cycles) || !cycles.length) return null;
-
-  const currentPeriodUnpaid = cycles.find((cycle) => cycle.periodo === periodoActual && isCycleUnpaid(cycle));
-  if (currentPeriodUnpaid) return currentPeriodUnpaid;
-
-  const bannerUnpaid = cycles.find((cycle) => isTruthy(cycle.banner_activo) && isCycleUnpaid(cycle));
-  if (bannerUnpaid) return bannerUnpaid;
-
-  return cycles.find((cycle) => isCycleUnpaid(cycle)) || null;
-}
-
-function getMensajeHtml({ diasRestantes, fechaVencimiento, fechaSuspension }) {
+function getMensajeHtml({ estado, diasRestantes, fechaVencimiento, fechaSuspension }) {
   const dias = typeof diasRestantes === "number" ? diasRestantes : null;
+  const isSuspended = String(estado || "").toLowerCase() === "suspended" || (typeof dias === "number" && dias < 0 && diffInDaysFromToday(fechaSuspension) < 0);
+
+  if (isSuspended) {
+    return `
+      <div class="impago-msg impago-msg--danger">
+        <div class="impago-msg-title">Servicio suspendido por falta de pago</div>
+        <div class="impago-msg-days">Tu acceso está en modo solo lectura</div>
+        <div class="impago-msg-body">Tu factura venció el ${fmtDate(fechaVencimiento)} y el plazo máximo de pago finalizó el ${fmtDate(fechaSuspension)}. Puedes entrar a todos los módulos para consultar información, pero no podrás usar cierres ni envíos hasta que pagues. El módulo de facturación sigue habilitado para restablecer el servicio.</div>
+      </div>
+    `;
+  }
 
   if (dias == null) {
     return `
       <div class="impago-msg impago-msg--warning">
         <div class="impago-msg-title">Aviso importante de facturación</div>
         <div class="impago-msg-days">Pago pendiente</div>
-        <div class="impago-msg-body">Tienes una factura pendiente. Revisa tu módulo de facturación para evitar suspensión del servicio.</div>
+        <div class="impago-msg-body">Tienes una factura pendiente. Revisa tu módulo de facturación para evitar la suspensión del servicio.</div>
       </div>
     `;
   }
@@ -218,7 +176,7 @@ function getMensajeHtml({ diasRestantes, fechaVencimiento, fechaSuspension }) {
       <div class="impago-msg impago-msg--warning">
         <div class="impago-msg-title">Aviso importante de facturación</div>
         <div class="impago-msg-days">Faltan <span class="impago-number">${dias}</span> día${dias === 1 ? "" : "s"}</div>
-        <div class="impago-msg-body">Tu factura vence el ${fmtDate(fechaVencimiento)}. Esta cuenta regresiva llegará a 0 el día 15 si aún no has pagado.</div>
+        <div class="impago-msg-body">Tu factura vence el ${fmtDate(fechaVencimiento)}. La cuenta regresiva llegará a 0 ese día.</div>
       </div>
     `;
   }
@@ -228,23 +186,17 @@ function getMensajeHtml({ diasRestantes, fechaVencimiento, fechaSuspension }) {
       <div class="impago-msg impago-msg--warning">
         <div class="impago-msg-title">Aviso importante de facturación</div>
         <div class="impago-msg-days">Hoy vence tu factura</div>
-        <div class="impago-msg-body">Tu factura vence hoy, ${fmtDate(fechaVencimiento)}. Si no pagas hoy, mañana comenzará a contarse la mora.</div>
+        <div class="impago-msg-body">Tu factura vence hoy, ${fmtDate(fechaVencimiento)}. Si no pagas hoy, mañana comenzará el conteo de mora hasta el día 20.</div>
       </div>
     `;
   }
 
   const diasMora = Math.abs(dias);
-  const suspension = getSuspensionDate(fechaVencimiento);
-  const suspensionDiff = suspension ? diffInDaysFromToday(suspension) : null;
-  const suspensionMessage = suspensionDiff != null && suspensionDiff >= 0
-    ? `Tu servicio será suspendido el ${fmtDate(suspension)} si no pagas.`
-    : `Tu servicio debía suspenderse el ${fmtDate(suspension)}. Regulariza el pago cuanto antes.`;
-
   return `
     <div class="impago-msg impago-msg--danger">
       <div class="impago-msg-title">Tu cuenta está en mora</div>
       <div class="impago-msg-days">Llevas <span class="impago-number">${diasMora}</span> día${diasMora === 1 ? "" : "s"} de mora</div>
-      <div class="impago-msg-body">Tu factura venció el ${fmtDate(fechaVencimiento)}. ${suspensionMessage}</div>
+      <div class="impago-msg-body">Tu factura venció el ${fmtDate(fechaVencimiento)}. Si no pagas antes del ${fmtDate(fechaSuspension)}, el servicio quedará suspendido y solo podrás consultar información y usar facturación para regularizar el pago.</div>
     </div>
   `;
 }
@@ -256,11 +208,6 @@ function ocultarAnuncio() {
   anuncioInyectado = false;
 }
 
-function getCurrentPeriod(date = new Date()) {
-  const current = getBogotaTodayYmd(date);
-  return `${current.year}-${String(current.month).padStart(2, "0")}`;
-}
-
 async function getBannerState() {
   const context = await getUserContext().catch(() => null);
   const empresaId = context?.empresa_id;
@@ -270,7 +217,7 @@ async function getBannerState() {
   const [{ data: empresa }, { data: cycles }] = await Promise.all([
     supabase
       .from("empresas")
-      .select("id, mostrar_anuncio_impago")
+      .select("id, mostrar_anuncio_impago, deuda_actual, activo, activa")
       .eq("id", empresaId)
       .maybeSingle(),
     supabase
@@ -285,10 +232,17 @@ async function getBannerState() {
   const cycle = pickRelevantCycle(cycles || [], periodoActual);
   const estado = String(cycle?.estado || "").toLowerCase();
   const fechaVencimiento = cycle?.fecha_vencimiento || null;
+  const fechaSuspension = getSuspensionDate(fechaVencimiento);
   const diasRestantes = diffInDaysFromToday(fechaVencimiento);
-  const showByFlags = isTruthy(empresa?.mostrar_anuncio_impago) || isTruthy(cycle?.banner_activo);
-  const showByWindow = shouldShowForDays(diasRestantes) && isCycleUnpaid(cycle);
-  const shouldShow = ["paid_verified"].includes(estado) ? false : Boolean(cycle && (showByFlags || showByWindow));
+  const deudaActual = Number(empresa?.deuda_actual || 0);
+  const empresaActiva = empresa?.activo !== false && empresa?.activa !== false;
+  const bannersHabilitados = isTruthy(empresa?.mostrar_anuncio_impago);
+  const administrativelyRestored = bannersHabilitados !== true && empresaActiva && deudaActual <= 0;
+  const showByFlags = bannersHabilitados && (isTruthy(cycle?.banner_activo) || estado === "suspended");
+  const showByWindow = bannersHabilitados && shouldShowForDays(diasRestantes) && isCycleUnpaid(cycle);
+  const shouldShow = administrativelyRestored || !bannersHabilitados || estado === "paid_verified"
+    ? false
+    : Boolean(cycle && (showByFlags || showByWindow));
 
   return {
     empresaId,
@@ -296,37 +250,36 @@ async function getBannerState() {
     estado,
     shouldShow,
     diasRestantes,
-    fechaVencimiento
+    fechaVencimiento,
+    fechaSuspension
   };
 }
 
-async function mostrarAnuncio({ storageKey, diasRestantes, fechaVencimiento, fechaSuspension }) {
+async function mostrarAnuncio({ storageKey, estado, diasRestantes, fechaVencimiento, fechaSuspension }) {
   ocultarAnuncio();
   const container = document.createElement("div");
   container.innerHTML = await getModalTemplateHtml();
   const modal = container.querySelector("#anuncio-impago");
   if (!modal) return;
 
+  const isSuspended = String(estado || "").toLowerCase() === "suspended";
   const title = modal.querySelector("#impagoModalTitle");
-  if (title) title.textContent = diasRestantes < 0 ? "Aviso de mora" : "Aviso importante";
+  if (title) title.textContent = isSuspended ? "Servicio suspendido" : (diasRestantes < 0 ? "Aviso de mora" : "Aviso importante");
 
   const message = modal.querySelector("#impagoModalMessage");
   if (message) {
-    message.innerHTML = getMensajeHtml({ diasRestantes, fechaVencimiento });
+    message.innerHTML = getMensajeHtml({ estado, diasRestantes, fechaVencimiento, fechaSuspension });
   }
 
-  const btnAceptar = modal.querySelector("#impagoModalAceptar");
-  btnAceptar?.addEventListener("click", () => {
+  const markAndClose = () => {
     markAsShown(storageKey);
     ocultarAnuncio();
-  });
+  };
+
+  modal.querySelector("#impagoModalAceptar")?.addEventListener("click", markAndClose);
+  modal.querySelector("#impagoModalPagar")?.addEventListener("click", markAndClose);
 
   const btnPagar = modal.querySelector("#impagoModalPagar");
-  btnPagar?.addEventListener("click", () => {
-    markAsShown(storageKey);
-    ocultarAnuncio();
-  });
-
   if (btnPagar) {
     btnPagar.setAttribute("href", BILLING_PAYMENT_URL);
     btnPagar.setAttribute("target", "_blank");
@@ -342,7 +295,7 @@ export async function verificarYMostrarAnuncio() {
   ensureBannerStyles();
 
   const bannerState = await getBannerState();
-  const { empresaId, cycleId, estado, shouldShow, diasRestantes, fechaVencimiento } = bannerState;
+  const { empresaId, cycleId, estado, shouldShow, diasRestantes, fechaVencimiento, fechaSuspension } = bannerState;
 
   if (!empresaId || shouldShow !== true) {
     ocultarAnuncio();
@@ -355,7 +308,7 @@ export async function verificarYMostrarAnuncio() {
     return;
   }
 
-  await mostrarAnuncio({ storageKey, diasRestantes, fechaVencimiento, fechaSuspension });
+  await mostrarAnuncio({ storageKey, estado, diasRestantes, fechaVencimiento, fechaSuspension });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
