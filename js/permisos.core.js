@@ -65,9 +65,14 @@ function getSuspensionDate(fechaVencimiento) {
   return `${due.year}-${String(due.month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-function resolveBillingReadOnlyState(cycle) {
+function resolveBillingReadOnlyState(cycle, empresa) {
   const estado = String(cycle?.estado || "").trim().toLowerCase();
-  if (!cycle || !estado || estado === "paid_verified") {
+  const deudaActual = Number(empresa?.deuda_actual || 0);
+  const empresaActiva = normalizeActiva(empresa);
+  const bannersActivos = empresa?.mostrar_anuncio_impago === true;
+  const restoredByAdmin = empresaActiva && deudaActual <= 0 && bannersActivos === false;
+
+  if (restoredByAdmin || !cycle || !estado || estado === "paid_verified") {
     return { suspendida_por_facturacion: false, solo_lectura_por_facturacion: false, motivo: "" };
   }
 
@@ -100,7 +105,7 @@ export async function getEmpresaPolicy(empresaId, forceRefresh = false) {
 
   const response = await supabase
     .from("empresas")
-    .select("id, plan, plan_actual, activo, activa")
+    .select("id, plan, plan_actual, activo, activa, deuda_actual, mostrar_anuncio_impago")
     .eq("id", empresaId)
     .maybeSingle();
 
@@ -111,7 +116,7 @@ export async function getEmpresaPolicy(empresaId, forceRefresh = false) {
     await new Promise((resolve) => setTimeout(resolve, 500));
     const retry = await supabase
       .from("empresas")
-      .select("id, plan, plan_actual, activo, activa")
+      .select("id, plan, plan_actual, activo, activa, deuda_actual, mostrar_anuncio_impago")
       .eq("id", empresaId)
       .maybeSingle();
     if (!retry?.error && retry?.data) {
@@ -128,7 +133,7 @@ export async function getEmpresaPolicy(empresaId, forceRefresh = false) {
   }
 
 
-  const billingState = resolveBillingReadOnlyState(await getLatestBillingCycle(empresaId));
+  const billingState = resolveBillingReadOnlyState(await getLatestBillingCycle(empresaId), data);
 
   const policy = {
     empresa_id: empresaId,

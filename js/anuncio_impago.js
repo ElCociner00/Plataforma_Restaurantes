@@ -217,7 +217,7 @@ async function getBannerState() {
   const [{ data: empresa }, { data: cycles }] = await Promise.all([
     supabase
       .from("empresas")
-      .select("id, mostrar_anuncio_impago")
+      .select("id, mostrar_anuncio_impago, deuda_actual, activo, activa")
       .eq("id", empresaId)
       .maybeSingle(),
     supabase
@@ -234,11 +234,15 @@ async function getBannerState() {
   const fechaVencimiento = cycle?.fecha_vencimiento || null;
   const fechaSuspension = getSuspensionDate(fechaVencimiento);
   const diasRestantes = diffInDaysFromToday(fechaVencimiento);
-  const showByFlags = isTruthy(empresa?.mostrar_anuncio_impago) || isTruthy(cycle?.banner_activo);
-  const showByWindow = shouldShowForDays(diasRestantes) && isCycleUnpaid(cycle);
-  const shouldShow = estado === "paid_verified"
+  const deudaActual = Number(empresa?.deuda_actual || 0);
+  const empresaActiva = empresa?.activo !== false && empresa?.activa !== false;
+  const bannersHabilitados = isTruthy(empresa?.mostrar_anuncio_impago);
+  const administrativelyRestored = bannersHabilitados !== true && empresaActiva && deudaActual <= 0;
+  const showByFlags = bannersHabilitados && (isTruthy(cycle?.banner_activo) || estado === "suspended");
+  const showByWindow = bannersHabilitados && shouldShowForDays(diasRestantes) && isCycleUnpaid(cycle);
+  const shouldShow = administrativelyRestored || !bannersHabilitados || estado === "paid_verified"
     ? false
-    : Boolean(cycle && (showByFlags || showByWindow || estado === "suspended"));
+    : Boolean(cycle && (showByFlags || showByWindow));
 
   return {
     empresaId,
