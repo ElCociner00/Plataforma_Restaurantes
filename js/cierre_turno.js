@@ -462,10 +462,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
-  const cargarPoliticaEmpresa = async () => {
+  const cargarPoliticaEmpresa = async (forceRefresh = false) => {
     const context = await getUserContext();
     if (!context?.empresa_id) return;
-    empresaPolicy = await getEmpresaPolicy(context.empresa_id).catch((error) => { setStatus("Error del sistema validando el plan. Recarga la pagina."); console.error("Error cargando politica de plan:", error); return { ...empresaPolicy, plan: "free", solo_lectura: true }; });
+    empresaPolicy = await getEmpresaPolicy(context.empresa_id, forceRefresh).catch((error) => { setStatus("Error del sistema validando el plan. Recarga la pagina."); console.error("Error cargando politica de plan:", error); return { ...empresaPolicy, plan: "free", solo_lectura: true }; });
     aplicarPoliticaSoloLectura();
   };
 
@@ -985,6 +985,10 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   btnDescargarImagen?.addEventListener("click", () => {
+    if (!verificado) {
+      setStatus("Primero debes verificar los datos antes de descargar el resumen.");
+      return;
+    }
     descargarImagenResumen();
   });
   btnSolicitarCorreccion?.addEventListener("click", () => {
@@ -1158,71 +1162,68 @@ document.addEventListener("DOMContentLoaded", () => {
     setStatus("Verificando...");
     btnVerificar.disabled = true;
 
-    // Siempre limpiar antes de un nuevo ciclo de verificación
-    limpiarDiferencias();
-
-    actualizarDomiciliosDesdeExtras();
-
-    if (!efectivoApertura?.value) {
-      setStatus("Atención: Completa el efectivo de apertura.");
-      return;
-    }
-
-    const contextPayload = await getContextPayload();
-    if (!contextPayload) return;
-
-    btnVerificar.disabled = true;
-
-    const payload = {
-      fecha: fecha.value,
-      responsable: responsable.value,
-      turno: {
-        hora_llegada: getHoraLlegadaCompleta(),
-        inicio: horaInicio.value,
-        fin: horaFin.value,
-        inicio_momento: getMomentoDia(horaInicio.value),
-        fin_momento: getMomentoDia(horaFin.value)
-      },
-      finanzas: {
-        efectivo_apertura: efectivoApertura.value || 0,
-        efectivo: {
-          sistema: String(getEfectivoSistemaNeto()),
-          real: inputsFinanzas.efectivo.real.value || 0
-        },
-        datafono: {
-          sistema: inputsFinanzas.datafono.sistema.value || 0,
-          real: inputsFinanzas.datafono.real.value || 0
-        },
-        rappi: {
-          sistema: inputsFinanzas.rappi.sistema.value || 0,
-          real: inputsFinanzas.rappi.real.value || 0
-        },
-        nequi: {
-          sistema: inputsFinanzas.nequi.sistema.value || 0,
-          real: inputsFinanzas.nequi.real.value || 0
-        },
-        transferencias: {
-          sistema: inputsFinanzas.transferencias.sistema.value || 0,
-          real: inputsFinanzas.transferencias.real.value || 0
-        },
-        bono_regalo: {
-          sistema: inputsFinanzas.bono_regalo.sistema.value || 0,
-          real: inputsFinanzas.bono_regalo.real.value || 0
-        },
-        propina: inputsSoloVista.propina.value || 0,
-        domicilios: inputsSoloVista.domicilios.value || 0,
-        bolsa: bolsa?.value || 0,
-        caja: caja?.value || 0
-      },
-      comentarios: comentarios.value || "",
-      bolsa: bolsa?.value || 0,
-      caja: caja?.value || 0,
-      efectivo_apertura: efectivoApertura.value || 0,
-      gastos_extras: buildExtrasPayload(),
-      ...contextPayload
-    };
-
     try {
+      // Siempre limpiar antes de un nuevo ciclo de verificación
+      limpiarDiferencias();
+      actualizarDomiciliosDesdeExtras();
+
+      if (!efectivoApertura?.value) {
+        setStatus("Atención: Completa el efectivo de apertura.");
+        return;
+      }
+
+      const contextPayload = await getContextPayload();
+      if (!contextPayload) return;
+
+      const payload = {
+        fecha: fecha.value,
+        responsable: responsable.value,
+        turno: {
+          hora_llegada: getHoraLlegadaCompleta(),
+          inicio: horaInicio.value,
+          fin: horaFin.value,
+          inicio_momento: getMomentoDia(horaInicio.value),
+          fin_momento: getMomentoDia(horaFin.value)
+        },
+        finanzas: {
+          efectivo_apertura: efectivoApertura.value || 0,
+          efectivo: {
+            sistema: String(getEfectivoSistemaNeto()),
+            real: inputsFinanzas.efectivo.real.value || 0
+          },
+          datafono: {
+            sistema: inputsFinanzas.datafono.sistema.value || 0,
+            real: inputsFinanzas.datafono.real.value || 0
+          },
+          rappi: {
+            sistema: inputsFinanzas.rappi.sistema.value || 0,
+            real: inputsFinanzas.rappi.real.value || 0
+          },
+          nequi: {
+            sistema: inputsFinanzas.nequi.sistema.value || 0,
+            real: inputsFinanzas.nequi.real.value || 0
+          },
+          transferencias: {
+            sistema: inputsFinanzas.transferencias.sistema.value || 0,
+            real: inputsFinanzas.transferencias.real.value || 0
+          },
+          bono_regalo: {
+            sistema: inputsFinanzas.bono_regalo.sistema.value || 0,
+            real: inputsFinanzas.bono_regalo.real.value || 0
+          },
+          propina: inputsSoloVista.propina.value || 0,
+          domicilios: inputsSoloVista.domicilios.value || 0,
+          bolsa: bolsa?.value || 0,
+          caja: caja?.value || 0
+        },
+        comentarios: comentarios.value || "",
+        bolsa: bolsa?.value || 0,
+        caja: caja?.value || 0,
+        efectivo_apertura: efectivoApertura.value || 0,
+        gastos_extras: buildExtrasPayload(),
+        ...contextPayload
+      };
+
       const res = await fetchWithTimeout(WEBHOOK_VERIFICAR_CIERRE, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1234,6 +1235,7 @@ document.addEventListener("DOMContentLoaded", () => {
         setStatus(data?.message || `Error al verificar cierre (HTTP ${res.status}).`);
         return;
       }
+
       const diferenciaEfectivoCalculada = syncDiferenciaEfectivo();
       const diferenciaLocal = (medio) => (
         toNumberValue(inputsFinanzas[medio]?.real?.value) - toNumberValue(inputsFinanzas[medio]?.sistema?.value)
@@ -1253,7 +1255,7 @@ document.addEventListener("DOMContentLoaded", () => {
         actualizarEstadoDiferencia(field, value);
       });
 
-      setStatus(data.message || "");
+      await cargarPoliticaEmpresa(true);
       verificado = true;
       setStatus((data.message || "") + " Descarga el resumen (⤓) para habilitar Subir cierre.");
       refreshEstadoBotonSubir();

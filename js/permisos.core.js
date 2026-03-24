@@ -67,12 +67,7 @@ function getSuspensionDate(fechaVencimiento) {
 
 function resolveBillingReadOnlyState(cycle, empresa) {
   const estado = String(cycle?.estado || "").trim().toLowerCase();
-  const deudaActual = Number(empresa?.deuda_actual || 0);
-  const empresaActiva = normalizeActiva(empresa);
-  const bannersActivos = empresa?.mostrar_anuncio_impago === true;
-  const restoredByAdmin = empresaActiva && deudaActual <= 0 && bannersActivos === false;
-
-  if (restoredByAdmin || !cycle || !estado || estado === "paid_verified") {
+  if (!cycle || !estado || estado === "paid_verified") {
     return { suspendida_por_facturacion: false, solo_lectura_por_facturacion: false, motivo: "" };
   }
 

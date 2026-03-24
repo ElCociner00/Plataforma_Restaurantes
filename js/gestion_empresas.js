@@ -167,6 +167,22 @@ async function syncBillingStateWithEmpresa(empresaId, { activa = null, mostrar =
   const bannersActivos = typeof mostrar === "boolean" ? mostrar : empresa?.mostrar_anuncio_impago === true;
   const periodo = getCurrentPeriod();
 
+  const { data: cycles } = await supabase
+    .from("billing_cycles")
+    .select("id, periodo")
+    .eq("empresa_id", empresaId)
+    .order("periodo", { ascending: false })
+    .order("fecha_vencimiento", { ascending: false })
+    .limit(3);
+
+  const targetIds = new Set();
+  (Array.isArray(cycles) ? cycles : []).forEach((cycle) => {
+    if (!cycle?.id) return;
+    if (cycle.periodo === periodo || targetIds.size === 0) targetIds.add(cycle.id);
+  });
+
+  if (!targetIds.size) return;
+
   const cycleUpdate = { updated_at: new Date().toISOString() };
 
   if (!bannersActivos) {
@@ -185,8 +201,7 @@ async function syncBillingStateWithEmpresa(empresaId, { activa = null, mostrar =
   await supabase
     .from("billing_cycles")
     .update(cycleUpdate)
-    .eq("empresa_id", empresaId)
-    .eq("periodo", periodo);
+    .in("id", Array.from(targetIds));
 }
 
 async function onToggleEstado(input) {

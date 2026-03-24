@@ -234,13 +234,10 @@ async function getBannerState() {
   const fechaVencimiento = cycle?.fecha_vencimiento || null;
   const fechaSuspension = getSuspensionDate(fechaVencimiento);
   const diasRestantes = diffInDaysFromToday(fechaVencimiento);
-  const deudaActual = Number(empresa?.deuda_actual || 0);
-  const empresaActiva = empresa?.activo !== false && empresa?.activa !== false;
   const bannersHabilitados = isTruthy(empresa?.mostrar_anuncio_impago);
-  const administrativelyRestored = bannersHabilitados !== true && empresaActiva && deudaActual <= 0;
   const showByFlags = bannersHabilitados && (isTruthy(cycle?.banner_activo) || estado === "suspended");
   const showByWindow = bannersHabilitados && shouldShowForDays(diasRestantes) && isCycleUnpaid(cycle);
-  const shouldShow = administrativelyRestored || !bannersHabilitados || estado === "paid_verified"
+  const shouldShow = !bannersHabilitados || estado === "paid_verified"
     ? false
     : Boolean(cycle && (showByFlags || showByWindow));
 
