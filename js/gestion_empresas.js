@@ -153,12 +153,64 @@ async function updateEmpresa(empresaId, payload) {
   if (error) throw error;
 }
 
+async function syncBillingStateWithEmpresa(empresaId, { activa = null, mostrar = null } = {}) {
+  if (!empresaId) return;
+
+  const { data: empresa } = await supabase
+    .from("empresas")
+    .select("id, deuda_actual, mostrar_anuncio_impago, activo, activa")
+    .eq("id", empresaId)
+    .maybeSingle();
+
+  const deudaActual = Number(empresa?.deuda_actual || 0);
+  const empresaActiva = typeof activa === "boolean" ? activa : normalizeEmpresaActiva(empresa);
+  const bannersActivos = typeof mostrar === "boolean" ? mostrar : empresa?.mostrar_anuncio_impago === true;
+  const periodo = getCurrentPeriod();
+
+  const { data: cycles } = await supabase
+    .from("billing_cycles")
+    .select("id, periodo")
+    .eq("empresa_id", empresaId)
+    .order("periodo", { ascending: false })
+    .order("fecha_vencimiento", { ascending: false })
+    .limit(3);
+
+  const targetIds = new Set();
+  (Array.isArray(cycles) ? cycles : []).forEach((cycle) => {
+    if (!cycle?.id) return;
+    if (cycle.periodo === periodo || targetIds.size === 0) targetIds.add(cycle.id);
+  });
+
+  if (!targetIds.size) return;
+
+  const cycleUpdate = { updated_at: new Date().toISOString() };
+
+  if (!bannersActivos) {
+    cycleUpdate.banner_activo = false;
+  }
+
+  if (empresaActiva && deudaActual <= 0) {
+    cycleUpdate.banner_activo = false;
+    cycleUpdate.suspension_aplicada = false;
+    cycleUpdate.estado = "paid_verified";
+  } else if (empresaActiva === false) {
+    cycleUpdate.suspension_aplicada = true;
+    cycleUpdate.estado = "suspended";
+  }
+
+  await supabase
+    .from("billing_cycles")
+    .update(cycleUpdate)
+    .in("id", Array.from(targetIds));
+}
+
 async function onToggleEstado(input) {
   const empresaId = input?.dataset?.id;
   const activa = input?.checked === true;
   if (!empresaId) return;
 
   await updateEmpresa(empresaId, { activo: activa, activa });
+  await syncBillingStateWithEmpresa(empresaId, { activa });
   if (empresaId === state.empresaActualId) window.dispatchEvent(new Event("empresaCambiada"));
 }
 
@@ -168,6 +220,7 @@ async function onToggleAnuncio(input) {
   if (!empresaId) return;
 
   await updateEmpresa(empresaId, { mostrar_anuncio_impago: mostrar });
+  await syncBillingStateWithEmpresa(empresaId, { mostrar });
   if (empresaId === state.empresaActualId) window.dispatchEvent(new Event("empresaCambiada"));
 
   if (WEBHOOKS?.NOTIFICACION_IMAGO?.url) {
@@ -248,6 +301,8 @@ async function applyManualOverride() {
     payload_json: { pauseAuto, manualUntil, forceBanner, forceSuspend }
   }).catch(() => {});
 
+  await syncBillingStateWithEmpresa(empresaId, { activa: !forceSuspend, mostrar: forceBanner });
+  if (empresaId === state.empresaActualId) window.dispatchEvent(new Event("empresaCambiada"));
   setStatus("Excepción manual aplicada.");
   await loadEmpresas();
 }

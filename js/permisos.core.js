@@ -24,6 +24,66 @@ const normalizeActiva = (empresa) => {
   return true;
 };
 
+async function getLatestBillingCycle(empresaId) {
+  if (!empresaId) return null;
+  const { data, error } = await supabase
+    .from("billing_cycles")
+    .select("id, estado, fecha_vencimiento, periodo, banner_activo")
+    .eq("empresa_id", empresaId)
+    .order("periodo", { ascending: false })
+    .order("fecha_vencimiento", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) return null;
+  return data || null;
+}
+
+function parseYmd(value) {
+  const match = String(value || "").match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) };
+}
+
+function toUtcMidday(ymd) {
+  if (!ymd) return null;
+  return Date.UTC(ymd.year, ymd.month - 1, ymd.day, 12, 0, 0, 0);
+}
+
+function diffDaysFromToday(value) {
+  const target = parseYmd(value);
+  if (!target) return null;
+  const now = new Date();
+  const today = { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1, day: now.getUTCDate() };
+  return Math.round((toUtcMidday(target) - toUtcMidday(today)) / 86400000);
+}
+
+function getSuspensionDate(fechaVencimiento) {
+  const due = parseYmd(fechaVencimiento);
+  if (!due) return null;
+  const day = Math.max(due.day, 20);
+  return `${due.year}-${String(due.month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function resolveBillingReadOnlyState(cycle, empresa) {
+  const estado = String(cycle?.estado || "").trim().toLowerCase();
+  if (!cycle || !estado || estado === "paid_verified") {
+    return { suspendida_por_facturacion: false, solo_lectura_por_facturacion: false, motivo: "" };
+  }
+
+  const suspensionDate = getSuspensionDate(cycle.fecha_vencimiento);
+  const suspensionDiff = diffDaysFromToday(suspensionDate);
+  const forcedSuspended = estado === "suspended";
+  const suspended = forcedSuspended || (typeof suspensionDiff === "number" && suspensionDiff < 0);
+  const readOnly = suspended;
+
+  return {
+    suspendida_por_facturacion: suspended,
+    solo_lectura_por_facturacion: readOnly,
+    motivo: readOnly ? "facturacion_suspendida" : ""
+  };
+}
+
 export async function getEmpresaPolicy(empresaId, forceRefresh = false) {
   if (!empresaId) {
     return {
@@ -40,7 +100,7 @@ export async function getEmpresaPolicy(empresaId, forceRefresh = false) {
 
   const response = await supabase
     .from("empresas")
-    .select("id, plan, plan_actual, activo, activa")
+    .select("id, plan, plan_actual, activo, activa, deuda_actual, mostrar_anuncio_impago")
     .eq("id", empresaId)
     .maybeSingle();
 
@@ -51,7 +111,7 @@ export async function getEmpresaPolicy(empresaId, forceRefresh = false) {
     await new Promise((resolve) => setTimeout(resolve, 500));
     const retry = await supabase
       .from("empresas")
-      .select("id, plan, plan_actual, activo, activa")
+      .select("id, plan, plan_actual, activo, activa, deuda_actual, mostrar_anuncio_impago")
       .eq("id", empresaId)
       .maybeSingle();
     if (!retry?.error && retry?.data) {
@@ -68,11 +128,17 @@ export async function getEmpresaPolicy(empresaId, forceRefresh = false) {
   }
 
 
+  const billingState = resolveBillingReadOnlyState(await getLatestBillingCycle(empresaId), data);
+
   const policy = {
     empresa_id: empresaId,
     plan: normalizePlan(data),
     activa: normalizeActiva(data),
-    solo_lectura: isEmpresaReadOnlyPlan(data)
+    suspendida_por_facturacion: billingState.suspendida_por_facturacion,
+    solo_lectura_plan: isEmpresaReadOnlyPlan(data),
+    solo_lectura_por_facturacion: billingState.solo_lectura_por_facturacion,
+    solo_lectura: isEmpresaReadOnlyPlan(data) || billingState.solo_lectura_por_facturacion,
+    motivo_solo_lectura: isEmpresaReadOnlyPlan(data) ? "plan_free" : billingState.motivo
   };
 
   empresaPolicyCache.set(empresaId, policy);
