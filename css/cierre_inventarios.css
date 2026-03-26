@@ -31,6 +31,31 @@
   overflow-x: auto;
 }
 
+.detalles-adicionales-toggle {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.detalles-adicionales-toggle label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detalles-adicionales-config {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.detalles-adicionales-config select {
+  width: 120px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

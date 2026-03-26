@@ -63,6 +63,43 @@
       </div>
     </section>
 
+    <section class="bloque">
+      <h2>Detalles adicionales</h2>
+      <div class="detalles-adicionales-toggle">
+        <span>¿Registrar inconsistencias?</span>
+        <label>
+          <input type="radio" name="detallesAdicionales" id="detallesAdicionalesNo" value="no" checked>
+          No
+        </label>
+        <label>
+          <input type="radio" name="detallesAdicionales" id="detallesAdicionalesSi" value="si">
+          Sí
+        </label>
+      </div>
+
+      <div id="detallesAdicionalesConfig" class="detalles-adicionales-config is-hidden">
+        <label for="cantidadInconsistencias">
+          ¿Cuántos productos tienen una inconsistencia?
+        </label>
+        <select id="cantidadInconsistencias">
+          <option value="0">0</option>
+        </select>
+      </div>
+
+      <div id="inconsistenciasWrap" class="tabla-wrap is-hidden">
+        <table>
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Responsable</th>
+              <th>Unidades faltantes</th>
+            </tr>
+          </thead>
+          <tbody id="inconsistenciasBody"></tbody>
+        </table>
+      </div>
+    </section>
+
     <section class="bloque acciones-cierre">
       <button id="consultar">Consultar Loggro</button>
       <button id="verificar" disabled>Verificar</button>
