@@ -378,7 +378,11 @@ const collectInconsistencias = () => {
   return rows.map((row) => ({
     producto_id: row.querySelector(".inconsistencia-producto")?.value || "",
     responsable_id: row.querySelector(".inconsistencia-responsable")?.value || "",
-    unidades_faltantes: Number(row.querySelector(".inconsistencia-faltantes")?.value || 0)
+    unidades_faltantes: Number(row.querySelector(".inconsistencia-faltantes")?.value || 0),
+    producto_nombre:
+      row.querySelector(".inconsistencia-producto")?.selectedOptions?.[0]?.textContent || "",
+    responsable_nombre:
+      row.querySelector(".inconsistencia-responsable")?.selectedOptions?.[0]?.textContent || ""
   }));
 };
 
@@ -898,9 +902,14 @@ btnSubir.addEventListener("click", async () => {
 
 
 const descargarImagenInventario = () => {
+  if (!verified) {
+    setStatus("Primero verifica el cierre antes de descargar la constancia.");
+    return;
+  }
+
   const canvas = document.createElement("canvas");
   canvas.width = 1080;
-  canvas.height = 1920;
+  canvas.height = 2200;
   const ctx = canvas.getContext("2d");
   if (!ctx) {
     setStatus("No se pudo generar la imagen del cierre inventarios.");
@@ -991,6 +1000,56 @@ const descargarImagenInventario = () => {
       y += rowH;
     });
 
+  y += 30;
+  const detallesActivos = isDetallesAdicionalesEnabled();
+  const inconsistencias = collectInconsistencias();
+  const detallesTitulo = detallesActivos && inconsistencias.length
+    ? "Detalles adicionales: hubo inconsistencias"
+    : "Detalles adicionales: no hubo inconsistencias";
+  ctx.fillStyle = "#1e3a8a";
+  ctx.font = "bold 24px Arial";
+  ctx.fillText(detallesTitulo, cardX + 36, y);
+  y += 24;
+
+  if (detallesActivos && inconsistencias.length) {
+    y += 14;
+    const detalleCols = [0.45, 0.35, 0.20].map((ratio) => Math.floor(tableW * ratio));
+    const drawDetalleRow = (rowY, values, header = false) => {
+      let x = tableX;
+      ctx.fillStyle = header ? "#dbeafe" : "#ffffff";
+      ctx.strokeStyle = "#bfdbfe";
+      ctx.fillRect(tableX, rowY, tableW, rowH);
+      ctx.strokeRect(tableX, rowY, tableW, rowH);
+
+      values.forEach((value, index) => {
+        if (index > 0) {
+          ctx.beginPath();
+          ctx.moveTo(x, rowY);
+          ctx.lineTo(x, rowY + rowH);
+          ctx.stroke();
+        }
+        ctx.fillStyle = "#1f2937";
+        ctx.font = header ? "bold 18px Arial" : "17px Arial";
+        ctx.fillText(String(value), x + 8, rowY + 25);
+        x += detalleCols[index];
+      });
+    };
+
+    drawDetalleRow(y, ["Producto", "Responsable", "Unidades faltantes"], true);
+    y += rowH;
+    inconsistencias.forEach((item) => {
+      drawDetalleRow(
+        y,
+        [
+          item.producto_nombre || item.producto_id || "-",
+          item.responsable_nombre || item.responsable_id || "-",
+          item.unidades_faltantes || 0
+        ]
+      );
+      y += rowH;
+    });
+  }
+
   const selloY = cardY + cardH - 30;
   ctx.textAlign = "center";
   ctx.fillStyle = "#4338ca";
@@ -1006,6 +1065,9 @@ const descargarImagenInventario = () => {
 
   resumenDescargado = true;
   aplicarBloqueoConstancia(true);
+  if (verified && empresaPolicy?.solo_lectura !== true) {
+    btnSubir.disabled = false;
+  }
   setStatus("Imagen del cierre inventarios descargada. Campos bloqueados hasta corregir o subir.");
 };
 

@@ -90,6 +90,16 @@ input[readonly] {
   margin-top: 10px;
 }
 
+.acciones-cierre-top {
+  position: sticky;
+  top: 74px;
+  z-index: 40;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+}
+
 .acciones-cierre button {
   flex: 1 1 180px;
   max-width: 220px;
