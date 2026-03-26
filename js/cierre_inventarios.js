@@ -6,7 +6,6 @@ import {
   WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS,
   WEBHOOK_CIERRE_INVENTARIOS_CONSULTAR,
   WEBHOOK_CIERRE_INVENTARIOS_SUBIR,
-  WEBHOOK_LISTAR_RESPONSABLES,
   WEBHOOK_ALERTA_MANIPULACION_CIERRE
 } from "../js/webhooks.js";
 
@@ -15,8 +14,14 @@ const responsable = document.getElementById("responsable");
 const horaInicio = document.getElementById("hora_inicio");
 const horaFin = document.getElementById("hora_fin");
 const inventarioBody = document.getElementById("inventarioBody");
+const inconsistenciasBody = document.getElementById("inconsistenciasBody");
 const status = document.getElementById("status");
 const loadingOverlay = document.getElementById("loadingOverlay");
+const detallesAdicionalesNo = document.getElementById("detallesAdicionalesNo");
+const detallesAdicionalesSi = document.getElementById("detallesAdicionalesSi");
+const detallesAdicionalesConfig = document.getElementById("detallesAdicionalesConfig");
+const cantidadInconsistencias = document.getElementById("cantidadInconsistencias");
+const inconsistenciasWrap = document.getElementById("inconsistenciasWrap");
 
 const btnConsultar = document.getElementById("consultar");
 const btnVerificar = document.getElementById("verificar");
@@ -33,6 +38,7 @@ let loadingSafetyTimeoutId = null;
 let nombreEmpresaActual = "";
 let resumenDescargado = false;
 let bloqueoConstanciaActivo = false;
+let responsablesCache = [];
 
 const setStatus = (message) => {
   status.textContent = message;
@@ -312,6 +318,130 @@ const setButtonState = ({ consultar, verificar, subir }) => {
   if (typeof subir === "boolean") btnSubir.disabled = !subir;
 };
 
+const isDetallesAdicionalesEnabled = () => Boolean(detallesAdicionalesSi?.checked);
+
+const getMaxInconsistencias = () => Math.max(0, productRows.size);
+
+const syncCantidadInconsistenciasOptions = () => {
+  if (!cantidadInconsistencias) return;
+  const max = getMaxInconsistencias();
+  const currentValue = Number(cantidadInconsistencias.value || 0);
+
+  cantidadInconsistencias.innerHTML = "";
+  for (let i = 0; i <= max; i += 1) {
+    const option = document.createElement("option");
+    option.value = String(i);
+    option.textContent = String(i);
+    cantidadInconsistencias.appendChild(option);
+  }
+  cantidadInconsistencias.value = String(Math.min(currentValue, max));
+};
+
+const buildResponsableOptions = (selectedValue = "") => {
+  const fragment = document.createDocumentFragment();
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Seleccione responsable";
+  fragment.appendChild(placeholder);
+
+  responsablesCache.forEach((item) => {
+    const option = document.createElement("option");
+    option.value = item.id ?? "";
+    option.textContent = item.nombre_completo ?? item.id ?? option.value;
+    if (option.value === selectedValue) option.selected = true;
+    fragment.appendChild(option);
+  });
+
+  return fragment;
+};
+
+const buildProductoOptions = (selectedValue = "") => {
+  const fragment = document.createDocumentFragment();
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Seleccione producto";
+  fragment.appendChild(placeholder);
+
+  productRows.forEach((rowData, productId) => {
+    const option = document.createElement("option");
+    option.value = productId;
+    option.textContent = rowData.nombre;
+    if (option.value === selectedValue) option.selected = true;
+    fragment.appendChild(option);
+  });
+
+  return fragment;
+};
+
+const collectInconsistencias = () => {
+  const rows = Array.from(inconsistenciasBody?.querySelectorAll("tr") || []);
+  return rows.map((row) => ({
+    producto_id: row.querySelector(".inconsistencia-producto")?.value || "",
+    responsable_id: row.querySelector(".inconsistencia-responsable")?.value || "",
+    unidades_faltantes: Number(row.querySelector(".inconsistencia-faltantes")?.value || 0)
+  }));
+};
+
+const renderInconsistenciasRows = () => {
+  if (!inconsistenciasBody) return;
+  const isEnabled = isDetallesAdicionalesEnabled();
+  const count = isEnabled ? Number(cantidadInconsistencias?.value || 0) : 0;
+  inconsistenciasBody.innerHTML = "";
+
+  if (!isEnabled || count <= 0) {
+    inconsistenciasWrap?.classList.add("is-hidden");
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+
+  for (let i = 0; i < count; i += 1) {
+    const tr = document.createElement("tr");
+
+    const productoCell = document.createElement("td");
+    const productoSelect = document.createElement("select");
+    productoSelect.className = "inconsistencia-producto";
+    productoSelect.appendChild(buildProductoOptions());
+    productoCell.appendChild(productoSelect);
+    tr.appendChild(productoCell);
+
+    const responsableCell = document.createElement("td");
+    const responsableSelect = document.createElement("select");
+    responsableSelect.className = "inconsistencia-responsable";
+    responsableSelect.appendChild(buildResponsableOptions());
+    responsableCell.appendChild(responsableSelect);
+    tr.appendChild(responsableCell);
+
+    const faltantesCell = document.createElement("td");
+    const faltantesInput = document.createElement("input");
+    faltantesInput.type = "text";
+    faltantesInput.className = "inconsistencia-faltantes";
+    faltantesInput.placeholder = "0";
+    enforceNumericInput([faltantesInput]);
+    faltantesCell.appendChild(faltantesInput);
+    tr.appendChild(faltantesCell);
+
+    [productoSelect, responsableSelect, faltantesInput].forEach((element) => {
+      element.addEventListener("change", resetVerification);
+      element.addEventListener("input", resetVerification);
+    });
+
+    fragment.appendChild(tr);
+  }
+
+  inconsistenciasBody.appendChild(fragment);
+  inconsistenciasWrap?.classList.remove("is-hidden");
+};
+
+const toggleDetallesAdicionales = (enabled) => {
+  detallesAdicionalesConfig?.classList.toggle("is-hidden", !enabled);
+  if (!enabled && cantidadInconsistencias) {
+    cantidadInconsistencias.value = "0";
+  }
+  renderInconsistenciasRows();
+  resetVerification();
+};
+
 const aplicarPoliticaSoloLectura = () => {
   const isReadOnly = empresaPolicy?.solo_lectura === true;
   const blockedByBilling = empresaPolicy?.motivo_solo_lectura === "facturacion_suspendida";
@@ -381,7 +511,10 @@ const aplicarBloqueoConstancia = (activo) => {
     fecha,
     responsable,
     horaInicio,
-    horaFin
+    horaFin,
+    detallesAdicionalesNo,
+    detallesAdicionalesSi,
+    cantidadInconsistencias
   ].filter(Boolean);
 
   controlesBloqueables.forEach((control) => {
@@ -390,6 +523,9 @@ const aplicarBloqueoConstancia = (activo) => {
 
   productRows.forEach((rowData) => {
     rowData.gastadoInput.disabled = activo;
+  });
+  inconsistenciasBody?.querySelectorAll("select, input").forEach((element) => {
+    element.disabled = activo;
   });
 
   correccionWrap?.classList.toggle("is-hidden", !activo);
@@ -427,7 +563,10 @@ const buildBasePayload = async () => {
     fecha: fecha.value,
     hora_inicio: horaInicio.value,
     hora_fin: horaFin.value,
-    responsable_id: responsable.value
+    responsable_id: responsable.value,
+    responsable_turno_id: responsable.value,
+    responsable_login_id: contextPayload.usuario_id || "",
+    registrado_por: contextPayload.usuario_id || ""
   };
 };
 
@@ -447,6 +586,7 @@ const loadResponsables = async () => {
       .eq("activo", true)
       .order("nombre_completo", { ascending: true });
     const responsables = error ? [] : (Array.isArray(data) ? data : []);
+    responsablesCache = responsables;
 
     responsable.innerHTML = '<option value="">Seleccione responsable</option>';
     responsables.forEach((item) => {
@@ -455,6 +595,7 @@ const loadResponsables = async () => {
       option.textContent = item.nombre_completo ?? item.id ?? option.value;
       responsable.appendChild(option);
     });
+    renderInconsistenciasRows();
   } catch (error) {
     setStatus("No se pudieron cargar responsables.");
   }
@@ -560,6 +701,8 @@ const renderProducts = async () => {
 
     setStatus("Construyendo tabla de productos...");
     renderProductRows(productosVisibles);
+    syncCantidadInconsistenciasOptions();
+    renderInconsistenciasRows();
 
     setStatus(productRows.size ? "Productos cargados." : "No hay productos para mostrar.");
   } catch (error) {
@@ -583,6 +726,21 @@ const validateRequiredFields = () => {
     setStatus("Atención: No hay productos cargados para operar.");
     return false;
   }
+  if (isDetallesAdicionalesEnabled()) {
+    const inconsistencias = collectInconsistencias();
+    const configuredCount = Number(cantidadInconsistencias?.value || 0);
+    if (configuredCount !== inconsistencias.length) {
+      setStatus("Atención: Actualiza la cantidad de inconsistencias y completa la tabla.");
+      return false;
+    }
+
+    for (const item of inconsistencias) {
+      if (!item.producto_id || !item.responsable_id || item.unidades_faltantes <= 0) {
+        setStatus("Atención: Completa producto, responsable y unidades faltantes (mayor a 0) en inconsistencias.");
+        return false;
+      }
+    }
+  }
   return true;
 };
 
@@ -603,6 +761,9 @@ btnConsultar.addEventListener("click", async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...payload,
+        detalles_adicionales: isDetallesAdicionalesEnabled(),
+        cantidad_inconsistencias: Number(cantidadInconsistencias?.value || 0),
+        inconsistencias: collectInconsistencias(),
         items: readRowsForWebhook()
       })
     });
@@ -706,6 +867,9 @@ btnSubir.addEventListener("click", async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...payload,
+        detalles_adicionales: isDetallesAdicionalesEnabled(),
+        cantidad_inconsistencias: Number(cantidadInconsistencias?.value || 0),
+        inconsistencias: collectInconsistencias(),
         items: readRowsForWebhook()
       })
     });
@@ -893,6 +1057,8 @@ btnLimpiar.addEventListener("click", () => {
   });
   resetVerification();
   setButtonState({ verificar: false });
+  if (detallesAdicionalesNo) detallesAdicionalesNo.checked = true;
+  toggleDetallesAdicionales(false);
   setStatus("Datos limpiados.");
 });
 
@@ -900,9 +1066,22 @@ btnLimpiar.addEventListener("click", () => {
   element.addEventListener("change", resetVerification);
 });
 
+detallesAdicionalesNo?.addEventListener("change", () => {
+  if (detallesAdicionalesNo.checked) toggleDetallesAdicionales(false);
+});
+
+detallesAdicionalesSi?.addEventListener("change", () => {
+  if (detallesAdicionalesSi.checked) toggleDetallesAdicionales(true);
+});
+
+cantidadInconsistencias?.addEventListener("change", () => {
+  renderInconsistenciasRows();
+  resetVerification();
+});
+
 setButtonState({ consultar: true, verificar: false, subir: false });
 cargarPoliticaEmpresa();
 loadResponsables();
 renderProducts();
 cargarNombreEmpresa();
-
+toggleDetallesAdicionales(false);
