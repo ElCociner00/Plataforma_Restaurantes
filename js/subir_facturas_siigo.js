@@ -1,6 +1,6 @@
 import { getUserContext } from "./session.js";
+import { supabase } from "./supabase.js";
 import {
-  WEBHOOK_CARGAR_FACTURAS_CORREO,
   WEBHOOK_SUBIR_SIIGO
 } from "./webhooks.js";
 
@@ -36,7 +36,7 @@ const state = {
   selectedId: null,
   currentPage: 1,
   generalColumns: [
-    "numero_factura", "fecha_iso", "proveedor", "nit", "estado", "tipo_factura", "debitos", "creditos", "balance"
+    "numero_factura", "fecha_iso", "proveedor", "nit", "tipo_factura", "iva", "inc", "total", "estado_siigo"
   ],
   detailColumns: [
     "producto", "cantidad", "valor_unitario", "subtotal", "porcentaje_impuesto", "codigo_contable", "valor_debito", "valor_credito", "descripcion"
@@ -305,8 +305,131 @@ const fetchWebhookWithFallback = async (url, payload) => {
   }
 };
 
+const GENERAL_VIEW_COLUMNS = [
+  "UUID",
+  "Tipo de documento",
+  "Prefijo",
+  "Consecutivo",
+  "Fecha Emisión",
+  "NIT Emisor",
+  "Nombre Emisor",
+  "IVA",
+  "INC",
+  "Total",
+  "Estado_Siigo"
+];
+
+const DETAIL_TABLE_COLUMNS = [
+  "id",
+  "uuid_factura",
+  "Prefijo Factura",
+  "Consecutivo Factura",
+  "Proveedor",
+  "Dirección",
+  "Télefono",
+  "Correo Empresa",
+  "Producto",
+  "Valor Unitario",
+  "Cantidad",
+  "Subtotal",
+  "Porcentaje INC o IVA",
+  "Código Contable",
+  "Valor Débito",
+  "Valor Crédito",
+  "Descripción",
+  "Estado",
+  "Tipo de Factura",
+  "Fecha Factura",
+  "NIT_CC",
+  "Estado_Siigo"
+];
+
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const invoiceId = (row, idx) => `${row.numero_factura || "sin-numero"}-${idx}`;
+
+const safeNumber = (value) => {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : 0;
+};
+
+const normalizeDateString = (value) => {
+  if (!value) return "";
+  const normalized = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return normalized;
+  const dateObj = new Date(normalized);
+  if (Number.isNaN(dateObj.getTime())) return normalized;
+  return dateObj.toISOString().slice(0, 10);
+};
+
+const toSelectColumns = (columns = []) => columns
+  .map((column) => (column.match(/^[a-z_][a-z0-9_]*$/i) ? column : `"${column}"`))
+  .join(", ");
+
+const fetchFacturasGenerales = async () => {
+  const { data, error } = await supabase
+    .from("vista_facturas_agrupadas")
+    .select(toSelectColumns(GENERAL_VIEW_COLUMNS))
+    .order("Fecha Emisión", { ascending: false });
+
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+};
+
+const fetchFacturasDetalles = async (uuids = []) => {
+  if (!uuids.length) return [];
+  const { data, error } = await supabase
+    .from("facturas_empresas")
+    .select(toSelectColumns(DETAIL_TABLE_COLUMNS))
+    .in("uuid_factura", uuids)
+    .eq("empresa_id", state.context?.empresa_id)
+    .order("Fecha Factura", { ascending: false });
+
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+};
+
+const normalizeInvoiceDetail = (row = {}) => ({
+  id_unico: row.id || crypto.randomUUID(),
+  producto: row["Producto"] || "",
+  cantidad: row["Cantidad"] || "",
+  valor_unitario: row["Valor Unitario"] || "",
+  subtotal: row["Subtotal"] || "",
+  porcentaje_impuesto: row["Porcentaje INC o IVA"] || "",
+  codigo_contable: row["Código Contable"] || "",
+  valor_debito: row["Valor Débito"] || "",
+  valor_credito: row["Valor Crédito"] || "",
+  descripcion: row["Descripción"] || ""
+});
+
+const normalizeInvoiceGeneral = (row = {}, details = []) => {
+  const prefijo = row["Prefijo"] || "";
+  const consecutivo = row["Consecutivo"] || "";
+  const numeroFactura = `${prefijo}${consecutivo}`.trim();
+  const firstDetail = details[0] || {};
+  const estadoSiigo = normalizeBoolean(row["Estado_Siigo"]);
+
+  return {
+    factura_uuid: row["UUID"] || "",
+    numero_factura: numeroFactura || row["UUID"] || "-",
+    prefijo_factura: prefijo,
+    consecutivo_factura: consecutivo,
+    fecha_iso: normalizeDateString(row["Fecha Emisión"]),
+    proveedor: row["Nombre Emisor"] || "",
+    nit: row["NIT Emisor"] || "",
+    direccion: firstDetail["Dirección"] || "",
+    telefono: firstDetail["Télefono"] || "",
+    correo_empresa: firstDetail["Correo Empresa"] || "",
+    estado: firstDetail["Estado"] || "no_registrado",
+    tipo_factura: row["Tipo de documento"] || firstDetail["Tipo de Factura"] || "",
+    iva: safeNumber(row["IVA"]),
+    inc: safeNumber(row["INC"]),
+    total: safeNumber(row["Total"]),
+    estado_siigo: estadoSiigo ? "Subida" : "Pendiente",
+    total_items: details.length,
+    siigo_subido: estadoSiigo,
+    items: details.map(normalizeInvoiceDetail)
+  };
+};
 
 const detailRowWeight = (item) => {
   const name = String(item.producto || "").trim().toUpperCase();
@@ -838,13 +961,26 @@ const handleBulkLoad = async () => {
 };
 
 const loadFacturas = async () => {
-  setStatus("Consultando facturas del correo...");
-  const data = await fetchWebhookWithFallback(WEBHOOK_CARGAR_FACTURAS_CORREO, buildContextPayload());
-  const rows = normalizeRows(data).map((row, idx) => ({
-    ...row,
-    __id: invoiceId(row, idx),
-    siigo_subido: normalizeBoolean(row?.siigo_subido)
-  }));
+  setStatus("Consultando facturas en Supabase...");
+  const generales = await fetchFacturasGenerales();
+  const uuids = [...new Set(generales.map((row) => row.UUID).filter(Boolean))];
+  const detalles = await fetchFacturasDetalles(uuids);
+  const detailsByUuid = detalles.reduce((acc, item) => {
+    const key = String(item.uuid_factura || "").trim();
+    if (!key) return acc;
+    if (!acc.has(key)) acc.set(key, []);
+    acc.get(key).push(item);
+    return acc;
+  }, new Map());
+
+  const rows = generales.map((row, idx) => {
+    const uuid = String(row.UUID || "").trim();
+    const invoice = normalizeInvoiceGeneral(row, detailsByUuid.get(uuid) || []);
+    return {
+      ...invoice,
+      __id: invoiceId(invoice, idx)
+    };
+  });
 
   state.allRows = rows;
   state.filteredRows = rows;
@@ -857,8 +993,8 @@ const loadFacturas = async () => {
 };
 
 const init = async () => {
-  if (!WEBHOOK_CARGAR_FACTURAS_CORREO || !WEBHOOK_SUBIR_SIIGO) {
-    setStatus("Configuración de webhooks incompleta.");
+  if (!WEBHOOK_SUBIR_SIIGO) {
+    setStatus("Falta configurar el webhook de subida a Siigo.");
     return;
   }
 
@@ -872,8 +1008,9 @@ const init = async () => {
 
   try {
     await loadFacturas();
-  } catch {
-    setStatus("Error cargando facturas de correo.");
+  } catch (error) {
+    console.error("Error cargando facturas desde Supabase:", error);
+    setStatus("Error cargando facturas desde Supabase.");
   }
 };
 
