@@ -344,6 +344,24 @@ const DETAIL_TABLE_COLUMNS = [
   "Estado_Siigo"
 ];
 
+const DETAIL_TABLE_COLUMNS_FALLBACK = [
+  "id",
+  "uuid_factura",
+  "Producto",
+  "Valor Unitario",
+  "Cantidad",
+  "Subtotal",
+  "Porcentaje INC o IVA",
+  "Código Contable",
+  "Valor Débito",
+  "Valor Crédito",
+  "Estado",
+  "Tipo de Factura",
+  "Fecha Factura",
+  "NIT_CC",
+  "Estado_Siigo"
+];
+
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const invoiceId = (row, idx) => `${row.numero_factura || "sin-numero"}-${idx}`;
 
@@ -369,27 +387,41 @@ const fetchFacturasGenerales = async () => {
   const empresaId = state.context?.empresa_id;
   if (!empresaId) return [];
 
-  const { data, error } = await supabase
+  const baseQuery = supabase
     .from("vista_facturas_agrupadas")
     .select(toSelectColumns(GENERAL_VIEW_COLUMNS))
-    .eq("empresa_id", empresaId)
-    .order("Fecha Emisión", { ascending: false });
+    .eq("empresa_id", String(empresaId));
 
-  if (error) throw error;
-  return Array.isArray(data) ? data : [];
+  let response = await baseQuery.order("Fecha Emisión", { ascending: false });
+  if (response.error) {
+    // Fallback defensivo: algunas configuraciones PostgREST pueden fallar con order en columnas con espacios.
+    response = await baseQuery;
+  }
+
+  if (response.error) throw response.error;
+  return Array.isArray(response.data) ? response.data : [];
 };
 
 const fetchFacturasDetalles = async (uuids = []) => {
   if (!uuids.length) return [];
-  const { data, error } = await supabase
+  const empresaId = state.context?.empresa_id;
+  if (!empresaId) return [];
+
+  const runQuery = async (columns) => supabase
     .from("facturas_empresas")
-    .select(toSelectColumns(DETAIL_TABLE_COLUMNS))
+    .select(toSelectColumns(columns))
     .in("uuid_factura", uuids)
-    .eq("empresa_id", state.context?.empresa_id)
+    .eq("empresa_id", empresaId)
     .order("Fecha Factura", { ascending: false });
 
-  if (error) throw error;
-  return Array.isArray(data) ? data : [];
+  let response = await runQuery(DETAIL_TABLE_COLUMNS);
+  if (response.error) {
+    // Fallback si cambió el schema y faltan columnas opcionales (ej. Dirección, Télefono, Correo Empresa).
+    response = await runQuery(DETAIL_TABLE_COLUMNS_FALLBACK);
+  }
+
+  if (response.error) throw response.error;
+  return Array.isArray(response.data) ? response.data : [];
 };
 
 const normalizeInvoiceDetail = (row = {}) => ({
@@ -1014,7 +1046,7 @@ const init = async () => {
     await loadFacturas();
   } catch (error) {
     console.error("Error cargando facturas desde Supabase:", error);
-    setStatus("Error cargando facturas desde Supabase.");
+    setStatus(`Error cargando facturas desde Supabase: ${error?.message || "detalle no disponible"}`);
   }
 };
 
