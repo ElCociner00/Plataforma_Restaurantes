@@ -337,7 +337,6 @@ const DETAIL_TABLE_COLUMNS = [
   "Código Contable",
   "Valor Débito",
   "Valor Crédito",
-  "Descripción",
   "Estado",
   "Tipo de Factura",
   "Fecha Factura",
@@ -403,7 +402,7 @@ const normalizeInvoiceDetail = (row = {}) => ({
   codigo_contable: row["Código Contable"] || "",
   valor_debito: row["Valor Débito"] || "",
   valor_credito: row["Valor Crédito"] || "",
-  descripcion: row["Descripción"] || ""
+  descripcion: row["Descripción"] || row["Detalle"] || ""
 });
 
 const normalizeInvoiceGeneral = (row = {}, details = []) => {

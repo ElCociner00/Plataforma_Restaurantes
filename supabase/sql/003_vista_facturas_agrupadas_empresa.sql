@@ -1,10 +1,10 @@
--- Vista agrupada de facturas con aislamiento por empresa.
--- Ejecutar en Supabase SQL Editor para exponer empresa_id y permitir filtros por tenant.
+-- Vista agrupada de facturas compatible con el esquema actual.
+-- empresa_id se expone como text (max(empresa_id::text)) para filtrar por tenant desde frontend.
 
 create or replace view public.vista_facturas_agrupadas as
 select
-  empresa_id,
   uuid_factura as "UUID",
+  max(empresa_id::text) as empresa_id,
   max("Tipo de Factura") as "Tipo de documento",
   max("Prefijo Factura") as "Prefijo",
   max("Consecutivo Factura") as "Consecutivo",
@@ -45,5 +45,4 @@ where
   uuid_factura is not null
   and uuid_factura <> ''::text
 group by
-  empresa_id,
   uuid_factura;
