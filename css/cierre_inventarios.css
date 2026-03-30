@@ -31,6 +31,31 @@
   overflow-x: auto;
 }
 
+.detalles-adicionales-toggle {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.detalles-adicionales-toggle label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detalles-adicionales-config {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.detalles-adicionales-config select {
+  width: 120px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -63,6 +88,16 @@ input[readonly] {
   gap: 12px;
   flex-wrap: wrap;
   margin-top: 10px;
+}
+
+.acciones-cierre-top {
+  position: sticky;
+  top: 74px;
+  z-index: 40;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
 }
 
 .acciones-cierre button {
