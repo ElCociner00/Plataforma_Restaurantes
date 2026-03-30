@@ -306,6 +306,7 @@ const fetchWebhookWithFallback = async (url, payload) => {
 };
 
 const GENERAL_VIEW_COLUMNS = [
+  "empresa_id",
   "UUID",
   "Tipo de documento",
   "Prefijo",
@@ -366,9 +367,13 @@ const toSelectColumns = (columns = []) => columns
   .join(", ");
 
 const fetchFacturasGenerales = async () => {
+  const empresaId = state.context?.empresa_id;
+  if (!empresaId) return [];
+
   const { data, error } = await supabase
     .from("vista_facturas_agrupadas")
     .select(toSelectColumns(GENERAL_VIEW_COLUMNS))
+    .eq("empresa_id", empresaId)
     .order("Fecha Emisión", { ascending: false });
 
   if (error) throw error;
