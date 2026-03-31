@@ -1,7 +1,8 @@
 import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 import {
-  WEBHOOK_SUBIR_SIIGO
+  WEBHOOK_SUBIR_SIIGO,
+  WEBHOOK_CORREGIR_FACTURA_INCONVENIENTE
 } from "./webhooks.js";
 
 const head = document.getElementById("facturasHead");
@@ -9,6 +10,14 @@ const body = document.getElementById("facturasBody");
 const detalleFactura = document.getElementById("detalleFactura");
 const status = document.getElementById("status");
 const paginacion = document.getElementById("facturasPaginacion");
+const inconvenientesAviso = document.getElementById("inconvenientesAviso");
+const tabFacturasListas = document.getElementById("tabFacturasListas");
+const tabFacturasRevision = document.getElementById("tabFacturasRevision");
+const tabFacturasCorregidas = document.getElementById("tabFacturasCorregidas");
+const revisionDot = document.getElementById("revisionDot");
+const accionesCorreccionWrap = document.getElementById("accionesCorreccionWrap");
+const corregirFacturaActualBtn = document.getElementById("corregirFacturaActual");
+const corregirRegistrarProveedorBtn = document.getElementById("corregirRegistrarProveedor");
 
 const filtroFechaDesde = document.getElementById("filtroFechaDesde");
 const filtroFechaHasta = document.getElementById("filtroFechaHasta");
@@ -32,9 +41,13 @@ const FUZZY_THRESHOLD_NIT = 0.85;
 const state = {
   context: null,
   allRows: [],
+  readyRows: [],
+  reviewRows: [],
+  correctedRows: [],
   filteredRows: [],
   selectedId: null,
   currentPage: 1,
+  panelMode: "listas",
   generalColumns: [
     "numero_factura", "fecha_iso", "proveedor", "nit", "tipo_factura", "iva", "inc", "total", "estado_siigo"
   ],
@@ -362,6 +375,24 @@ const DETAIL_TABLE_COLUMNS_FALLBACK = [
   "Estado_Siigo"
 ];
 
+const INCONVENIENTES_TABLE_COLUMNS = [
+  "id",
+  "uuid_factura",
+  "Proveedor",
+  "Producto",
+  "Cantidad",
+  "Valor Unitario",
+  "Subtotal",
+  "Código Contable",
+  "Valor Débito",
+  "Valor Crédito",
+  "Estado",
+  "Tipo de Factura",
+  "Fecha Factura",
+  "NIT_CC",
+  "Estado_Resuelto"
+];
+
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const invoiceId = (row, idx) => `${row.numero_factura || "sin-numero"}-${idx}`;
 
@@ -424,20 +455,38 @@ const fetchFacturasDetalles = async (uuids = []) => {
   return Array.isArray(response.data) ? response.data : [];
 };
 
-const normalizeInvoiceDetail = (row = {}) => ({
+const fetchFacturasInconvenientes = async (resolved) => {
+  const empresaId = state.context?.empresa_id;
+  if (!empresaId) return [];
+
+  const { data, error } = await supabase
+    .from("facturas_empresas_inconvenientes")
+    .select(toSelectColumns(INCONVENIENTES_TABLE_COLUMNS))
+    .eq("empresa_id", empresaId)
+    .eq("Estado_Resuelto", resolved)
+    .order("Fecha Factura", { ascending: false });
+
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+};
+
+const normalizeInvoiceDetail = (row = {}, source = "principal") => ({
   id_unico: row.id || crypto.randomUUID(),
+  source,
+  editable_codigo: source !== "principal",
   producto: row["Producto"] || "",
   cantidad: row["Cantidad"] || "",
   valor_unitario: row["Valor Unitario"] || "",
   subtotal: row["Subtotal"] || "",
   porcentaje_impuesto: row["Porcentaje INC o IVA"] || "",
   codigo_contable: row["Código Contable"] || "",
+  codigo_contable_original: row["Código Contable"] || "",
   valor_debito: row["Valor Débito"] || "",
   valor_credito: row["Valor Crédito"] || "",
   descripcion: row["Descripción"] || row["Detalle"] || ""
 });
 
-const normalizeInvoiceGeneral = (row = {}, details = []) => {
+const normalizeInvoiceGeneral = (row = {}, details = [], inconvenientes = [], estadoRevision = "lista") => {
   const prefijo = row["Prefijo"] || "";
   const consecutivo = row["Consecutivo"] || "";
   const numeroFactura = `${prefijo}${consecutivo}`.trim();
@@ -463,7 +512,11 @@ const normalizeInvoiceGeneral = (row = {}, details = []) => {
     estado_siigo: estadoSiigo ? "Subida" : "Pendiente",
     total_items: details.length,
     siigo_subido: estadoSiigo,
-    items: details.map(normalizeInvoiceDetail)
+    estado_revision: estadoRevision,
+    items: [
+      ...details.map((item) => normalizeInvoiceDetail(item, "principal")),
+      ...inconvenientes.map((item) => normalizeInvoiceDetail(item, "inconveniente"))
+    ]
   };
 };
 
@@ -480,6 +533,37 @@ const baseSortDetails = (items = []) => [...items].sort((a, b) => detailRowWeigh
 const getPaginatedRows = () => {
   const start = (state.currentPage - 1) * PAGE_SIZE;
   return state.filteredRows.slice(start, start + PAGE_SIZE);
+};
+
+const getRowsByMode = () => {
+  if (state.panelMode === "revision") return state.reviewRows;
+  if (state.panelMode === "corregidas") return state.correctedRows;
+  return state.readyRows;
+};
+
+const renderPanelIndicators = () => {
+  const reviewCount = state.reviewRows.length;
+  revisionDot?.classList.toggle("hidden", reviewCount <= 0);
+
+  if (inconvenientesAviso) {
+    if (reviewCount > 0) {
+      inconvenientesAviso.classList.remove("hidden");
+      inconvenientesAviso.textContent = `Atención: hay ${reviewCount} factura(s) con inconvenientes para revisión.`;
+    } else {
+      inconvenientesAviso.classList.add("hidden");
+      inconvenientesAviso.textContent = "";
+    }
+  }
+
+  [
+    [tabFacturasListas, "listas"],
+    [tabFacturasRevision, "revision"],
+    [tabFacturasCorregidas, "corregidas"]
+  ].forEach(([button, mode]) => {
+    button?.classList.toggle("active", state.panelMode === mode);
+  });
+
+  accionesCorreccionWrap?.classList.toggle("hidden", state.panelMode !== "revision");
 };
 
 const getDetailsByInvoice = (invoice) => {
@@ -548,14 +632,14 @@ const bindInlineDetailDrag = () => {
 
 const buildDetailTableHtml = (invoiceIdValue) => {
   const items = getDetailsByInvoiceId(invoiceIdValue);
-  const detailHead = ["↕", ...state.detailColumns].map((col) => `<th>${toReadableLabel(col)}</th>`).join("");
+  const detailHead = ["↕", "origen", ...state.detailColumns].map((col) => `<th>${toReadableLabel(col)}</th>`).join("");
 
   if (!items.length) {
     return `
       <div class="inline-detail-wrap">
         <table class="inline-detail-table">
           <thead><tr>${detailHead}</tr></thead>
-          <tbody><tr><td colspan="${state.detailColumns.length + 1}">Sin items.</td></tr></tbody>
+          <tbody><tr><td colspan="${state.detailColumns.length + 2}">Sin items.</td></tr></tbody>
         </table>
       </div>
     `;
@@ -563,8 +647,14 @@ const buildDetailTableHtml = (invoiceIdValue) => {
 
   const detailRows = items.map((item, idx) => {
     const key = String(item.id_unico || `${item.producto}-${idx}`);
-    const cols = state.detailColumns.map((col) => `<td>${escapeHtml(format(item[col]))}</td>`).join("");
-    return `<tr draggable="true" data-detail-key="${escapeAttr(key)}"><td class="drag-col">⋮⋮</td>${cols}</tr>`;
+    const cols = state.detailColumns.map((col) => {
+      if (col === "codigo_contable" && item.editable_codigo && state.panelMode === "revision") {
+        return `<td><input data-codigo-edit="${escapeAttr(key)}" type="text" value="${escapeAttr(item[col] || "")}" placeholder="Código contable"></td>`;
+      }
+      return `<td>${escapeHtml(format(item[col]))}</td>`;
+    }).join("");
+    const origen = item.source === "inconveniente" ? "Inconveniente" : "Principal";
+    return `<tr draggable="true" data-detail-key="${escapeAttr(key)}"><td class="drag-col">⋮⋮</td><td>${origen}</td>${cols}</tr>`;
   }).join("");
 
   return `
@@ -579,8 +669,13 @@ const buildDetailTableHtml = (invoiceIdValue) => {
 
 const updateDetailStatusText = () => {
   const selected = state.allRows.find((row) => row.__id === state.selectedId);
+  const modeLabel = state.panelMode === "revision"
+    ? "revisión"
+    : state.panelMode === "corregidas"
+      ? "corregidas"
+      : "listas";
   detalleFactura.textContent = selected
-    ? `Detalle de ${format(selected.numero_factura)} visible debajo de la fila seleccionada.`
+    ? `Detalle de ${format(selected.numero_factura)} (${modeLabel}) visible debajo de la fila seleccionada.`
     : "Selecciona una factura para ver items debajo de su fila.";
 };
 
@@ -675,6 +770,7 @@ const enqueueSwitchUpdate = (row, checked) => {
 };
 
 const renderTable = () => {
+  const canToggleSiigo = state.panelMode === "listas";
   const headers = ["subir_siigo", ...state.generalColumns];
   head.innerHTML = `<tr>${headers.map((col) => {
     if (col === "subir_siigo") return '<th class="siigo-control-col">Siigo</th>';
@@ -696,7 +792,7 @@ const renderTable = () => {
     tdSwitch.innerHTML = `
       <div class="siigo-switch-wrap">
         <label class="switch" data-switch-label>
-          <input type="checkbox" ${isUploaded ? "checked" : ""}>
+          <input type="checkbox" ${isUploaded ? "checked" : ""} ${canToggleSiigo ? "" : "disabled"}>
           <span class="slider"></span>
         </label>
         <span class="siigo-state ${hasSyncError ? "is-error" : (isUploaded ? "is-on" : "is-off")}">${hasSyncError ? "Error al subir" : (isUploaded ? "Subida" : "Pendiente")}</span>
@@ -756,6 +852,7 @@ const renderTable = () => {
 
     const switchInput = tdSwitch.querySelector("input");
     switchInput?.addEventListener("change", async (event) => {
+      if (!canToggleSiigo) return;
       event.stopPropagation();
       const nextChecked = event.target.checked;
       const currentChecked = getInvoiceState(row);
@@ -806,13 +903,14 @@ const getFuzzyScore = (query, candidate, threshold, matcher = similarityScore) =
 };
 
 const applyFilters = () => {
+  const sourceRows = getRowsByMode();
   const desde = filtroFechaDesde.value;
   const hasta = filtroFechaHasta.value;
   const numero = filtroNumero.value.trim();
   const proveedor = filtroProveedor.value.trim().toLowerCase();
   const nit = filtroNit.value.trim();
 
-  const scoredRows = state.allRows.map((row) => {
+  const scoredRows = sourceRows.map((row) => {
     const fecha = String(row.fecha_iso || "");
     if (desde && fecha < desde) return null;
     if (hasta && fecha > hasta) return null;
@@ -844,6 +942,14 @@ const applyFilters = () => {
   state.currentPage = 1;
   renderTable();
   updateDetailStatusText();
+};
+
+const switchPanelMode = (mode) => {
+  state.panelMode = mode;
+  state.currentPage = 1;
+  state.selectedId = null;
+  renderPanelIndicators();
+  applyFilters();
 };
 
 const downloadFile = (content, filename, mimeType) => {
@@ -996,12 +1102,92 @@ const handleBulkLoad = async () => {
   setStatus(`Carga masiva finalizada. Facturas procesadas: ${pendingRows.length}.`);
 };
 
+const getSelectedInvoice = () => state.allRows.find((row) => row.__id === state.selectedId) || null;
+
+const buildCorreccionRows = (invoice) => {
+  const items = Array.isArray(invoice?.items) ? invoice.items : [];
+  return items
+    .filter((item) => item.source === "inconveniente")
+    .map((item) => ({
+      id: item.id_unico,
+      uuid_factura: invoice.factura_uuid,
+      proveedor: invoice.proveedor,
+      producto: item.producto,
+      codigo_contable_original: item.codigo_contable_original || "",
+      codigo_contable_corregido: String(item.codigo_contable || "").trim()
+    }))
+    .filter((item) => item.codigo_contable_corregido.length > 0);
+};
+
+const enviarCorreccionInconveniente = async (modo) => {
+  const invoice = getSelectedInvoice();
+  if (!invoice || state.panelMode !== "revision") {
+    setStatus("Selecciona una factura del panel de revisión.");
+    return;
+  }
+
+  const rows = buildCorreccionRows(invoice);
+  if (!rows.length) {
+    setStatus("No hay filas corregidas con código contable para enviar.");
+    return;
+  }
+
+  const payload = {
+    tenant_id: state.context?.empresa_id,
+    empresa_id: state.context?.empresa_id,
+    usuario_id: getResponsableId(),
+    rol: state.context?.rol,
+    timestamp: getTimestamp(),
+    accion: "corregir_inconveniente_factura",
+    tipo_correccion: modo,
+    uuid_factura: invoice.factura_uuid,
+    numero_factura: invoice.numero_factura,
+    proveedor: invoice.proveedor,
+    rows
+  };
+
+  try {
+    const response = await fetchWebhookSignal(WEBHOOK_CORREGIR_FACTURA_INCONVENIENTE, payload);
+    const ok = response?.ok !== false;
+    if (!ok) {
+      setStatus(response?.message || "No se pudo registrar la corrección.");
+      return;
+    }
+
+    state.reviewRows = state.reviewRows.filter((row) => row.__id !== invoice.__id);
+    state.correctedRows = [{ ...invoice, estado_revision: "corregida" }, ...state.correctedRows];
+    state.allRows = [...state.readyRows, ...state.reviewRows, ...state.correctedRows];
+    switchPanelMode("corregidas");
+    setStatus(response?.message || "Corrección aplicada y factura movida a corregidas.");
+  } catch (error) {
+    setStatus(`Error aplicando corrección: ${error?.message || "sin detalle"}`);
+  }
+};
+
 const loadFacturas = async () => {
   setStatus("Consultando facturas en Supabase...");
   const generales = await fetchFacturasGenerales();
   const uuids = [...new Set(generales.map((row) => row.UUID).filter(Boolean))];
   const detalles = await fetchFacturasDetalles(uuids);
+  const inconvenientesPendientes = await fetchFacturasInconvenientes(false);
+  const inconvenientesResueltos = await fetchFacturasInconvenientes(true);
   const detailsByUuid = detalles.reduce((acc, item) => {
+    const key = String(item.uuid_factura || "").trim();
+    if (!key) return acc;
+    if (!acc.has(key)) acc.set(key, []);
+    acc.get(key).push(item);
+    return acc;
+  }, new Map());
+
+  const pendingByUuid = inconvenientesPendientes.reduce((acc, item) => {
+    const key = String(item.uuid_factura || "").trim();
+    if (!key) return acc;
+    if (!acc.has(key)) acc.set(key, []);
+    acc.get(key).push(item);
+    return acc;
+  }, new Map());
+
+  const resolvedByUuid = inconvenientesResueltos.reduce((acc, item) => {
     const key = String(item.uuid_factura || "").trim();
     if (!key) return acc;
     if (!acc.has(key)) acc.set(key, []);
@@ -1011,21 +1197,35 @@ const loadFacturas = async () => {
 
   const rows = generales.map((row, idx) => {
     const uuid = String(row.UUID || "").trim();
-    const invoice = normalizeInvoiceGeneral(row, detailsByUuid.get(uuid) || []);
+    const hasPending = pendingByUuid.has(uuid);
+    const hasResolved = resolvedByUuid.has(uuid);
+    const invoice = normalizeInvoiceGeneral(
+      row,
+      detailsByUuid.get(uuid) || [],
+      pendingByUuid.get(uuid) || [],
+      hasPending ? "revision" : (hasResolved ? "corregida" : "lista")
+    );
     return {
       ...invoice,
       __id: invoiceId(invoice, idx)
     };
   });
 
-  state.allRows = rows;
-  state.filteredRows = rows;
-  state.selectedId = rows[0]?.__id || null;
+  state.readyRows = rows.filter((row) => row.estado_revision === "lista");
+  state.reviewRows = rows.filter((row) => row.estado_revision === "revision");
+  state.correctedRows = rows.filter((row) => row.estado_revision === "corregida");
+  state.allRows = [...state.readyRows, ...state.reviewRows, ...state.correctedRows];
+
+  state.filteredRows = getRowsByMode();
+  state.selectedId = state.filteredRows[0]?.__id || null;
   state.currentPage = 1;
 
+  renderPanelIndicators();
   renderTable();
   updateDetailStatusText();
-  setStatus(rows.length ? `Facturas cargadas: ${rows.length}` : "No hay facturas para mostrar.");
+  setStatus(rows.length
+    ? `Facturas cargadas: ${rows.length}. Listas: ${state.readyRows.length}, revisión: ${state.reviewRows.length}, corregidas: ${state.correctedRows.length}.`
+    : "No hay facturas para mostrar.");
 };
 
 const init = async () => {
@@ -1059,5 +1259,21 @@ btnLimpiarFiltros.addEventListener("click", () => {
 });
 btnDescargarFacturas?.addEventListener("click", handleDownload);
 btnCargarTodasFacturas?.addEventListener("click", handleBulkLoad);
+tabFacturasListas?.addEventListener("click", () => switchPanelMode("listas"));
+tabFacturasRevision?.addEventListener("click", () => switchPanelMode("revision"));
+tabFacturasCorregidas?.addEventListener("click", () => switchPanelMode("corregidas"));
+corregirFacturaActualBtn?.addEventListener("click", () => enviarCorreccionInconveniente("corregir_factura_actual"));
+corregirRegistrarProveedorBtn?.addEventListener("click", () => enviarCorreccionInconveniente("corregir_y_registrar_proveedor"));
+body?.addEventListener("input", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) return;
+  const key = target.dataset.codigoEdit;
+  if (!key) return;
+  const invoice = getSelectedInvoice();
+  if (!invoice) return;
+  const item = (invoice.items || []).find((row) => String(row.id_unico) === String(key));
+  if (!item) return;
+  item.codigo_contable = target.value;
+});
 
 init();

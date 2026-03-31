@@ -94,6 +94,10 @@ export const WEBHOOK_CARGAR_FACTURAS_CORREO =
 export const WEBHOOK_SUBIR_SIIGO =
   "https://n8n.globalnexoshop.com/webhook/subir_factura_siigo";
 
+// siigo/subir_facturas_siigo/index.html (corregir facturas en panel de revision)
+export const WEBHOOK_CORREGIR_FACTURA_INCONVENIENTE =
+  "https://n8n.globalnexoshop.com/webhook/corregir_factura_inconveniente";
+
 /**
  * WEBHOOKS CENTRALIZADOS
  * Instrucción: Para modificar URLs, cambiar SOLO aquí

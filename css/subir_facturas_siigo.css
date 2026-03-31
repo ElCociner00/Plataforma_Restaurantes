@@ -185,6 +185,54 @@ tr.selected {
   color: #374151;
 }
 
+.facturas-panel-switch {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 8px 0 10px;
+}
+
+.facturas-panel-switch button {
+  width: auto;
+  min-width: 0;
+  padding: 8px 12px;
+}
+
+.facturas-panel-switch button.active {
+  background: #312e81;
+}
+
+.revision-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #dc2626;
+  margin-left: 6px;
+}
+
+.inconvenientes-aviso {
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 8px;
+}
+
+.acciones-correccion-wrap {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.acciones-correccion-wrap button {
+  width: auto;
+  min-width: 0;
+  padding: 8px 10px;
+}
+
 .descarga-label {
   display: flex;
   flex-direction: column;
