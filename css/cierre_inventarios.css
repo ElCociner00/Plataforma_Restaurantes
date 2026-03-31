@@ -56,6 +56,12 @@
   width: 120px;
 }
 
+.inconsistencias-hint {
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

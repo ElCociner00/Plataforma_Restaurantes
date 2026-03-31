@@ -668,6 +668,7 @@ const buildDetailTableHtml = (invoiceIdValue) => {
 };
 
 const updateDetailStatusText = () => {
+  if (!detalleFactura) return;
   const selected = state.allRows.find((row) => row.__id === state.selectedId);
   const modeLabel = state.panelMode === "revision"
     ? "revisión"
@@ -783,6 +784,7 @@ const renderTable = () => {
 
   rows.forEach((row) => {
     const tr = document.createElement("tr");
+    tr.classList.add("invoice-row");
     tr.classList.toggle("selected", row.__id === state.selectedId);
 
     const isUploaded = getInvoiceState(row);
