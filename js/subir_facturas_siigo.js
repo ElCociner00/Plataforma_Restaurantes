@@ -52,7 +52,7 @@ const state = {
     "numero_factura", "fecha_iso", "proveedor", "nit", "tipo_factura", "iva", "inc", "total", "estado_siigo"
   ],
   detailColumns: [
-    "producto", "cantidad", "valor_unitario", "subtotal", "porcentaje_impuesto", "codigo_contable", "valor_debito", "valor_credito", "descripcion"
+    "producto", "cantidad", "valor_unitario", "subtotal", "valor_impuesto", "codigo_contable", "valor_debito", "valor_credito", "descripcion"
   ],
   detailOrderByInvoice: {},
   switchQueue: Promise.resolve(),
@@ -478,7 +478,7 @@ const normalizeInvoiceDetail = (row = {}, source = "principal") => ({
   cantidad: row["Cantidad"] || "",
   valor_unitario: row["Valor Unitario"] || "",
   subtotal: row["Subtotal"] || "",
-  porcentaje_impuesto: row["Porcentaje INC o IVA"] || "",
+  valor_impuesto: row["Porcentaje INC o IVA"] || "",
   codigo_contable: row["Código Contable"] || "",
   codigo_contable_original: row["Código Contable"] || "",
   valor_debito: row["Valor Débito"] || "",
@@ -668,6 +668,7 @@ const buildDetailTableHtml = (invoiceIdValue) => {
 };
 
 const updateDetailStatusText = () => {
+  if (!detalleFactura) return;
   const selected = state.allRows.find((row) => row.__id === state.selectedId);
   const modeLabel = state.panelMode === "revision"
     ? "revisión"
@@ -733,6 +734,10 @@ const runSwitchUpdate = async (row, checked) => {
     subir_siigo: checked,
     ok: checked,
     numero_factura: row.numero_factura,
+    fecha_factura: row.fecha_iso || null,
+    uuid_factura: row.factura_uuid || null,
+    prefijo_factura: row.prefijo_factura || null,
+    consecutivo_factura: row.consecutivo_factura || null,
     factura_id: row.factura_id || row.id || row.__id,
     nit: row.nit || null,
     proveedor: row.proveedor || null,
@@ -783,6 +788,7 @@ const renderTable = () => {
 
   rows.forEach((row) => {
     const tr = document.createElement("tr");
+    tr.classList.add("invoice-row");
     tr.classList.toggle("selected", row.__id === state.selectedId);
 
     const isUploaded = getInvoiceState(row);
@@ -995,7 +1001,7 @@ const buildUnifiedRows = (rows) => {
       detalle_cantidad: item.cantidad,
       detalle_valor_unitario: item.valor_unitario,
       detalle_subtotal: item.subtotal,
-      detalle_porcentaje_impuesto: item.porcentaje_impuesto,
+      detalle_valor_impuesto: item.valor_impuesto,
       detalle_codigo_contable: item.codigo_contable,
       detalle_valor_debito: item.valor_debito,
       detalle_valor_credito: item.valor_credito,

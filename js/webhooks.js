@@ -98,6 +98,14 @@ export const WEBHOOK_SUBIR_SIIGO =
 export const WEBHOOK_CORREGIR_FACTURA_INCONVENIENTE =
   "https://n8n.globalnexoshop.com/webhook/corregir_factura_inconveniente";
 
+// siigo/configuracion_siigo/proveedores_siigo.html (listar proveedores del tenant)
+export const WEBHOOK_SIIGO_PROVEEDORES_LISTAR =
+  "https://n8n.globalnexoshop.com/webhook/siigo_proveedores_listar";
+
+// siigo/configuracion_siigo/proveedores_siigo.html (registrar nuevo proveedor)
+export const WEBHOOK_SIIGO_PROVEEDORES_REGISTRAR =
+  "https://n8n.globalnexoshop.com/webhook/siigo_proveedores_registrar";
+
 /**
  * WEBHOOKS CENTRALIZADOS
  * Instrucción: Para modificar URLs, cambiar SOLO aquí
