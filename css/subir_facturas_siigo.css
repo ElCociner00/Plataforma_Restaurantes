@@ -102,7 +102,13 @@ th.dragging {
 }
 
 tr.selected {
-  background: #f5f3ff;
+  background: #ede9fe;
+  outline: 2px solid #7c3aed;
+  outline-offset: -2px;
+}
+
+tr.invoice-row:not(.selected) {
+  background: #ffffff;
 }
 
 .fecha-col {
@@ -163,11 +169,16 @@ tr.selected {
 .detail-inline-row td {
   padding: 0;
   border-bottom: 1px solid #ddd6fe;
+  background: #f8faff;
+}
+
+.detail-inline-row {
+  border-left: 4px solid #93c5fd;
 }
 
 .inline-detail-wrap {
   padding: 10px;
-  background: #fcfbff;
+  background: #f8faff;
 }
 
 .inline-detail-table {
@@ -218,19 +229,34 @@ tr.selected {
   border-radius: 10px;
   padding: 10px;
   margin-bottom: 8px;
+  text-align: center;
+  font-weight: 600;
 }
 
 .acciones-correccion-wrap {
-  margin-top: 10px;
+  margin: 8px 0 12px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  justify-content: center;
+  position: sticky;
+  top: 78px;
+  z-index: 21;
+  background: #ffffffeb;
+  padding: 8px;
+  border: 1px solid #e9d5ff;
+  border-radius: 10px;
 }
 
 .acciones-correccion-wrap button {
   width: auto;
   min-width: 0;
-  padding: 8px 10px;
+  padding: 9px 14px;
+  font-weight: 600;
+}
+
+.hidden {
+  display: none !important;
 }
 
 .descarga-label {
