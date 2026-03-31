@@ -73,23 +73,23 @@ const renderRows = (rows) => {
 
   proveedoresBody.innerHTML = rows.map((row) => `
     <tr>
-      <td>${escapeHtml(row.nit || "-")}</td>
-      <td>${escapeHtml(row.tipo || "-")}</td>
-      <td>${escapeHtml(row.proveedor || "-")}</td>
-      <td>${escapeHtml(row.codigo_contable || "-")}</td>
-      <td>${escapeHtml(row.nombre || "-")}</td>
+      <td class="col-nit">${escapeHtml(row.nit || "-")}</td>
+      <td class="col-tipo">${escapeHtml(row.tipo || "-")}</td>
+      <td class="col-proveedor">${escapeHtml(row.proveedor || "-")}</td>
+      <td class="col-codigo">${escapeHtml(row.codigo_contable || "-")}</td>
+      <td class="col-nombre">${escapeHtml(row.nombre || "-")}</td>
     </tr>
   `).join("");
 };
 
-const cargarProveedores = async () => {
+const cargarProveedores = async ({ silent = false } = {}) => {
   const context = await buildContextPayload();
   if (!context) {
     setStatus("No se pudo validar sesión.");
     return;
   }
 
-  setStatus("Consultando proveedores...");
+  if (!silent) setStatus("Consultando proveedores...");
 
   try {
     const res = await fetch(WEBHOOK_SIIGO_PROVEEDORES_LISTAR, {
@@ -109,7 +109,7 @@ const cargarProveedores = async () => {
 
     const rows = normalizeList(data).map(mapProveedorRow);
     renderRows(rows);
-    setStatus(`Proveedores cargados: ${rows.length}.`);
+    if (!silent) setStatus(`Proveedores cargados: ${rows.length}.`);
   } catch (error) {
     setStatus(`Error consultando proveedores: ${error?.message || "sin detalle"}.`);
   }
@@ -181,8 +181,11 @@ const registrarNuevoProveedor = async () => {
       return;
     }
 
-    setStatus(data?.message || "Nuevo proveedor registrado correctamente.");
-    await cargarProveedores();
+    const successLabel = typeof data === "boolean"
+      ? String(data)
+      : (typeof data?.ok === "boolean" ? String(data.ok) : "true");
+    setStatus(data?.message || `Nuevo proveedor registrado (${successLabel}).`);
+    await cargarProveedores({ silent: true });
   } catch (error) {
     setStatus(`Error registrando proveedor: ${error?.message || "sin detalle"}.`);
   } finally {
@@ -191,7 +194,7 @@ const registrarNuevoProveedor = async () => {
 };
 
 enforceNumericInput([nitProveedor, codigoContable]);
-recargarProveedores?.addEventListener("click", cargarProveedores);
+recargarProveedores?.addEventListener("click", () => cargarProveedores());
 registrarProveedor?.addEventListener("click", registrarNuevoProveedor);
 codigoEspecial?.addEventListener("change", applyDefaultsByCodigoEspecial);
 tipoProveedor?.addEventListener("input", () => {
