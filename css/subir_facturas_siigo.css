@@ -102,7 +102,13 @@ th.dragging {
 }
 
 tr.selected {
-  background: #f5f3ff;
+  background: #ede9fe;
+  outline: 2px solid #7c3aed;
+  outline-offset: -2px;
+}
+
+tr.invoice-row:not(.selected) {
+  background: #ffffff;
 }
 
 .fecha-col {
@@ -163,11 +169,16 @@ tr.selected {
 .detail-inline-row td {
   padding: 0;
   border-bottom: 1px solid #ddd6fe;
+  background: #f8faff;
+}
+
+.detail-inline-row {
+  border-left: 4px solid #93c5fd;
 }
 
 .inline-detail-wrap {
   padding: 10px;
-  background: #fcfbff;
+  background: #f8faff;
 }
 
 .inline-detail-table {
