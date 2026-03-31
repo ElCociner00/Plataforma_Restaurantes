@@ -164,9 +164,35 @@ export async function getPermisosEfectivos(usuarioId, empresaId, forceRefresh = 
     .eq("usuario_id", usuarioId)
     .eq("empresa_id", empresaId);
 
-  if (error) throw error;
+  let permisos = data || [];
 
-  const permisos = data || [];
+  if (error || !permisos.length) {
+    const context = await getUserContext().catch(() => null);
+    let rol = String(context?.rol || "").trim().toLowerCase();
+
+    if (!rol) {
+      const roleLookup = await supabase
+        .from("usuarios_sistema")
+        .select("rol")
+        .eq("id", usuarioId)
+        .maybeSingle();
+      if (!roleLookup?.error && roleLookup?.data?.rol) {
+        rol = String(roleLookup.data.rol).trim().toLowerCase();
+      }
+    }
+
+    if (rol) {
+      const fallback = await supabase
+        .from("roles_permisos_modulo")
+        .select("modulo, permitido")
+        .eq("rol", rol);
+      if (!fallback?.error && Array.isArray(fallback?.data) && fallback.data.length) {
+        permisos = fallback.data;
+      }
+    }
+  }
+
+  if (error && !permisos.length) throw error;
   permisosCacheSet(permisos);
   permisosCacheKey = cacheKey;
 
@@ -242,4 +268,3 @@ export async function esSuperAdmin() {
   superAdminCache.set(cacheKey, false);
   return false;
 }
-
