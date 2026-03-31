@@ -22,6 +22,7 @@ const detallesAdicionalesSi = document.getElementById("detallesAdicionalesSi");
 const detallesAdicionalesConfig = document.getElementById("detallesAdicionalesConfig");
 const cantidadInconsistencias = document.getElementById("cantidadInconsistencias");
 const inconsistenciasWrap = document.getElementById("inconsistenciasWrap");
+const inconsistenciasHint = document.getElementById("inconsistenciasHint");
 
 const btnConsultar = document.getElementById("consultar");
 const btnVerificar = document.getElementById("verificar");
@@ -39,6 +40,7 @@ let nombreEmpresaActual = "";
 let resumenDescargado = false;
 let bloqueoConstanciaActivo = false;
 let responsablesCache = [];
+let inconsistenciasDraft = [];
 
 const setStatus = (message) => {
   status.textContent = message;
@@ -386,11 +388,18 @@ const collectInconsistencias = () => {
   }));
 };
 
+const saveInconsistenciasDraft = () => {
+  inconsistenciasDraft = collectInconsistencias();
+};
+
 const renderInconsistenciasRows = () => {
   if (!inconsistenciasBody) return;
+  saveInconsistenciasDraft();
+
   const isEnabled = isDetallesAdicionalesEnabled();
   const count = isEnabled ? Number(cantidadInconsistencias?.value || 0) : 0;
   inconsistenciasBody.innerHTML = "";
+  inconsistenciasHint?.classList.toggle("is-hidden", !isEnabled || count <= 0);
 
   if (!isEnabled || count <= 0) {
     inconsistenciasWrap?.classList.add("is-hidden");
@@ -405,14 +414,14 @@ const renderInconsistenciasRows = () => {
     const productoCell = document.createElement("td");
     const productoSelect = document.createElement("select");
     productoSelect.className = "inconsistencia-producto";
-    productoSelect.appendChild(buildProductoOptions());
+    productoSelect.appendChild(buildProductoOptions(inconsistenciasDraft[i]?.producto_id || ""));
     productoCell.appendChild(productoSelect);
     tr.appendChild(productoCell);
 
     const responsableCell = document.createElement("td");
     const responsableSelect = document.createElement("select");
     responsableSelect.className = "inconsistencia-responsable";
-    responsableSelect.appendChild(buildResponsableOptions());
+    responsableSelect.appendChild(buildResponsableOptions(inconsistenciasDraft[i]?.responsable_id || ""));
     responsableCell.appendChild(responsableSelect);
     tr.appendChild(responsableCell);
 
@@ -421,6 +430,7 @@ const renderInconsistenciasRows = () => {
     faltantesInput.type = "text";
     faltantesInput.className = "inconsistencia-faltantes";
     faltantesInput.placeholder = "0";
+    faltantesInput.value = String(inconsistenciasDraft[i]?.unidades_faltantes || "");
     enforceNumericInput([faltantesInput]);
     faltantesCell.appendChild(faltantesInput);
     tr.appendChild(faltantesCell);
@@ -439,8 +449,10 @@ const renderInconsistenciasRows = () => {
 
 const toggleDetallesAdicionales = (enabled) => {
   detallesAdicionalesConfig?.classList.toggle("is-hidden", !enabled);
+  inconsistenciasHint?.classList.toggle("is-hidden", !enabled);
   if (!enabled && cantidadInconsistencias) {
     cantidadInconsistencias.value = "0";
+    inconsistenciasDraft = [];
   }
   renderInconsistenciasRows();
   resetVerification();
@@ -733,16 +745,27 @@ const validateRequiredFields = () => {
   if (isDetallesAdicionalesEnabled()) {
     const inconsistencias = collectInconsistencias();
     const configuredCount = Number(cantidadInconsistencias?.value || 0);
+    if (configuredCount <= 0) {
+      setStatus("Atención: si activas detalles adicionales debes registrar al menos 1 inconsistencia.");
+      return false;
+    }
     if (configuredCount !== inconsistencias.length) {
       setStatus("Atención: Actualiza la cantidad de inconsistencias y completa la tabla.");
       return false;
     }
+
+    const productosElegidos = new Set();
 
     for (const item of inconsistencias) {
       if (!item.producto_id || !item.responsable_id || item.unidades_faltantes <= 0) {
         setStatus("Atención: Completa producto, responsable y unidades faltantes (mayor a 0) en inconsistencias.");
         return false;
       }
+      if (productosElegidos.has(item.producto_id)) {
+        setStatus("Atención: no repitas el mismo producto en inconsistencias.");
+        return false;
+      }
+      productosElegidos.add(item.producto_id);
     }
   }
   return true;

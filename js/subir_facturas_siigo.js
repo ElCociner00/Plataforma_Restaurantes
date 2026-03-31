@@ -668,6 +668,7 @@ const buildDetailTableHtml = (invoiceIdValue) => {
 };
 
 const updateDetailStatusText = () => {
+  if (!detalleFactura) return;
   const selected = state.allRows.find((row) => row.__id === state.selectedId);
   const modeLabel = state.panelMode === "revision"
     ? "revisión"
@@ -733,6 +734,10 @@ const runSwitchUpdate = async (row, checked) => {
     subir_siigo: checked,
     ok: checked,
     numero_factura: row.numero_factura,
+    fecha_factura: row.fecha_iso || null,
+    uuid_factura: row.factura_uuid || null,
+    prefijo_factura: row.prefijo_factura || null,
+    consecutivo_factura: row.consecutivo_factura || null,
     factura_id: row.factura_id || row.id || row.__id,
     nit: row.nit || null,
     proveedor: row.proveedor || null,
@@ -783,6 +788,7 @@ const renderTable = () => {
 
   rows.forEach((row) => {
     const tr = document.createElement("tr");
+    tr.classList.add("invoice-row");
     tr.classList.toggle("selected", row.__id === state.selectedId);
 
     const isUploaded = getInvoiceState(row);
