@@ -49,6 +49,14 @@
         <button id="tabFacturasRevision" type="button">Facturas para revisión <span id="revisionDot" class="revision-dot hidden" aria-hidden="true"></span></button>
         <button id="tabFacturasCorregidas" type="button">Corregidas (historial)</button>
       </div>
+      <div id="accionesCorreccionWrap" class="acciones-correccion-wrap hidden" aria-live="polite">
+        <button id="corregirFacturaActual" type="button" title="Corrige solo la factura seleccionada. Úsalo para casos únicos.">
+          Corregir factura actual 🔍
+        </button>
+        <button id="corregirRegistrarProveedor" type="button" title="Corrige y registra el código como base para futuras facturas del proveedor.">
+          Corregir y registrar proveedor 🔍
+        </button>
+      </div>
       <p class="hint">Arrastra encabezados para reordenar columnas. Usa el switch para subir/quitar en Siigo.</p>
       <div class="tabla-wrap">
         <table>
@@ -62,14 +70,6 @@
     <section class="bloque">
       <h2>Detalle de factura seleccionada</h2>
       <div id="detalleFactura" class="detalle-box">Selecciona una factura para ver items debajo de su fila.</div>
-      <div id="accionesCorreccionWrap" class="acciones-correccion-wrap hidden">
-        <button id="corregirFacturaActual" type="button" title="Corrige solo la factura seleccionada. Úsalo para casos únicos.">
-          Corregir factura actual 🔍
-        </button>
-        <button id="corregirRegistrarProveedor" type="button" title="Corrige y registra el código como base para futuras facturas del proveedor.">
-          Corregir y registrar proveedor 🔍
-        </button>
-      </div>
       <div id="status" class="status"></div>
     </section>
   </div>
