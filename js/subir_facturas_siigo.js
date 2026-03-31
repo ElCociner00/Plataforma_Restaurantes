@@ -16,6 +16,8 @@ const tabFacturasRevision = document.getElementById("tabFacturasRevision");
 const tabFacturasCorregidas = document.getElementById("tabFacturasCorregidas");
 const revisionDot = document.getElementById("revisionDot");
 const accionesCorreccionWrap = document.getElementById("accionesCorreccionWrap");
+const nombreCuentaWrap = document.getElementById("nombreCuentaWrap");
+const nombreCuentaContable = document.getElementById("nombreCuentaContable");
 const corregirFacturaActualBtn = document.getElementById("corregirFacturaActual");
 const corregirRegistrarProveedorBtn = document.getElementById("corregirRegistrarProveedor");
 
@@ -52,12 +54,14 @@ const state = {
     "numero_factura", "fecha_iso", "proveedor", "nit", "tipo_factura", "iva", "inc", "total", "estado_siigo"
   ],
   detailColumns: [
-    "producto", "cantidad", "valor_unitario", "subtotal", "porcentaje_impuesto", "codigo_contable", "valor_debito", "valor_credito", "descripcion"
+    "producto", "cantidad", "valor_unitario", "subtotal", "valor_impuesto", "codigo_contable", "valor_debito", "valor_credito", "descripcion"
   ],
   detailOrderByInvoice: {},
   switchQueue: Promise.resolve(),
   switchQueueCount: 0,
-  switchErrorByInvoice: {}
+  switchErrorByInvoice: {},
+  correctionMode: null,
+  correctionTargetId: null
 };
 
 const setStatus = (message) => { status.textContent = message; };
@@ -478,7 +482,7 @@ const normalizeInvoiceDetail = (row = {}, source = "principal") => ({
   cantidad: row["Cantidad"] || "",
   valor_unitario: row["Valor Unitario"] || "",
   subtotal: row["Subtotal"] || "",
-  porcentaje_impuesto: row["Porcentaje INC o IVA"] || "",
+  valor_impuesto: row["Porcentaje INC o IVA"] || "",
   codigo_contable: row["Código Contable"] || "",
   codigo_contable_original: row["Código Contable"] || "",
   valor_debito: row["Valor Débito"] || "",
@@ -541,6 +545,12 @@ const getRowsByMode = () => {
   return state.readyRows;
 };
 
+const isCorrectionEditingEnabled = (invoiceIdValue) => {
+  if (state.panelMode !== "revision") return false;
+  if (!state.correctionMode) return false;
+  return state.correctionTargetId === invoiceIdValue;
+};
+
 const renderPanelIndicators = () => {
   const reviewCount = state.reviewRows.length;
   revisionDot?.classList.toggle("hidden", reviewCount <= 0);
@@ -564,6 +574,8 @@ const renderPanelIndicators = () => {
   });
 
   accionesCorreccionWrap?.classList.toggle("hidden", state.panelMode !== "revision");
+  const needsAccountName = state.panelMode === "revision" && state.correctionMode === "corregir_y_registrar_proveedor";
+  nombreCuentaWrap?.classList.toggle("hidden", !needsAccountName);
 };
 
 const getDetailsByInvoice = (invoice) => {
@@ -648,7 +660,7 @@ const buildDetailTableHtml = (invoiceIdValue) => {
   const detailRows = items.map((item, idx) => {
     const key = String(item.id_unico || `${item.producto}-${idx}`);
     const cols = state.detailColumns.map((col) => {
-      if (col === "codigo_contable" && item.editable_codigo && state.panelMode === "revision") {
+      if (col === "codigo_contable" && item.editable_codigo && isCorrectionEditingEnabled(invoiceIdValue)) {
         return `<td><input data-codigo-edit="${escapeAttr(key)}" type="text" value="${escapeAttr(item[col] || "")}" placeholder="Código contable"></td>`;
       }
       return `<td>${escapeHtml(format(item[col]))}</td>`;
@@ -668,6 +680,7 @@ const buildDetailTableHtml = (invoiceIdValue) => {
 };
 
 const updateDetailStatusText = () => {
+  if (!detalleFactura) return;
   const selected = state.allRows.find((row) => row.__id === state.selectedId);
   const modeLabel = state.panelMode === "revision"
     ? "revisión"
@@ -733,6 +746,10 @@ const runSwitchUpdate = async (row, checked) => {
     subir_siigo: checked,
     ok: checked,
     numero_factura: row.numero_factura,
+    fecha_factura: row.fecha_iso || null,
+    uuid_factura: row.factura_uuid || null,
+    prefijo_factura: row.prefijo_factura || null,
+    consecutivo_factura: row.consecutivo_factura || null,
     factura_id: row.factura_id || row.id || row.__id,
     nit: row.nit || null,
     proveedor: row.proveedor || null,
@@ -783,6 +800,7 @@ const renderTable = () => {
 
   rows.forEach((row) => {
     const tr = document.createElement("tr");
+    tr.classList.add("invoice-row");
     tr.classList.toggle("selected", row.__id === state.selectedId);
 
     const isUploaded = getInvoiceState(row);
@@ -946,6 +964,11 @@ const applyFilters = () => {
 
 const switchPanelMode = (mode) => {
   state.panelMode = mode;
+  if (mode !== "revision") {
+    state.correctionMode = null;
+    state.correctionTargetId = null;
+    if (nombreCuentaContable) nombreCuentaContable.value = "";
+  }
   state.currentPage = 1;
   state.selectedId = null;
   renderPanelIndicators();
@@ -995,7 +1018,7 @@ const buildUnifiedRows = (rows) => {
       detalle_cantidad: item.cantidad,
       detalle_valor_unitario: item.valor_unitario,
       detalle_subtotal: item.subtotal,
-      detalle_porcentaje_impuesto: item.porcentaje_impuesto,
+      detalle_valor_impuesto: item.valor_impuesto,
       detalle_codigo_contable: item.codigo_contable,
       detalle_valor_debito: item.valor_debito,
       detalle_valor_credito: item.valor_credito,
@@ -1116,7 +1139,18 @@ const buildCorreccionRows = (invoice) => {
       codigo_contable_original: item.codigo_contable_original || "",
       codigo_contable_corregido: String(item.codigo_contable || "").trim()
     }))
-    .filter((item) => item.codigo_contable_corregido.length > 0);
+    .filter((item) => item.codigo_contable_corregido.length > 0)
+    .filter((item) => item.codigo_contable_corregido !== item.codigo_contable_original)
+    .filter((item) => /^\d{8}$/.test(item.codigo_contable_corregido));
+};
+
+const isPositiveWebhookResponse = (response) => {
+  if (response === true) return true;
+  if (typeof response === "object" && response !== null) {
+    if (response.ok === true || response.success === true) return true;
+    if (String(response.status || "").toLowerCase() === "true") return true;
+  }
+  return false;
 };
 
 const enviarCorreccionInconveniente = async (modo) => {
@@ -1126,9 +1160,29 @@ const enviarCorreccionInconveniente = async (modo) => {
     return;
   }
 
+  if (state.correctionMode !== modo || state.correctionTargetId !== invoice.__id) {
+    state.correctionMode = modo;
+    state.correctionTargetId = invoice.__id;
+    renderPanelIndicators();
+    renderTable();
+    const label = modo === "corregir_y_registrar_proveedor"
+      ? "Edita el código contable y completa el nombre de la cuenta contable para registrar proveedor."
+      : "Edita el código contable y vuelve a pulsar el botón para enviar.";
+    setStatus(label);
+    return;
+  }
+
+  if (modo === "corregir_y_registrar_proveedor") {
+    const cuenta = String(nombreCuentaContable?.value || "").trim();
+    if (!cuenta) {
+      setStatus("Ingresa el nombre de la cuenta contable para registrar proveedor.");
+      return;
+    }
+  }
+
   const rows = buildCorreccionRows(invoice);
   if (!rows.length) {
-    setStatus("No hay filas corregidas con código contable para enviar.");
+    setStatus("Debes cambiar al menos un código contable con formato válido de 8 dígitos.");
     return;
   }
 
@@ -1143,12 +1197,15 @@ const enviarCorreccionInconveniente = async (modo) => {
     uuid_factura: invoice.factura_uuid,
     numero_factura: invoice.numero_factura,
     proveedor: invoice.proveedor,
+    nombre_cuenta_contable: modo === "corregir_y_registrar_proveedor"
+      ? String(nombreCuentaContable?.value || "").trim().toUpperCase()
+      : null,
     rows
   };
 
   try {
-    const response = await fetchWebhookSignal(WEBHOOK_CORREGIR_FACTURA_INCONVENIENTE, payload);
-    const ok = response?.ok !== false;
+    const response = await fetchWebhookWithFallback(WEBHOOK_CORREGIR_FACTURA_INCONVENIENTE, payload);
+    const ok = isPositiveWebhookResponse(response);
     if (!ok) {
       setStatus(response?.message || "No se pudo registrar la corrección.");
       return;
@@ -1157,6 +1214,9 @@ const enviarCorreccionInconveniente = async (modo) => {
     state.reviewRows = state.reviewRows.filter((row) => row.__id !== invoice.__id);
     state.correctedRows = [{ ...invoice, estado_revision: "corregida" }, ...state.correctedRows];
     state.allRows = [...state.readyRows, ...state.reviewRows, ...state.correctedRows];
+    state.correctionMode = null;
+    state.correctionTargetId = null;
+    if (nombreCuentaContable) nombreCuentaContable.value = "";
     switchPanelMode("corregidas");
     setStatus(response?.message || "Corrección aplicada y factura movida a corregidas.");
   } catch (error) {
