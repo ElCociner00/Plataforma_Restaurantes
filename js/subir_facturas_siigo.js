@@ -52,7 +52,7 @@ const state = {
     "numero_factura", "fecha_iso", "proveedor", "nit", "tipo_factura", "iva", "inc", "total", "estado_siigo"
   ],
   detailColumns: [
-    "producto", "cantidad", "valor_unitario", "subtotal", "porcentaje_impuesto", "codigo_contable", "valor_debito", "valor_credito", "descripcion"
+    "producto", "cantidad", "valor_unitario", "subtotal", "valor_impuesto", "codigo_contable", "valor_debito", "valor_credito", "descripcion"
   ],
   detailOrderByInvoice: {},
   switchQueue: Promise.resolve(),
@@ -478,7 +478,7 @@ const normalizeInvoiceDetail = (row = {}, source = "principal") => ({
   cantidad: row["Cantidad"] || "",
   valor_unitario: row["Valor Unitario"] || "",
   subtotal: row["Subtotal"] || "",
-  porcentaje_impuesto: row["Porcentaje INC o IVA"] || "",
+  valor_impuesto: row["Porcentaje INC o IVA"] || "",
   codigo_contable: row["Código Contable"] || "",
   codigo_contable_original: row["Código Contable"] || "",
   valor_debito: row["Valor Débito"] || "",
@@ -1001,7 +1001,7 @@ const buildUnifiedRows = (rows) => {
       detalle_cantidad: item.cantidad,
       detalle_valor_unitario: item.valor_unitario,
       detalle_subtotal: item.subtotal,
-      detalle_porcentaje_impuesto: item.porcentaje_impuesto,
+      detalle_valor_impuesto: item.valor_impuesto,
       detalle_codigo_contable: item.codigo_contable,
       detalle_valor_debito: item.valor_debito,
       detalle_valor_credito: item.valor_credito,
