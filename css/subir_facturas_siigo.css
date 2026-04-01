@@ -182,7 +182,15 @@ tr.invoice-row:not(.selected) {
 }
 
 .inline-detail-table {
+  width: 100%;
   min-width: 720px;
+  table-layout: fixed;
+}
+
+.inline-detail-table td input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .drag-col {
@@ -253,6 +261,15 @@ tr.invoice-row:not(.selected) {
   min-width: 0;
   padding: 9px 14px;
   font-weight: 600;
+}
+
+.nombre-cuenta-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 280px;
+  font-size: 0.82rem;
+  color: #374151;
 }
 
 .hidden {
