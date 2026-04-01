@@ -54,7 +54,7 @@ const state = {
     "numero_factura", "fecha_iso", "proveedor", "nit", "tipo_factura", "iva", "inc", "total", "estado_siigo"
   ],
   detailColumns: [
-    "producto", "cantidad", "valor_unitario", "subtotal", "valor_impuesto", "codigo_contable", "valor_debito", "valor_credito", "descripcion"
+    "producto", "cantidad", "valor_unitario", "subtotal", "valor_impuesto", "codigo_contable", "valor_debito", "valor_credito"
   ],
   detailOrderByInvoice: {},
   switchQueue: Promise.resolve(),
@@ -1021,8 +1021,7 @@ const buildUnifiedRows = (rows) => {
       detalle_valor_impuesto: item.valor_impuesto,
       detalle_codigo_contable: item.codigo_contable,
       detalle_valor_debito: item.valor_debito,
-      detalle_valor_credito: item.valor_credito,
-      detalle_descripcion: item.descripcion
+      detalle_valor_credito: item.valor_credito
     }));
   });
 };
@@ -1225,7 +1224,7 @@ const enviarCorreccionInconveniente = async (modo) => {
 };
 
 const loadFacturas = async () => {
-  setStatus("Consultando facturas en Supabase...");
+  setStatus("Consultando facturas...");
   const generales = await fetchFacturasGenerales();
   const uuids = [...new Set(generales.map((row) => row.UUID).filter(Boolean))];
   const detalles = await fetchFacturasDetalles(uuids);
@@ -1305,8 +1304,8 @@ const init = async () => {
   try {
     await loadFacturas();
   } catch (error) {
-    console.error("Error cargando facturas desde Supabase:", error);
-    setStatus(`Error cargando facturas desde Supabase: ${error?.message || "detalle no disponible"}`);
+    console.error("Error cargando facturas:", error);
+    setStatus(`Error cargando facturas: ${error?.message || "detalle no disponible"}`);
   }
 };
 

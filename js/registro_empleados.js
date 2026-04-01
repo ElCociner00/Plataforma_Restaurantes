@@ -183,7 +183,7 @@ form?.addEventListener("submit", async (e) => {
       statusDiv.textContent = data?.message || `Error registrando empleado (HTTP ${res.status}).`;
     }
   } catch {
-    statusDiv.textContent = "Error de conexión con backend plataforma.";
+    statusDiv.textContent = "Error de conexión. Intenta nuevamente.";
   } finally {
     setSubmitting(false);
   }

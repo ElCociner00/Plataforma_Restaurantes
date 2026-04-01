@@ -915,7 +915,7 @@ btnSubir.addEventListener("click", async () => {
       return;
     }
 
-    setStatus(data.message || (data.ok ? "Datos subidos correctamente." : "El webhook devolvio error."));
+    setStatus(data.message || (data.ok ? "Datos subidos correctamente." : "No se pudo completar el envío."));
     aplicarBloqueoConstancia(false);
   } catch (error) {
     setStatus("Error subiendo datos.");

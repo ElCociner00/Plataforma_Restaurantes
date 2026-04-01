@@ -19,18 +19,18 @@ form.addEventListener("submit", async (e) => {
   console.log("Password length:", password.length);
 
   try {
-    // 1. Primero verifica que supabase esté funcionando
-    console.log("Intentando login con Supabase...");
+    // 1. Intento de autenticación
+    console.log("Intentando login...");
     
     const { data, error } = await supabase.auth.signInWithPassword({ 
       email, 
       password 
     });
     
-    console.log("Respuesta de Supabase:", { data, error });
+    console.log("Respuesta de autenticación:", { data, error });
 
     if (error) {
-      console.error("Error de Supabase:", error.message);
+      console.error("Error de autenticación:", error.message);
       alert("Credenciales incorrectas: " + error.message);
       return;
     }
