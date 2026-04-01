@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>AXIOMA | Gestionar proveedores Siigo</title>
+  <link rel="stylesheet" href="../../css/main.css">
+  <link rel="stylesheet" href="../../css/proveedores_siigo.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../../js/auth_guard.js"></script>
+  <script type="module">
+    import { guardPage } from "../../js/guard_page.js";
+    guardPage("configuracion_siigo");
+  </script>
+  <script type="module" src="../../js/header.js"></script>
+
+  <div class="main proveedores-main">
+    <h1>Gestionar proveedores</h1>
+    <p class="proveedores-hint">Consulta y registra proveedores por tenant para la operación de Siigo.</p>
+
+    <section class="bloque">
+      <div class="header-row">
+        <h2>Proveedores registrados</h2>
+        <button id="recargarProveedores" type="button">Recargar</button>
+      </div>
+      <div class="tabla-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-nit">NIT</th>
+              <th class="col-tipo">Tipo</th>
+              <th class="col-proveedor">Proveedor</th>
+              <th class="col-codigo">Código Contable</th>
+              <th class="col-nombre">Nombre</th>
+            </tr>
+          </thead>
+          <tbody id="proveedoresBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="bloque">
+      <h2>Añadir nuevo proveedor</h2>
+      <form id="formProveedor" class="form-grid">
+        <label>
+          Razón social
+          <input id="razonSocial" type="text" required>
+        </label>
+        <label>
+          NIT proveedor
+          <input id="nitProveedor" type="text" required inputmode="numeric">
+        </label>
+        <label>
+          Código especial
+          <select id="codigoEspecial">
+            <option value="NO" selected>NO</option>
+            <option value="SI">SI</option>
+          </select>
+        </label>
+        <label>
+          Código contable
+          <input id="codigoContable" type="text" required inputmode="numeric" maxlength="8" value="14350501">
+        </label>
+        <label>
+          Tipo
+          <input id="tipoProveedor" type="text" required value="INVENTARIOS">
+        </label>
+      </form>
+      <p class="nota">Recuerde: el código contable debe tener 8 dígitos.</p>
+      <button id="registrarProveedor" type="button">Registrar proveedor</button>
+      <div id="status" class="status"></div>
+    </section>
+  </div>
+
+  <script type="module" src="../../js/proveedores_siigo.js"></script>
+  <script type="module" src="../../js/footer.js"></script>
+</body>
+</html>

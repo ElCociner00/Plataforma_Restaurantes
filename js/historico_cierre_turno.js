@@ -1044,7 +1044,7 @@ const loadInitialData = async () => {
     };
 
     const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData?.session?.access_token) throw new Error("No hay JWT activo para consultar el historico.");
+    if (!sessionData?.session?.access_token) throw new Error("No hay una sesión activa para consultar el histórico.");
 
     const generalSettings = loadJson(getGeneralVisibilityKey(payload.tenant_id), {});
     const detailSettings = loadJson(getDetailVisibilityKey(payload.tenant_id), {});
@@ -1097,7 +1097,7 @@ const loadInitialData = async () => {
         rowsData = directRows || [];
       } else {
         throw new Error(
-          "Fallo Supabase y webhook historico (" + webhookResponse.status + "). " +
+          "No se pudo cargar el histórico (" + webhookResponse.status + "). " +
           (rowsError.message || rowsError.code || "Sin detalle.")
         );
       }
@@ -1136,8 +1136,8 @@ const loadInitialData = async () => {
       setStatus("La carga tardo mas de 5 segundos.");
     } else {
       const message = error?.message || "Error desconocido";
-      const isRlsError = /permission|rls|jwt|not authorized|forbidden/i.test(message);
-      setStatus((isRlsError ? "Error de permisos/JWT en historico: " : "Error cargando historico: ") + message);
+      const isAccessError = /permission|rls|jwt|not authorized|forbidden/i.test(message);
+      setStatus((isAccessError ? "No tienes acceso a este histórico: " : "Error cargando histórico: ") + message);
     }
   } finally {
     setLoading(false);

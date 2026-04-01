@@ -1,0 +1,67 @@
+.proveedores-main {
+  max-width: 1100px;
+}
+
+.proveedores-hint {
+  text-align: center;
+  color: #4b5563;
+  margin-top: -6px;
+}
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.tabla-wrap {
+  overflow: auto;
+  border: 1px solid #ddd6fe;
+  border-radius: 10px;
+}
+
+table {
+  width: 100%;
+  min-width: 1200px;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+th,
+td {
+  border-bottom: 1px solid #ede9fe;
+  padding: 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  background: #f5f3ff;
+}
+
+.col-nit {
+  font-variant-numeric: tabular-nums;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nota {
+  margin: 10px 0;
+  color: #6b21a8;
+  font-weight: 600;
+}
+
+.status {
+  margin-top: 10px;
+}
