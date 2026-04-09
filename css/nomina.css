@@ -1,0 +1,37 @@
+.nomina-main {
+  max-width: 980px;
+}
+
+.intro {
+  color: #4b5563;
+  font-size: 0.95rem;
+}
+
+.payload-preview {
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 0.82rem;
+  overflow: auto;
+}
+
+.checklist {
+  margin: 0;
+  padding-left: 18px;
+  color: #374151;
+}
+
+.checklist li {
+  margin-bottom: 6px;
+}
+
+.status {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  color: #3730a3;
+  border-radius: 8px;
+}

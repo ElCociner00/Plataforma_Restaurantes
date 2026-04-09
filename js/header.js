@@ -32,7 +32,8 @@ const LOGGRO_ROUTE_BY_MODULE = [
 
 const SIIGO_ROUTE_BY_MODULE = [
   ["dashboard_siigo", "/Plataforma_Restaurantes/siigo/dashboard_siigo/"],
-  ["subir_facturas_siigo", "/Plataforma_Restaurantes/siigo/subir_facturas_siigo/"]
+  ["subir_facturas_siigo", "/Plataforma_Restaurantes/siigo/subir_facturas_siigo/"],
+  ["nomina", "/Plataforma_Restaurantes/nomina/"]
 ];
 
 const resolveRouteForEnv = async (env, context) => {
@@ -117,6 +118,7 @@ function buildMenu({ context, environmentForMenu }) {
   if (environmentForMenu === ENV_SIIGO) {
     menu += `<a class="nav-link-btn" href="/Plataforma_Restaurantes/siigo/dashboard_siigo/">Dashboard</a>`;
     menu += `<a class="nav-link-btn" href="/Plataforma_Restaurantes/siigo/subir_facturas_siigo/">Ver o subir facturas correo</a>`;
+    menu += `<a class="nav-link-btn" href="/Plataforma_Restaurantes/nomina/">Nomina (borrador)</a>`;
   }
 
   menu += `<a class="nav-link-btn" href="/Plataforma_Restaurantes/facturacion/">Facturacion</a>`;

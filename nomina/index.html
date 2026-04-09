@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>AXIOMA | Nómina (borrador)</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/nomina.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../js/auth_guard.js"></script>
+  <script type="module">
+    import { guardPage } from "../js/guard_page.js";
+    guardPage("nomina");
+  </script>
+  <script type="module" src="../js/header.js"></script>
+
+  <div class="main nomina-main">
+    <h1>Módulo Nómina (Borrador funcional)</h1>
+    <p class="intro">
+      Esta pantalla sirve como base para iniciar la implementación de nómina multitenant.
+      Aquí encontrarás el payload sugerido, tablas requeridas y checklist de integración n8n + Supabase.
+    </p>
+
+    <section class="bloque">
+      <h2>1) Flujo sugerido</h2>
+      <ol>
+        <li>Seleccionar periodo de nómina.</li>
+        <li>Consolidar cierres de turno + inventarios + apoyos.</li>
+        <li>Generar movimientos de nómina por empleado.</li>
+        <li>Aprobar movimientos y emitir desprendibles.</li>
+      </ol>
+    </section>
+
+    <section class="bloque">
+      <h2>2) Payload sugerido para cálculo</h2>
+      <pre id="payloadNominaPreview" class="payload-preview"></pre>
+    </section>
+
+    <section class="bloque">
+      <h2>3) Estado actual</h2>
+      <ul id="nominaChecklist" class="checklist"></ul>
+      <div id="nominaStatus" class="status"></div>
+    </section>
+  </div>
+
+  <script type="module" src="../js/nomina.js"></script>
+  <script type="module" src="../js/footer.js"></script>
+</body>
+</html>
