@@ -2,7 +2,8 @@ import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 import {
   WEBHOOK_SUBIR_SIIGO,
-  WEBHOOK_CORREGIR_FACTURA_INCONVENIENTE
+  WEBHOOK_CORREGIR_FACTURA_INCONVENIENTE,
+  WEBHOOK_CARGAR_FACTURAS_CORREO
 } from "./webhooks.js";
 
 const head = document.getElementById("facturasHead");
@@ -409,6 +410,13 @@ const normalizeDateString = (value) => {
   if (!value) return "";
   const normalized = String(value).trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return normalized;
+  const dmy = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmy) {
+    const day = dmy[1].padStart(2, "0");
+    const month = dmy[2].padStart(2, "0");
+    const year = dmy[3];
+    return `${year}-${month}-${day}`;
+  }
   const dateObj = new Date(normalized);
   if (Number.isNaN(dateObj.getTime())) return normalized;
   return dateObj.toISOString().slice(0, 10);
@@ -418,23 +426,36 @@ const toSelectColumns = (columns = []) => columns
   .map((column) => (column.match(/^[a-z_][a-z0-9_]*$/i) ? column : `"${column}"`))
   .join(", ");
 
+const sortByDateDesc = (rows = [], key) => [...rows].sort((a, b) => {
+  const aDate = new Date(String(a?.[key] || ""));
+  const bDate = new Date(String(b?.[key] || ""));
+  const aTime = Number.isNaN(aDate.getTime()) ? 0 : aDate.getTime();
+  const bTime = Number.isNaN(bDate.getTime()) ? 0 : bDate.getTime();
+  return bTime - aTime;
+});
+
 const fetchFacturasGenerales = async () => {
   const empresaId = state.context?.empresa_id;
   if (!empresaId) return [];
+  const views = ["vista_facturas_agrupadas", "vista_facturas_agrupadas_empresa"];
+  let lastError = null;
 
-  const baseQuery = supabase
-    .from("vista_facturas_agrupadas")
-    .select(toSelectColumns(GENERAL_VIEW_COLUMNS))
-    .eq("empresa_id", String(empresaId));
+  for (const viewName of views) {
+    const response = await supabase
+      .from(viewName)
+      .select(toSelectColumns(GENERAL_VIEW_COLUMNS))
+      .eq("empresa_id", String(empresaId));
 
-  let response = await baseQuery.order("Fecha Emisión", { ascending: false });
-  if (response.error) {
-    // Fallback defensivo: algunas configuraciones PostgREST pueden fallar con order en columnas con espacios.
-    response = await baseQuery;
+    if (response.error) {
+      lastError = response.error;
+      continue;
+    }
+
+    const rows = Array.isArray(response.data) ? response.data : [];
+    return sortByDateDesc(rows, "Fecha Emisión");
   }
 
-  if (response.error) throw response.error;
-  return Array.isArray(response.data) ? response.data : [];
+  throw lastError || new Error("No se pudo consultar la vista de facturas.");
 };
 
 const fetchFacturasDetalles = async (uuids = []) => {
@@ -446,8 +467,7 @@ const fetchFacturasDetalles = async (uuids = []) => {
     .from("facturas_empresas")
     .select(toSelectColumns(columns))
     .in("uuid_factura", uuids)
-    .eq("empresa_id", empresaId)
-    .order("Fecha Factura", { ascending: false });
+    .eq("empresa_id", empresaId);
 
   let response = await runQuery(DETAIL_TABLE_COLUMNS);
   if (response.error) {
@@ -456,7 +476,7 @@ const fetchFacturasDetalles = async (uuids = []) => {
   }
 
   if (response.error) throw response.error;
-  return Array.isArray(response.data) ? response.data : [];
+  return sortByDateDesc(Array.isArray(response.data) ? response.data : [], "Fecha Factura");
 };
 
 const fetchFacturasInconvenientes = async (resolved) => {
@@ -467,27 +487,141 @@ const fetchFacturasInconvenientes = async (resolved) => {
     .from("facturas_empresas_inconvenientes")
     .select(toSelectColumns(INCONVENIENTES_TABLE_COLUMNS))
     .eq("empresa_id", empresaId)
-    .eq("Estado_Resuelto", resolved)
-    .order("Fecha Factura", { ascending: false });
+    .eq("Estado_Resuelto", resolved);
 
   if (error) throw error;
-  return Array.isArray(data) ? data : [];
+  return sortByDateDesc(Array.isArray(data) ? data : [], "Fecha Factura");
+};
+
+const parseNumericText = (value) => {
+  if (value == null) return 0;
+  const raw = String(value).trim();
+  if (!raw) return 0;
+  const normalized = raw.replace(/\./g, "").replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const pickValue = (row, keys = []) => {
+  for (const key of keys) {
+    if (row?.[key] !== undefined && row?.[key] !== null && row?.[key] !== "") return row[key];
+  }
+  return "";
+};
+
+const unwrapWebhookRow = (item) => {
+  if (!item || typeof item !== "object") return item;
+  if (item.json && typeof item.json === "object") return item.json;
+  if (item.data && typeof item.data === "object" && !Array.isArray(item.data)) return item.data;
+  return item;
+};
+
+const buildRowsFromWebhookRaw = (rawRows = []) => {
+  const normalizedRows = rawRows.map(unwrapWebhookRow).filter((item) => item && typeof item === "object");
+  const isGroupedShape = normalizedRows.length > 0
+    && (normalizedRows[0]?.UUID || normalizedRows[0]?.["Tipo de documento"] || normalizedRows[0]?.["Fecha Emisión"]);
+
+  if (isGroupedShape) {
+    return normalizedRows.map((row, idx) => {
+      const invoice = normalizeInvoiceGeneral({
+        UUID: row.UUID || row.uuid_factura || "",
+        Prefijo: row.Prefijo || row["Prefijo Factura"] || "",
+        Consecutivo: row.Consecutivo || row["Consecutivo Factura"] || "",
+        "Fecha Emisión": row["Fecha Emisión"] || row["Fecha Factura"] || "",
+        "Nombre Emisor": row["Nombre Emisor"] || row.Proveedor || "",
+        "NIT Emisor": row["NIT Emisor"] || row.NIT_CC || "",
+        "Tipo de documento": row["Tipo de documento"] || row["Tipo de Factura"] || "",
+        IVA: row.IVA ?? row["Valor IVA"] ?? 0,
+        INC: row.INC ?? row["Valor INC"] ?? 0,
+        Total: row.Total ?? row["Valor Total"] ?? 0,
+        Estado_Siigo: normalizeBoolean(row["Estado_Siigo"])
+      }, [], [], "lista");
+      return { ...invoice, __id: invoiceId(invoice, idx) };
+    });
+  }
+
+  const IVA_CODES = new Set(["24080101", "24080501"]);
+  const INC_CODES = new Set(["24080102"]);
+
+  const grouped = new Map();
+  normalizedRows.forEach((item) => {
+    const uuid = String(item?.uuid_factura || item?.UUID || item?.uuid || "").trim();
+    if (!uuid) return;
+    if (!grouped.has(uuid)) grouped.set(uuid, []);
+    grouped.get(uuid).push(item);
+  });
+
+  return Array.from(grouped.entries()).map(([uuid, items], idx) => {
+    const first = items[0] || {};
+    const prefijo = first["Prefijo Factura"] || first.Prefijo || "";
+    const consecutivo = first["Consecutivo Factura"] || first.Consecutivo || "";
+    const numeroFactura = `${prefijo}${consecutivo}`.trim() || uuid;
+    const fecha = first["Fecha Factura"] || first["Fecha Emisión"] || "";
+    const iva = items.reduce((acc, row) => {
+      const code = String(row["Código Contable"] || "");
+      return acc + (IVA_CODES.has(code) ? parseNumericText(row["Valor Débito"]) : 0);
+    }, 0);
+    const inc = items.reduce((acc, row) => {
+      const code = String(row["Código Contable"] || "");
+      return acc + (INC_CODES.has(code) ? parseNumericText(row["Valor Débito"]) : 0);
+    }, 0);
+    const totalFromCredits = items.reduce((acc, row) => {
+      const code = String(row["Código Contable"] || "");
+      if (IVA_CODES.has(code) || INC_CODES.has(code)) return acc;
+      return acc + parseNumericText(row["Valor Crédito"]);
+    }, 0);
+    const totalFromSubtotals = items.reduce((acc, row) => acc + parseNumericText(row.Subtotal), 0);
+    const total = totalFromCredits > 0 ? totalFromCredits : totalFromSubtotals;
+
+    const details = items.map((detail) => ({
+      ...detail,
+      id: detail.id || crypto.randomUUID(),
+      uuid_factura: uuid
+    }));
+
+    const invoice = normalizeInvoiceGeneral({
+      UUID: uuid,
+      Prefijo: prefijo,
+      Consecutivo: consecutivo,
+      "Fecha Emisión": fecha,
+      "Nombre Emisor": first["Proveedor"] || first["Nombre Emisor"] || "",
+      "NIT Emisor": first["NIT_CC"] || first["NIT Emisor"] || "",
+      "Tipo de documento": first["Tipo de Factura"] || first["Tipo de documento"] || "",
+      IVA: iva,
+      INC: inc,
+      Total: total,
+      Estado_Siigo: normalizeBoolean(first["Estado_Siigo"])
+    }, details, [], "lista");
+
+    return { ...invoice, __id: invoiceId(invoice, idx) };
+  });
+};
+
+const loadFacturasFromWebhookFallback = async () => {
+  if (!WEBHOOK_CARGAR_FACTURAS_CORREO) {
+    throw new Error("No hay webhook de emergencia configurado para cargar facturas.");
+  }
+
+  const payload = buildContextPayload();
+  const response = await fetchWebhookWithFallback(WEBHOOK_CARGAR_FACTURAS_CORREO, payload);
+  const rawRows = normalizeRows(response);
+  return sortByDateDesc(buildRowsFromWebhookRaw(rawRows), "fecha_iso");
 };
 
 const normalizeInvoiceDetail = (row = {}, source = "principal") => ({
   id_unico: row.id || crypto.randomUUID(),
   source,
   editable_codigo: source !== "principal",
-  producto: row["Producto"] || "",
-  cantidad: row["Cantidad"] || "",
-  valor_unitario: row["Valor Unitario"] || "",
-  subtotal: row["Subtotal"] || "",
-  valor_impuesto: row["Porcentaje INC o IVA"] || "",
-  codigo_contable: row["Código Contable"] || "",
-  codigo_contable_original: row["Código Contable"] || "",
-  valor_debito: row["Valor Débito"] || "",
-  valor_credito: row["Valor Crédito"] || "",
-  descripcion: row["Descripción"] || row["Detalle"] || ""
+  producto: pickValue(row, ["Producto", "producto", "item", "descripcion_producto"]),
+  cantidad: pickValue(row, ["Cantidad", "cantidad"]),
+  valor_unitario: pickValue(row, ["Valor Unitario", "valor_unitario"]),
+  subtotal: pickValue(row, ["Subtotal", "subtotal"]),
+  valor_impuesto: pickValue(row, ["Porcentaje INC o IVA", "porcentaje_inc_o_iva", "valor_impuesto"]),
+  codigo_contable: pickValue(row, ["Código Contable", "Codigo Contable", "codigo_contable"]),
+  codigo_contable_original: pickValue(row, ["Código Contable", "Codigo Contable", "codigo_contable"]),
+  valor_debito: pickValue(row, ["Valor Débito", "Valor Debito", "valor_debito"]),
+  valor_credito: pickValue(row, ["Valor Crédito", "Valor Credito", "valor_credito"]),
+  descripcion: pickValue(row, ["Descripción", "Descripcion", "Detalle", "detalle"])
 });
 
 const normalizeInvoiceGeneral = (row = {}, details = [], inconvenientes = [], estadoRevision = "lista") => {
@@ -505,10 +639,10 @@ const normalizeInvoiceGeneral = (row = {}, details = [], inconvenientes = [], es
     fecha_iso: normalizeDateString(row["Fecha Emisión"]),
     proveedor: row["Nombre Emisor"] || "",
     nit: row["NIT Emisor"] || "",
-    direccion: firstDetail["Dirección"] || "",
-    telefono: firstDetail["Télefono"] || "",
-    correo_empresa: firstDetail["Correo Empresa"] || "",
-    estado: firstDetail["Estado"] || "no_registrado",
+    direccion: pickValue(firstDetail, ["Dirección", "Direccion", "direccion"]),
+    telefono: pickValue(firstDetail, ["Télefono", "Telefono", "telefono"]),
+    correo_empresa: pickValue(firstDetail, ["Correo Empresa", "correo_empresa"]),
+    estado: pickValue(firstDetail, ["Estado", "estado"]) || "no_registrado",
     tipo_factura: row["Tipo de documento"] || firstDetail["Tipo de Factura"] || "",
     iva: safeNumber(row["IVA"]),
     inc: safeNumber(row["INC"]),
@@ -1225,50 +1359,57 @@ const enviarCorreccionInconveniente = async (modo) => {
 
 const loadFacturas = async () => {
   setStatus("Consultando facturas...");
-  const generales = await fetchFacturasGenerales();
-  const uuids = [...new Set(generales.map((row) => row.UUID).filter(Boolean))];
-  const detalles = await fetchFacturasDetalles(uuids);
-  const inconvenientesPendientes = await fetchFacturasInconvenientes(false);
-  const inconvenientesResueltos = await fetchFacturasInconvenientes(true);
-  const detailsByUuid = detalles.reduce((acc, item) => {
-    const key = String(item.uuid_factura || "").trim();
-    if (!key) return acc;
-    if (!acc.has(key)) acc.set(key, []);
-    acc.get(key).push(item);
-    return acc;
-  }, new Map());
+  let rows = [];
+  try {
+    const generales = await fetchFacturasGenerales();
+    const uuids = [...new Set(generales.map((row) => row.UUID).filter(Boolean))];
+    const detalles = await fetchFacturasDetalles(uuids);
+    const inconvenientesPendientes = await fetchFacturasInconvenientes(false);
+    const inconvenientesResueltos = await fetchFacturasInconvenientes(true);
+    const detailsByUuid = detalles.reduce((acc, item) => {
+      const key = String(item.uuid_factura || "").trim();
+      if (!key) return acc;
+      if (!acc.has(key)) acc.set(key, []);
+      acc.get(key).push(item);
+      return acc;
+    }, new Map());
 
-  const pendingByUuid = inconvenientesPendientes.reduce((acc, item) => {
-    const key = String(item.uuid_factura || "").trim();
-    if (!key) return acc;
-    if (!acc.has(key)) acc.set(key, []);
-    acc.get(key).push(item);
-    return acc;
-  }, new Map());
+    const pendingByUuid = inconvenientesPendientes.reduce((acc, item) => {
+      const key = String(item.uuid_factura || "").trim();
+      if (!key) return acc;
+      if (!acc.has(key)) acc.set(key, []);
+      acc.get(key).push(item);
+      return acc;
+    }, new Map());
 
-  const resolvedByUuid = inconvenientesResueltos.reduce((acc, item) => {
-    const key = String(item.uuid_factura || "").trim();
-    if (!key) return acc;
-    if (!acc.has(key)) acc.set(key, []);
-    acc.get(key).push(item);
-    return acc;
-  }, new Map());
+    const resolvedByUuid = inconvenientesResueltos.reduce((acc, item) => {
+      const key = String(item.uuid_factura || "").trim();
+      if (!key) return acc;
+      if (!acc.has(key)) acc.set(key, []);
+      acc.get(key).push(item);
+      return acc;
+    }, new Map());
 
-  const rows = generales.map((row, idx) => {
-    const uuid = String(row.UUID || "").trim();
-    const hasPending = pendingByUuid.has(uuid);
-    const hasResolved = resolvedByUuid.has(uuid);
-    const invoice = normalizeInvoiceGeneral(
-      row,
-      detailsByUuid.get(uuid) || [],
-      pendingByUuid.get(uuid) || [],
-      hasPending ? "revision" : (hasResolved ? "corregida" : "lista")
-    );
-    return {
-      ...invoice,
-      __id: invoiceId(invoice, idx)
-    };
-  });
+    rows = generales.map((row, idx) => {
+      const uuid = String(row.UUID || "").trim();
+      const hasPending = pendingByUuid.has(uuid);
+      const hasResolved = resolvedByUuid.has(uuid);
+      const invoice = normalizeInvoiceGeneral(
+        row,
+        detailsByUuid.get(uuid) || [],
+        pendingByUuid.get(uuid) || [],
+        hasPending ? "revision" : (hasResolved ? "corregida" : "lista")
+      );
+      return {
+        ...invoice,
+        __id: invoiceId(invoice, idx)
+      };
+    });
+  } catch (primaryError) {
+    console.warn("Carga principal de facturas falló. Activando fallback webhook.", primaryError);
+    rows = await loadFacturasFromWebhookFallback();
+    setStatus("Facturas cargadas con ruta de emergencia (webhook).");
+  }
 
   state.readyRows = rows.filter((row) => row.estado_revision === "lista");
   state.reviewRows = rows.filter((row) => row.estado_revision === "revision");

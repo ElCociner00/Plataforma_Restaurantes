@@ -49,6 +49,12 @@ const mergeRoleDefaults = (role, permisosMap) => ({
   ...getRoleDefaults(role),
   ...(permisosMap || {})
 });
+const escapeHtml = (value) => String(value || "")
+  .replaceAll("&", "&amp;")
+  .replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;")
+  .replaceAll('"', "&quot;")
+  .replaceAll("'", "&#39;");
 
 const renderSummary = () => {
   if (!summary) return;
@@ -111,8 +117,8 @@ const renderTable = () => {
 
     return `
       <tr>
-        <td>${empleado.nombre}</td>
-        <td>${empleado.rol}</td>
+        <td>${escapeHtml(empleado.nombre)}</td>
+        <td>${escapeHtml(empleado.rol)}</td>
         ${switches.map((item) => `<td>${item}</td>`).join("")}
       </tr>
     `;

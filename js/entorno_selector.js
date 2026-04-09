@@ -16,7 +16,8 @@ const LOGGRO_ROUTE_BY_MODULE = [
 
 const SIIGO_ROUTE_BY_MODULE = [
   ["dashboard_siigo", "/Plataforma_Restaurantes/siigo/dashboard_siigo/"],
-  ["subir_facturas_siigo", "/Plataforma_Restaurantes/siigo/subir_facturas_siigo/"]
+  ["subir_facturas_siigo", "/Plataforma_Restaurantes/siigo/subir_facturas_siigo/"],
+  ["nomina", "/Plataforma_Restaurantes/nomina/"]
 ];
 
 const resolveRouteByPermisos = async (env, context) => {
