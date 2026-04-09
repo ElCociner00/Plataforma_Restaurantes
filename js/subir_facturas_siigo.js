@@ -503,6 +503,31 @@ const parseNumericText = (value) => {
 };
 
 const buildRowsFromWebhookRaw = (rawRows = []) => {
+  const isGroupedShape = rawRows.length > 0
+    && (rawRows[0]?.UUID || rawRows[0]?.["Tipo de documento"] || rawRows[0]?.["Fecha Emisión"]);
+
+  if (isGroupedShape) {
+    return rawRows.map((row, idx) => {
+      const invoice = normalizeInvoiceGeneral({
+        UUID: row.UUID || row.uuid_factura || "",
+        Prefijo: row.Prefijo || row["Prefijo Factura"] || "",
+        Consecutivo: row.Consecutivo || row["Consecutivo Factura"] || "",
+        "Fecha Emisión": row["Fecha Emisión"] || row["Fecha Factura"] || "",
+        "Nombre Emisor": row["Nombre Emisor"] || row.Proveedor || "",
+        "NIT Emisor": row["NIT Emisor"] || row.NIT_CC || "",
+        "Tipo de documento": row["Tipo de documento"] || row["Tipo de Factura"] || "",
+        IVA: row.IVA ?? row["Valor IVA"] ?? 0,
+        INC: row.INC ?? row["Valor INC"] ?? 0,
+        Total: row.Total ?? row["Valor Total"] ?? 0,
+        Estado_Siigo: normalizeBoolean(row["Estado_Siigo"])
+      }, [], [], "lista");
+      return { ...invoice, __id: invoiceId(invoice, idx) };
+    });
+  }
+
+  const IVA_CODES = new Set(["24080101", "24080501"]);
+  const INC_CODES = new Set(["24080102"]);
+
   const grouped = new Map();
   rawRows.forEach((item) => {
     const uuid = String(item?.uuid_factura || item?.UUID || "").trim();
@@ -519,17 +544,19 @@ const buildRowsFromWebhookRaw = (rawRows = []) => {
     const fecha = first["Fecha Factura"] || first["Fecha Emisión"] || "";
     const iva = items.reduce((acc, row) => {
       const code = String(row["Código Contable"] || "");
-      return acc + (code === "24080101" ? parseNumericText(row["Valor Débito"]) : 0);
+      return acc + (IVA_CODES.has(code) ? parseNumericText(row["Valor Débito"]) : 0);
     }, 0);
     const inc = items.reduce((acc, row) => {
       const code = String(row["Código Contable"] || "");
-      return acc + (code === "24080102" ? parseNumericText(row["Valor Débito"]) : 0);
+      return acc + (INC_CODES.has(code) ? parseNumericText(row["Valor Débito"]) : 0);
     }, 0);
-    const total = items.reduce((acc, row) => {
+    const totalFromCredits = items.reduce((acc, row) => {
       const code = String(row["Código Contable"] || "");
-      if (code === "24080101" || code === "24080102") return acc;
+      if (IVA_CODES.has(code) || INC_CODES.has(code)) return acc;
       return acc + parseNumericText(row["Valor Crédito"]);
     }, 0);
+    const totalFromSubtotals = items.reduce((acc, row) => acc + parseNumericText(row.Subtotal), 0);
+    const total = totalFromCredits > 0 ? totalFromCredits : totalFromSubtotals;
 
     const details = items.map((detail) => ({
       ...detail,
@@ -544,6 +571,7 @@ const buildRowsFromWebhookRaw = (rawRows = []) => {
       "Fecha Emisión": fecha,
       "Nombre Emisor": first["Proveedor"] || first["Nombre Emisor"] || "",
       "NIT Emisor": first["NIT_CC"] || first["NIT Emisor"] || "",
+      "Tipo de documento": first["Tipo de Factura"] || first["Tipo de documento"] || "",
       IVA: iva,
       INC: inc,
       Total: total,
