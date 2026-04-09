@@ -10,24 +10,6 @@ const state = {
   rows: []
 };
 
-const setStatus = (message) => {
-  if (statusEl) statusEl.textContent = message || "";
-};
-
-const fmtMoney = (value) => Number(value || 0).toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
-const fmtDateTime = (value) => {
-  if (!value) return "-";
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? "-" : d.toLocaleString("es-CO");
-};
-
-const escapeHtml = (value) => String(value || "")
-  .replaceAll("&", "&amp;")
-  .replaceAll("<", "&lt;")
-  .replaceAll(">", "&gt;")
-  .replaceAll('"', "&quot;")
-  .replaceAll("'", "&#39;");
-
 const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ""; };
 const fmtMoney = (v) => Number(v || 0).toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
 const fmtDate = (v) => {
