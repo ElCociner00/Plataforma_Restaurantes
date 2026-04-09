@@ -2,7 +2,8 @@ import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 import {
   WEBHOOK_SUBIR_SIIGO,
-  WEBHOOK_CORREGIR_FACTURA_INCONVENIENTE
+  WEBHOOK_CORREGIR_FACTURA_INCONVENIENTE,
+  WEBHOOK_CARGAR_FACTURAS_CORREO
 } from "./webhooks.js";
 
 const head = document.getElementById("facturasHead");
@@ -409,6 +410,13 @@ const normalizeDateString = (value) => {
   if (!value) return "";
   const normalized = String(value).trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return normalized;
+  const dmy = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmy) {
+    const day = dmy[1].padStart(2, "0");
+    const month = dmy[2].padStart(2, "0");
+    const year = dmy[3];
+    return `${year}-${month}-${day}`;
+  }
   const dateObj = new Date(normalized);
   if (Number.isNaN(dateObj.getTime())) return normalized;
   return dateObj.toISOString().slice(0, 10);
@@ -483,6 +491,78 @@ const fetchFacturasInconvenientes = async (resolved) => {
 
   if (error) throw error;
   return sortByDateDesc(Array.isArray(data) ? data : [], "Fecha Factura");
+};
+
+const parseNumericText = (value) => {
+  if (value == null) return 0;
+  const raw = String(value).trim();
+  if (!raw) return 0;
+  const normalized = raw.replace(/\./g, "").replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const buildRowsFromWebhookRaw = (rawRows = []) => {
+  const grouped = new Map();
+  rawRows.forEach((item) => {
+    const uuid = String(item?.uuid_factura || item?.UUID || "").trim();
+    if (!uuid) return;
+    if (!grouped.has(uuid)) grouped.set(uuid, []);
+    grouped.get(uuid).push(item);
+  });
+
+  return Array.from(grouped.entries()).map(([uuid, items], idx) => {
+    const first = items[0] || {};
+    const prefijo = first["Prefijo Factura"] || first.Prefijo || "";
+    const consecutivo = first["Consecutivo Factura"] || first.Consecutivo || "";
+    const numeroFactura = `${prefijo}${consecutivo}`.trim() || uuid;
+    const fecha = first["Fecha Factura"] || first["Fecha Emisión"] || "";
+    const iva = items.reduce((acc, row) => {
+      const code = String(row["Código Contable"] || "");
+      return acc + (code === "24080101" ? parseNumericText(row["Valor Débito"]) : 0);
+    }, 0);
+    const inc = items.reduce((acc, row) => {
+      const code = String(row["Código Contable"] || "");
+      return acc + (code === "24080102" ? parseNumericText(row["Valor Débito"]) : 0);
+    }, 0);
+    const total = items.reduce((acc, row) => {
+      const code = String(row["Código Contable"] || "");
+      if (code === "24080101" || code === "24080102") return acc;
+      return acc + parseNumericText(row["Valor Crédito"]);
+    }, 0);
+
+    const details = items.map((detail) => ({
+      ...detail,
+      id: detail.id || crypto.randomUUID(),
+      uuid_factura: uuid
+    }));
+
+    const invoice = normalizeInvoiceGeneral({
+      UUID: uuid,
+      Prefijo: prefijo,
+      Consecutivo: consecutivo,
+      "Fecha Emisión": fecha,
+      "Nombre Emisor": first["Proveedor"] || first["Nombre Emisor"] || "",
+      "NIT Emisor": first["NIT_CC"] || first["NIT Emisor"] || "",
+      IVA: iva,
+      INC: inc,
+      Total: total,
+      Estado_Siigo: normalizeBoolean(first["Estado_Siigo"])
+    }, details, [], "lista");
+
+    return { ...invoice, __id: invoiceId(invoice, idx) };
+  });
+};
+
+const loadFacturasFromWebhookFallback = async () => {
+  if (!WEBHOOK_CARGAR_FACTURAS_CORREO) {
+    throw new Error("No hay webhook de emergencia configurado para cargar facturas.");
+  }
+
+  const payload = buildContextPayload();
+  const response = await fetchWebhookWithFallback(WEBHOOK_CARGAR_FACTURAS_CORREO, payload);
+  const rawRows = normalizeRows(response);
+  return sortByDateDesc(buildRowsFromWebhookRaw(rawRows), "fecha_iso");
 };
 
 const normalizeInvoiceDetail = (row = {}, source = "principal") => ({
@@ -1236,50 +1316,57 @@ const enviarCorreccionInconveniente = async (modo) => {
 
 const loadFacturas = async () => {
   setStatus("Consultando facturas...");
-  const generales = await fetchFacturasGenerales();
-  const uuids = [...new Set(generales.map((row) => row.UUID).filter(Boolean))];
-  const detalles = await fetchFacturasDetalles(uuids);
-  const inconvenientesPendientes = await fetchFacturasInconvenientes(false);
-  const inconvenientesResueltos = await fetchFacturasInconvenientes(true);
-  const detailsByUuid = detalles.reduce((acc, item) => {
-    const key = String(item.uuid_factura || "").trim();
-    if (!key) return acc;
-    if (!acc.has(key)) acc.set(key, []);
-    acc.get(key).push(item);
-    return acc;
-  }, new Map());
+  let rows = [];
+  try {
+    const generales = await fetchFacturasGenerales();
+    const uuids = [...new Set(generales.map((row) => row.UUID).filter(Boolean))];
+    const detalles = await fetchFacturasDetalles(uuids);
+    const inconvenientesPendientes = await fetchFacturasInconvenientes(false);
+    const inconvenientesResueltos = await fetchFacturasInconvenientes(true);
+    const detailsByUuid = detalles.reduce((acc, item) => {
+      const key = String(item.uuid_factura || "").trim();
+      if (!key) return acc;
+      if (!acc.has(key)) acc.set(key, []);
+      acc.get(key).push(item);
+      return acc;
+    }, new Map());
 
-  const pendingByUuid = inconvenientesPendientes.reduce((acc, item) => {
-    const key = String(item.uuid_factura || "").trim();
-    if (!key) return acc;
-    if (!acc.has(key)) acc.set(key, []);
-    acc.get(key).push(item);
-    return acc;
-  }, new Map());
+    const pendingByUuid = inconvenientesPendientes.reduce((acc, item) => {
+      const key = String(item.uuid_factura || "").trim();
+      if (!key) return acc;
+      if (!acc.has(key)) acc.set(key, []);
+      acc.get(key).push(item);
+      return acc;
+    }, new Map());
 
-  const resolvedByUuid = inconvenientesResueltos.reduce((acc, item) => {
-    const key = String(item.uuid_factura || "").trim();
-    if (!key) return acc;
-    if (!acc.has(key)) acc.set(key, []);
-    acc.get(key).push(item);
-    return acc;
-  }, new Map());
+    const resolvedByUuid = inconvenientesResueltos.reduce((acc, item) => {
+      const key = String(item.uuid_factura || "").trim();
+      if (!key) return acc;
+      if (!acc.has(key)) acc.set(key, []);
+      acc.get(key).push(item);
+      return acc;
+    }, new Map());
 
-  const rows = generales.map((row, idx) => {
-    const uuid = String(row.UUID || "").trim();
-    const hasPending = pendingByUuid.has(uuid);
-    const hasResolved = resolvedByUuid.has(uuid);
-    const invoice = normalizeInvoiceGeneral(
-      row,
-      detailsByUuid.get(uuid) || [],
-      pendingByUuid.get(uuid) || [],
-      hasPending ? "revision" : (hasResolved ? "corregida" : "lista")
-    );
-    return {
-      ...invoice,
-      __id: invoiceId(invoice, idx)
-    };
-  });
+    rows = generales.map((row, idx) => {
+      const uuid = String(row.UUID || "").trim();
+      const hasPending = pendingByUuid.has(uuid);
+      const hasResolved = resolvedByUuid.has(uuid);
+      const invoice = normalizeInvoiceGeneral(
+        row,
+        detailsByUuid.get(uuid) || [],
+        pendingByUuid.get(uuid) || [],
+        hasPending ? "revision" : (hasResolved ? "corregida" : "lista")
+      );
+      return {
+        ...invoice,
+        __id: invoiceId(invoice, idx)
+      };
+    });
+  } catch (primaryError) {
+    console.warn("Carga principal de facturas falló. Activando fallback webhook.", primaryError);
+    rows = await loadFacturasFromWebhookFallback();
+    setStatus("Facturas cargadas con ruta de emergencia (webhook).");
+  }
 
   state.readyRows = rows.filter((row) => row.estado_revision === "lista");
   state.reviewRows = rows.filter((row) => row.estado_revision === "revision");
