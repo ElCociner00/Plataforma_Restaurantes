@@ -1,6 +1,7 @@
 import { enforceNumericInput } from "../js/input_utils.js";
 import { getUserContext } from "../js/session.js";
 import { supabase } from "../js/supabase.js";
+import { fetchResponsablesActivos } from "../js/responsables.js";
 import { getEmpresaPolicy, puedeEnviarDatos } from "../js/permisos.core.js";
 import {
   WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS,
@@ -595,13 +596,7 @@ const loadResponsables = async () => {
 
   try {
     const empresaId = contextPayload.empresa_id || contextPayload.tenant_id;
-    const { data, error } = await supabase
-      .from("usuarios_sistema")
-      .select("id, nombre_completo, activo")
-      .eq("empresa_id", empresaId)
-      .eq("activo", true)
-      .order("nombre_completo", { ascending: true });
-    const responsables = error ? [] : (Array.isArray(data) ? data : []);
+    const responsables = await fetchResponsablesActivos(empresaId);
     responsablesCache = responsables;
 
     responsable.innerHTML = '<option value="">Seleccione responsable</option>';

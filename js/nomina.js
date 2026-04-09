@@ -1,4 +1,6 @@
 import { getUserContext } from "./session.js";
+import { fetchResponsablesActivos } from "./responsables.js";
+import { getActiveEnvironment } from "./environment.js";
 
 const empresaInput = document.getElementById("nominaEmpresa");
 const fechaInicioInput = document.getElementById("nominaFechaInicio");
@@ -18,12 +20,7 @@ const fmtMoney = (value) => Number(value || 0).toLocaleString("es-CO", {
   maximumFractionDigits: 0
 });
 
-const demoMovimientos = [
-  { empleado: "Operario A", tipo: "Base", naturaleza: "Devengo", valor: 950000, fuente: "Sistema", estado: "Pendiente" },
-  { empleado: "Operario A", tipo: "Propina", naturaleza: "Devengo", valor: 180000, fuente: "Cierre turno", estado: "Pendiente" },
-  { empleado: "Operario A", tipo: "Faltante inventario", naturaleza: "Deducción", valor: 30000, fuente: "Inventarios", estado: "Pendiente" },
-  { empleado: "Operario B", tipo: "Bono apoyo", naturaleza: "Devengo", valor: 10500, fuente: "Apoyos", estado: "Pendiente" }
-];
+const demoMovimientos = [];
 
 const renderResumen = () => {
   const devengado = demoMovimientos
@@ -40,6 +37,14 @@ const renderResumen = () => {
 
 const renderMovimientos = () => {
   if (!movimientosBody) return;
+  if (!demoMovimientos.length) {
+    movimientosBody.innerHTML = `
+      <tr>
+        <td colspan="6">No hay movimientos de borrador para mostrar.</td>
+      </tr>
+    `;
+    return;
+  }
   movimientosBody.innerHTML = demoMovimientos.map((item) => `
     <tr>
       <td>${item.empleado}</td>
@@ -65,8 +70,6 @@ const setDefaultDates = () => {
 
 const init = async () => {
   setDefaultDates();
-  renderResumen();
-  renderMovimientos();
 
   const ctx = await getUserContext().catch(() => null);
   if (!ctx?.empresa_id) {
@@ -74,8 +77,22 @@ const init = async () => {
     return;
   }
 
+  const entorno = getActiveEnvironment() || "sin_entorno";
+  const responsablesActivos = await fetchResponsablesActivos(ctx.empresa_id).catch(() => []);
+  const empleadoA = responsablesActivos[0]?.nombre_completo || "Operario A";
+  const empleadoB = responsablesActivos[1]?.nombre_completo || empleadoA;
+
+  demoMovimientos.splice(0, demoMovimientos.length, ...[
+    { empleado: empleadoA, tipo: "Base", naturaleza: "Devengo", valor: 950000, fuente: "Sistema", estado: "Pendiente" },
+    { empleado: empleadoA, tipo: "Propina", naturaleza: "Devengo", valor: 180000, fuente: "Cierre turno", estado: "Pendiente" },
+    { empleado: empleadoA, tipo: "Faltante inventario", naturaleza: "Deducción", valor: 30000, fuente: "Inventarios", estado: "Pendiente" },
+    { empleado: empleadoB, tipo: "Bono apoyo", naturaleza: "Devengo", valor: 10500, fuente: "Apoyos", estado: "Pendiente" }
+  ]);
+
   empresaInput.value = ctx.empresa_id;
-  statusEl.textContent = "Módulo nómina disponible en modo borrador funcional. Próximo paso: conectar tablas y workflows n8n.";
+  renderResumen();
+  renderMovimientos();
+  statusEl.textContent = `Módulo nómina en borrador habilitado para ${entorno.toUpperCase()} con ${responsablesActivos.length} usuarios activos detectados. Próximo paso: conectar tablas reales y workflows n8n.`;
 };
 
 init();

@@ -2,6 +2,7 @@ import { enforceNumericInput } from "./input_utils.js";
 import { buildRequestHeaders, getUserContext } from "./session.js";
 import { WEBHOOK_REGISTRAR_EMPLEADO } from "./webhooks.js";
 import { supabase } from "./supabase.js";
+import { fetchUsuariosEmpresa } from "./responsables.js";
 
 const form = document.getElementById("registroEmpleadoForm");
 const btnRegistrar = document.getElementById("btnRegistrar");
@@ -56,6 +57,8 @@ function renderUsuarios(rows) {
         <thead>
           <tr>
             <th>Usuario</th>
+            <th>Identificación</th>
+            <th>Origen</th>
             <th>Acceso</th>
           </tr>
         </thead>
@@ -63,9 +66,17 @@ function renderUsuarios(rows) {
           ${rows.map((row) => `
               <tr>
                 <td>${escapeHtml(row.nombre_completo || "Sin nombre")}</td>
+                <td>${escapeHtml(row.cedula || "-")}</td>
+                <td>${escapeHtml(row.source === "otros_usuarios" ? "Revisor/Admin" : "Empleado")}</td>
                 <td>
                   <label class="switch-cell">
-                    <input type="checkbox" data-action="toggleUsuario" data-user-id="${escapeHtml(row.id)}" ${row.activo ? "checked" : ""}>
+                    <input
+                      type="checkbox"
+                      data-action="toggleUsuario"
+                      data-user-id="${escapeHtml(row.id)}"
+                      data-source="${escapeHtml(row.source)}"
+                      ${row.activo ? "checked" : ""}
+                    >
                     <span class="switch-slider"></span>
                   </label>
                 </td>
@@ -85,20 +96,10 @@ async function cargarUsuariosGestion() {
   }
 
   setUsuariosEstado("Cargando usuarios...");
-  const { data, error } = await supabase
-    .from("usuarios_sistema")
-    .select("id,nombre_completo,rol,activo")
-    .eq("empresa_id", context.empresa_id)
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    setUsuariosEstado(`No se pudieron cargar usuarios: ${error.message || "sin detalle"}`);
-    return;
-  }
-
-  const rows = (Array.isArray(data) ? data : []).filter((item) => String(item.rol || "").toLowerCase() !== "admin_root");
-  renderUsuarios(rows);
-  setUsuariosEstado(`Usuarios visibles: ${rows.length}.`);
+  const rows = await fetchUsuariosEmpresa(context.empresa_id);
+  const rowsFiltradas = rows.filter((item) => String(item.rol || "").toLowerCase() !== "admin_root");
+  renderUsuarios(rowsFiltradas);
+  setUsuariosEstado(`Usuarios visibles: ${rowsFiltradas.length}.`);
 }
 
 
@@ -108,16 +109,27 @@ usuariosPanel?.addEventListener("change", async (event) => {
   if (!input) return;
 
   const userId = input.dataset.userId;
+  const source = input.dataset.source;
   if (!userId) return;
 
   input.disabled = true;
   setUsuariosEstado("Actualizando usuario...");
 
-  const { error } = await supabase
-    .from("usuarios_sistema")
-    .update({ activo: input.checked })
-    .eq("id", userId)
-    .neq("rol", "admin_root");
+  let error = null;
+  if (source === "otros_usuarios") {
+    const result = await supabase
+      .from("otros_usuarios")
+      .update({ estado: input.checked ? "activo" : "inactivo" })
+      .eq("id", userId);
+    error = result.error;
+  } else {
+    const result = await supabase
+      .from("usuarios_sistema")
+      .update({ activo: input.checked })
+      .eq("id", userId)
+      .neq("rol", "admin_root");
+    error = result.error;
+  }
 
   if (error) {
     setUsuariosEstado(`No se pudo actualizar: ${error.message || "sin detalle"}`);
