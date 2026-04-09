@@ -502,12 +502,27 @@ const parseNumericText = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const pickValue = (row, keys = []) => {
+  for (const key of keys) {
+    if (row?.[key] !== undefined && row?.[key] !== null && row?.[key] !== "") return row[key];
+  }
+  return "";
+};
+
+const unwrapWebhookRow = (item) => {
+  if (!item || typeof item !== "object") return item;
+  if (item.json && typeof item.json === "object") return item.json;
+  if (item.data && typeof item.data === "object" && !Array.isArray(item.data)) return item.data;
+  return item;
+};
+
 const buildRowsFromWebhookRaw = (rawRows = []) => {
-  const isGroupedShape = rawRows.length > 0
-    && (rawRows[0]?.UUID || rawRows[0]?.["Tipo de documento"] || rawRows[0]?.["Fecha Emisión"]);
+  const normalizedRows = rawRows.map(unwrapWebhookRow).filter((item) => item && typeof item === "object");
+  const isGroupedShape = normalizedRows.length > 0
+    && (normalizedRows[0]?.UUID || normalizedRows[0]?.["Tipo de documento"] || normalizedRows[0]?.["Fecha Emisión"]);
 
   if (isGroupedShape) {
-    return rawRows.map((row, idx) => {
+    return normalizedRows.map((row, idx) => {
       const invoice = normalizeInvoiceGeneral({
         UUID: row.UUID || row.uuid_factura || "",
         Prefijo: row.Prefijo || row["Prefijo Factura"] || "",
@@ -529,8 +544,8 @@ const buildRowsFromWebhookRaw = (rawRows = []) => {
   const INC_CODES = new Set(["24080102"]);
 
   const grouped = new Map();
-  rawRows.forEach((item) => {
-    const uuid = String(item?.uuid_factura || item?.UUID || "").trim();
+  normalizedRows.forEach((item) => {
+    const uuid = String(item?.uuid_factura || item?.UUID || item?.uuid || "").trim();
     if (!uuid) return;
     if (!grouped.has(uuid)) grouped.set(uuid, []);
     grouped.get(uuid).push(item);
@@ -597,16 +612,16 @@ const normalizeInvoiceDetail = (row = {}, source = "principal") => ({
   id_unico: row.id || crypto.randomUUID(),
   source,
   editable_codigo: source !== "principal",
-  producto: row["Producto"] || "",
-  cantidad: row["Cantidad"] || "",
-  valor_unitario: row["Valor Unitario"] || "",
-  subtotal: row["Subtotal"] || "",
-  valor_impuesto: row["Porcentaje INC o IVA"] || "",
-  codigo_contable: row["Código Contable"] || "",
-  codigo_contable_original: row["Código Contable"] || "",
-  valor_debito: row["Valor Débito"] || "",
-  valor_credito: row["Valor Crédito"] || "",
-  descripcion: row["Descripción"] || row["Detalle"] || ""
+  producto: pickValue(row, ["Producto", "producto", "item", "descripcion_producto"]),
+  cantidad: pickValue(row, ["Cantidad", "cantidad"]),
+  valor_unitario: pickValue(row, ["Valor Unitario", "valor_unitario"]),
+  subtotal: pickValue(row, ["Subtotal", "subtotal"]),
+  valor_impuesto: pickValue(row, ["Porcentaje INC o IVA", "porcentaje_inc_o_iva", "valor_impuesto"]),
+  codigo_contable: pickValue(row, ["Código Contable", "Codigo Contable", "codigo_contable"]),
+  codigo_contable_original: pickValue(row, ["Código Contable", "Codigo Contable", "codigo_contable"]),
+  valor_debito: pickValue(row, ["Valor Débito", "Valor Debito", "valor_debito"]),
+  valor_credito: pickValue(row, ["Valor Crédito", "Valor Credito", "valor_credito"]),
+  descripcion: pickValue(row, ["Descripción", "Descripcion", "Detalle", "detalle"])
 });
 
 const normalizeInvoiceGeneral = (row = {}, details = [], inconvenientes = [], estadoRevision = "lista") => {
@@ -624,10 +639,10 @@ const normalizeInvoiceGeneral = (row = {}, details = [], inconvenientes = [], es
     fecha_iso: normalizeDateString(row["Fecha Emisión"]),
     proveedor: row["Nombre Emisor"] || "",
     nit: row["NIT Emisor"] || "",
-    direccion: firstDetail["Dirección"] || "",
-    telefono: firstDetail["Télefono"] || "",
-    correo_empresa: firstDetail["Correo Empresa"] || "",
-    estado: firstDetail["Estado"] || "no_registrado",
+    direccion: pickValue(firstDetail, ["Dirección", "Direccion", "direccion"]),
+    telefono: pickValue(firstDetail, ["Télefono", "Telefono", "telefono"]),
+    correo_empresa: pickValue(firstDetail, ["Correo Empresa", "correo_empresa"]),
+    estado: pickValue(firstDetail, ["Estado", "estado"]) || "no_registrado",
     tipo_factura: row["Tipo de documento"] || firstDetail["Tipo de Factura"] || "",
     iva: safeNumber(row["IVA"]),
     inc: safeNumber(row["INC"]),
