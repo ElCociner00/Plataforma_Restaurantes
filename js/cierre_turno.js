@@ -1,6 +1,7 @@
 import { enforceNumericInput } from "./input_utils.js";
 import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
+import { fetchResponsablesActivos } from "./responsables.js";
 import { getEmpresaPolicy, puedeEnviarDatos } from "./permisos.core.js";
 import {
   WEBHOOK_CONSULTAR_DATOS_CIERRE,
@@ -517,13 +518,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!contextPayload) return;
 
       const empresaId = contextPayload.empresa_id || contextPayload.tenant_id;
-      const { data, error } = await supabase
-        .from("usuarios_sistema")
-        .select("id, nombre_completo, activo")
-        .eq("empresa_id", empresaId)
-        .eq("activo", true)
-        .order("nombre_completo", { ascending: true });
-      const responsables = error ? [] : (Array.isArray(data) ? data : []);
+      const responsables = await fetchResponsablesActivos(empresaId);
 
 
 

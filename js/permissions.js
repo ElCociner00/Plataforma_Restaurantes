@@ -20,7 +20,7 @@ export const PAGE_ENVIRONMENT = {
   configuracion_siigo: "siigo",
   subir_facturas_siigo: "siigo",
   historico_facturas_siigo: "siigo",
-  nomina: "siigo"
+  nomina: ["siigo", "loggro"]
 };
 
 export const DEFAULT_ROLE_PERMISSIONS = {
