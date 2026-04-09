@@ -40,6 +40,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnToggleEfectivoSistema = document.getElementById("toggleEfectivoSistema");
   const efectivoSistemaModo = document.getElementById("efectivoSistemaModo");
   const totalGastosExtrasEl = document.getElementById("totalGastosExtras");
+  const totalIngresosSistemaEl = document.getElementById("totalIngresosSistema");
+  const totalIngresosRealesEl = document.getElementById("totalIngresosReales");
+  const totalGastosTurnoEl = document.getElementById("totalGastosTurno");
+  const totalVentaDiaBrutaEl = document.getElementById("totalVentaDiaBruta");
+  const totalVentaDiaNetaEl = document.getElementById("totalVentaDiaNeta");
+  const totalDiferenciaGeneralEl = document.getElementById("totalDiferenciaGeneral");
   const correccionWrap = document.getElementById("correccionWrap");
   const btnSolicitarCorreccion = document.getElementById("solicitarCorreccion");
   const modalCorreccion = document.getElementById("modalCorreccion");
@@ -151,6 +157,40 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const getEfectivoSistemaNeto = () => getEfectivoSistemaBruto() - getTotalGastosExtras();
 
+  const getTotalIngresosSistema = () => (
+    toNumberValue(inputsFinanzas.efectivo.sistema?.value)
+    + toNumberValue(inputsFinanzas.datafono.sistema?.value)
+    + toNumberValue(inputsFinanzas.rappi.sistema?.value)
+    + toNumberValue(inputsFinanzas.nequi.sistema?.value)
+    + toNumberValue(inputsFinanzas.transferencias.sistema?.value)
+    + toNumberValue(inputsFinanzas.bono_regalo.sistema?.value)
+  );
+
+  const getTotalIngresosReales = () => (
+    toNumberValue(inputsFinanzas.efectivo.real?.value)
+    + toNumberValue(inputsFinanzas.datafono.real?.value)
+    + toNumberValue(inputsFinanzas.rappi.real?.value)
+    + toNumberValue(inputsFinanzas.nequi.real?.value)
+    + toNumberValue(inputsFinanzas.transferencias.real?.value)
+    + toNumberValue(inputsFinanzas.bono_regalo.real?.value)
+  );
+
+  const renderTotalizados = () => {
+    const totalSistema = getTotalIngresosSistema();
+    const totalReal = getTotalIngresosReales();
+    const totalGastos = getTotalGastosExtras();
+    const ventaBruta = totalReal;
+    const ventaNeta = totalReal - totalGastos;
+    const diferenciaGeneral = totalReal - totalSistema;
+
+    if (totalIngresosSistemaEl) totalIngresosSistemaEl.textContent = formatCOP(totalSistema);
+    if (totalIngresosRealesEl) totalIngresosRealesEl.textContent = formatCOP(totalReal);
+    if (totalGastosTurnoEl) totalGastosTurnoEl.textContent = formatCOP(totalGastos);
+    if (totalVentaDiaBrutaEl) totalVentaDiaBrutaEl.textContent = formatCOP(ventaBruta);
+    if (totalVentaDiaNetaEl) totalVentaDiaNetaEl.textContent = formatCOP(ventaNeta);
+    if (totalDiferenciaGeneralEl) totalDiferenciaGeneralEl.textContent = formatCOP(diferenciaGeneral);
+  };
+
   const syncEfectivoSistemaDisplay = () => {
     const bruto = getEfectivoSistemaBruto();
     const neto = getEfectivoSistemaNeto();
@@ -161,6 +201,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ? "efectivo despues de gastos"
         : "efectivo bruto";
     }
+    renderTotalizados();
   };
 
   const syncTotalesExtras = () => {
@@ -168,6 +209,7 @@ document.addEventListener("DOMContentLoaded", () => {
       totalGastosExtrasEl.textContent = String(getTotalGastosExtras());
     }
     syncEfectivoSistemaDisplay();
+    renderTotalizados();
   };
 
   enforceNumericInput([
@@ -683,6 +725,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     });
+    renderTotalizados();
     return settings;
   };
 
@@ -763,6 +806,7 @@ document.addEventListener("DOMContentLoaded", () => {
   syncEfectivoRealFromCajaBolsa();
   syncEfectivoSistemaDisplay();
   syncTotalesExtras();
+  renderTotalizados();
   actualizarEstadoHoraFin();
   populateHoraLlegadaOptions();
   cargarPoliticaEmpresa();
@@ -805,7 +849,10 @@ document.addEventListener("DOMContentLoaded", () => {
     syncDiferenciaEfectivo();
   });
   Object.values(inputsFinanzas).forEach((grupo) => {
-    grupo.real.addEventListener("input", marcarComoNoVerificado);
+    grupo.real.addEventListener("input", () => {
+      renderTotalizados();
+      marcarComoNoVerificado();
+    });
   });
   Object.values(inputsDiferencias).forEach(({ input }) => {
     input.addEventListener("input", marcarComoNoVerificado);

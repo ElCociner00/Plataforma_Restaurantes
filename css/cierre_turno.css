@@ -325,6 +325,39 @@ input:not([readonly]) {
   border-radius: 8px;
 }
 
+.totales-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.total-card {
+  border: 1px solid #ddd6fe;
+  background: #faf5ff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.total-label {
+  font-size: 0.84rem;
+  color: #6b21a8;
+  font-weight: 600;
+}
+
+.total-card strong {
+  font-size: 1rem;
+  color: #312e81;
+}
+
+.totales-note {
+  margin-top: 10px;
+  font-size: 0.84rem;
+  color: #5b21b6;
+}
+
 @media (max-width: 768px) {
   .apertura-grid {
     grid-template-columns: 1fr;
