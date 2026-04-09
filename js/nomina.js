@@ -1,57 +1,81 @@
 import { getUserContext } from "./session.js";
 
-const payloadPreview = document.getElementById("payloadNominaPreview");
-const checklistEl = document.getElementById("nominaChecklist");
+const empresaInput = document.getElementById("nominaEmpresa");
+const fechaInicioInput = document.getElementById("nominaFechaInicio");
+const fechaFinInput = document.getElementById("nominaFechaFin");
+const corteSelect = document.getElementById("nominaCorte");
+
+const totalDevengadoEl = document.getElementById("nominaTotalDevengado");
+const totalDeduccionesEl = document.getElementById("nominaTotalDeducciones");
+const totalNetoEl = document.getElementById("nominaTotalNeto");
+
+const movimientosBody = document.getElementById("nominaMovimientosBody");
 const statusEl = document.getElementById("nominaStatus");
 
-const payloadEjemplo = {
-  empresa_id: "<UUID_EMPRESA>",
-  periodo: {
-    fecha_inicio: "2026-04-01",
-    fecha_fin: "2026-04-15",
-    corte: "quincenal"
-  },
-  empleado_id: "<UUID_USUARIO>",
-  entradas: {
-    salario_base_proporcional: 950000,
-    horas_extras_valor: 120000,
-    propinas_valor: 180000,
-    bonos_apoyo_valor: 50000
-  },
-  descuentos: {
-    inventario_valor: 30000,
-    otros_descuentos_valor: 10000
-  },
-  reglas: {
-    porcentaje_descuento_fallas: 100,
-    reconocimiento_apoyo_por_hora: 7000
-  },
-  neto_estimado: 1260000,
-  fuentes: {
-    cierres_turno: ["<id_cierre_1>", "<id_cierre_2>"],
-    cierres_inventario: ["<id_inv_1>"],
-    apoyos_turno: ["<id_apoyo_1>"]
-  }
-};
+const fmtMoney = (value) => Number(value || 0).toLocaleString("es-CO", {
+  style: "currency",
+  currency: "COP",
+  maximumFractionDigits: 0
+});
 
-const checklist = [
-  "Crear tablas SQL del módulo nómina (004_nomina_core.sql).",
-  "Insertar datos de prueba para empresa test (005_nomina_seed_test.sql).",
-  "Crear workflow n8n: consolidación de movimientos y desprendible.",
-  "Crear UI final de liquidación y aprobación por periodo."
+const demoMovimientos = [
+  { empleado: "Operario A", tipo: "Base", naturaleza: "Devengo", valor: 950000, fuente: "Sistema", estado: "Pendiente" },
+  { empleado: "Operario A", tipo: "Propina", naturaleza: "Devengo", valor: 180000, fuente: "Cierre turno", estado: "Pendiente" },
+  { empleado: "Operario A", tipo: "Faltante inventario", naturaleza: "Deducción", valor: 30000, fuente: "Inventarios", estado: "Pendiente" },
+  { empleado: "Operario B", tipo: "Bono apoyo", naturaleza: "Devengo", valor: 10500, fuente: "Apoyos", estado: "Pendiente" }
 ];
 
-const render = async () => {
-  payloadPreview.textContent = JSON.stringify(payloadEjemplo, null, 2);
-  checklistEl.innerHTML = checklist.map((item) => `<li>${item}</li>`).join("");
+const renderResumen = () => {
+  const devengado = demoMovimientos
+    .filter((item) => item.naturaleza === "Devengo")
+    .reduce((acc, item) => acc + Number(item.valor || 0), 0);
+  const deducciones = demoMovimientos
+    .filter((item) => item.naturaleza === "Deducción")
+    .reduce((acc, item) => acc + Number(item.valor || 0), 0);
+
+  if (totalDevengadoEl) totalDevengadoEl.textContent = fmtMoney(devengado);
+  if (totalDeduccionesEl) totalDeduccionesEl.textContent = fmtMoney(deducciones);
+  if (totalNetoEl) totalNetoEl.textContent = fmtMoney(devengado - deducciones);
+};
+
+const renderMovimientos = () => {
+  if (!movimientosBody) return;
+  movimientosBody.innerHTML = demoMovimientos.map((item) => `
+    <tr>
+      <td>${item.empleado}</td>
+      <td>${item.tipo}</td>
+      <td>${item.naturaleza}</td>
+      <td>${fmtMoney(item.valor)}</td>
+      <td>${item.fuente}</td>
+      <td>${item.estado}</td>
+    </tr>
+  `).join("");
+};
+
+const setDefaultDates = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const start = new Date(year, month, 1);
+  const end = new Date(year, month, 15);
+  fechaInicioInput.value = start.toISOString().slice(0, 10);
+  fechaFinInput.value = end.toISOString().slice(0, 10);
+  corteSelect.value = "quincenal";
+};
+
+const init = async () => {
+  setDefaultDates();
+  renderResumen();
+  renderMovimientos();
 
   const ctx = await getUserContext().catch(() => null);
   if (!ctx?.empresa_id) {
-    statusEl.textContent = "No se pudo resolver la empresa activa para esta sesión.";
+    statusEl.textContent = "No se pudo resolver la empresa activa para este módulo.";
     return;
   }
 
-  statusEl.textContent = `Empresa activa detectada: ${ctx.empresa_id}. Este módulo está en fase borrador y listo para conectarse a BD.`;
+  empresaInput.value = ctx.empresa_id;
+  statusEl.textContent = "Módulo nómina disponible en modo borrador funcional. Próximo paso: conectar tablas y workflows n8n.";
 };
 
-render();
+init();

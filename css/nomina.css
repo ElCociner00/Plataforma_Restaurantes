@@ -1,5 +1,5 @@
 .nomina-main {
-  max-width: 980px;
+  max-width: 1020px;
 }
 
 .intro {
@@ -7,24 +7,71 @@
   font-size: 0.95rem;
 }
 
-.payload-preview {
-  background: #0f172a;
-  color: #e2e8f0;
-  border: 1px solid #334155;
+.nomina-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.nomina-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.88rem;
+}
+
+.nomina-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.nomina-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.nomina-card {
+  border: 1px solid #ddd6fe;
+  background: #f5f3ff;
   border-radius: 10px;
-  padding: 14px;
-  font-size: 0.82rem;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nomina-card span {
+  font-size: 0.85rem;
+  color: #6b21a8;
+}
+
+.nomina-card strong {
+  color: #312e81;
+  font-size: 1rem;
+}
+
+.tabla-wrap {
   overflow: auto;
 }
 
-.checklist {
-  margin: 0;
-  padding-left: 18px;
-  color: #374151;
+.nomina-table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-.checklist li {
-  margin-bottom: 6px;
+.nomina-table th,
+.nomina-table td {
+  border: 1px solid #e5e7eb;
+  padding: 8px;
+  text-align: left;
+  font-size: 0.86rem;
+}
+
+.nomina-table th {
+  background: #f3f4f6;
 }
 
 .status {

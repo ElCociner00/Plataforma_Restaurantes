@@ -418,23 +418,36 @@ const toSelectColumns = (columns = []) => columns
   .map((column) => (column.match(/^[a-z_][a-z0-9_]*$/i) ? column : `"${column}"`))
   .join(", ");
 
+const sortByDateDesc = (rows = [], key) => [...rows].sort((a, b) => {
+  const aDate = new Date(String(a?.[key] || ""));
+  const bDate = new Date(String(b?.[key] || ""));
+  const aTime = Number.isNaN(aDate.getTime()) ? 0 : aDate.getTime();
+  const bTime = Number.isNaN(bDate.getTime()) ? 0 : bDate.getTime();
+  return bTime - aTime;
+});
+
 const fetchFacturasGenerales = async () => {
   const empresaId = state.context?.empresa_id;
   if (!empresaId) return [];
+  const views = ["vista_facturas_agrupadas", "vista_facturas_agrupadas_empresa"];
+  let lastError = null;
 
-  const baseQuery = supabase
-    .from("vista_facturas_agrupadas")
-    .select(toSelectColumns(GENERAL_VIEW_COLUMNS))
-    .eq("empresa_id", String(empresaId));
+  for (const viewName of views) {
+    const response = await supabase
+      .from(viewName)
+      .select(toSelectColumns(GENERAL_VIEW_COLUMNS))
+      .eq("empresa_id", String(empresaId));
 
-  let response = await baseQuery.order("Fecha Emisión", { ascending: false });
-  if (response.error) {
-    // Fallback defensivo: algunas configuraciones PostgREST pueden fallar con order en columnas con espacios.
-    response = await baseQuery;
+    if (response.error) {
+      lastError = response.error;
+      continue;
+    }
+
+    const rows = Array.isArray(response.data) ? response.data : [];
+    return sortByDateDesc(rows, "Fecha Emisión");
   }
 
-  if (response.error) throw response.error;
-  return Array.isArray(response.data) ? response.data : [];
+  throw lastError || new Error("No se pudo consultar la vista de facturas.");
 };
 
 const fetchFacturasDetalles = async (uuids = []) => {
@@ -446,8 +459,7 @@ const fetchFacturasDetalles = async (uuids = []) => {
     .from("facturas_empresas")
     .select(toSelectColumns(columns))
     .in("uuid_factura", uuids)
-    .eq("empresa_id", empresaId)
-    .order("Fecha Factura", { ascending: false });
+    .eq("empresa_id", empresaId);
 
   let response = await runQuery(DETAIL_TABLE_COLUMNS);
   if (response.error) {
@@ -456,7 +468,7 @@ const fetchFacturasDetalles = async (uuids = []) => {
   }
 
   if (response.error) throw response.error;
-  return Array.isArray(response.data) ? response.data : [];
+  return sortByDateDesc(Array.isArray(response.data) ? response.data : [], "Fecha Factura");
 };
 
 const fetchFacturasInconvenientes = async (resolved) => {
@@ -467,11 +479,10 @@ const fetchFacturasInconvenientes = async (resolved) => {
     .from("facturas_empresas_inconvenientes")
     .select(toSelectColumns(INCONVENIENTES_TABLE_COLUMNS))
     .eq("empresa_id", empresaId)
-    .eq("Estado_Resuelto", resolved)
-    .order("Fecha Factura", { ascending: false });
+    .eq("Estado_Resuelto", resolved);
 
   if (error) throw error;
-  return Array.isArray(data) ? data : [];
+  return sortByDateDesc(Array.isArray(data) ? data : [], "Fecha Factura");
 };
 
 const normalizeInvoiceDetail = (row = {}, source = "principal") => ({

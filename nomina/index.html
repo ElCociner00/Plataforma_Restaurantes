@@ -15,30 +15,81 @@
   <script type="module" src="../js/header.js"></script>
 
   <div class="main nomina-main">
-    <h1>Módulo Nómina (Borrador funcional)</h1>
-    <p class="intro">
-      Esta pantalla sirve como base para iniciar la implementación de nómina multitenant.
-      Aquí encontrarás el payload sugerido, tablas requeridas y checklist de integración n8n + Supabase.
-    </p>
+    <h1>Nómina</h1>
+    <p class="intro">Gestión de periodos, movimientos y desprendibles por empresa.</p>
 
     <section class="bloque">
-      <h2>1) Flujo sugerido</h2>
-      <ol>
-        <li>Seleccionar periodo de nómina.</li>
-        <li>Consolidar cierres de turno + inventarios + apoyos.</li>
-        <li>Generar movimientos de nómina por empleado.</li>
-        <li>Aprobar movimientos y emitir desprendibles.</li>
-      </ol>
+      <h2>Periodo de nómina</h2>
+      <div class="nomina-grid">
+        <label>Empresa
+          <input id="nominaEmpresa" type="text" readonly>
+        </label>
+        <label>Corte
+          <select id="nominaCorte">
+            <option value="quincenal">Quincenal</option>
+            <option value="mensual">Mensual</option>
+          </select>
+        </label>
+        <label>Fecha inicio
+          <input id="nominaFechaInicio" type="date">
+        </label>
+        <label>Fecha fin
+          <input id="nominaFechaFin" type="date">
+        </label>
+      </div>
+      <div class="nomina-actions">
+        <button type="button" id="crearPeriodoNomina">Crear período</button>
+        <button type="button" id="liquidarPeriodoNomina" disabled>Liquidar período</button>
+      </div>
     </section>
 
     <section class="bloque">
-      <h2>2) Payload sugerido para cálculo</h2>
-      <pre id="payloadNominaPreview" class="payload-preview"></pre>
+      <h2>Resumen del período</h2>
+      <div class="nomina-cards">
+        <article class="nomina-card">
+          <span>Devengado</span>
+          <strong id="nominaTotalDevengado">$0,00</strong>
+        </article>
+        <article class="nomina-card">
+          <span>Deducciones</span>
+          <strong id="nominaTotalDeducciones">$0,00</strong>
+        </article>
+        <article class="nomina-card">
+          <span>Neto</span>
+          <strong id="nominaTotalNeto">$0,00</strong>
+        </article>
+      </div>
     </section>
 
     <section class="bloque">
-      <h2>3) Estado actual</h2>
-      <ul id="nominaChecklist" class="checklist"></ul>
+      <h2>Movimientos de nómina</h2>
+      <div class="tabla-wrap">
+        <table class="nomina-table">
+          <thead>
+            <tr>
+              <th>Empleado</th>
+              <th>Tipo</th>
+              <th>Naturaleza</th>
+              <th>Valor</th>
+              <th>Fuente</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="nominaMovimientosBody">
+            <tr>
+              <td colspan="6">Sin datos para mostrar.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="bloque">
+      <h2>Desprendibles</h2>
+      <div class="nomina-actions">
+        <button type="button" id="generarDesprendibles" disabled>Generar desprendibles</button>
+        <button type="button" id="descargarDesprendibles" disabled>Descargar desprendibles</button>
+      </div>
       <div id="nominaStatus" class="status"></div>
     </section>
   </div>
