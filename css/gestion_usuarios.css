@@ -2,81 +2,56 @@
   max-width: min(1100px, 96vw);
 }
 
-form {
-  max-width: 640px;
-  margin: 0 auto;
-}
-
-form label {
-  text-align: center;
-  display: block;
-}
-
-form input {
-  text-align: center;
-}
-
-input[type="text"],
-input[type="password"],
-input[type="date"],
-input[type="email"] {
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 12px;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-}
-
-button[type="submit"] {
-  margin-top: 12px;
-}
-
-#status {
-  margin-top: 10px;
-  font-size: 0.9rem;
-}
-
-.usuarios-gestion-box {
-  margin-top: 26px;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 14px;
-  background: #fff;
-}
-
-.usuarios-gestion-box h2 {
-  margin: 0 0 6px;
-}
-
-.usuarios-help {
-  margin: 0 0 10px;
+.intro {
+  margin: 0 0 12px;
   color: #4b5563;
+}
+
+.status {
+  margin-bottom: 12px;
   font-size: 0.92rem;
 }
 
-.usuarios-tabla-wrap {
-  width: 100%;
+.tabla-wrap {
   overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
 }
 
 .usuarios-tabla {
   width: 100%;
-  min-width: 620px;
+  min-width: 880px;
   border-collapse: collapse;
-  font-size: 14px;
 }
 
 .usuarios-tabla th,
 .usuarios-tabla td {
-  padding: 10px;
   border-bottom: 1px solid #e5e7eb;
+  padding: 10px;
   text-align: center;
+  font-size: 14px;
 }
 
-.usuarios-estado,
-.usuarios-vacio {
-  margin-top: 10px;
-  font-size: 13px;
+.usuarios-tabla th {
+  background: #f9fafb;
+}
+
+.badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.badge.empleado {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.badge.otro {
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .switch-cell {
@@ -119,11 +94,4 @@ button[type="submit"] {
 
 .switch-cell input:checked + .switch-slider::before {
   transform: translateX(22px);
-}
-
-@media (max-width: 700px) {
-  .main,
-  form {
-    max-width: 100%;
-  }
 }

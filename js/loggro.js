@@ -1,4 +1,5 @@
 import { getUserContext } from "./session.js";
+import { buildRequestHeaders } from "./session.js";
 import { WEBHOOK_REGISTRO_CREDENCIALES } from "./webhooks.js";
 
 const form = document.getElementById("loggroForm");
@@ -42,9 +43,13 @@ form.addEventListener("submit", async (event) => {
   };
 
   try {
+    const authHeaders = await buildRequestHeaders({ includeTenant: true });
     const res = await fetch(WEBHOOK_REGISTRO_CREDENCIALES, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders
+      },
       body: JSON.stringify(payload)
     });
 

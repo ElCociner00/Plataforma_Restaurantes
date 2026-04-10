@@ -1,6 +1,7 @@
 import { supabase } from "./supabase.js";
 import { getUserContext, obtenerUsuarioActual } from "./session.js";
 import { isEmpresaReadOnlyPlan, normalizeEmpresaActiva, resolveEmpresaPlan } from "./plan.js";
+import { DEFAULT_ROLE_PERMISSIONS } from "./permissions.js";
 
 let permisosCache = null;
 let permisosCacheKey = null;
@@ -189,10 +190,20 @@ export async function getPermisosEfectivos(usuarioId, empresaId, forceRefresh = 
       if (!fallback?.error && Array.isArray(fallback?.data) && fallback.data.length) {
         permisos = fallback.data;
       }
+
+      if (!permisos.length) {
+        const byRole = DEFAULT_ROLE_PERMISSIONS?.[rol] || {};
+        permisos = Object.entries(byRole).map(([modulo, permitido]) => ({
+          modulo,
+          permitido: permitido === true
+        }));
+      }
     }
   }
 
-  if (error && !permisos.length) throw error;
+  if (error && !permisos.length) {
+    permisos = [];
+  }
   permisosCacheSet(permisos);
   permisosCacheKey = cacheKey;
 
