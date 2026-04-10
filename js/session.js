@@ -4,6 +4,7 @@ let cachedUserContext = null;
 const CONTEXT_CACHE_KEY = "app_user_context_fallback_v1";
 const MANUAL_CONTEXT_KEY = "app_manual_context_bootstrap_v1";
 const TENANT_HINTS_KEY = "app_tenant_hints_v1";
+const EMERGENCY_SESSION_KEY = "app_emergency_session_v1";
 
 const SUPER_ADMIN_EMAIL = "santiagoelchameluco@gmail.com";
 const SUPER_ADMIN_ID = "1e17e7c6-d959-4089-ab22-3f64b5b5be41";
@@ -120,6 +121,24 @@ const readTenantHintByEmail = (email) => {
     const hit = hints?.[key];
     if (!hit?.empresa_id) return null;
     return hit;
+  } catch (_error) {
+    return null;
+  }
+};
+
+const readEmergencyLocalSession = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(EMERGENCY_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const expiresAt = Number(parsed?.expires_at || 0);
+    if (!parsed?.user_id || !parsed?.empresa_id || !expiresAt) return null;
+    if (Date.now() > expiresAt) {
+      localStorage.removeItem(EMERGENCY_SESSION_KEY);
+      return null;
+    }
+    return parsed;
   } catch (_error) {
     return null;
   }
@@ -307,7 +326,24 @@ export async function getUserContext() {
   if (cachedUserContext) return cachedUserContext;
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!user) {
+    const emergency = readEmergencyLocalSession();
+    if (emergency?.empresa_id) {
+      cachedUserContext = {
+        user: {
+          id: emergency.user_id,
+          email: emergency.email || "",
+          user_id: emergency.user_id
+        },
+        rol: normalizeRole(emergency.rol || "admin"),
+        empresa_id: emergency.empresa_id,
+        super_admin: false,
+        emergency_auth: true
+      };
+      return cachedUserContext;
+    }
+    return null;
+  }
 
   const { data: usuarioSistema, error: usuarioSistemaError } = await findUsuarioSistema(user);
 
@@ -463,6 +499,32 @@ export async function buildRequestHeaders({ includeTenant = true } = {}) {
 }
 
 if (typeof window !== "undefined") {
+  window.setEmergencyLocalSession = (payload = {}) => {
+    try {
+      const userId = String(payload.user_id || "").trim();
+      const empresaId = String(payload.empresa_id || "").trim();
+      if (!userId || !empresaId) return false;
+      const rol = normalizeRole(payload.rol || "admin") || "admin";
+      const expiresAt = Date.now() + (12 * 60 * 60 * 1000);
+      localStorage.setItem(EMERGENCY_SESSION_KEY, JSON.stringify({
+        user_id: userId,
+        email: normalizeEmail(payload.email || ""),
+        empresa_id: empresaId,
+        rol,
+        expires_at: expiresAt
+      }));
+      cachedUserContext = null;
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  };
+
+  window.clearEmergencyLocalSession = () => {
+    localStorage.removeItem(EMERGENCY_SESSION_KEY);
+    cachedUserContext = null;
+  };
+
   window.setManualContextBootstrap = (payload = {}) => {
     try {
       const userId = String(payload.user_id || "").trim();

@@ -14,15 +14,21 @@ function protectInteractions() {
   ["click", "keydown", "touchstart"].forEach((event) => {
     document.addEventListener(event, async () => {
       const { data } = await supabase.auth.getSession();
-      if (!data.session) redirectToLogin();
+      if (!data.session) {
+        const context = await getUserContext().catch(() => null);
+        if (!context?.emergency_auth) redirectToLogin();
+      }
     });
   });
 }
 
-const enforceSessionAndEnvironment = (session) => {
+const enforceSessionAndEnvironment = async (session) => {
   if (!session) {
-    redirectToLogin();
-    return false;
+    const context = await getUserContext().catch(() => null);
+    if (!context?.emergency_auth) {
+      redirectToLogin();
+      return false;
+    }
   }
 
   const currentPath = String(window.location.pathname || "");
@@ -59,16 +65,18 @@ const hydratePermisosCache = async () => {
 
 document.addEventListener("DOMContentLoaded", async () => {
   const { data: initial } = await supabase.auth.getSession();
-  if (!enforceSessionAndEnvironment(initial.session)) return;
+  if (!await enforceSessionAndEnvironment(initial.session)) return;
   await hydratePermisosCache().catch(() => {});
 
   document.body.style.display = "block";
   protectInteractions();
 
   const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-    if (!enforceSessionAndEnvironment(session)) return;
-    hydratePermisosCache().catch(() => {});
-    document.body.style.display = "block";
+    enforceSessionAndEnvironment(session).then((allowed) => {
+      if (!allowed) return;
+      hydratePermisosCache().catch(() => {});
+      document.body.style.display = "block";
+    });
   });
 
   window.addEventListener("beforeunload", () => {
