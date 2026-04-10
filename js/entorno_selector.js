@@ -63,4 +63,5 @@ const initRoleUi = async () => {
 
 btnLoggro?.addEventListener("click", () => goByRole(ENV_LOGGRO));
 btnSiigo?.addEventListener("click", () => goByRole(ENV_SIIGO));
+
 initRoleUi();

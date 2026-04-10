@@ -43,8 +43,25 @@ form.addEventListener("submit", async (e) => {
     console.log("Contexto obtenido:", context);
 
     if (!context) {
-      alert("Usuario autenticado, pero sin contexto completo. Se activará modo de emergencia.");
-      window.location.href = "/Plataforma_Restaurantes/entorno/";
+      let recovered = null;
+      if (typeof window.bootstrapContextByIdentity === "function") {
+        recovered = await window.bootstrapContextByIdentity({ email });
+      }
+
+      if (!recovered) {
+        const cedula = window.prompt("No se encontró contexto automático. Ingresa tu cédula para validar acceso:");
+        if (cedula && typeof window.bootstrapContextByIdentity === "function") {
+          recovered = await window.bootstrapContextByIdentity({ email, cedula });
+        }
+      }
+
+      if (recovered?.empresa_id) {
+        alert("Acceso recuperado correctamente.");
+        window.location.href = "/Plataforma_Restaurantes/entorno/";
+        return;
+      }
+
+      alert("No se pudo validar tu contexto. Contacta al administrador.");
       return;
     }
 

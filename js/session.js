@@ -2,6 +2,7 @@ import { supabase } from "./supabase.js";
 
 let cachedUserContext = null;
 const CONTEXT_CACHE_KEY = "app_user_context_fallback_v1";
+const MANUAL_CONTEXT_KEY = "app_manual_context_bootstrap_v1";
 
 const SUPER_ADMIN_EMAIL = "santiagoelchameluco@gmail.com";
 const SUPER_ADMIN_ID = "1e17e7c6-d959-4089-ab22-3f64b5b5be41";
@@ -96,6 +97,83 @@ const readContextFallback = (user) => {
     return null;
   }
 };
+
+const readManualContext = (user) => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(MANUAL_CONTEXT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.user_id !== user?.id) return null;
+    if (!parsed.empresa_id) return null;
+    return {
+      user,
+      rol: normalizeRole(parsed.rol || "admin"),
+      empresa_id: parsed.empresa_id,
+      super_admin: false,
+      fallback: true,
+      manual_bootstrap: true
+    };
+  } catch (_error) {
+    return null;
+  }
+};
+
+async function resolveContextByIdentity({ user, email, cedula }) {
+  const normalizedEmail = normalizeEmail(email || user?.email);
+  const normalizedCedula = String(cedula || "").trim();
+
+  if (normalizedEmail) {
+    const { data: userByEmail } = await supabase
+      .from("usuarios_sistema")
+      .select("empresa_id, rol, activo, nombre_completo")
+      .eq("nombre_completo", normalizedEmail)
+      .maybeSingle();
+    if (userByEmail && isRecordActive(userByEmail) && userByEmail.empresa_id) {
+      return {
+        user,
+        rol: normalizeRole(userByEmail.rol || "admin"),
+        empresa_id: userByEmail.empresa_id,
+        super_admin: false,
+        fallback: true
+      };
+    }
+  }
+
+  if (normalizedCedula) {
+    const { data: empleadoByCedula } = await supabase
+      .from("empleados")
+      .select("empresa_id, estado")
+      .eq("cedula", normalizedCedula)
+      .maybeSingle();
+    if (empleadoByCedula && isRecordActive(empleadoByCedula) && empleadoByCedula.empresa_id) {
+      return {
+        user,
+        rol: "operativo",
+        empresa_id: empleadoByCedula.empresa_id,
+        super_admin: false,
+        fallback: true
+      };
+    }
+
+    const { data: otroByCedula } = await supabase
+      .from("otros_usuarios")
+      .select("empresa_id, estado")
+      .eq("cedula", normalizedCedula)
+      .maybeSingle();
+    if (otroByCedula && isRecordActive(otroByCedula) && otroByCedula.empresa_id) {
+      return {
+        user,
+        rol: "revisor",
+        empresa_id: otroByCedula.empresa_id,
+        super_admin: false,
+        fallback: true
+      };
+    }
+  }
+
+  return null;
+}
 
 async function resolveContextByCreator(user) {
   const userId = String(user?.id || "").trim();
@@ -220,6 +298,12 @@ export async function getUserContext() {
     return cachedUserContext;
   }
 
+  const manualContext = readManualContext(user);
+  if (manualContext?.empresa_id) {
+    cachedUserContext = manualContext;
+    return cachedUserContext;
+  }
+
   return null;
 }
 
@@ -301,6 +385,45 @@ export async function buildRequestHeaders({ includeTenant = true } = {}) {
 }
 
 if (typeof window !== "undefined") {
+  window.setManualContextBootstrap = (payload = {}) => {
+    try {
+      const userId = String(payload.user_id || "").trim();
+      const empresaId = String(payload.empresa_id || "").trim();
+      if (!userId || !empresaId) return false;
+      localStorage.setItem(MANUAL_CONTEXT_KEY, JSON.stringify({
+        user_id: userId,
+        email: normalizeEmail(payload.email || ""),
+        empresa_id: empresaId,
+        rol: normalizeRole(payload.rol || "admin"),
+        saved_at: new Date().toISOString()
+      }));
+      cachedUserContext = null;
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  };
+
+  window.clearManualContextBootstrap = () => {
+    localStorage.removeItem(MANUAL_CONTEXT_KEY);
+    cachedUserContext = null;
+  };
+
+  window.bootstrapContextByIdentity = async (payload = {}) => {
+    const { data: userData } = await supabase.auth.getUser();
+    const authUser = userData?.user;
+    if (!authUser) return null;
+    const context = await resolveContextByIdentity({
+      user: authUser,
+      email: payload.email || authUser.email,
+      cedula: payload.cedula || ""
+    });
+    if (!context?.empresa_id) return null;
+    saveContextFallback(context);
+    cachedUserContext = context;
+    return context;
+  };
+
   window.getEmpresaActual = async () => {
     const session = await getSessionConEmpresa();
     return session?.empresa || null;
