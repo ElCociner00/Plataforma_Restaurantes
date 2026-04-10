@@ -1,6 +1,7 @@
 import { supabase } from "./supabase.js";
 
 let cachedUserContext = null;
+const CONTEXT_CACHE_KEY = "app_user_context_fallback_v1";
 
 const SUPER_ADMIN_EMAIL = "santiagoelchameluco@gmail.com";
 const SUPER_ADMIN_ID = "1e17e7c6-d959-4089-ab22-3f64b5b5be41";
@@ -12,9 +13,120 @@ const isRecordActive = (record) => {
   if (!record || typeof record !== "object") return false;
   if (typeof record.activo === "boolean") return record.activo;
   if (typeof record.activa === "boolean") return record.activa;
+  if (typeof record.estado === "boolean") return record.estado;
   if (record.estado == null) return true;
   return String(record.estado).toLowerCase() !== "inactivo";
 };
+
+async function findUsuarioSistema(user) {
+  const userId = String(user?.id || "").trim();
+  const email = normalizeEmail(user?.email);
+  if (!userId && !email) return { data: null, error: null };
+
+  if (userId) {
+    const byId = await supabase
+      .from("usuarios_sistema")
+      .select("id, rol, empresa_id, activo, nombre_completo")
+      .eq("id", userId)
+      .maybeSingle();
+    if (!byId.error && byId.data) return byId;
+  }
+
+  if (!email) return { data: null, error: null };
+  return supabase
+    .from("usuarios_sistema")
+    .select("id, rol, empresa_id, activo, nombre_completo")
+    .eq("nombre_completo", email)
+    .maybeSingle();
+}
+
+async function findOtroUsuario(user) {
+  const userId = String(user?.id || "").trim();
+  const email = normalizeEmail(user?.email);
+  if (!userId && !email) return { data: null, error: null };
+
+  if (userId) {
+    const byId = await supabase
+      .from("otros_usuarios")
+      .select("id, empresa_id, estado, nombre_completo")
+      .eq("id", userId)
+      .maybeSingle();
+    if (!byId.error && byId.data) return byId;
+  }
+
+  if (!email) return { data: null, error: null };
+  return supabase
+    .from("otros_usuarios")
+    .select("id, empresa_id, estado, nombre_completo")
+    .eq("nombre_completo", email)
+    .maybeSingle();
+}
+
+const saveContextFallback = (context) => {
+  if (typeof window === "undefined" || !context?.user?.id) return;
+  try {
+    const payload = {
+      user_id: context.user.id,
+      email: normalizeEmail(context.user.email),
+      rol: context.rol || "",
+      empresa_id: context.empresa_id || null,
+      saved_at: new Date().toISOString()
+    };
+    localStorage.setItem(CONTEXT_CACHE_KEY, JSON.stringify(payload));
+  } catch (_error) {
+    // no-op
+  }
+};
+
+const readContextFallback = (user) => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(CONTEXT_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.user_id !== user?.id) return null;
+    return {
+      user,
+      rol: normalizeRole(parsed.rol || "admin"),
+      empresa_id: parsed.empresa_id || null,
+      super_admin: false,
+      fallback: true
+    };
+  } catch (_error) {
+    return null;
+  }
+};
+
+async function resolveContextByCreator(user) {
+  const userId = String(user?.id || "").trim();
+  if (!userId) return null;
+
+  const tables = [
+    { name: "usuarios_sistema", select: "empresa_id", role: "admin" },
+    { name: "otros_usuarios", select: "empresa_id", role: "revisor" },
+    { name: "empleados", select: "empresa_id", role: "operativo" }
+  ];
+
+  for (const table of tables) {
+    const { data, error } = await supabase
+      .from(table.name)
+      .select(table.select)
+      .eq("añadido_por", userId)
+      .limit(1)
+      .maybeSingle();
+    if (!error && data?.empresa_id) {
+      return {
+        user,
+        rol: table.role,
+        empresa_id: data.empresa_id,
+        super_admin: false,
+        fallback: true
+      };
+    }
+  }
+
+  return null;
+}
 
 async function getSuperAdminContext(user) {
   const email = normalizeEmail(user?.email);
@@ -62,11 +174,7 @@ export async function getUserContext() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: usuarioSistema, error: usuarioSistemaError } = await supabase
-    .from("usuarios_sistema")
-    .select("rol, empresa_id, activo")
-    .eq("id", user.id)
-    .maybeSingle();
+  const { data: usuarioSistema, error: usuarioSistemaError } = await findUsuarioSistema(user);
 
   if (!usuarioSistemaError && usuarioSistema && isRecordActive(usuarioSistema)) {
     cachedUserContext = {
@@ -75,14 +183,11 @@ export async function getUserContext() {
       empresa_id: usuarioSistema.empresa_id,
       super_admin: false
     };
+    saveContextFallback(cachedUserContext);
     return cachedUserContext;
   }
 
-  const { data: otroUsuario, error: otroUsuarioError } = await supabase
-    .from("otros_usuarios")
-    .select("empresa_id, estado")
-    .eq("id", user.id)
-    .maybeSingle();
+  const { data: otroUsuario, error: otroUsuarioError } = await findOtroUsuario(user);
 
   if (!otroUsuarioError && otroUsuario && isRecordActive(otroUsuario)) {
     cachedUserContext = {
@@ -91,12 +196,27 @@ export async function getUserContext() {
       empresa_id: otroUsuario.empresa_id,
       super_admin: false
     };
+    saveContextFallback(cachedUserContext);
     return cachedUserContext;
   }
 
   const superAdminContext = await getSuperAdminContext(user);
   if (superAdminContext) {
     cachedUserContext = superAdminContext;
+    saveContextFallback(cachedUserContext);
+    return cachedUserContext;
+  }
+
+  const creatorContext = await resolveContextByCreator(user);
+  if (creatorContext?.empresa_id) {
+    cachedUserContext = creatorContext;
+    saveContextFallback(cachedUserContext);
+    return cachedUserContext;
+  }
+
+  const fallbackContext = readContextFallback(user);
+  if (fallbackContext?.empresa_id) {
+    cachedUserContext = fallbackContext;
     return cachedUserContext;
   }
 
@@ -129,11 +249,7 @@ export async function getSessionConEmpresa() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: usuarioSistema, error } = await supabase
-    .from("usuarios_sistema")
-    .select("id, rol, empresa_id, activo")
-    .eq("id", user.id)
-    .maybeSingle();
+  const { data: usuarioSistema, error } = await findUsuarioSistema(user);
 
   if (!error && usuarioSistema && usuarioSistema.activo !== false) {
     return {
@@ -144,11 +260,7 @@ export async function getSessionConEmpresa() {
     };
   }
 
-  const { data: otroUsuario, error: otroUsuarioError } = await supabase
-    .from("otros_usuarios")
-    .select("id, empresa_id, estado")
-    .eq("id", user.id)
-    .maybeSingle();
+  const { data: otroUsuario, error: otroUsuarioError } = await findOtroUsuario(user);
 
   if (!otroUsuarioError && otroUsuario && isRecordActive(otroUsuario)) {
     return {

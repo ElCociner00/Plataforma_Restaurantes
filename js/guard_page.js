@@ -84,17 +84,21 @@ export async function guardPage(pageKey, permisosOverride = null) {
     return;
   }
 
-  const expectedEnvironment = pageKey === "facturacion" || pageKey === "gestion_empresas" || isSuper
+  const expectedEnvironment = pageKey === "facturacion" || pageKey === "nomina" || pageKey === "gestion_empresas" || isSuper
     ? null
     : PAGE_ENVIRONMENT[pageKey];
   const activeEnvironment = localStorage.getItem("app_entorno_activo");
 
-  if (expectedEnvironment && !activeEnvironment) {
+  const expectedEnvironments = Array.isArray(expectedEnvironment)
+    ? expectedEnvironment
+    : (expectedEnvironment ? [expectedEnvironment] : []);
+
+  if (expectedEnvironments.length && !activeEnvironment) {
     safeRedirect(SELECTOR_URL);
     return;
   }
 
-  if (expectedEnvironment && activeEnvironment && expectedEnvironment !== activeEnvironment) {
+  if (expectedEnvironments.length && activeEnvironment && !expectedEnvironments.includes(activeEnvironment)) {
     alert("Este modulo pertenece a otro entorno.");
     safeRedirect(SELECTOR_URL);
     return;

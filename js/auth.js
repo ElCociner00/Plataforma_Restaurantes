@@ -43,7 +43,8 @@ form.addEventListener("submit", async (e) => {
     console.log("Contexto obtenido:", context);
 
     if (!context) {
-      alert("Usuario sin contexto - contacta al administrador");
+      alert("Usuario autenticado, pero sin contexto completo. Se activará modo de emergencia.");
+      window.location.href = "/Plataforma_Restaurantes/entorno/";
       return;
     }
 
