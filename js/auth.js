@@ -43,18 +43,7 @@ form.addEventListener("submit", async (e) => {
     console.log("Contexto obtenido:", context);
 
     if (!context) {
-      let recovered = null;
-      if (typeof window.bootstrapContextByIdentity === "function") {
-        recovered = await window.bootstrapContextByIdentity({ email });
-      }
-
-      if (recovered?.empresa_id) {
-        alert("Acceso recuperado correctamente.");
-        window.location.href = "/Plataforma_Restaurantes/entorno/";
-        return;
-      }
-
-      alert("No se pudo validar tu contexto. Contacta al administrador.");
+      alert("Usuario sin contexto - contacta al administrador");
       return;
     }
 
