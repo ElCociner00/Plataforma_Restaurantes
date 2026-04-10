@@ -1,4 +1,5 @@
 import { buildRequestHeaders, getUserContext } from "./session.js";
+import { fetchResponsablesActivos } from "./responsables.js";
 import { supabase } from "./supabase.js";
 import { WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS } from "./webhooks.js";
 
@@ -1051,11 +1052,7 @@ const loadInitialData = async () => {
     const detailItemSettings = loadJson(getDetailItemVisibilityKey(payload.tenant_id), {});
     const orderSettings = loadJson(getGeneralOrderKey(payload.tenant_id), []);
 
-    const { data: responsablesData } = await supabase
-      .from("usuarios_sistema")
-      .select("id, nombre_completo")
-      .eq("empresa_id", payload.empresa_id)
-      .eq("activo", true);
+    const responsablesData = await fetchResponsablesActivos(payload.empresa_id);
 
     state.responsableNamesById = (Array.isArray(responsablesData) ? responsablesData : []).reduce((acc, item) => {
       const key = String(item?.id || "").trim();
