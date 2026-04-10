@@ -1,10 +1,9 @@
 .nomina-main {
-  max-width: 1020px;
+  max-width: 1200px;
 }
 
 .intro {
   color: #4b5563;
-  font-size: 0.95rem;
 }
 
 .nomina-grid {
@@ -17,68 +16,138 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 0.88rem;
+  font-size: 0.9rem;
 }
 
 .nomina-actions {
-  margin-top: 12px;
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  margin-top: 12px;
 }
 
 .nomina-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
   gap: 10px;
 }
 
 .nomina-card {
-  border: 1px solid #ddd6fe;
-  background: #f5f3ff;
+  border: 1px solid #e5e7eb;
   border-radius: 10px;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.nomina-card span {
-  font-size: 0.85rem;
-  color: #6b21a8;
-}
-
-.nomina-card strong {
-  color: #312e81;
-  font-size: 1rem;
+  padding: 10px;
+  background: #fff;
 }
 
 .tabla-wrap {
-  overflow: auto;
+  overflow-x: auto;
 }
 
 .nomina-table {
   width: 100%;
   border-collapse: collapse;
+  background: #fff;
 }
 
 .nomina-table th,
 .nomina-table td {
   border: 1px solid #e5e7eb;
   padding: 8px;
-  text-align: left;
-  font-size: 0.86rem;
+  font-size: 0.9rem;
 }
 
 .nomina-table th {
   background: #f3f4f6;
 }
 
+.comprobante {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: #fff;
+  padding: 18px;
+}
+
+.comprobante-title {
+  text-align: center;
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+.comprobante-top {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.empresa-logo {
+  width: 80px;
+  height: 40px;
+  border: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+.empresa-data {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.empleado-data {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.comprobante-table {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.comprobante-col h3 {
+  margin: 0;
+}
+
+.comprobante-col table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+.comprobante-col th,
+.comprobante-col td {
+  border: 1px solid #e5e7eb;
+  padding: 6px;
+  font-size: 0.86rem;
+}
+
+.comprobante-col th,
+.comprobante-col tfoot {
+  background: #f3f4f6;
+}
+
+.comprobante-neto {
+  margin-top: 12px;
+  padding: 10px;
+  background: #f3f4f6;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 14px;
+  font-weight: 700;
+}
+
 .status {
   margin-top: 10px;
-  padding: 10px 12px;
+  padding: 10px;
   border: 1px solid #c7d2fe;
-  background: #eef2ff;
-  color: #3730a3;
   border-radius: 8px;
+  background: #eef2ff;
 }
