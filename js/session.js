@@ -22,26 +22,20 @@ async function findUsuarioSistema(user) {
   const email = normalizeEmail(user?.email);
   if (!userId && !email) return { data: null, error: null };
 
-  const filters = [];
-  if (userId) filters.push(`id.eq.${userId}`);
-  if (email) filters.push(`nombre_completo.eq.${email}`);
-  const useOr = filters.join(",");
-
-  if (useOr) {
-    const result = await supabase
+  if (userId) {
+    const byId = await supabase
       .from("usuarios_sistema")
       .select("id, rol, empresa_id, activo, nombre_completo")
-      .or(useOr)
-      .limit(1)
+      .eq("id", userId)
       .maybeSingle();
-    if (!result.error && result.data) return result;
+    if (!byId.error && byId.data) return byId;
   }
 
-  if (!userId) return { data: null, error: null };
+  if (!email) return { data: null, error: null };
   return supabase
     .from("usuarios_sistema")
     .select("id, rol, empresa_id, activo, nombre_completo")
-    .eq("id", userId)
+    .eq("nombre_completo", email)
     .maybeSingle();
 }
 
@@ -50,26 +44,20 @@ async function findOtroUsuario(user) {
   const email = normalizeEmail(user?.email);
   if (!userId && !email) return { data: null, error: null };
 
-  const filters = [];
-  if (userId) filters.push(`id.eq.${userId}`);
-  if (email) filters.push(`nombre_completo.eq.${email}`);
-  const useOr = filters.join(",");
-
-  if (useOr) {
-    const result = await supabase
+  if (userId) {
+    const byId = await supabase
       .from("otros_usuarios")
       .select("id, empresa_id, estado, nombre_completo")
-      .or(useOr)
-      .limit(1)
+      .eq("id", userId)
       .maybeSingle();
-    if (!result.error && result.data) return result;
+    if (!byId.error && byId.data) return byId;
   }
 
-  if (!userId) return { data: null, error: null };
+  if (!email) return { data: null, error: null };
   return supabase
     .from("otros_usuarios")
     .select("id, empresa_id, estado, nombre_completo")
-    .eq("id", userId)
+    .eq("nombre_completo", email)
     .maybeSingle();
 }
 
