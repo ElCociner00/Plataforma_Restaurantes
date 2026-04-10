@@ -15,8 +15,7 @@ function protectInteractions() {
     document.addEventListener(event, async () => {
       const { data } = await supabase.auth.getSession();
       if (!data.session) {
-        const context = await getUserContext().catch(() => null);
-        if (!context?.emergency_auth) redirectToLogin();
+        redirectToLogin();
       }
     });
   });
@@ -24,11 +23,8 @@ function protectInteractions() {
 
 const enforceSessionAndEnvironment = async (session) => {
   if (!session) {
-    const context = await getUserContext().catch(() => null);
-    if (!context?.emergency_auth) {
-      redirectToLogin();
-      return false;
-    }
+    redirectToLogin();
+    return false;
   }
 
   const currentPath = String(window.location.pathname || "");
