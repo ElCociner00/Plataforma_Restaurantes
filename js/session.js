@@ -7,6 +7,7 @@ const SUPER_ADMIN_ID = "1e17e7c6-d959-4089-ab22-3f64b5b5be41";
 
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 const normalizeRole = (value) => String(value || "").trim().toLowerCase();
+const EMAIL_LOOKUP_COLUMNS = ["nombre_completo", "correo", "email", "usuario"];
 
 const isRecordActive = (record) => {
   if (!record || typeof record !== "object") return false;
