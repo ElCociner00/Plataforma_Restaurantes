@@ -14,13 +14,14 @@ export const PAGE_ENVIRONMENT = {
   permisos: "loggro",
   registro_empleados: "loggro",
   registro_otros_usuarios: "loggro",
+  gestion_usuarios: "loggro",
   gestion_empresas: "loggro",
   facturacion: "siigo",
   dashboard_siigo: "siigo",
   configuracion_siigo: "siigo",
   subir_facturas_siigo: "siigo",
   historico_facturas_siigo: "siigo",
-  nomina: "siigo"
+  nomina: ["siigo", "loggro"]
 };
 
 export const DEFAULT_ROLE_PERMISSIONS = {
@@ -40,6 +41,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     permisos: true,
     registro_empleados: true,
     registro_otros_usuarios: true,
+    gestion_usuarios: true,
     gestion_empresas: true,
     facturacion: true,
     dashboard_siigo: true,
@@ -64,6 +66,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     permisos: false,
     registro_empleados: false,
     registro_otros_usuarios: false,
+    gestion_usuarios: true,
     gestion_empresas: false,
     facturacion: true,
     dashboard_siigo: true,
@@ -88,6 +91,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     permisos: false,
     registro_empleados: false,
     registro_otros_usuarios: false,
+    gestion_usuarios: false,
     gestion_empresas: false,
     facturacion: false,
     dashboard_siigo: true,
@@ -112,6 +116,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     permisos: false,
     registro_empleados: false,
     registro_otros_usuarios: false,
+    gestion_usuarios: false,
     gestion_empresas: false,
     facturacion: false,
     dashboard_siigo: false,
