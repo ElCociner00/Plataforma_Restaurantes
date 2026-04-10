@@ -3,6 +3,7 @@ import { supabase } from "./supabase.js";
 let cachedUserContext = null;
 const CONTEXT_CACHE_KEY = "app_user_context_fallback_v1";
 const MANUAL_CONTEXT_KEY = "app_manual_context_bootstrap_v1";
+const TENANT_HINTS_KEY = "app_tenant_hints_v1";
 
 const SUPER_ADMIN_EMAIL = "santiagoelchameluco@gmail.com";
 const SUPER_ADMIN_ID = "1e17e7c6-d959-4089-ab22-3f64b5b5be41";
@@ -74,6 +75,16 @@ const saveContextFallback = (context) => {
       saved_at: new Date().toISOString()
     };
     localStorage.setItem(CONTEXT_CACHE_KEY, JSON.stringify(payload));
+    const hintsRaw = localStorage.getItem(TENANT_HINTS_KEY);
+    const hints = hintsRaw ? JSON.parse(hintsRaw) : {};
+    if (payload.email && payload.empresa_id) {
+      hints[payload.email] = {
+        empresa_id: payload.empresa_id,
+        rol: payload.rol || "admin",
+        saved_at: payload.saved_at
+      };
+      localStorage.setItem(TENANT_HINTS_KEY, JSON.stringify(hints));
+    }
   } catch (_error) {
     // no-op
   }
@@ -96,6 +107,52 @@ const readContextFallback = (user) => {
   } catch (_error) {
     return null;
   }
+};
+
+const readTenantHintByEmail = (email) => {
+  if (typeof window === "undefined") return null;
+  try {
+    const key = normalizeEmail(email);
+    if (!key) return null;
+    const raw = localStorage.getItem(TENANT_HINTS_KEY);
+    if (!raw) return null;
+    const hints = JSON.parse(raw);
+    const hit = hints?.[key];
+    if (!hit?.empresa_id) return null;
+    return hit;
+  } catch (_error) {
+    return null;
+  }
+};
+
+const resolveContextFromAuthClaims = (user) => {
+  const appMeta = user?.app_metadata || user?.raw_app_meta_data || {};
+  const userMeta = user?.user_metadata || user?.raw_user_meta_data || {};
+  const empresaId = String(
+    appMeta.empresa_id
+    || appMeta.tenant_id
+    || userMeta.empresa_id
+    || userMeta.tenant_id
+    || ""
+  ).trim();
+  if (!empresaId) return null;
+
+  const rol = normalizeRole(
+    appMeta.rol
+    || appMeta.role
+    || userMeta.rol
+    || userMeta.role
+    || "admin"
+  );
+
+  return {
+    user,
+    rol: rol || "admin",
+    empresa_id: empresaId,
+    super_admin: false,
+    fallback: true,
+    claim_bootstrap: true
+  };
 };
 
 const readManualContext = (user) => {
@@ -301,6 +358,27 @@ export async function getUserContext() {
   const manualContext = readManualContext(user);
   if (manualContext?.empresa_id) {
     cachedUserContext = manualContext;
+    return cachedUserContext;
+  }
+
+  const claimsContext = resolveContextFromAuthClaims(user);
+  if (claimsContext?.empresa_id) {
+    cachedUserContext = claimsContext;
+    saveContextFallback(cachedUserContext);
+    return cachedUserContext;
+  }
+
+  const emailHint = readTenantHintByEmail(user?.email);
+  if (emailHint?.empresa_id) {
+    cachedUserContext = {
+      user,
+      rol: normalizeRole(emailHint.rol || "admin"),
+      empresa_id: emailHint.empresa_id,
+      super_admin: false,
+      fallback: true,
+      hint_bootstrap: true
+    };
+    saveContextFallback(cachedUserContext);
     return cachedUserContext;
   }
 
