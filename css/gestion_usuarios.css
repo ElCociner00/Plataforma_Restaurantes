@@ -1,0 +1,97 @@
+.main {
+  max-width: min(1100px, 96vw);
+}
+
+.intro {
+  margin: 0 0 12px;
+  color: #4b5563;
+}
+
+.status {
+  margin-bottom: 12px;
+  font-size: 0.92rem;
+}
+
+.tabla-wrap {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.usuarios-tabla {
+  width: 100%;
+  min-width: 880px;
+  border-collapse: collapse;
+}
+
+.usuarios-tabla th,
+.usuarios-tabla td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 10px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.usuarios-tabla th {
+  background: #f9fafb;
+}
+
+.badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.badge.empleado {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.badge.otro {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.switch-cell {
+  position: relative;
+  display: inline-block;
+  width: 46px;
+  height: 24px;
+}
+
+.switch-cell input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-slider {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  background: #d1d5db;
+  border-radius: 999px;
+  transition: .2s ease;
+}
+
+.switch-slider::before {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  top: 3px;
+  border-radius: 999px;
+  background: #fff;
+  transition: .2s ease;
+}
+
+.switch-cell input:checked + .switch-slider {
+  background: #2563eb;
+}
+
+.switch-cell input:checked + .switch-slider::before {
+  transform: translateX(22px);
+}

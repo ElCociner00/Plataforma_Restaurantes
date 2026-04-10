@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>AXIOMA | Nómina (borrador)</title>
+  <title>AXIOMA | Nómina</title>
   <link rel="stylesheet" href="../css/main.css">
   <link rel="stylesheet" href="../css/nomina.css">
 </head>
@@ -16,7 +16,7 @@
 
   <div class="main nomina-main">
     <h1>Nómina</h1>
-    <p class="intro">Gestión de periodos, movimientos y desprendibles por empresa.</p>
+    <p class="intro">Gestión de periodos, resumen por empleado y descarga de comprobante de nómina.</p>
 
     <section class="bloque">
       <h2>Periodo de nómina</h2>
@@ -36,10 +36,13 @@
         <label>Fecha fin
           <input id="nominaFechaFin" type="date">
         </label>
+        <label>Responsable / Empleado
+          <select id="nominaEmpleado"></select>
+        </label>
       </div>
       <div class="nomina-actions">
-        <button type="button" id="crearPeriodoNomina">Crear período</button>
-        <button type="button" id="liquidarPeriodoNomina" disabled>Liquidar período</button>
+        <button type="button" id="consultarNomina">Consultar nómina</button>
+        <button type="button" id="descargarComprobanteNomina">Descargar comprobante</button>
       </div>
     </section>
 
@@ -62,7 +65,7 @@
     </section>
 
     <section class="bloque">
-      <h2>Movimientos de nómina</h2>
+      <h2>Detalle de ingresos y deducciones</h2>
       <div class="tabla-wrap">
         <table class="nomina-table">
           <thead>
@@ -84,12 +87,41 @@
       </div>
     </section>
 
-    <section class="bloque">
-      <h2>Desprendibles</h2>
-      <div class="nomina-actions">
-        <button type="button" id="generarDesprendibles" disabled>Generar desprendibles</button>
-        <button type="button" id="descargarDesprendibles" disabled>Descargar desprendibles</button>
-      </div>
+    <section class="bloque comprobante-wrap">
+      <h2>Comprobante de nómina</h2>
+      <article id="nominaComprobante" class="comprobante">
+        <header class="comprobante-title">Comprobante de Nómina</header>
+        <div class="comprobante-top">
+          <div class="empresa-data">
+            <div class="empresa-logo">AXIOMA</div>
+            <strong id="nominaEmpresaNombre">EMPRESA</strong>
+            <span id="nominaEmpresaNit">NIT -</span>
+          </div>
+          <div class="empleado-data" id="nominaEmpleadoData"></div>
+        </div>
+        <div class="comprobante-table">
+          <div class="comprobante-col">
+            <h3>Ingresos</h3>
+            <table>
+              <thead><tr><th>Concepto</th><th>Cantidad</th><th>Valor</th></tr></thead>
+              <tbody id="nominaIngresosBody"></tbody>
+              <tfoot><tr><td colspan="2">Total ingresos</td><td id="nominaTotalIngresosTabla">$0</td></tr></tfoot>
+            </table>
+          </div>
+          <div class="comprobante-col">
+            <h3>Deducciones</h3>
+            <table>
+              <thead><tr><th>Concepto</th><th>Cantidad</th><th>Valor</th></tr></thead>
+              <tbody id="nominaDeduccionesBody"></tbody>
+              <tfoot><tr><td colspan="2">Total deducciones</td><td id="nominaTotalDeduccionesTabla">$0</td></tr></tfoot>
+            </table>
+          </div>
+        </div>
+        <footer class="comprobante-neto">
+          <span>NETO A PAGAR</span>
+          <strong id="nominaNetoPagarComprobante">$0</strong>
+        </footer>
+      </article>
       <div id="nominaStatus" class="status"></div>
     </section>
   </div>

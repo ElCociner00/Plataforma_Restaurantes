@@ -11,7 +11,7 @@ const toResponsableRecord = (row, source) => {
   const rol = normalizeText(row?.rol) || (source === "otros_usuarios" ? "revisor" : "");
   const activo = typeof row?.activo === "boolean"
     ? row.activo
-    : normalizeText(row?.estado).toLowerCase() !== "inactivo";
+    : (typeof row?.estado === "boolean" ? row.estado : normalizeText(row?.estado).toLowerCase() !== "inactivo");
 
   return {
     id,
@@ -27,7 +27,7 @@ export async function fetchUsuariosEmpresa(empresaId) {
   const safeEmpresaId = normalizeText(empresaId);
   if (!safeEmpresaId) return [];
 
-  const [usuariosSistemaRes, otrosUsuariosRes] = await Promise.all([
+  const [usuariosSistemaRes, otrosUsuariosRes, empleadosRes] = await Promise.all([
     supabase
       .from("usuarios_sistema")
       .select("id, nombre_completo, rol, activo, created_at")
@@ -35,16 +35,32 @@ export async function fetchUsuariosEmpresa(empresaId) {
     supabase
       .from("otros_usuarios")
       .select("id, nombre_completo, cedula, estado, created_at")
+      .eq("empresa_id", safeEmpresaId),
+    supabase
+      .from("empleados")
+      .select("id, nombre_completo, cedula, estado")
       .eq("empresa_id", safeEmpresaId)
   ]);
 
   const usuariosSistema = Array.isArray(usuariosSistemaRes.data) ? usuariosSistemaRes.data : [];
   const otrosUsuarios = Array.isArray(otrosUsuariosRes.data) ? otrosUsuariosRes.data : [];
 
+  const empleados = Array.isArray(empleadosRes.data) ? empleadosRes.data : [];
+  const empleadosById = new Map(empleados.map((item) => [normalizeText(item.id), item]));
+  const empleadosByNombre = new Map(empleados.map((item) => [normalizeText(item.nombre_completo).toLowerCase(), item]));
+
   const normalized = [
     ...usuariosSistema.map((row) => toResponsableRecord(row, "usuarios_sistema")),
     ...otrosUsuarios.map((row) => toResponsableRecord(row, "otros_usuarios"))
-  ].filter(Boolean);
+  ].filter(Boolean).map((row) => {
+    const empleado = empleadosById.get(row.id) || empleadosByNombre.get(normalizeText(row.nombre_completo).toLowerCase());
+    return {
+      ...row,
+      nombre_completo: normalizeText(empleado?.nombre_completo) || row.nombre_completo,
+      cedula: row.cedula || normalizeText(empleado?.cedula),
+      estado_empleado: normalizeText(empleado?.estado)
+    };
+  });
 
   const dedupById = new Map();
   normalized.forEach((row) => {

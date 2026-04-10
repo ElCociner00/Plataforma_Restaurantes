@@ -29,7 +29,6 @@ const btnConsultar = document.getElementById("consultar");
 const btnVerificar = document.getElementById("verificar");
 const btnSubir = document.getElementById("subir");
 const btnLimpiar = document.getElementById("limpiar");
-const btnDescargarImagen = document.getElementById("descargarImagenInventario");
 const correccionWrap = document.getElementById("correccionWrapInventario");
 const btnSolicitarCorreccion = document.getElementById("solicitarCorreccionInventario");
 const modalCorreccion = document.getElementById("modalCorreccionInventario");
@@ -513,7 +512,7 @@ const enviarAlertaManipulacion = (motivo) => {
 };
 
 const refreshEstadoSubir = () => {
-  const habilitar = verified && resumenDescargado && empresaPolicy?.solo_lectura !== true;
+  const habilitar = verified && empresaPolicy?.solo_lectura !== true;
   btnSubir.disabled = !habilitar;
 };
 
@@ -524,7 +523,6 @@ const aplicarBloqueoConstancia = (activo) => {
     btnConsultar,
     btnVerificar,
     btnLimpiar,
-    btnDescargarImagen,
     fecha,
     responsable,
     horaInicio,
@@ -849,14 +847,10 @@ btnVerificar.addEventListener("click", () => {
   verified = true;
   setButtonState({ subir: false });
   refreshEstadoSubir();
-  setStatus("Verificación completada. Descarga el resumen (⤓) para habilitar Subir datos.");
+  setStatus("Verificación completada. Ya puedes subir datos.");
 });
 
 btnSubir.addEventListener("click", async () => {
-  if (!resumenDescargado) {
-    setStatus("Debes descargar el resumen (⤓) antes de subir datos.");
-    return;
-  }
   if (empresaPolicy?.solo_lectura === true) {
     setStatus(empresaPolicy?.motivo_solo_lectura === "facturacion_suspendida"
       ? "Servicio suspendido por falta de pago: usa facturación para restablecerlo."
@@ -910,7 +904,11 @@ btnSubir.addEventListener("click", async () => {
       return;
     }
 
-    setStatus(data.message || (data.ok ? "Datos subidos correctamente." : "No se pudo completar el envío."));
+    const descargaOk = descargarImagenInventario({ bloquearDespues: false });
+    setStatus(
+      (data.message || (data.ok ? "Datos subidos correctamente." : "No se pudo completar el envío."))
+      + (descargaOk ? " Constancia descargada automáticamente." : " No se pudo descargar constancia automática.")
+    );
     aplicarBloqueoConstancia(false);
   } catch (error) {
     setStatus("Error subiendo datos.");
@@ -919,7 +917,7 @@ btnSubir.addEventListener("click", async () => {
 
 
 
-const descargarImagenInventario = () => {
+const descargarImagenInventario = ({ bloquearDespues = false } = {}) => {
   if (!verified) {
     setStatus("Primero verifica el cierre antes de descargar la constancia.");
     return;
@@ -1082,16 +1080,9 @@ const descargarImagenInventario = () => {
   link.click();
 
   resumenDescargado = true;
-  aplicarBloqueoConstancia(true);
-  if (verified && empresaPolicy?.solo_lectura !== true) {
-    btnSubir.disabled = false;
-  }
-  setStatus("Imagen del cierre inventarios descargada. Campos bloqueados hasta corregir o subir.");
+  aplicarBloqueoConstancia(Boolean(bloquearDespues));
+  return true;
 };
-
-btnDescargarImagen?.addEventListener("click", () => {
-  descargarImagenInventario();
-});
 
 btnSolicitarCorreccion?.addEventListener("click", () => {
   if (!bloqueoConstanciaActivo) return;
@@ -1104,7 +1095,7 @@ btnAceptarCorreccion?.addEventListener("click", () => {
   resumenDescargado = false;
   verified = false;
   aplicarBloqueoConstancia(false);
-  setStatus("Modo corrección habilitado. Revisa datos, verifica y descarga nuevamente antes de subir.");
+  setStatus("Modo corrección habilitado. Revisa datos y verifica nuevamente antes de subir.");
 });
 
 document.addEventListener("contextmenu", (event) => {

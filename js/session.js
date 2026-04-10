@@ -12,9 +12,66 @@ const isRecordActive = (record) => {
   if (!record || typeof record !== "object") return false;
   if (typeof record.activo === "boolean") return record.activo;
   if (typeof record.activa === "boolean") return record.activa;
+  if (typeof record.estado === "boolean") return record.estado;
   if (record.estado == null) return true;
   return String(record.estado).toLowerCase() !== "inactivo";
 };
+
+async function findUsuarioSistema(user) {
+  const userId = String(user?.id || "").trim();
+  const email = normalizeEmail(user?.email);
+  if (!userId && !email) return { data: null, error: null };
+
+  const filters = [];
+  if (userId) filters.push(`id.eq.${userId}`);
+  if (email) filters.push(`nombre_completo.eq.${email}`);
+  const useOr = filters.join(",");
+
+  if (useOr) {
+    const result = await supabase
+      .from("usuarios_sistema")
+      .select("id, rol, empresa_id, activo, nombre_completo")
+      .or(useOr)
+      .limit(1)
+      .maybeSingle();
+    if (!result.error && result.data) return result;
+  }
+
+  if (!userId) return { data: null, error: null };
+  return supabase
+    .from("usuarios_sistema")
+    .select("id, rol, empresa_id, activo, nombre_completo")
+    .eq("id", userId)
+    .maybeSingle();
+}
+
+async function findOtroUsuario(user) {
+  const userId = String(user?.id || "").trim();
+  const email = normalizeEmail(user?.email);
+  if (!userId && !email) return { data: null, error: null };
+
+  const filters = [];
+  if (userId) filters.push(`id.eq.${userId}`);
+  if (email) filters.push(`nombre_completo.eq.${email}`);
+  const useOr = filters.join(",");
+
+  if (useOr) {
+    const result = await supabase
+      .from("otros_usuarios")
+      .select("id, empresa_id, estado, nombre_completo")
+      .or(useOr)
+      .limit(1)
+      .maybeSingle();
+    if (!result.error && result.data) return result;
+  }
+
+  if (!userId) return { data: null, error: null };
+  return supabase
+    .from("otros_usuarios")
+    .select("id, empresa_id, estado, nombre_completo")
+    .eq("id", userId)
+    .maybeSingle();
+}
 
 async function getSuperAdminContext(user) {
   const email = normalizeEmail(user?.email);
@@ -62,11 +119,7 @@ export async function getUserContext() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: usuarioSistema, error: usuarioSistemaError } = await supabase
-    .from("usuarios_sistema")
-    .select("rol, empresa_id, activo")
-    .eq("id", user.id)
-    .maybeSingle();
+  const { data: usuarioSistema, error: usuarioSistemaError } = await findUsuarioSistema(user);
 
   if (!usuarioSistemaError && usuarioSistema && isRecordActive(usuarioSistema)) {
     cachedUserContext = {
@@ -78,11 +131,7 @@ export async function getUserContext() {
     return cachedUserContext;
   }
 
-  const { data: otroUsuario, error: otroUsuarioError } = await supabase
-    .from("otros_usuarios")
-    .select("empresa_id, estado")
-    .eq("id", user.id)
-    .maybeSingle();
+  const { data: otroUsuario, error: otroUsuarioError } = await findOtroUsuario(user);
 
   if (!otroUsuarioError && otroUsuario && isRecordActive(otroUsuario)) {
     cachedUserContext = {
@@ -129,11 +178,7 @@ export async function getSessionConEmpresa() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: usuarioSistema, error } = await supabase
-    .from("usuarios_sistema")
-    .select("id, rol, empresa_id, activo")
-    .eq("id", user.id)
-    .maybeSingle();
+  const { data: usuarioSistema, error } = await findUsuarioSistema(user);
 
   if (!error && usuarioSistema && usuarioSistema.activo !== false) {
     return {
@@ -144,11 +189,7 @@ export async function getSessionConEmpresa() {
     };
   }
 
-  const { data: otroUsuario, error: otroUsuarioError } = await supabase
-    .from("otros_usuarios")
-    .select("id, empresa_id, estado")
-    .eq("id", user.id)
-    .maybeSingle();
+  const { data: otroUsuario, error: otroUsuarioError } = await findOtroUsuario(user);
 
   if (!otroUsuarioError && otroUsuario && isRecordActive(otroUsuario)) {
     return {

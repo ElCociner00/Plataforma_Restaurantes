@@ -84,7 +84,7 @@ export async function guardPage(pageKey, permisosOverride = null) {
     return;
   }
 
-  const expectedEnvironment = pageKey === "facturacion" || pageKey === "gestion_empresas" || isSuper
+  const expectedEnvironment = pageKey === "facturacion" || pageKey === "nomina" || pageKey === "gestion_empresas" || isSuper
     ? null
     : PAGE_ENVIRONMENT[pageKey];
   const activeEnvironment = localStorage.getItem("app_entorno_activo");

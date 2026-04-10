@@ -33,7 +33,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnVerificar = document.getElementById("verificar");
   const btnEnviar = document.getElementById("enviar");
   const btnLimpiar = document.getElementById("limpiarDatos");
-  const btnDescargarImagen = document.getElementById("descargarImagenCierre");
   const confirmacionEnvio = document.getElementById("confirmacionEnvio");
   const mensajeEnvio = document.getElementById("mensajeEnvio");
   const btnConfirmarEnvio = document.getElementById("confirmarEnvio");
@@ -279,7 +278,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const refreshEstadoBotonSubir = () => {
-    const habilitar = verificado && resumenDescargado && empresaPolicy?.solo_lectura !== true;
+    const habilitar = verificado && empresaPolicy?.solo_lectura !== true;
     btnEnviar.disabled = !habilitar;
   };
 
@@ -291,7 +290,6 @@ document.addEventListener("DOMContentLoaded", () => {
       btnConsultarGastos,
       btnVerificar,
       btnLimpiar,
-      btnDescargarImagen,
       btnToggleEfectivoSistema,
       fecha,
       responsable,
@@ -875,7 +873,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return { finanzas, gastos };
   };
 
-  const descargarImagenResumen = () => {
+  const descargarImagenResumen = ({ bloquearDespues = false } = {}) => {
     const canvas = document.createElement("canvas");
     canvas.width = 1080;
     canvas.height = 1920;
@@ -1022,17 +1020,9 @@ document.addEventListener("DOMContentLoaded", () => {
     link.click();
 
     resumenDescargado = true;
-    aplicarBloqueoConstancia(true);
-    setStatus("Imagen del cierre descargada. Campos bloqueados hasta confirmar corrección o subir cierre.");
+    aplicarBloqueoConstancia(Boolean(bloquearDespues));
+    return true;
   };
-
-  btnDescargarImagen?.addEventListener("click", () => {
-    if (!verificado) {
-      setStatus("Primero debes verificar los datos antes de descargar el resumen.");
-      return;
-    }
-    descargarImagenResumen();
-  });
   btnSolicitarCorreccion?.addEventListener("click", () => {
     if (!bloqueoConstanciaActivo) return;
     enviarAlertaManipulacion("solicita_correccion");
@@ -1044,7 +1034,7 @@ document.addEventListener("DOMContentLoaded", () => {
     resumenDescargado = false;
     verificado = false;
     aplicarBloqueoConstancia(false);
-    setStatus("Modo corrección habilitado. Vuelve a verificar y descarga nuevamente el resumen para subir.");
+    setStatus("Modo corrección habilitado. Vuelve a verificar antes de subir.");
   });
 
   document.addEventListener("contextmenu", (event) => {
@@ -1299,7 +1289,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       await cargarPoliticaEmpresa(true);
       verificado = true;
-      setStatus((data.message || "") + " Descarga el resumen (⤓) para habilitar Subir cierre.");
+      setStatus((data.message || "") + " Verificación completada, ya puedes subir el cierre.");
       refreshEstadoBotonSubir();
     } catch (err) {
       setStatus(err?.name === "AbortError"
@@ -1460,10 +1450,6 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   btnEnviar.addEventListener("click", async () => {
-    if (!resumenDescargado) {
-      setStatus("Debes descargar el resumen (⤓) antes de subir el cierre.");
-      return;
-    }
     if (empresaPolicy?.solo_lectura === true) {
       setStatus("Plan FREE: envio bloqueado. Solo visualizacion.");
       confirmacionEnvio.classList.add("is-hidden");
@@ -1514,7 +1500,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       console.info("Webhook subir_cierre OK", { status: res.status, data });
-      setStatus(data?.message || "Cierre enviado correctamente.");
+      const descargaOk = descargarImagenResumen({ bloquearDespues: false });
+      setStatus(
+        (data?.message || "Cierre enviado correctamente.")
+        + (descargaOk ? " Constancia descargada automáticamente." : " No se pudo descargar constancia automática.")
+      );
       confirmacionEnvio.classList.add("is-hidden");
       aplicarBloqueoConstancia(false);
     } catch (err) {
