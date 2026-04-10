@@ -178,9 +178,6 @@ function wireHeaderEvents(header, context) {
       event.preventDefault();
       setActiveEnvironment("");
       clearBannerDisplayCache();
-      if (typeof window.clearEmergencyLocalSession === "function") {
-        window.clearEmergencyLocalSession();
-      }
       await supabase.auth.signOut();
       window.location.href = "/Plataforma_Restaurantes/index.html";
     };
