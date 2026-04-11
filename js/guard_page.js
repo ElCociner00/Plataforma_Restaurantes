@@ -1,7 +1,6 @@
 import { getUserContext } from "./session.js";
 import { esSuperAdmin, getPermisosEfectivos } from "./permisos.core.js";
 import { getActiveEnvironment, setActiveEnvironment } from "./environment.js";
-import { supabase } from "./supabase.js";
 import {
   buildAccessMap,
   getHomeByRole,
@@ -50,26 +49,8 @@ export async function guardPage(pageKey) {
 
   const normalizedPage = String(pageKey || "").trim().toLowerCase();
   const requiredEnv = MODULE_ENV_MAP[normalizedPage] || "";
-  const userId = context?.user?.id || context?.user?.user_id;
-  const empresaId = context?.empresa_id || null;
-  let permisosRows = [];
   let role = toRole(context, isSuper);
-
-  if (!isSuper && userId && empresaId && (!role || role === "operativo")) {
-    const roleLookup = await supabase
-      .from("usuarios_sistema")
-      .select("rol")
-      .eq("id", userId)
-      .eq("empresa_id", empresaId)
-      .maybeSingle();
-    if (!roleLookup?.error && roleLookup?.data?.rol) {
-      role = String(roleLookup.data.rol).trim().toLowerCase();
-    }
-  }
-
-  if (userId && (empresaId || isSuper)) {
-    permisosRows = await getPermisosEfectivos(userId, empresaId).catch(() => []);
-  }
+  const permisosRows = [];
 
   if (requiredEnv) {
     const activeEnv = getActiveEnvironment();
@@ -86,7 +67,7 @@ export async function guardPage(pageKey) {
   const accessMap = buildAccessMap(role, permisosRows);
   const hasEffectiveAccess = accessMap.get(normalizedPage) === true;
   const hasFallbackAccess = hasLocalAccess(role, normalizedPage);
-  const canAccessPage = hasEffectiveAccess || (permisosRows.length === 0 && hasFallbackAccess);
+  const canAccessPage = hasEffectiveAccess || hasFallbackAccess;
 
   if (!canAccessPage) {
     const redirectTarget = resolveFirstAllowedRoute(role, requiredEnv || getActiveEnvironment(), permisosRows);
