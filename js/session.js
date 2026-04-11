@@ -1,285 +1,63 @@
 import { supabase } from "./supabase.js";
 
 let cachedUserContext = null;
-const CONTEXT_CACHE_KEY = "app_user_context_fallback_v1";
-const MANUAL_CONTEXT_KEY = "app_manual_context_bootstrap_v1";
-const TENANT_HINTS_KEY = "app_tenant_hints_v1";
-const EMERGENCY_SESSION_KEY = "app_emergency_session_v1";
 
 const SUPER_ADMIN_EMAIL = "santiagoelchameluco@gmail.com";
 const SUPER_ADMIN_ID = "1e17e7c6-d959-4089-ab22-3f64b5b5be41";
 
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 const normalizeRole = (value) => String(value || "").trim().toLowerCase();
+const normalizeText = (value) => String(value || "").trim();
+const normalizeName = (value) => normalizeText(value).toLowerCase();
 
 const isRecordActive = (record) => {
   if (!record || typeof record !== "object") return false;
   if (typeof record.activo === "boolean") return record.activo;
   if (typeof record.activa === "boolean") return record.activa;
-  if (typeof record.estado === "boolean") return record.estado;
   if (record.estado == null) return true;
   return String(record.estado).toLowerCase() !== "inactivo";
 };
 
-async function findUsuarioSistema(user) {
-  const userId = String(user?.id || "").trim();
-  const email = normalizeEmail(user?.email);
-  if (!userId && !email) return { data: null, error: null };
+function getIdentityCandidates(user) {
+  const metadata = user?.user_metadata || user?.raw_user_meta_data || {};
+  const names = [
+    metadata.nombre_completo,
+    metadata.nombre,
+    metadata.full_name,
+    metadata.display_name,
+    metadata.name
+  ]
+    .map(normalizeText)
+    .filter(Boolean);
 
-  if (userId) {
-    const byId = await supabase
-      .from("usuarios_sistema")
-      .select("id, rol, empresa_id, activo, nombre_completo")
-      .eq("id", userId)
-      .maybeSingle();
-    if (!byId.error && byId.data) return byId;
-  }
-
-  if (!email) return { data: null, error: null };
-  return supabase
-    .from("usuarios_sistema")
-    .select("id, rol, empresa_id, activo, nombre_completo")
-    .eq("nombre_completo", email)
-    .maybeSingle();
-}
-
-async function findOtroUsuario(user) {
-  const userId = String(user?.id || "").trim();
-  const email = normalizeEmail(user?.email);
-  if (!userId && !email) return { data: null, error: null };
-
-  if (userId) {
-    const byId = await supabase
-      .from("otros_usuarios")
-      .select("id, empresa_id, estado, nombre_completo")
-      .eq("id", userId)
-      .maybeSingle();
-    if (!byId.error && byId.data) return byId;
-  }
-
-  if (!email) return { data: null, error: null };
-  return supabase
-    .from("otros_usuarios")
-    .select("id, empresa_id, estado, nombre_completo")
-    .eq("nombre_completo", email)
-    .maybeSingle();
-}
-
-const saveContextFallback = (context) => {
-  if (typeof window === "undefined" || !context?.user?.id) return;
-  try {
-    const payload = {
-      user_id: context.user.id,
-      email: normalizeEmail(context.user.email),
-      rol: context.rol || "",
-      empresa_id: context.empresa_id || null,
-      saved_at: new Date().toISOString()
-    };
-    localStorage.setItem(CONTEXT_CACHE_KEY, JSON.stringify(payload));
-    const hintsRaw = localStorage.getItem(TENANT_HINTS_KEY);
-    const hints = hintsRaw ? JSON.parse(hintsRaw) : {};
-    if (payload.email && payload.empresa_id) {
-      hints[payload.email] = {
-        empresa_id: payload.empresa_id,
-        rol: payload.rol || "admin",
-        saved_at: payload.saved_at
-      };
-      localStorage.setItem(TENANT_HINTS_KEY, JSON.stringify(hints));
-    }
-  } catch (_error) {
-    // no-op
-  }
-};
-
-const readContextFallback = (user) => {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(CONTEXT_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || parsed.user_id !== user?.id) return null;
-    return {
-      user,
-      rol: normalizeRole(parsed.rol || "admin"),
-      empresa_id: parsed.empresa_id || null,
-      super_admin: false,
-      fallback: true
-    };
-  } catch (_error) {
-    return null;
-  }
-};
-
-const readTenantHintByEmail = (email) => {
-  if (typeof window === "undefined") return null;
-  try {
-    const key = normalizeEmail(email);
-    if (!key) return null;
-    const raw = localStorage.getItem(TENANT_HINTS_KEY);
-    if (!raw) return null;
-    const hints = JSON.parse(raw);
-    const hit = hints?.[key];
-    if (!hit?.empresa_id) return null;
-    return hit;
-  } catch (_error) {
-    return null;
-  }
-};
-
-const readEmergencyLocalSession = () => {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(EMERGENCY_SESSION_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    const expiresAt = Number(parsed?.expires_at || 0);
-    if (!parsed?.user_id || !parsed?.empresa_id || !expiresAt) return null;
-    if (Date.now() > expiresAt) {
-      localStorage.removeItem(EMERGENCY_SESSION_KEY);
-      return null;
-    }
-    return parsed;
-  } catch (_error) {
-    return null;
-  }
-};
-
-const resolveContextFromAuthClaims = (user) => {
-  const appMeta = user?.app_metadata || user?.raw_app_meta_data || {};
-  const userMeta = user?.user_metadata || user?.raw_user_meta_data || {};
-  const empresaId = String(
-    appMeta.empresa_id
-    || appMeta.tenant_id
-    || userMeta.empresa_id
-    || userMeta.tenant_id
-    || ""
-  ).trim();
-  if (!empresaId) return null;
-
-  const rol = normalizeRole(
-    appMeta.rol
-    || appMeta.role
-    || userMeta.rol
-    || userMeta.role
-    || "admin"
-  );
+  const cedulas = [
+    metadata.cedula,
+    metadata.documento,
+    metadata.document,
+    metadata.dni
+  ]
+    .map((value) => normalizeText(value))
+    .filter(Boolean);
 
   return {
-    user,
-    rol: rol || "admin",
-    empresa_id: empresaId,
-    super_admin: false,
-    fallback: true,
-    claim_bootstrap: true
+    names,
+    namesNormalized: names.map(normalizeName),
+    cedulas
   };
-};
-
-const readManualContext = (user) => {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(MANUAL_CONTEXT_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || parsed.user_id !== user?.id) return null;
-    if (!parsed.empresa_id) return null;
-    return {
-      user,
-      rol: normalizeRole(parsed.rol || "admin"),
-      empresa_id: parsed.empresa_id,
-      super_admin: false,
-      fallback: true,
-      manual_bootstrap: true
-    };
-  } catch (_error) {
-    return null;
-  }
-};
-
-async function resolveContextByIdentity({ user, email, cedula }) {
-  const normalizedEmail = normalizeEmail(email || user?.email);
-  const normalizedCedula = String(cedula || "").trim();
-
-  if (normalizedEmail) {
-    const { data: userByEmail } = await supabase
-      .from("usuarios_sistema")
-      .select("empresa_id, rol, activo, nombre_completo")
-      .eq("nombre_completo", normalizedEmail)
-      .maybeSingle();
-    if (userByEmail && isRecordActive(userByEmail) && userByEmail.empresa_id) {
-      return {
-        user,
-        rol: normalizeRole(userByEmail.rol || "admin"),
-        empresa_id: userByEmail.empresa_id,
-        super_admin: false,
-        fallback: true
-      };
-    }
-  }
-
-  if (normalizedCedula) {
-    const { data: empleadoByCedula } = await supabase
-      .from("empleados")
-      .select("empresa_id, estado")
-      .eq("cedula", normalizedCedula)
-      .maybeSingle();
-    if (empleadoByCedula && isRecordActive(empleadoByCedula) && empleadoByCedula.empresa_id) {
-      return {
-        user,
-        rol: "operativo",
-        empresa_id: empleadoByCedula.empresa_id,
-        super_admin: false,
-        fallback: true
-      };
-    }
-
-    const { data: otroByCedula } = await supabase
-      .from("otros_usuarios")
-      .select("empresa_id, estado")
-      .eq("cedula", normalizedCedula)
-      .maybeSingle();
-    if (otroByCedula && isRecordActive(otroByCedula) && otroByCedula.empresa_id) {
-      return {
-        user,
-        rol: "revisor",
-        empresa_id: otroByCedula.empresa_id,
-        super_admin: false,
-        fallback: true
-      };
-    }
-  }
-
-  return null;
 }
 
-async function resolveContextByCreator(user) {
-  const userId = String(user?.id || "").trim();
-  if (!userId) return null;
-
-  const tables = [
-    { name: "usuarios_sistema", select: "empresa_id", role: "admin" },
-    { name: "otros_usuarios", select: "empresa_id", role: "revisor" },
-    { name: "empleados", select: "empresa_id", role: "operativo" }
-  ];
-
-  for (const table of tables) {
-    const { data, error } = await supabase
-      .from(table.name)
-      .select(table.select)
-      .eq("añadido_por", userId)
+async function queryByName(table, select, namesNormalized = []) {
+  for (const fullName of namesNormalized) {
+    const response = await supabase
+      .from(table)
+      .select(select)
+      .ilike("nombre_completo", fullName)
       .limit(1)
       .maybeSingle();
-    if (!error && data?.empresa_id) {
-      return {
-        user,
-        rol: table.role,
-        empresa_id: data.empresa_id,
-        super_admin: false,
-        fallback: true
-      };
-    }
-  }
 
-  return null;
+    if (!response.error && response.data) return response;
+  }
+  return { data: null, error: null };
 }
 
 async function getSuperAdminContext(user) {
@@ -326,26 +104,25 @@ export async function getUserContext() {
   if (cachedUserContext) return cachedUserContext;
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    const emergency = readEmergencyLocalSession();
-    if (emergency?.empresa_id) {
-      cachedUserContext = {
-        user: {
-          id: emergency.user_id,
-          email: emergency.email || "",
-          user_id: emergency.user_id
-        },
-        rol: normalizeRole(emergency.rol || "admin"),
-        empresa_id: emergency.empresa_id,
-        super_admin: false,
-        emergency_auth: true
-      };
-      return cachedUserContext;
-    }
-    return null;
-  }
+  if (!user) return null;
 
-  const { data: usuarioSistema, error: usuarioSistemaError } = await findUsuarioSistema(user);
+  const identity = getIdentityCandidates(user);
+
+  let { data: usuarioSistema, error: usuarioSistemaError } = await supabase
+    .from("usuarios_sistema")
+    .select("id, rol, empresa_id, activo, nombre_completo")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!usuarioSistema) {
+    const byName = await queryByName(
+      "usuarios_sistema",
+      "id, rol, empresa_id, activo, nombre_completo",
+      identity.namesNormalized
+    );
+    usuarioSistema = byName.data;
+    usuarioSistemaError = byName.error;
+  }
 
   if (!usuarioSistemaError && usuarioSistema && isRecordActive(usuarioSistema)) {
     cachedUserContext = {
@@ -354,11 +131,39 @@ export async function getUserContext() {
       empresa_id: usuarioSistema.empresa_id,
       super_admin: false
     };
-    saveContextFallback(cachedUserContext);
     return cachedUserContext;
   }
 
-  const { data: otroUsuario, error: otroUsuarioError } = await findOtroUsuario(user);
+  let { data: otroUsuario, error: otroUsuarioError } = await supabase
+    .from("otros_usuarios")
+    .select("id, empresa_id, estado, nombre_completo, cedula")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!otroUsuario) {
+    const byName = await queryByName(
+      "otros_usuarios",
+      "id, empresa_id, estado, nombre_completo, cedula",
+      identity.namesNormalized
+    );
+    otroUsuario = byName.data;
+    otroUsuarioError = byName.error;
+  }
+
+  if (!otroUsuario && identity.cedulas.length) {
+    for (const cedula of identity.cedulas) {
+      const byCedula = await supabase
+        .from("otros_usuarios")
+        .select("id, empresa_id, estado, nombre_completo, cedula")
+        .eq("cedula", cedula)
+        .limit(1)
+        .maybeSingle();
+      if (!byCedula.error && byCedula.data) {
+        otroUsuario = byCedula.data;
+        break;
+      }
+    }
+  }
 
   if (!otroUsuarioError && otroUsuario && isRecordActive(otroUsuario)) {
     cachedUserContext = {
@@ -367,54 +172,53 @@ export async function getUserContext() {
       empresa_id: otroUsuario.empresa_id,
       super_admin: false
     };
-    saveContextFallback(cachedUserContext);
+    return cachedUserContext;
+  }
+
+  let { data: empleado, error: empleadoError } = await supabase
+    .from("empleados")
+    .select("id, empresa_id, estado, nombre_completo, cedula")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!empleado) {
+    const byName = await queryByName(
+      "empleados",
+      "id, empresa_id, estado, nombre_completo, cedula",
+      identity.namesNormalized
+    );
+    empleado = byName.data;
+    empleadoError = byName.error;
+  }
+
+  if (!empleado && identity.cedulas.length) {
+    for (const cedula of identity.cedulas) {
+      const byCedula = await supabase
+        .from("empleados")
+        .select("id, empresa_id, estado, nombre_completo, cedula")
+        .eq("cedula", cedula)
+        .limit(1)
+        .maybeSingle();
+      if (!byCedula.error && byCedula.data) {
+        empleado = byCedula.data;
+        break;
+      }
+    }
+  }
+
+  if (!empleadoError && empleado && isRecordActive(empleado)) {
+    cachedUserContext = {
+      user,
+      rol: "operativo",
+      empresa_id: empleado.empresa_id,
+      super_admin: false
+    };
     return cachedUserContext;
   }
 
   const superAdminContext = await getSuperAdminContext(user);
   if (superAdminContext) {
     cachedUserContext = superAdminContext;
-    saveContextFallback(cachedUserContext);
-    return cachedUserContext;
-  }
-
-  const creatorContext = await resolveContextByCreator(user);
-  if (creatorContext?.empresa_id) {
-    cachedUserContext = creatorContext;
-    saveContextFallback(cachedUserContext);
-    return cachedUserContext;
-  }
-
-  const fallbackContext = readContextFallback(user);
-  if (fallbackContext?.empresa_id) {
-    cachedUserContext = fallbackContext;
-    return cachedUserContext;
-  }
-
-  const manualContext = readManualContext(user);
-  if (manualContext?.empresa_id) {
-    cachedUserContext = manualContext;
-    return cachedUserContext;
-  }
-
-  const claimsContext = resolveContextFromAuthClaims(user);
-  if (claimsContext?.empresa_id) {
-    cachedUserContext = claimsContext;
-    saveContextFallback(cachedUserContext);
-    return cachedUserContext;
-  }
-
-  const emailHint = readTenantHintByEmail(user?.email);
-  if (emailHint?.empresa_id) {
-    cachedUserContext = {
-      user,
-      rol: normalizeRole(emailHint.rol || "admin"),
-      empresa_id: emailHint.empresa_id,
-      super_admin: false,
-      fallback: true,
-      hint_bootstrap: true
-    };
-    saveContextFallback(cachedUserContext);
     return cachedUserContext;
   }
 
@@ -447,35 +251,36 @@ export async function getSessionConEmpresa() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: usuarioSistema, error } = await findUsuarioSistema(user);
-
-  if (!error && usuarioSistema && usuarioSistema.activo !== false) {
+  const context = await getUserContext();
+  if (!context?.empresa_id) {
+    const superAdminContext = await getSuperAdminContext(user);
+    if (!superAdminContext) return null;
     return {
       user,
-      usuarioSistema,
-      empresa: await loadEmpresaById(usuarioSistema.empresa_id),
-      superAdmin: false
+      usuarioSistema: null,
+      empresa: null,
+      superAdmin: true
     };
   }
 
-  const { data: otroUsuario, error: otroUsuarioError } = await findOtroUsuario(user);
-
-  if (!otroUsuarioError && otroUsuario && isRecordActive(otroUsuario)) {
+  if (context.super_admin === true) {
     return {
       user,
-      usuarioSistema: { ...otroUsuario, rol: "revisor" },
-      empresa: await loadEmpresaById(otroUsuario.empresa_id),
-      superAdmin: false
+      usuarioSistema: null,
+      empresa: null,
+      superAdmin: true
     };
   }
 
-  const superAdminContext = await getSuperAdminContext(user);
-  if (!superAdminContext) return null;
   return {
     user,
-    usuarioSistema: null,
-    empresa: null,
-    superAdmin: true
+    usuarioSistema: {
+      id: context.user?.id || user.id,
+      rol: context.rol,
+      empresa_id: context.empresa_id
+    },
+    empresa: await loadEmpresaById(context.empresa_id),
+    superAdmin: false
   };
 }
 
@@ -499,71 +304,6 @@ export async function buildRequestHeaders({ includeTenant = true } = {}) {
 }
 
 if (typeof window !== "undefined") {
-  window.setEmergencyLocalSession = (payload = {}) => {
-    try {
-      const userId = String(payload.user_id || "").trim();
-      const empresaId = String(payload.empresa_id || "").trim();
-      if (!userId || !empresaId) return false;
-      const rol = normalizeRole(payload.rol || "admin") || "admin";
-      const expiresAt = Date.now() + (12 * 60 * 60 * 1000);
-      localStorage.setItem(EMERGENCY_SESSION_KEY, JSON.stringify({
-        user_id: userId,
-        email: normalizeEmail(payload.email || ""),
-        empresa_id: empresaId,
-        rol,
-        expires_at: expiresAt
-      }));
-      cachedUserContext = null;
-      return true;
-    } catch (_error) {
-      return false;
-    }
-  };
-
-  window.clearEmergencyLocalSession = () => {
-    localStorage.removeItem(EMERGENCY_SESSION_KEY);
-    cachedUserContext = null;
-  };
-
-  window.setManualContextBootstrap = (payload = {}) => {
-    try {
-      const userId = String(payload.user_id || "").trim();
-      const empresaId = String(payload.empresa_id || "").trim();
-      if (!userId || !empresaId) return false;
-      localStorage.setItem(MANUAL_CONTEXT_KEY, JSON.stringify({
-        user_id: userId,
-        email: normalizeEmail(payload.email || ""),
-        empresa_id: empresaId,
-        rol: normalizeRole(payload.rol || "admin"),
-        saved_at: new Date().toISOString()
-      }));
-      cachedUserContext = null;
-      return true;
-    } catch (_error) {
-      return false;
-    }
-  };
-
-  window.clearManualContextBootstrap = () => {
-    localStorage.removeItem(MANUAL_CONTEXT_KEY);
-    cachedUserContext = null;
-  };
-
-  window.bootstrapContextByIdentity = async (payload = {}) => {
-    const { data: userData } = await supabase.auth.getUser();
-    const authUser = userData?.user;
-    if (!authUser) return null;
-    const context = await resolveContextByIdentity({
-      user: authUser,
-      email: payload.email || authUser.email,
-      cedula: payload.cedula || ""
-    });
-    if (!context?.empresa_id) return null;
-    saveContextFallback(context);
-    cachedUserContext = context;
-    return context;
-  };
-
   window.getEmpresaActual = async () => {
     const session = await getSessionConEmpresa();
     return session?.empresa || null;
