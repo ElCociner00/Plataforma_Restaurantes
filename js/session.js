@@ -161,12 +161,17 @@ function buildFallbackContextFromUser(user) {
 
 function getIdentityCandidates(user) {
   const metadata = user?.user_metadata || user?.raw_user_meta_data || {};
+  const email = normalizeEmail(user?.email);
+  const emailAlias = email.includes("@") ? normalizeText(email.split("@")[0]) : "";
+
   const names = [
     metadata.nombre_completo,
     metadata.nombre,
     metadata.full_name,
     metadata.display_name,
-    metadata.name
+    metadata.name,
+    email,
+    emailAlias
   ]
     .map(normalizeText)
     .filter(Boolean);
@@ -183,7 +188,8 @@ function getIdentityCandidates(user) {
   return {
     names,
     namesNormalized: names.map(normalizeName),
-    cedulas
+    cedulas,
+    emails: [email].filter(Boolean)
   };
 }
 
@@ -288,6 +294,16 @@ export async function getUserContext() {
     .eq("id", user.id)
     .maybeSingle();
 
+  if (!usuarioSistema && identity.emails.length) {
+    const byEmail = await queryByEmailOnNombre(
+      "usuarios_sistema",
+      "id, rol, empresa_id, activo, nombre_completo",
+      identity.emails
+    );
+    usuarioSistema = byEmail.data;
+    usuarioSistemaError = byEmail.error;
+  }
+
   if (!usuarioSistema) {
     const byName = await queryByName(
       "usuarios_sistema",
@@ -312,6 +328,16 @@ export async function getUserContext() {
     .select("id, empresa_id, estado, nombre_completo, cedula")
     .eq("id", user.id)
     .maybeSingle();
+
+  if (!otroUsuario && identity.emails.length) {
+    const byEmail = await queryByEmailOnNombre(
+      "otros_usuarios",
+      "id, empresa_id, estado, nombre_completo, cedula",
+      identity.emails
+    );
+    otroUsuario = byEmail.data;
+    otroUsuarioError = byEmail.error;
+  }
 
   if (!otroUsuario) {
     const byName = await queryByName(
@@ -353,6 +379,16 @@ export async function getUserContext() {
     .eq("id", user.id)
     .maybeSingle();
 
+  if (!empleado && identity.emails.length) {
+    const byEmail = await queryByEmailOnNombre(
+      "empleados",
+      "id, empresa_id, estado, nombre_completo, cedula",
+      identity.emails
+    );
+    empleado = byEmail.data;
+    empleadoError = byEmail.error;
+  }
+
   if (!empleado) {
     const byName = await queryByName(
       "empleados",
@@ -392,6 +428,11 @@ export async function getUserContext() {
     return persistUserContext(superAdminContext);
   }
 
+  const companyEmailContext = await resolveEmpresaContextByCorreoEmpresa(user);
+  if (companyEmailContext) {
+    return persistUserContext(companyEmailContext);
+  }
+
   const localFallback = buildFallbackContextFromUser(user);
   if (localFallback) {
     return persistUserContext(localFallback);
@@ -413,10 +454,46 @@ export function clearUserContextCache() {
   clearStoredUserContext();
 }
 
+async function queryByEmailOnNombre(table, select, emails = []) {
+  for (const email of emails) {
+    const response = await supabase
+      .from(table)
+      .select(select)
+      .ilike("nombre_completo", email)
+      .limit(1)
+      .maybeSingle();
+
+    if (!response.error && response.data) return response;
+  }
+  return { data: null, error: null };
+}
+
+async function resolveEmpresaContextByCorreoEmpresa(user) {
+  const email = normalizeEmail(user?.email);
+  if (!email) return null;
+
+  const { data, error } = await supabase
+    .from("empresas")
+    .select("id, correo_empresa, activa, activo")
+    .ilike("correo_empresa", email)
+    .limit(2);
+
+  if (error || !Array.isArray(data) || data.length !== 1) return null;
+  const empresa = data[0];
+  if (!isRecordActive(empresa)) return null;
+
+  return {
+    user,
+    rol: "admin",
+    empresa_id: empresa.id,
+    super_admin: false
+  };
+}
 function isRecordActive(record) {
   if (!record || typeof record !== "object") return false;
   if (typeof record.activo === "boolean") return record.activo;
   if (typeof record.activa === "boolean") return record.activa;
+  if (typeof record.estado === "boolean") return record.estado;
   if (record.estado == null) return true;
   return String(record.estado).toLowerCase() !== "inactivo";
 }
@@ -505,3 +582,11 @@ if (typeof window !== "undefined") {
     return session?.empresa || null;
   };
 }
+
+
+
+
+
+
+
+
