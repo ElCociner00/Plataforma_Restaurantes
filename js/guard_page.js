@@ -1,136 +1,62 @@
 import { getUserContext } from "./session.js";
-import { PAGE_ENVIRONMENT } from "./permissions.js";
-import { esSuperAdmin, getPermisosEfectivos, permisosCacheGet, permisosCacheSet, tienePermiso } from "./permisos.core.js";
+import { esSuperAdmin } from "./permisos.core.js";
+import { getActiveEnvironment, setActiveEnvironment } from "./environment.js";
+import { getHomeByRole, hasLocalAccess, MODULE_ENV_MAP } from "./access_control.local.js";
 
 const LOGIN_URL = "/Plataforma_Restaurantes/index.html";
-const SELECTOR_URL = "/Plataforma_Restaurantes/entorno/";
-let isRedirecting = false;
+const GUARD_REASON_KEY = "app_guard_reason";
+let redirectInFlight = false;
 
-const FALLBACK_ROUTES = [
-  "cierre_turno",
-  "cierre_inventarios",
-  "historico_cierre_turno",
-  "historico_cierre_inventarios",
-  "dashboard",
-  "facturacion",
-  "subir_facturas_siigo",
-  "dashboard_siigo",
-  "nomina",
-  "gestion_usuarios",
-  "configuracion",
-  "configuracion_siigo"
-];
-
-const toModulePath = (moduleKey) => {
-  const map = {
-    dashboard: "/Plataforma_Restaurantes/dashboard/",
-    cierre_turno: "/Plataforma_Restaurantes/cierre_turno/",
-    historico_cierre_turno: "/Plataforma_Restaurantes/cierre_turno/historico_cierre_turno.html",
-    cierre_inventarios: "/Plataforma_Restaurantes/cierre_inventarios/",
-    historico_cierre_inventarios: "/Plataforma_Restaurantes/cierre_inventarios/historico_cierre_inventarios.html",
-    facturacion: "/Plataforma_Restaurantes/facturacion/",
-    subir_facturas_siigo: "/Plataforma_Restaurantes/siigo/subir_facturas_siigo/",
-    dashboard_siigo: "/Plataforma_Restaurantes/siigo/dashboard_siigo/",
-    nomina: "/Plataforma_Restaurantes/nomina/",
-    gestion_usuarios: "/Plataforma_Restaurantes/gestion_usuarios/",
-    configuracion: "/Plataforma_Restaurantes/configuracion/",
-    configuracion_siigo: "/Plataforma_Restaurantes/siigo/configuracion_siigo/"
-  };
-  return map[moduleKey] || SELECTOR_URL;
+const toRole = (context, isSuper) => {
+  if (isSuper) return "admin_root";
+  return String(context?.rol || "admin").trim().toLowerCase() || "admin";
 };
 
-const getForbiddenRedirect = (context, permisos = null, isSuper = false) => {
-  if (isSuper) return "/Plataforma_Restaurantes/gestion_empresas/";
+const normalizePath = (value) => String(value || "")
+  .replace(/\/index\.html$/i, "")
+  .replace(/\/+$/, "") || "/";
 
-  const env = localStorage.getItem("app_entorno_activo") || "loggro";
+const redirectWithReason = (url, reason) => {
+  if (!url || redirectInFlight) return;
+  const current = normalizePath(window.location.pathname);
+  const target = normalizePath(url);
+  if (current === target) return;
 
-  const permisosArray = Array.isArray(permisos) ? permisos : [];
-  for (const moduleKey of FALLBACK_ROUTES) {
-    if (tienePermiso(moduleKey, permisosArray)) {
-      return toModulePath(moduleKey);
-    }
+  try {
+    if (reason) sessionStorage.setItem(GUARD_REASON_KEY, reason);
+  } catch (_error) {
+    // noop
   }
 
-  return SELECTOR_URL;
+  redirectInFlight = true;
+  window.location.href = url;
 };
 
-const safeRedirect = (targetUrl) => {
-  if (!targetUrl || isRedirecting) return;
-
-  const normalizePath = (value) => String(value || "").replace(/\/+$/, "");
-  const currentPath = normalizePath(window.location.pathname);
-  const targetPath = normalizePath(targetUrl);
-  if (currentPath === targetPath) return;
-
-  isRedirecting = true;
-  window.location.href = targetUrl;
-};
-
-async function ensurePermisos(context, override) {
-  if (override) return override;
-  const cached = permisosCacheGet();
-  if (cached) return cached;
-  if (!context?.empresa_id || !context?.user) return null;
-  const userId = context.user.id || context.user.user_id;
-  if (!userId) return null;
-  const permisos = await getPermisosEfectivos(userId, context.empresa_id).catch(() => null);
-  permisosCacheSet(permisos);
-  return permisos;
-}
-
-export async function guardPage(pageKey, permisosOverride = null) {
-  const context = await getUserContext();
+export async function guardPage(pageKey) {
+  const context = await getUserContext().catch(() => null);
   const isSuper = await esSuperAdmin().catch(() => false);
 
   if (!context && !isSuper) {
-    safeRedirect(LOGIN_URL);
+    redirectWithReason(LOGIN_URL, "Sesion no valida. Inicia sesion de nuevo.");
     return;
   }
 
-  if (pageKey === "gestion_empresas" && !isSuper) {
-    console.warn("Acceso denegado a gestion empresas (solo super admin)");
-    safeRedirect(getForbiddenRedirect(context));
+  const role = toRole(context, isSuper);
+  const requiredEnv = MODULE_ENV_MAP[String(pageKey || "").trim().toLowerCase()] || "";
+
+  if (requiredEnv) {
+    const activeEnv = getActiveEnvironment();
+    if (activeEnv !== requiredEnv) {
+      setActiveEnvironment(requiredEnv);
+    }
+  }
+
+  if (pageKey === "gestion_empresas" && role !== "admin_root") {
+    redirectWithReason(getHomeByRole(role), "Solo admin root puede entrar a Gestion de empresas.");
     return;
   }
 
-  const expectedEnvironment = pageKey === "facturacion" || pageKey === "nomina" || pageKey === "gestion_empresas" || isSuper
-    ? null
-    : PAGE_ENVIRONMENT[pageKey];
-  const activeEnvironment = localStorage.getItem("app_entorno_activo");
-
-  const expectedEnvironments = Array.isArray(expectedEnvironment)
-    ? expectedEnvironment
-    : (expectedEnvironment ? [expectedEnvironment] : []);
-
-  if (expectedEnvironments.length && !activeEnvironment) {
-    safeRedirect(SELECTOR_URL);
-    return;
-  }
-
-  if (expectedEnvironments.length && activeEnvironment && !expectedEnvironments.includes(activeEnvironment)) {
-    alert("Este modulo pertenece a otro entorno.");
-    safeRedirect(SELECTOR_URL);
-    return;
-  }
-
-  if (isSuper && (pageKey === "gestion_empresas" || pageKey === "facturacion")) {
-    return;
-  }
-
-  const permisos = await ensurePermisos(context, permisosOverride);
-  if (!context?.empresa_id || !permisos) {
-    safeRedirect(getForbiddenRedirect(context, permisos, isSuper));
-    return;
-  }
-
-  const allowed = tienePermiso(pageKey, permisos);
-
-  if (!allowed) {
-    alert("No tienes permisos para acceder a este modulo");
-    safeRedirect(getForbiddenRedirect(context, permisos, isSuper));
+  if (!hasLocalAccess(role, pageKey)) {
+    redirectWithReason(getHomeByRole(role), "Tu rol no tiene acceso a este modulo.");
   }
 }
-
-
-
-
