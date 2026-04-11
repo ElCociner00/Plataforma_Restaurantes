@@ -159,12 +159,6 @@ export async function getPermisosEfectivos(usuarioId, empresaId, forceRefresh = 
     return permisosCache;
   }
 
-  const { data, error } = await supabase
-    .from("v_permisos_efectivos")
-    .select("modulo, permitido")
-    .eq("usuario_id", usuarioId)
-    .eq("empresa_id", empresaId);
-
   const normalizeModuleKey = (value) => String(value || "").trim().toLowerCase();
   const normalizePermitido = (value) => value === true || value === 1 || String(value || "").trim().toLowerCase() === "true";
   const normalizePermisosArray = (rows) => (Array.isArray(rows) ? rows : [])
@@ -174,68 +168,68 @@ export async function getPermisosEfectivos(usuarioId, empresaId, forceRefresh = 
     }))
     .filter((row) => Boolean(row.modulo));
 
-  let permisos = normalizePermisosArray(data);
-  let rol = "";
-
-  if (error || !permisos.length) {
+  const resolveRole = async () => {
     const context = await getUserContext().catch(() => null);
-    rol = String(context?.rol || "").trim().toLowerCase();
+    const contextRole = String(context?.rol || "").trim().toLowerCase();
+    if (contextRole) return contextRole;
 
-    if (!rol) {
-      const roleLookup = await supabase
-        .from("usuarios_sistema")
-        .select("rol")
-        .eq("id", usuarioId)
-        .maybeSingle();
-      if (!roleLookup?.error && roleLookup?.data?.rol) {
-        rol = String(roleLookup.data.rol).trim().toLowerCase();
-      }
+    const byEmpresa = await supabase
+      .from("usuarios_sistema")
+      .select("rol")
+      .eq("id", usuarioId)
+      .eq("empresa_id", empresaId)
+      .maybeSingle();
+    if (!byEmpresa?.error && byEmpresa?.data?.rol) {
+      return String(byEmpresa.data.rol).trim().toLowerCase();
     }
 
-    if (rol) {
-      const fallback = await supabase
+    const fallback = await supabase
+      .from("usuarios_sistema")
+      .select("rol")
+      .eq("id", usuarioId)
+      .maybeSingle();
+    if (!fallback?.error && fallback?.data?.rol) {
+      return String(fallback.data.rol).trim().toLowerCase();
+    }
+
+    return "operativo";
+  };
+
+  const rol = await resolveRole();
+
+  const [effectiveResponse, roleResponse] = await Promise.all([
+    supabase
+      .from("v_permisos_efectivos")
+      .select("modulo, permitido")
+      .eq("usuario_id", usuarioId)
+      .eq("empresa_id", empresaId),
+    rol
+      ? supabase
         .from("roles_permisos_modulo")
         .select("modulo, permitido")
-        .eq("rol", rol);
-      if (!fallback?.error && Array.isArray(fallback?.data) && fallback.data.length) {
-        permisos = normalizePermisosArray(fallback.data);
-      }
+        .eq("rol", rol)
+      : Promise.resolve({ data: [], error: null })
+  ]);
 
-      if (!permisos.length) {
-        const byRole = DEFAULT_ROLE_PERMISSIONS?.[rol] || {};
-        permisos = Object.entries(byRole).map(([modulo, permitido]) => ({
-          modulo: normalizeModuleKey(modulo),
-          permitido: permitido === true
-        }));
-      }
-    }
-  }
+  const defaultsByRole = DEFAULT_ROLE_PERMISSIONS?.[rol] || {};
+  const merged = new Map(
+    Object.entries(defaultsByRole).map(([modulo, permitido]) => [normalizeModuleKey(modulo), permitido === true])
+  );
 
-  if (!rol) {
-    const context = await getUserContext().catch(() => null);
-    rol = String(context?.rol || "").trim().toLowerCase();
-  }
-
-  if (rol && Array.isArray(permisos) && permisos.length) {
-    const defaultsByRole = DEFAULT_ROLE_PERMISSIONS?.[rol] || {};
-    const merged = new Map();
-
-    Object.entries(defaultsByRole).forEach(([modulo, permitido]) => {
-      merged.set(normalizeModuleKey(modulo), permitido === true);
+  const applyRowsAsAvailabilitySource = (rows) => {
+    normalizePermisosArray(rows).forEach((row) => {
+      const module = normalizeModuleKey(row.modulo);
+      const currentlyAllowed = merged.get(module) === true;
+      merged.set(module, currentlyAllowed || normalizePermitido(row.permitido));
     });
+  };
 
-    permisos.forEach((row) => {
-      merged.set(normalizeModuleKey(row.modulo), normalizePermitido(row.permitido));
-    });
+  applyRowsAsAvailabilitySource(roleResponse?.data);
+  applyRowsAsAvailabilitySource(effectiveResponse?.data);
 
-    permisos = Array.from(merged.entries()).map(([modulo, permitido]) => ({ modulo, permitido }));
-  }
-
+  let permisos = Array.from(merged.entries()).map(([modulo, permitido]) => ({ modulo, permitido }));
   permisos = applyEmergencyRolePermissions(rol, permisos);
 
-  if (error && !permisos.length) {
-    permisos = [];
-  }
   permisosCacheSet(permisos);
   permisosCacheKey = cacheKey;
 

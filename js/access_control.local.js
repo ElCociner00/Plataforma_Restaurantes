@@ -1,7 +1,7 @@
 import { ENV_LOGGRO, ENV_SIIGO } from "./environment.js";
 import { DEFAULT_ROLE_PERMISSIONS, PAGE_ENVIRONMENT } from "./permissions.js";
 
-const normalizeRole = (value) => String(value || "").trim().toLowerCase() || "admin";
+const normalizeRole = (value) => String(value || "").trim().toLowerCase() || "operativo";
 const normalizeModule = (value) => String(value || "").trim().toLowerCase();
 
 export const LOCAL_ROLE_ACCESS = {

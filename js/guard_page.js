@@ -1,6 +1,7 @@
 import { getUserContext } from "./session.js";
 import { esSuperAdmin, getPermisosEfectivos } from "./permisos.core.js";
 import { getActiveEnvironment, setActiveEnvironment } from "./environment.js";
+import { supabase } from "./supabase.js";
 import {
   buildAccessMap,
   getHomeByRole,
@@ -15,7 +16,7 @@ let redirectInFlight = false;
 
 const toRole = (context, isSuper) => {
   if (isSuper) return "admin_root";
-  return String(context?.rol || "admin").trim().toLowerCase() || "admin";
+  return String(context?.rol || "operativo").trim().toLowerCase() || "operativo";
 };
 
 const normalizePath = (value) => String(value || "")
@@ -47,12 +48,24 @@ export async function guardPage(pageKey) {
     return;
   }
 
-  const role = toRole(context, isSuper);
   const normalizedPage = String(pageKey || "").trim().toLowerCase();
   const requiredEnv = MODULE_ENV_MAP[normalizedPage] || "";
   const userId = context?.user?.id || context?.user?.user_id;
   const empresaId = context?.empresa_id || null;
   let permisosRows = [];
+  let role = toRole(context, isSuper);
+
+  if (!isSuper && userId && empresaId && (!role || role === "operativo")) {
+    const roleLookup = await supabase
+      .from("usuarios_sistema")
+      .select("rol")
+      .eq("id", userId)
+      .eq("empresa_id", empresaId)
+      .maybeSingle();
+    if (!roleLookup?.error && roleLookup?.data?.rol) {
+      role = String(roleLookup.data.rol).trim().toLowerCase();
+    }
+  }
 
   if (userId && (empresaId || isSuper)) {
     permisosRows = await getPermisosEfectivos(userId, empresaId).catch(() => []);
