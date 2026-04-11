@@ -2,6 +2,7 @@ import { supabase } from "./supabase.js";
 import { getUserContext, obtenerUsuarioActual } from "./session.js";
 import { isEmpresaReadOnlyPlan, normalizeEmpresaActiva, resolveEmpresaPlan } from "./plan.js";
 import { DEFAULT_ROLE_PERMISSIONS } from "./permissions.js";
+import { applyEmergencyRolePermissions } from "./permisos.emergencia.js";
 
 let permisosCache = null;
 let permisosCacheKey = null;
@@ -165,11 +166,21 @@ export async function getPermisosEfectivos(usuarioId, empresaId, forceRefresh = 
     .eq("usuario_id", usuarioId)
     .eq("empresa_id", empresaId);
 
-  let permisos = data || [];
+  const normalizeModuleKey = (value) => String(value || "").trim().toLowerCase();
+  const normalizePermitido = (value) => value === true || value === 1 || String(value || "").trim().toLowerCase() === "true";
+  const normalizePermisosArray = (rows) => (Array.isArray(rows) ? rows : [])
+    .map((row) => ({
+      modulo: normalizeModuleKey(row?.modulo),
+      permitido: normalizePermitido(row?.permitido)
+    }))
+    .filter((row) => Boolean(row.modulo));
+
+  let permisos = normalizePermisosArray(data);
+  let rol = "";
 
   if (error || !permisos.length) {
     const context = await getUserContext().catch(() => null);
-    let rol = String(context?.rol || "").trim().toLowerCase();
+    rol = String(context?.rol || "").trim().toLowerCase();
 
     if (!rol) {
       const roleLookup = await supabase
@@ -188,18 +199,40 @@ export async function getPermisosEfectivos(usuarioId, empresaId, forceRefresh = 
         .select("modulo, permitido")
         .eq("rol", rol);
       if (!fallback?.error && Array.isArray(fallback?.data) && fallback.data.length) {
-        permisos = fallback.data;
+        permisos = normalizePermisosArray(fallback.data);
       }
 
       if (!permisos.length) {
         const byRole = DEFAULT_ROLE_PERMISSIONS?.[rol] || {};
         permisos = Object.entries(byRole).map(([modulo, permitido]) => ({
-          modulo,
+          modulo: normalizeModuleKey(modulo),
           permitido: permitido === true
         }));
       }
     }
   }
+
+  if (!rol) {
+    const context = await getUserContext().catch(() => null);
+    rol = String(context?.rol || "").trim().toLowerCase();
+  }
+
+  if (rol && Array.isArray(permisos) && permisos.length) {
+    const defaultsByRole = DEFAULT_ROLE_PERMISSIONS?.[rol] || {};
+    const merged = new Map();
+
+    Object.entries(defaultsByRole).forEach(([modulo, permitido]) => {
+      merged.set(normalizeModuleKey(modulo), permitido === true);
+    });
+
+    permisos.forEach((row) => {
+      merged.set(normalizeModuleKey(row.modulo), normalizePermitido(row.permitido));
+    });
+
+    permisos = Array.from(merged.entries()).map(([modulo, permitido]) => ({ modulo, permitido }));
+  }
+
+  permisos = applyEmergencyRolePermissions(rol, permisos);
 
   if (error && !permisos.length) {
     permisos = [];
@@ -213,13 +246,15 @@ export async function getPermisosEfectivos(usuarioId, empresaId, forceRefresh = 
 export function tienePermiso(modulo, permisos) {
   if (!modulo || !permisos) return false;
 
+  const normalizedModulo = String(modulo || "").trim().toLowerCase();
+
   if (Array.isArray(permisos)) {
-    const item = permisos.find((permiso) => permiso.modulo === modulo);
+    const item = permisos.find((permiso) => String(permiso?.modulo || "").trim().toLowerCase() === normalizedModulo);
     return item ? item.permitido === true : false;
   }
 
   if (typeof permisos === "object") {
-    return permisos[modulo] === true;
+    return permisos[normalizedModulo] === true || permisos[modulo] === true;
   }
 
   return false;

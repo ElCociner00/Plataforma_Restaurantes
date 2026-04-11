@@ -5,6 +5,7 @@ import { getPermisosEfectivos, tienePermiso } from "./permisos.core.js";
 const btnLoggro = document.getElementById("btnEntornoLoggro");
 const btnSiigo = document.getElementById("btnEntornoSiigo");
 const status = document.getElementById("status");
+const GUARD_REASON_KEY = "app_guard_reason";
 
 const LOGGRO_ROUTE_BY_MODULE = [
   ["dashboard", "/Plataforma_Restaurantes/dashboard/"],
@@ -57,13 +58,22 @@ const initRoleUi = async () => {
 
   btnSiigo.disabled = false;
   btnSiigo.title = "";
+
+  try {
+    const reason = String(sessionStorage.getItem(GUARD_REASON_KEY) || "").trim();
+    if (reason && status) {
+      status.textContent = reason;
+      sessionStorage.removeItem(GUARD_REASON_KEY);
+    }
+  } catch (_error) {
+    // noop
+  }
 };
 
 btnLoggro?.addEventListener("click", () => goByRole(ENV_LOGGRO));
 btnSiigo?.addEventListener("click", () => goByRole(ENV_SIIGO));
 
 initRoleUi();
-
 
 
 

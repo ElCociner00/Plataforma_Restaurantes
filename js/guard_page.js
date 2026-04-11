@@ -1,9 +1,11 @@
 import { getUserContext } from "./session.js";
 import { PAGE_ENVIRONMENT } from "./permissions.js";
 import { esSuperAdmin, getPermisosEfectivos, permisosCacheGet, permisosCacheSet, tienePermiso } from "./permisos.core.js";
+import { getEmergencyHomeByRole, isEmergencyAllowed } from "./permisos.emergencia.js";
 
 const LOGIN_URL = "/Plataforma_Restaurantes/index.html";
 const SELECTOR_URL = "/Plataforma_Restaurantes/entorno/";
+const GUARD_REASON_KEY = "app_guard_reason";
 let isRedirecting = false;
 
 const FALLBACK_ROUTES = [
@@ -42,28 +44,44 @@ const toModulePath = (moduleKey) => {
 const getForbiddenRedirect = (context, permisos = null, isSuper = false) => {
   if (isSuper) return "/Plataforma_Restaurantes/gestion_empresas/";
 
-  const env = localStorage.getItem("app_entorno_activo") || "loggro";
+  const role = String(context?.rol || "").trim().toLowerCase();
 
   const permisosArray = Array.isArray(permisos) ? permisos : [];
   for (const moduleKey of FALLBACK_ROUTES) {
-    if (tienePermiso(moduleKey, permisosArray)) {
+    if (tienePermiso(moduleKey, permisosArray) || isEmergencyAllowed(role, moduleKey)) {
       return toModulePath(moduleKey);
     }
   }
 
-  return SELECTOR_URL;
+  return getEmergencyHomeByRole(role) || SELECTOR_URL;
 };
 
 const safeRedirect = (targetUrl) => {
   if (!targetUrl || isRedirecting) return;
 
-  const normalizePath = (value) => String(value || "").replace(/\/+$/, "");
+  const normalizePath = (value) => {
+    const raw = String(value || "").trim();
+    const path = raw.includes("//") ? (new URL(raw, window.location.origin)).pathname : raw;
+    return path
+      .replace(/\/index\.html$/i, "")
+      .replace(/\/+$/, "") || "/";
+  };
+
   const currentPath = normalizePath(window.location.pathname);
   const targetPath = normalizePath(targetUrl);
   if (currentPath === targetPath) return;
 
   isRedirecting = true;
   window.location.href = targetUrl;
+};
+
+const redirectWithReason = (targetUrl, reason) => {
+  try {
+    if (reason) sessionStorage.setItem(GUARD_REASON_KEY, reason);
+  } catch (_error) {
+    // noop
+  }
+  safeRedirect(targetUrl);
 };
 
 async function ensurePermisos(context, override) {
@@ -83,13 +101,13 @@ export async function guardPage(pageKey, permisosOverride = null) {
   const isSuper = await esSuperAdmin().catch(() => false);
 
   if (!context && !isSuper) {
-    safeRedirect(LOGIN_URL);
+    redirectWithReason(LOGIN_URL, "No se pudo validar tu sesion. Inicia sesion nuevamente.");
     return;
   }
 
   if (pageKey === "gestion_empresas" && !isSuper) {
     console.warn("Acceso denegado a gestion empresas (solo super admin)");
-    safeRedirect(getForbiddenRedirect(context));
+    redirectWithReason(getForbiddenRedirect(context), "Tu rol no puede entrar a Gestion de empresas.");
     return;
   }
 
@@ -103,13 +121,12 @@ export async function guardPage(pageKey, permisosOverride = null) {
     : (expectedEnvironment ? [expectedEnvironment] : []);
 
   if (expectedEnvironments.length && !activeEnvironment) {
-    safeRedirect(SELECTOR_URL);
+    redirectWithReason(SELECTOR_URL, "No hay entorno activo. Debes seleccionar Loggro o Siigo.");
     return;
   }
 
   if (expectedEnvironments.length && activeEnvironment && !expectedEnvironments.includes(activeEnvironment)) {
-    alert("Este modulo pertenece a otro entorno.");
-    safeRedirect(SELECTOR_URL);
+    redirectWithReason(SELECTOR_URL, "Este modulo pertenece a otro entorno. Selecciona el entorno correcto.");
     return;
   }
 
@@ -119,18 +136,27 @@ export async function guardPage(pageKey, permisosOverride = null) {
 
   const permisos = await ensurePermisos(context, permisosOverride);
   if (!context?.empresa_id || !permisos) {
-    safeRedirect(getForbiddenRedirect(context, permisos, isSuper));
+    redirectWithReason(getForbiddenRedirect(context, permisos, isSuper), "No se pudieron resolver permisos. Te enviamos a un modulo seguro.");
     return;
   }
 
-  const allowed = tienePermiso(pageKey, permisos);
+  const role = String(context?.rol || "").trim().toLowerCase();
+  const allowed = tienePermiso(pageKey, permisos) || isEmergencyAllowed(role, pageKey);
 
   if (!allowed) {
-    alert("No tienes permisos para acceder a este modulo");
-    safeRedirect(getForbiddenRedirect(context, permisos, isSuper));
+    const forbiddenRedirect = getForbiddenRedirect(context, permisos, isSuper);
+    const normalizePath = (value) => String(value || "")
+      .replace(/\/index\.html$/i, "")
+      .replace(/\/+$/, "") || "/";
+    const currentPath = normalizePath(window.location.pathname);
+    const targetPath = normalizePath(forbiddenRedirect);
+
+    if (targetPath === currentPath) {
+      redirectWithReason(SELECTOR_URL, "Se detecto una redireccion repetitiva. Selecciona entorno para continuar.");
+      return;
+    }
+
+    redirectWithReason(forbiddenRedirect, "No tienes permisos para este modulo. Te llevamos a uno permitido.");
   }
 }
-
-
-
 

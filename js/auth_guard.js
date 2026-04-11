@@ -3,10 +3,15 @@ import { getUserContext } from "./session.js";
 import { esSuperAdmin, getPermisosEfectivos, permisosCacheSet } from "./permisos.core.js";
 
 const LOGIN_URL = "/Plataforma_Restaurantes/index.html";
-const SELECTOR_URL = "/Plataforma_Restaurantes/entorno/";
 let permisosHydrated = false;
+const GUARD_REASON_KEY = "app_guard_reason";
 
-function redirectToLogin() {
+function redirectToLogin(reason = "Tu sesion no es valida. Inicia sesion nuevamente.") {
+  try {
+    sessionStorage.setItem(GUARD_REASON_KEY, reason);
+  } catch (_error) {
+    // noop
+  }
   window.location.replace(LOGIN_URL);
 }
 
@@ -19,22 +24,11 @@ function protectInteractions() {
   });
 }
 
-const enforceSessionAndEnvironment = (session) => {
+const enforceSession = (session) => {
   if (!session) {
-    redirectToLogin();
+    redirectToLogin("Tu sesion ha finalizado o no existe.");
     return false;
   }
-
-  const currentPath = String(window.location.pathname || "");
-  const isSelectorPage = window.location.pathname.includes("/entorno/");
-  const isGlobalNoTenantPage = currentPath.includes("/gestion_empresas/") || currentPath.includes("/facturacion/");
-  const entornoActivo = localStorage.getItem("app_entorno_activo");
-
-  if (!isSelectorPage && !isGlobalNoTenantPage && !entornoActivo) {
-    window.location.replace(SELECTOR_URL);
-    return false;
-  }
-
   return true;
 };
 
@@ -59,14 +53,14 @@ const hydratePermisosCache = async () => {
 
 document.addEventListener("DOMContentLoaded", async () => {
   const { data: initial } = await supabase.auth.getSession();
-  if (!enforceSessionAndEnvironment(initial.session)) return;
+  if (!enforceSession(initial.session)) return;
   await hydratePermisosCache().catch(() => {});
 
   document.body.style.display = "block";
   protectInteractions();
 
   const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-    if (!enforceSessionAndEnvironment(session)) return;
+    if (!enforceSession(session)) return;
     hydratePermisosCache().catch(() => {});
     document.body.style.display = "block";
   });

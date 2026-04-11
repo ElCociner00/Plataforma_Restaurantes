@@ -211,12 +211,17 @@ async function renderAuthenticatedHeader() {
   const activeEnvironment = getActiveEnvironment();
   const currentPath = String(window.location.pathname || "");
   const isGlobalNoTenantPage = currentPath.includes("/gestion_empresas/") || currentPath.includes("/facturacion/");
+
+  const inferEnvironmentFromPath = () => {
+    if (currentPath.includes("/siigo/") || currentPath.includes("/nomina/")) return ENV_SIIGO;
+    return ENV_LOGGRO;
+  };
+
   if (!activeEnvironment && !isGlobalNoTenantPage) {
-    window.location.href = "/Plataforma_Restaurantes/entorno/";
-    return;
+    setActiveEnvironment(inferEnvironmentFromPath());
   }
 
-  const environmentForMenu = activeEnvironment || (isGlobalNoTenantPage ? ENV_LOGGRO : "");
+  const environmentForMenu = getActiveEnvironment() || (isGlobalNoTenantPage ? ENV_LOGGRO : inferEnvironmentFromPath());
   const nombreEmpresa = await obtenerNombreEmpresa(context.empresa_id);
   const menu = buildMenu({ context, environmentForMenu });
 
@@ -241,7 +246,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderFallbackHeader("Menu temporal disponible");
   }
 });
-
 
 
 
