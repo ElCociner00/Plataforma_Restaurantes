@@ -1,5 +1,5 @@
 import { getUserContext } from "./session.js";
-import { esSuperAdmin } from "./permisos.core.js";
+import { esSuperAdmin, getPermisosEfectivos } from "./permisos.core.js";
 import { getActiveEnvironment, setActiveEnvironment } from "./environment.js";
 import {
   buildAccessMap,

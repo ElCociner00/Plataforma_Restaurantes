@@ -1,6 +1,7 @@
 import { getUserContext } from "./session.js";
 import { ENV_LOGGRO, ENV_SIIGO, setActiveEnvironment } from "./environment.js";
-import { resolveDefaultRouteForRoleEnv } from "./access_control.local.js";
+import { getPermisosEfectivos } from "./permisos.core.js";
+import { resolveFirstAllowedRoute } from "./access_control.local.js";
 
 const btnLoggro = document.getElementById("btnEntornoLoggro");
 const btnSiigo = document.getElementById("btnEntornoSiigo");
@@ -16,7 +17,10 @@ const goByRole = async (env) => {
 
   setActiveEnvironment(env);
   const rol = String(context?.rol || "").trim().toLowerCase();
-  const route = resolveDefaultRouteForRoleEnv(rol, env);
+  const userId = context?.user?.id || context?.user?.user_id;
+  const empresaId = context?.empresa_id || null;
+  const permisos = userId ? await getPermisosEfectivos(userId, empresaId).catch(() => []) : [];
+  const route = resolveFirstAllowedRoute(rol, env, permisos);
   window.location.href = route;
 };
 
