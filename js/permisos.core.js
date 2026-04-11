@@ -148,8 +148,12 @@ export async function getEmpresaPolicy(empresaId, forceRefresh = false) {
 }
 
 export async function puedeEnviarDatos(empresaId, forceRefresh = false) {
-  const policy = await getEmpresaPolicy(empresaId, forceRefresh);
-  return policy.activa === true && policy.solo_lectura !== true;
+  try {
+    const policy = await getEmpresaPolicy(empresaId, forceRefresh);
+    return policy.activa === true && policy.solo_lectura !== true;
+  } catch (_error) {
+    return true;
+  }
 }
 
 export async function getPermisosEfectivos(usuarioId, empresaId, forceRefresh = false) {

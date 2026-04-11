@@ -248,7 +248,7 @@ function resolveRole(user, session) {
   const storedRole = normalizeRole(stored?.rol);
   if (storedRole) return storedRole;
 
-  return "admin";
+  return "operativo";
 }
 
 function buildLocalContext(user, session) {
@@ -260,7 +260,7 @@ function buildLocalContext(user, session) {
 
   const context = {
     user,
-    rol: role || "admin",
+    rol: role || "operativo",
     empresa_id: empresaId,
     super_admin: superAdmin
   };
