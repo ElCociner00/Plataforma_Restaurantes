@@ -36,7 +36,7 @@ form.addEventListener("submit", async (e) => {
     }
     
     console.log("Login exitoso, usuario:", data.user?.email);
-    primeUserContextFromAuth(data.user);
+    primeUserContextFromAuth(data.user, data.session);
 
     // 2. Obtener contexto
     console.log("Obteniendo contexto de usuario...");
@@ -62,3 +62,4 @@ form.addEventListener("submit", async (e) => {
     alert("Error interno: " + catchError.message);
   }
 });
+
