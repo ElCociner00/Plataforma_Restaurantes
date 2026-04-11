@@ -1,24 +1,107 @@
-// permisos.sync.js
+import { supabase } from "./supabase.js";
+import { DEFAULT_ROLE_PERMISSIONS } from "./permissions.js";
 
-// Function to check permissions synchronously
-function checkPermissions(user, requiredPermissions) {
-    const userPermissions = user.permissions || [];
-    // Check if user has all the required permissions
-    return requiredPermissions.every(permission => userPermissions.includes(permission));
-}
+const PERMISOS_STORAGE_KEY = "app_user_permissions_cache_v2";
+const PERMISOS_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hora
 
-// Middleware function for permission checking
-function permissionsMiddleware(requiredPermissions) {
-    return function(req, res, next) {
-        const user = req.user; // Assuming user info is attached to the request.
-        if (checkPermissions(user, requiredPermissions)) {
-            next(); // User has permissions, proceed to the next middleware
+let permisosCacheados = null;
+let permisosCacheLocked = false;
+
+const DEFAULT_PERMISSIONS_BY_ROLE = {
+    admin_root: { __all__: true },
+    admin: { __all__: true },
+    revisor: {
+        dashboard: true, cierre_turno: true, historico_cierre_turno: true,
+        cierre_inventarios: true, historico_cierre_inventarios: true,
+        inventarios: true, dashboard_siigo: true, facturacion: true
+    },
+    operativo: { cierre_turno: true, cierre_inventarios: true }
+};
+
+export async function cargarYPersistirPermisosSync(usuarioId, empresaId, rol) {
+    if (permisosCacheLocked) return permisosCacheados || {};
+    permisosCacheLocked = true;
+    console.log(`[PermisosSync] Cargando permisos para ${usuarioId}`);
+
+    let permisosMap = {};
+    try {
+        const { data, error } = await supabase
+            .from("v_permisos_efectivos")
+            .select("modulo, permitido")
+            .eq("usuario_id", usuarioId)
+            .eq("empresa_id", empresaId);
+
+        if (!error && Array.isArray(data)) {
+            data.forEach(p => {
+                permisosMap[String(p.modulo).toLowerCase()] = p.permitido === true;
+            });
+            console.log(`[PermisosSync] ✓ ${data.length} permisos cargados`);
         } else {
-            // Handle insufficient permissions, e.g., redirect or send error
-            res.status(403).send('Forbidden: You do not have permission to access this resource.');
+            console.warn("[PermisosSync] Error en query:", error?.message);
         }
-    };
+    } catch (error) {
+        console.error("[PermisosSync] Excepción:", error);
+    }
+
+    if (Object.keys(permisosMap).length === 0) {
+        const defaultsForRole = DEFAULT_PERMISSIONS_BY_ROLE[String(rol).toLowerCase()] || DEFAULT_PERMISSIONS_BY_ROLE.operativo;
+        permisosMap = { ...defaultsForRole };
+        console.log(`[PermisosSync] Usando defaults para rol: ${rol}`);
+    }
+
+    const cachePayload = { timestamp: Date.now(), permisos: permisosMap, usuarioId, empresaId, rol };
+    try {
+        localStorage.setItem(PERMISOS_STORAGE_KEY, JSON.stringify(cachePayload));
+    } catch (e) {
+        console.warn("[PermisosSync] localStorage error:", e);
+    }
+
+    permisosCacheados = permisosMap;
+    permisosCacheLocked = false;
+    return permisosMap;
 }
 
-// Export the middleware for use in routes
-module.exports = permissionsMiddleware;
+export function obtenerPermisosSync() {
+    if (permisosCacheados && Object.keys(permisosCacheados).length > 0) return permisosCacheados;
+    
+    try {
+        const raw = localStorage.getItem(PERMISOS_STORAGE_KEY);
+        if (raw) {
+            const { timestamp, permisos } = JSON.parse(raw);
+            if (Date.now() - timestamp < PERMISOS_CACHE_TTL_MS) {
+                permisosCacheados = permisos;
+                return permisos;
+            }
+            localStorage.removeItem(PERMISOS_STORAGE_KEY);
+        }
+    } catch (e) {
+        console.error("[PermisosSync] localStorage read error:", e);
+    }
+    
+    return {};
+}
+
+export function tienePermisoSync(modulo) {
+    if (!modulo) return false;
+    const permisos = obtenerPermisosSync();
+    const normalized = String(modulo).toLowerCase().trim();
+    
+    if (permisos.__all__ === true) {
+        console.log(`[PermisosSync] ✓ Acceso total para: ${modulo}`);
+        return true;
+    }
+    
+    const hasAccess = permisos[normalized] === true;
+    console.log(`[PermisosSync] ${hasAccess ? "✓" : "✗"} ${modulo}`);
+    return hasAccess;
+}
+
+export function limpiarCachePermisosSync() {
+    permisosCacheados = null;
+    permisosCacheLocked = false;
+    try {
+        localStorage.removeItem(PERMISOS_STORAGE_KEY);
+    } catch (e) {
+        console.warn("[PermisosSync] localStorage clear error:", e);
+    }
+}
