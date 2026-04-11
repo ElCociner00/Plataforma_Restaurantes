@@ -1,7 +1,13 @@
 import { getUserContext } from "./session.js";
 import { esSuperAdmin } from "./permisos.core.js";
 import { getActiveEnvironment, setActiveEnvironment } from "./environment.js";
-import { getHomeByRole, hasLocalAccess, MODULE_ENV_MAP } from "./access_control.local.js";
+import {
+  buildAccessMap,
+  getHomeByRole,
+  hasLocalAccess,
+  MODULE_ENV_MAP,
+  resolveFirstAllowedRoute
+} from "./access_control.local.js";
 
 const LOGIN_URL = "/Plataforma_Restaurantes/index.html";
 const GUARD_REASON_KEY = "app_guard_reason";
@@ -9,7 +15,7 @@ let redirectInFlight = false;
 
 const toRole = (context, isSuper) => {
   if (isSuper) return "admin_root";
-  return String(context?.rol || "admin").trim().toLowerCase() || "admin";
+  return String(context?.rol || "operativo").trim().toLowerCase() || "operativo";
 };
 
 const normalizePath = (value) => String(value || "")
@@ -41,8 +47,10 @@ export async function guardPage(pageKey) {
     return;
   }
 
-  const role = toRole(context, isSuper);
-  const requiredEnv = MODULE_ENV_MAP[String(pageKey || "").trim().toLowerCase()] || "";
+  const normalizedPage = String(pageKey || "").trim().toLowerCase();
+  const requiredEnv = MODULE_ENV_MAP[normalizedPage] || "";
+  let role = toRole(context, isSuper);
+  const permisosRows = [];
 
   if (requiredEnv) {
     const activeEnv = getActiveEnvironment();
@@ -56,7 +64,13 @@ export async function guardPage(pageKey) {
     return;
   }
 
-  if (!hasLocalAccess(role, pageKey)) {
-    redirectWithReason(getHomeByRole(role), "Tu rol no tiene acceso a este modulo.");
+  const accessMap = buildAccessMap(role, permisosRows);
+  const hasEffectiveAccess = accessMap.get(normalizedPage) === true;
+  const hasFallbackAccess = hasLocalAccess(role, normalizedPage);
+  const canAccessPage = hasEffectiveAccess || hasFallbackAccess;
+
+  if (!canAccessPage) {
+    const redirectTarget = resolveFirstAllowedRoute(role, requiredEnv || getActiveEnvironment(), permisosRows);
+    redirectWithReason(redirectTarget, "Tu rol no tiene acceso a este modulo.");
   }
 }
