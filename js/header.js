@@ -1,9 +1,9 @@
 import "./mobile_shell.js";
 import { supabase } from "./supabase.js";
 import { clearUserContextCache, getUserContext } from "./session.js";
-import { getPermisosEfectivos, tienePermiso } from "./permisos.core.js";
 import { clearBannerDisplayCache, verificarYMostrarAnuncio } from "./anuncio_impago.js";
 import { ENV_LOGGRO, ENV_SIIGO, getActiveEnvironment, setActiveEnvironment } from "./environment.js";
+import { resolveDefaultRouteForRoleEnv } from "./access_control.local.js";
 
 const HEADER_ID = "globalAppHeader";
 
@@ -22,34 +22,7 @@ const getLogoSrc = () => {
     : "/images/Logo.webp";
 };
 
-const LOGGRO_ROUTE_BY_MODULE = [
-  ["dashboard", "/Plataforma_Restaurantes/dashboard/"],
-  ["cierre_turno", "/Plataforma_Restaurantes/cierre_turno/"],
-  ["historico_cierre_turno", "/Plataforma_Restaurantes/cierre_turno/historico_cierre_turno.html"],
-  ["cierre_inventarios", "/Plataforma_Restaurantes/cierre_inventarios/"],
-  ["historico_cierre_inventarios", "/Plataforma_Restaurantes/cierre_inventarios/historico_cierre_inventarios.html"]
-];
-
-const SIIGO_ROUTE_BY_MODULE = [
-  ["dashboard_siigo", "/Plataforma_Restaurantes/siigo/dashboard_siigo/"],
-  ["subir_facturas_siigo", "/Plataforma_Restaurantes/siigo/subir_facturas_siigo/"],
-  ["nomina", "/Plataforma_Restaurantes/nomina/"]
-];
-
-const resolveRouteForEnv = async (env, context) => {
-  const userId = context?.user?.id || context?.user?.user_id;
-  const empresaId = context?.empresa_id;
-  if (!userId || !empresaId) {
-    return "";
-  }
-
-  const permisos = await getPermisosEfectivos(userId, empresaId).catch(() => []);
-  const routesByEnv = env === ENV_SIIGO ? SIIGO_ROUTE_BY_MODULE : LOGGRO_ROUTE_BY_MODULE;
-  const allowedRoute = routesByEnv.find(([module]) => tienePermiso(module, permisos))?.[1];
-
-  if (allowedRoute) return allowedRoute;
-  return "";
-};
+const resolveRouteForEnv = async (env, context) => resolveDefaultRouteForRoleEnv(context?.rol, env);
 
 const obtenerNombreEmpresa = async (empresaId) => {
   if (!empresaId) return "";
@@ -159,11 +132,7 @@ function wireHeaderEvents(header, context) {
       event.preventDefault();
       const nextEnv = link.getAttribute("data-switch-env");
       setActiveEnvironment(nextEnv);
-      let targetRoute = await resolveRouteForEnv(nextEnv, context);
-      if (!targetRoute) {
-        const rol = String(context?.rol || "").trim().toLowerCase();
-        targetRoute = nextEnv === ENV_SIIGO ? "/Plataforma_Restaurantes/siigo/dashboard_siigo/" : (rol === "operativo" ? "/Plataforma_Restaurantes/cierre_turno/" : "/Plataforma_Restaurantes/dashboard/");
-      }
+      const targetRoute = await resolveRouteForEnv(nextEnv, context);
       window.location.href = targetRoute;
     };
   });
@@ -211,12 +180,17 @@ async function renderAuthenticatedHeader() {
   const activeEnvironment = getActiveEnvironment();
   const currentPath = String(window.location.pathname || "");
   const isGlobalNoTenantPage = currentPath.includes("/gestion_empresas/") || currentPath.includes("/facturacion/");
+
+  const inferEnvironmentFromPath = () => {
+    if (currentPath.includes("/siigo/") || currentPath.includes("/nomina/")) return ENV_SIIGO;
+    return ENV_LOGGRO;
+  };
+
   if (!activeEnvironment && !isGlobalNoTenantPage) {
-    window.location.href = "/Plataforma_Restaurantes/entorno/";
-    return;
+    setActiveEnvironment(inferEnvironmentFromPath());
   }
 
-  const environmentForMenu = activeEnvironment || (isGlobalNoTenantPage ? ENV_LOGGRO : "");
+  const environmentForMenu = getActiveEnvironment() || (isGlobalNoTenantPage ? ENV_LOGGRO : inferEnvironmentFromPath());
   const nombreEmpresa = await obtenerNombreEmpresa(context.empresa_id);
   const menu = buildMenu({ context, environmentForMenu });
 
@@ -241,7 +215,5 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderFallbackHeader("Menu temporal disponible");
   }
 });
-
-
 
 
