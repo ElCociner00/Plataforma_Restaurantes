@@ -57,7 +57,14 @@ const getForbiddenRedirect = (context, permisos = null, isSuper = false) => {
 const safeRedirect = (targetUrl) => {
   if (!targetUrl || isRedirecting) return;
 
-  const normalizePath = (value) => String(value || "").replace(/\/+$/, "");
+  const normalizePath = (value) => {
+    const raw = String(value || "").trim();
+    const path = raw.includes("//") ? (new URL(raw, window.location.origin)).pathname : raw;
+    return path
+      .replace(/\/index\.html$/i, "")
+      .replace(/\/+$/, "") || "/";
+  };
+
   const currentPath = normalizePath(window.location.pathname);
   const targetPath = normalizePath(targetUrl);
   if (currentPath === targetPath) return;
@@ -126,11 +133,22 @@ export async function guardPage(pageKey, permisosOverride = null) {
   const allowed = tienePermiso(pageKey, permisos);
 
   if (!allowed) {
+    const forbiddenRedirect = getForbiddenRedirect(context, permisos, isSuper);
+    const normalizePath = (value) => String(value || "")
+      .replace(/\/index\.html$/i, "")
+      .replace(/\/+$/, "") || "/";
+    const currentPath = normalizePath(window.location.pathname);
+    const targetPath = normalizePath(forbiddenRedirect);
+
+    if (targetPath === currentPath) {
+      safeRedirect(SELECTOR_URL);
+      return;
+    }
+
     alert("No tienes permisos para acceder a este modulo");
-    safeRedirect(getForbiddenRedirect(context, permisos, isSuper));
+    safeRedirect(forbiddenRedirect);
   }
 }
-
 
 
 
