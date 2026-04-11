@@ -4,30 +4,20 @@ const normalizeRole = (value) => String(value || "").trim().toLowerCase() || "ad
 
 export const LOCAL_ROLE_ACCESS = {
   admin_root: { all: true },
-  admin: {
-    dashboard: true,
+  admin: { all: true },
+  operativo: {
     cierre_turno: true,
     historico_cierre_turno: true,
     cierre_inventarios: true,
     historico_cierre_inventarios: true,
-    facturacion: true,
-    dashboard_siigo: true,
-    subir_facturas_siigo: true,
-    historico_facturas_siigo: true,
-    nomina: true,
-    loggro: true,
     inventarios: true,
+    dashboard: false,
     configuracion: false,
+    configuracion_siigo: false,
     gestion_usuarios: false,
     permisos: false,
     registro_empleados: false,
-    registro_otros_usuarios: false,
-    configuracion_siigo: false,
-    gestion_empresas: false
-  },
-  operativo: {
-    cierre_turno: true,
-    cierre_inventarios: true
+    registro_otros_usuarios: false
   }
 };
 
@@ -76,4 +66,3 @@ export function resolveDefaultRouteForRoleEnv(role, env) {
     ? "/Plataforma_Restaurantes/cierre_turno/"
     : "/Plataforma_Restaurantes/dashboard/";
 }
-
