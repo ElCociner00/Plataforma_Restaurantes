@@ -2,6 +2,7 @@ import { supabase } from "./supabase.js";
 import { getUserContext, obtenerUsuarioActual } from "./session.js";
 import { isEmpresaReadOnlyPlan, normalizeEmpresaActiva, resolveEmpresaPlan } from "./plan.js";
 import { DEFAULT_ROLE_PERMISSIONS } from "./permissions.js";
+import { applyEmergencyRolePermissions } from "./permisos.emergencia.js";
 
 let permisosCache = null;
 let permisosCacheKey = null;
@@ -166,10 +167,11 @@ export async function getPermisosEfectivos(usuarioId, empresaId, forceRefresh = 
     .eq("empresa_id", empresaId);
 
   const normalizeModuleKey = (value) => String(value || "").trim().toLowerCase();
+  const normalizePermitido = (value) => value === true || value === 1 || String(value || "").trim().toLowerCase() === "true";
   const normalizePermisosArray = (rows) => (Array.isArray(rows) ? rows : [])
     .map((row) => ({
       modulo: normalizeModuleKey(row?.modulo),
-      permitido: row?.permitido === true
+      permitido: normalizePermitido(row?.permitido)
     }))
     .filter((row) => Boolean(row.modulo));
 
@@ -224,11 +226,13 @@ export async function getPermisosEfectivos(usuarioId, empresaId, forceRefresh = 
     });
 
     permisos.forEach((row) => {
-      merged.set(normalizeModuleKey(row.modulo), row.permitido === true);
+      merged.set(normalizeModuleKey(row.modulo), normalizePermitido(row.permitido));
     });
 
     permisos = Array.from(merged.entries()).map(([modulo, permitido]) => ({ modulo, permitido }));
   }
+
+  permisos = applyEmergencyRolePermissions(rol, permisos);
 
   if (error && !permisos.length) {
     permisos = [];

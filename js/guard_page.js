@@ -1,6 +1,7 @@
 import { getUserContext } from "./session.js";
 import { PAGE_ENVIRONMENT } from "./permissions.js";
 import { esSuperAdmin, getPermisosEfectivos, permisosCacheGet, permisosCacheSet, tienePermiso } from "./permisos.core.js";
+import { getEmergencyHomeByRole, isEmergencyAllowed } from "./permisos.emergencia.js";
 
 const LOGIN_URL = "/Plataforma_Restaurantes/index.html";
 const SELECTOR_URL = "/Plataforma_Restaurantes/entorno/";
@@ -42,16 +43,16 @@ const toModulePath = (moduleKey) => {
 const getForbiddenRedirect = (context, permisos = null, isSuper = false) => {
   if (isSuper) return "/Plataforma_Restaurantes/gestion_empresas/";
 
-  const env = localStorage.getItem("app_entorno_activo") || "loggro";
+  const role = String(context?.rol || "").trim().toLowerCase();
 
   const permisosArray = Array.isArray(permisos) ? permisos : [];
   for (const moduleKey of FALLBACK_ROUTES) {
-    if (tienePermiso(moduleKey, permisosArray)) {
+    if (tienePermiso(moduleKey, permisosArray) || isEmergencyAllowed(role, moduleKey)) {
       return toModulePath(moduleKey);
     }
   }
 
-  return SELECTOR_URL;
+  return getEmergencyHomeByRole(role) || SELECTOR_URL;
 };
 
 const safeRedirect = (targetUrl) => {
@@ -130,7 +131,8 @@ export async function guardPage(pageKey, permisosOverride = null) {
     return;
   }
 
-  const allowed = tienePermiso(pageKey, permisos);
+  const role = String(context?.rol || "").trim().toLowerCase();
+  const allowed = tienePermiso(pageKey, permisos) || isEmergencyAllowed(role, pageKey);
 
   if (!allowed) {
     const forbiddenRedirect = getForbiddenRedirect(context, permisos, isSuper);
@@ -149,6 +151,5 @@ export async function guardPage(pageKey, permisosOverride = null) {
     safeRedirect(forbiddenRedirect);
   }
 }
-
 
 
