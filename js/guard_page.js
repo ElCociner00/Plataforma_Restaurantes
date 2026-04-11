@@ -5,6 +5,7 @@ import { getEmergencyHomeByRole, isEmergencyAllowed } from "./permisos.emergenci
 
 const LOGIN_URL = "/Plataforma_Restaurantes/index.html";
 const SELECTOR_URL = "/Plataforma_Restaurantes/entorno/";
+const GUARD_REASON_KEY = "app_guard_reason";
 let isRedirecting = false;
 
 const FALLBACK_ROUTES = [
@@ -74,6 +75,15 @@ const safeRedirect = (targetUrl) => {
   window.location.href = targetUrl;
 };
 
+const redirectWithReason = (targetUrl, reason) => {
+  try {
+    if (reason) sessionStorage.setItem(GUARD_REASON_KEY, reason);
+  } catch (_error) {
+    // noop
+  }
+  safeRedirect(targetUrl);
+};
+
 async function ensurePermisos(context, override) {
   if (override) return override;
   const cached = permisosCacheGet();
@@ -91,13 +101,13 @@ export async function guardPage(pageKey, permisosOverride = null) {
   const isSuper = await esSuperAdmin().catch(() => false);
 
   if (!context && !isSuper) {
-    safeRedirect(LOGIN_URL);
+    redirectWithReason(LOGIN_URL, "No se pudo validar tu sesion. Inicia sesion nuevamente.");
     return;
   }
 
   if (pageKey === "gestion_empresas" && !isSuper) {
     console.warn("Acceso denegado a gestion empresas (solo super admin)");
-    safeRedirect(getForbiddenRedirect(context));
+    redirectWithReason(getForbiddenRedirect(context), "Tu rol no puede entrar a Gestion de empresas.");
     return;
   }
 
@@ -111,13 +121,12 @@ export async function guardPage(pageKey, permisosOverride = null) {
     : (expectedEnvironment ? [expectedEnvironment] : []);
 
   if (expectedEnvironments.length && !activeEnvironment) {
-    safeRedirect(SELECTOR_URL);
+    redirectWithReason(SELECTOR_URL, "No hay entorno activo. Debes seleccionar Loggro o Siigo.");
     return;
   }
 
   if (expectedEnvironments.length && activeEnvironment && !expectedEnvironments.includes(activeEnvironment)) {
-    alert("Este modulo pertenece a otro entorno.");
-    safeRedirect(SELECTOR_URL);
+    redirectWithReason(SELECTOR_URL, "Este modulo pertenece a otro entorno. Selecciona el entorno correcto.");
     return;
   }
 
@@ -127,7 +136,7 @@ export async function guardPage(pageKey, permisosOverride = null) {
 
   const permisos = await ensurePermisos(context, permisosOverride);
   if (!context?.empresa_id || !permisos) {
-    safeRedirect(getForbiddenRedirect(context, permisos, isSuper));
+    redirectWithReason(getForbiddenRedirect(context, permisos, isSuper), "No se pudieron resolver permisos. Te enviamos a un modulo seguro.");
     return;
   }
 
@@ -143,13 +152,11 @@ export async function guardPage(pageKey, permisosOverride = null) {
     const targetPath = normalizePath(forbiddenRedirect);
 
     if (targetPath === currentPath) {
-      safeRedirect(SELECTOR_URL);
+      redirectWithReason(SELECTOR_URL, "Se detecto una redireccion repetitiva. Selecciona entorno para continuar.");
       return;
     }
 
-    alert("No tienes permisos para acceder a este modulo");
-    safeRedirect(forbiddenRedirect);
+    redirectWithReason(forbiddenRedirect, "No tienes permisos para este modulo. Te llevamos a uno permitido.");
   }
 }
-
 
