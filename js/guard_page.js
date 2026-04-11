@@ -12,7 +12,13 @@ const FALLBACK_ROUTES = [
   "historico_cierre_turno",
   "historico_cierre_inventarios",
   "dashboard",
-  "facturacion"
+  "facturacion",
+  "subir_facturas_siigo",
+  "dashboard_siigo",
+  "nomina",
+  "gestion_usuarios",
+  "configuracion",
+  "configuracion_siigo"
 ];
 
 const toModulePath = (moduleKey) => {
@@ -22,7 +28,13 @@ const toModulePath = (moduleKey) => {
     historico_cierre_turno: "/Plataforma_Restaurantes/cierre_turno/historico_cierre_turno.html",
     cierre_inventarios: "/Plataforma_Restaurantes/cierre_inventarios/",
     historico_cierre_inventarios: "/Plataforma_Restaurantes/cierre_inventarios/historico_cierre_inventarios.html",
-    facturacion: "/Plataforma_Restaurantes/facturacion/"
+    facturacion: "/Plataforma_Restaurantes/facturacion/",
+    subir_facturas_siigo: "/Plataforma_Restaurantes/siigo/subir_facturas_siigo/",
+    dashboard_siigo: "/Plataforma_Restaurantes/siigo/dashboard_siigo/",
+    nomina: "/Plataforma_Restaurantes/nomina/",
+    gestion_usuarios: "/Plataforma_Restaurantes/gestion_usuarios/",
+    configuracion: "/Plataforma_Restaurantes/configuracion/",
+    configuracion_siigo: "/Plataforma_Restaurantes/siigo/configuracion_siigo/"
   };
   return map[moduleKey] || SELECTOR_URL;
 };
@@ -31,9 +43,6 @@ const getForbiddenRedirect = (context, permisos = null, isSuper = false) => {
   if (isSuper) return "/Plataforma_Restaurantes/gestion_empresas/";
 
   const env = localStorage.getItem("app_entorno_activo") || "loggro";
-  if (env === "siigo") {
-    return "/Plataforma_Restaurantes/siigo/dashboard_siigo/";
-  }
 
   const permisosArray = Array.isArray(permisos) ? permisos : [];
   for (const moduleKey of FALLBACK_ROUTES) {
@@ -121,3 +130,7 @@ export async function guardPage(pageKey, permisosOverride = null) {
     safeRedirect(getForbiddenRedirect(context, permisos, isSuper));
   }
 }
+
+
+
+

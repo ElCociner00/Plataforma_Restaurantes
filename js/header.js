@@ -40,9 +40,7 @@ const resolveRouteForEnv = async (env, context) => {
   const userId = context?.user?.id || context?.user?.user_id;
   const empresaId = context?.empresa_id;
   if (!userId || !empresaId) {
-    return env === ENV_SIIGO
-      ? "/Plataforma_Restaurantes/siigo/dashboard_siigo/"
-      : "/Plataforma_Restaurantes/dashboard/";
+    return "";
   }
 
   const permisos = await getPermisosEfectivos(userId, empresaId).catch(() => []);
@@ -50,9 +48,7 @@ const resolveRouteForEnv = async (env, context) => {
   const allowedRoute = routesByEnv.find(([module]) => tienePermiso(module, permisos))?.[1];
 
   if (allowedRoute) return allowedRoute;
-  return env === ENV_SIIGO
-    ? "/Plataforma_Restaurantes/siigo/dashboard_siigo/"
-    : "/Plataforma_Restaurantes/dashboard/";
+  return "";
 };
 
 const obtenerNombreEmpresa = async (empresaId) => {
@@ -164,6 +160,7 @@ function wireHeaderEvents(header, context) {
       const nextEnv = link.getAttribute("data-switch-env");
       setActiveEnvironment(nextEnv);
       const targetRoute = await resolveRouteForEnv(nextEnv, context);
+      if (!targetRoute) return;
       window.location.href = targetRoute;
     };
   });
@@ -241,3 +238,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderFallbackHeader("Menu temporal disponible");
   }
 });
+
+
+
+

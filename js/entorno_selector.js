@@ -24,9 +24,7 @@ const resolveRouteByPermisos = async (env, context) => {
   const userId = context?.user?.id || context?.user?.user_id;
   const empresaId = context?.empresa_id;
   if (!userId || !empresaId) {
-    return env === ENV_SIIGO
-      ? "/Plataforma_Restaurantes/siigo/dashboard_siigo/"
-      : "/Plataforma_Restaurantes/dashboard/";
+    return "";
   }
 
   const permisos = await getPermisosEfectivos(userId, empresaId).catch(() => []);
@@ -34,9 +32,7 @@ const resolveRouteByPermisos = async (env, context) => {
   const route = routes.find(([modulo]) => tienePermiso(modulo, permisos))?.[1];
 
   if (route) return route;
-  return env === ENV_SIIGO
-    ? "/Plataforma_Restaurantes/siigo/dashboard_siigo/"
-    : "/Plataforma_Restaurantes/dashboard/";
+  return "";
 };
 
 const goByRole = async (env) => {
@@ -48,6 +44,10 @@ const goByRole = async (env) => {
 
   setActiveEnvironment(env);
   const route = await resolveRouteByPermisos(env, context);
+  if (!route) {
+    status.textContent = "No tienes modulos habilitados en ese entorno.";
+    return;
+  }
   window.location.href = route;
 };
 
@@ -56,7 +56,7 @@ const initRoleUi = async () => {
   if (!context) return;
 
   const routeSiigo = await resolveRouteByPermisos(ENV_SIIGO, context).catch(() => "");
-  const hasSiigoAccess = routeSiigo.includes("/siigo/");
+  const hasSiigoAccess = !!routeSiigo;
   btnSiigo.disabled = !hasSiigoAccess;
   btnSiigo.title = hasSiigoAccess ? "" : "No tienes módulos habilitados en Siigo";
 };
@@ -65,3 +65,7 @@ btnLoggro?.addEventListener("click", () => goByRole(ENV_LOGGRO));
 btnSiigo?.addEventListener("click", () => goByRole(ENV_SIIGO));
 
 initRoleUi();
+
+
+
+
