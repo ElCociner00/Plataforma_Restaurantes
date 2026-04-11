@@ -3,7 +3,8 @@ import { supabase } from "./supabase.js";
 import { clearUserContextCache, getUserContext } from "./session.js";
 import { clearBannerDisplayCache, verificarYMostrarAnuncio } from "./anuncio_impago.js";
 import { ENV_LOGGRO, ENV_SIIGO, getActiveEnvironment, setActiveEnvironment } from "./environment.js";
-import { resolveDefaultRouteForRoleEnv } from "./access_control.local.js";
+import { resolveFirstAllowedRoute } from "./access_control.local.js";
+import { getPermisosEfectivos } from "./permisos.core.js";
 
 const HEADER_ID = "globalAppHeader";
 
@@ -22,7 +23,12 @@ const getLogoSrc = () => {
     : "/images/Logo.webp";
 };
 
-const resolveRouteForEnv = async (env, context) => resolveDefaultRouteForRoleEnv(context?.rol, env);
+const resolveRouteForEnv = async (env, context) => {
+  const userId = context?.user?.id || context?.user?.user_id;
+  const empresaId = context?.empresa_id || null;
+  const permisos = userId ? await getPermisosEfectivos(userId, empresaId).catch(() => []) : [];
+  return resolveFirstAllowedRoute(context?.rol, env, permisos);
+};
 
 const obtenerNombreEmpresa = async (empresaId) => {
   if (!empresaId) return "";
@@ -215,5 +221,4 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderFallbackHeader("Menu temporal disponible");
   }
 });
-
 
