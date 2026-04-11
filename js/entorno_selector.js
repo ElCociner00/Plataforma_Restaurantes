@@ -43,10 +43,10 @@ const goByRole = async (env) => {
   }
 
   setActiveEnvironment(env);
-  const route = await resolveRouteByPermisos(env, context);
+  let route = await resolveRouteByPermisos(env, context);
   if (!route) {
-    status.textContent = "No tienes modulos habilitados en ese entorno.";
-    return;
+    const rol = String(context?.rol || "").trim().toLowerCase();
+    route = env === ENV_SIIGO ? "/Plataforma_Restaurantes/siigo/dashboard_siigo/" : (rol === "operativo" ? "/Plataforma_Restaurantes/cierre_turno/" : "/Plataforma_Restaurantes/dashboard/");
   }
   window.location.href = route;
 };
@@ -55,10 +55,8 @@ const initRoleUi = async () => {
   const context = await getUserContext().catch(() => null);
   if (!context) return;
 
-  const routeSiigo = await resolveRouteByPermisos(ENV_SIIGO, context).catch(() => "");
-  const hasSiigoAccess = !!routeSiigo;
-  btnSiigo.disabled = !hasSiigoAccess;
-  btnSiigo.title = hasSiigoAccess ? "" : "No tienes módulos habilitados en Siigo";
+  btnSiigo.disabled = false;
+  btnSiigo.title = "";
 };
 
 btnLoggro?.addEventListener("click", () => goByRole(ENV_LOGGRO));

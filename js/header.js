@@ -159,8 +159,11 @@ function wireHeaderEvents(header, context) {
       event.preventDefault();
       const nextEnv = link.getAttribute("data-switch-env");
       setActiveEnvironment(nextEnv);
-      const targetRoute = await resolveRouteForEnv(nextEnv, context);
-      if (!targetRoute) return;
+      let targetRoute = await resolveRouteForEnv(nextEnv, context);
+      if (!targetRoute) {
+        const rol = String(context?.rol || "").trim().toLowerCase();
+        targetRoute = nextEnv === ENV_SIIGO ? "/Plataforma_Restaurantes/siigo/dashboard_siigo/" : (rol === "operativo" ? "/Plataforma_Restaurantes/cierre_turno/" : "/Plataforma_Restaurantes/dashboard/");
+      }
       window.location.href = targetRoute;
     };
   });
