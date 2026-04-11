@@ -1,6 +1,9 @@
 import { supabase } from "./supabase.js";
 
 let cachedUserContext = null;
+const USER_CONTEXT_STORAGE_KEY = "app_user_context_cache_v1";
+const USER_CONTEXT_TTL_MS = 24 * 60 * 60 * 1000;
+let authSubscriptionInitialized = false;
 
 const SUPER_ADMIN_EMAIL = "santiagoelchameluco@gmail.com";
 const SUPER_ADMIN_ID = "1e17e7c6-d959-4089-ab22-3f64b5b5be41";
@@ -9,14 +12,152 @@ const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 const normalizeRole = (value) => String(value || "").trim().toLowerCase();
 const normalizeText = (value) => String(value || "").trim();
 const normalizeName = (value) => normalizeText(value).toLowerCase();
+const hasWindow = typeof window !== "undefined";
 
-const isRecordActive = (record) => {
-  if (!record || typeof record !== "object") return false;
-  if (typeof record.activo === "boolean") return record.activo;
-  if (typeof record.activa === "boolean") return record.activa;
-  if (record.estado == null) return true;
-  return String(record.estado).toLowerCase() !== "inactivo";
-};
+function clearStoredUserContext() {
+  if (!hasWindow) return;
+  window.localStorage.removeItem(USER_CONTEXT_STORAGE_KEY);
+}
+
+function sanitizeContextCandidate(context) {
+  if (!context || typeof context !== "object") return null;
+
+  const user = context.user && typeof context.user === "object"
+    ? context.user
+    : null;
+  const userId = normalizeText(user?.id || user?.user_id);
+  const userEmail = normalizeEmail(user?.email);
+  const role = normalizeRole(context.rol);
+  const isSuper = context.super_admin === true;
+  const empresaId = isSuper ? null : normalizeText(context.empresa_id);
+
+  if (!userId && !userEmail) return null;
+  if (!role) return null;
+  if (!isSuper && !empresaId) return null;
+
+  return {
+    user: {
+      id: userId || null,
+      user_id: userId || null,
+      email: userEmail || null
+    },
+    rol: role,
+    empresa_id: empresaId || null,
+    super_admin: isSuper
+  };
+}
+
+function saveUserContextToStorage(context) {
+  if (!hasWindow) return null;
+  const safeContext = sanitizeContextCandidate(context);
+  if (!safeContext) return null;
+
+  const payload = {
+    expires_at: Date.now() + USER_CONTEXT_TTL_MS,
+    context: safeContext
+  };
+
+  window.localStorage.setItem(USER_CONTEXT_STORAGE_KEY, JSON.stringify(payload));
+  return safeContext;
+}
+
+function readUserContextFromStorage(user) {
+  if (!hasWindow) return null;
+
+  const raw = window.localStorage.getItem(USER_CONTEXT_STORAGE_KEY);
+  if (!raw) return null;
+
+  try {
+    const payload = JSON.parse(raw);
+    const expiresAt = Number(payload?.expires_at);
+    if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+      clearStoredUserContext();
+      return null;
+    }
+
+    const safeContext = sanitizeContextCandidate(payload?.context);
+    if (!safeContext) {
+      clearStoredUserContext();
+      return null;
+    }
+
+    const loginUserId = normalizeText(user?.id);
+    const loginEmail = normalizeEmail(user?.email);
+    const cachedUserId = normalizeText(safeContext?.user?.id || safeContext?.user?.user_id);
+    const cachedEmail = normalizeEmail(safeContext?.user?.email);
+
+    if (loginUserId && cachedUserId && loginUserId !== cachedUserId) {
+      clearStoredUserContext();
+      return null;
+    }
+
+    if (loginEmail && cachedEmail && loginEmail !== cachedEmail) {
+      clearStoredUserContext();
+      return null;
+    }
+
+    return safeContext;
+  } catch (_error) {
+    clearStoredUserContext();
+    return null;
+  }
+}
+
+function persistUserContext(context) {
+  const safeContext = sanitizeContextCandidate(context);
+  if (!safeContext) return null;
+  cachedUserContext = safeContext;
+  saveUserContextToStorage(safeContext);
+  return safeContext;
+}
+
+function buildFallbackContextFromUser(user) {
+  if (!user || typeof user !== "object") return null;
+
+  const userId = normalizeText(user.id || user.user_id);
+  const email = normalizeEmail(user.email);
+  if (!userId && !email) return null;
+
+  const userMeta = user.user_metadata || user.raw_user_meta_data || {};
+  const appMeta = user.app_metadata || {};
+  const roleCandidate = normalizeRole(
+    userMeta.rol ||
+    userMeta.role ||
+    userMeta.user_role ||
+    userMeta.tipo_usuario ||
+    appMeta.rol ||
+    appMeta.role
+  );
+
+  const role = roleCandidate || "operativo";
+  const superAdmin = (
+    userMeta.super_admin === true ||
+    userMeta.is_super_admin === true ||
+    appMeta.super_admin === true ||
+    role === "admin_root"
+  );
+
+  const empresaId = superAdmin
+    ? null
+    : normalizeText(
+      userMeta.empresa_id ||
+      userMeta.tenant_id ||
+      userMeta.company_id ||
+      userMeta.id_empresa ||
+      appMeta.empresa_id ||
+      appMeta.tenant_id ||
+      appMeta.company_id
+    );
+
+  if (!superAdmin && !empresaId) return null;
+
+  return {
+    user,
+    rol: role,
+    empresa_id: empresaId || null,
+    super_admin: superAdmin
+  };
+}
 
 function getIdentityCandidates(user) {
   const metadata = user?.user_metadata || user?.raw_user_meta_data || {};
@@ -44,6 +185,28 @@ function getIdentityCandidates(user) {
     namesNormalized: names.map(normalizeName),
     cedulas
   };
+}
+
+function initializeAuthSubscription() {
+  if (!hasWindow || authSubscriptionInitialized) return;
+  authSubscriptionInitialized = true;
+
+  supabase.auth.onAuthStateChange((event, session) => {
+    const nextUserId = normalizeText(session?.user?.id);
+    const currentUserId = normalizeText(cachedUserContext?.user?.id || cachedUserContext?.user?.user_id);
+    const eventName = String(event || "").toUpperCase();
+
+    if (eventName === "SIGNED_OUT") {
+      cachedUserContext = null;
+      clearStoredUserContext();
+      return;
+    }
+
+    if (currentUserId && nextUserId && currentUserId !== nextUserId) {
+      cachedUserContext = null;
+      clearStoredUserContext();
+    }
+  });
 }
 
 async function queryByName(table, select, namesNormalized = []) {
@@ -101,10 +264,21 @@ async function getSuperAdminContext(user) {
 }
 
 export async function getUserContext() {
+  initializeAuthSubscription();
   if (cachedUserContext) return cachedUserContext;
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!user) {
+    cachedUserContext = null;
+    clearStoredUserContext();
+    return null;
+  }
+
+  const storedContext = readUserContextFromStorage(user);
+  if (storedContext) {
+    cachedUserContext = storedContext;
+    return cachedUserContext;
+  }
 
   const identity = getIdentityCandidates(user);
 
@@ -125,13 +299,12 @@ export async function getUserContext() {
   }
 
   if (!usuarioSistemaError && usuarioSistema && isRecordActive(usuarioSistema)) {
-    cachedUserContext = {
+    return persistUserContext({
       user,
       rol: normalizeRole(usuarioSistema.rol),
       empresa_id: usuarioSistema.empresa_id,
       super_admin: false
-    };
-    return cachedUserContext;
+    });
   }
 
   let { data: otroUsuario, error: otroUsuarioError } = await supabase
@@ -166,13 +339,12 @@ export async function getUserContext() {
   }
 
   if (!otroUsuarioError && otroUsuario && isRecordActive(otroUsuario)) {
-    cachedUserContext = {
+    return persistUserContext({
       user,
       rol: "revisor",
       empresa_id: otroUsuario.empresa_id,
       super_admin: false
-    };
-    return cachedUserContext;
+    });
   }
 
   let { data: empleado, error: empleadoError } = await supabase
@@ -207,22 +379,46 @@ export async function getUserContext() {
   }
 
   if (!empleadoError && empleado && isRecordActive(empleado)) {
-    cachedUserContext = {
+    return persistUserContext({
       user,
       rol: "operativo",
       empresa_id: empleado.empresa_id,
       super_admin: false
-    };
-    return cachedUserContext;
+    });
   }
 
   const superAdminContext = await getSuperAdminContext(user);
   if (superAdminContext) {
-    cachedUserContext = superAdminContext;
-    return cachedUserContext;
+    return persistUserContext(superAdminContext);
+  }
+
+  const localFallback = buildFallbackContextFromUser(user);
+  if (localFallback) {
+    return persistUserContext(localFallback);
   }
 
   return null;
+}
+
+export function primeUserContextFromAuth(user) {
+  if (!user) return null;
+
+  const fallback = buildFallbackContextFromUser(user);
+  if (!fallback) return null;
+  return persistUserContext(fallback);
+}
+
+export function clearUserContextCache() {
+  cachedUserContext = null;
+  clearStoredUserContext();
+}
+
+function isRecordActive(record) {
+  if (!record || typeof record !== "object") return false;
+  if (typeof record.activo === "boolean") return record.activo;
+  if (typeof record.activa === "boolean") return record.activa;
+  if (record.estado == null) return true;
+  return String(record.estado).toLowerCase() !== "inactivo";
 }
 
 export async function getCurrentEmpresaId() {

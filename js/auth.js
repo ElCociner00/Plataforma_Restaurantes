@@ -1,5 +1,5 @@
 import { supabase } from "./supabase.js";
-import { getUserContext } from "./session.js";
+import { getUserContext, primeUserContextFromAuth } from "./session.js";
 
 const form = document.getElementById("loginForm");
 const emailInput = document.getElementById("emailInput");
@@ -36,6 +36,7 @@ form.addEventListener("submit", async (e) => {
     }
     
     console.log("Login exitoso, usuario:", data.user?.email);
+    primeUserContextFromAuth(data.user);
 
     // 2. Obtener contexto
     console.log("Obteniendo contexto de usuario...");

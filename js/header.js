@@ -1,6 +1,6 @@
 import "./mobile_shell.js";
 import { supabase } from "./supabase.js";
-import { getUserContext } from "./session.js";
+import { clearUserContextCache, getUserContext } from "./session.js";
 import { getPermisosEfectivos, tienePermiso } from "./permisos.core.js";
 import { clearBannerDisplayCache, verificarYMostrarAnuncio } from "./anuncio_impago.js";
 import { ENV_LOGGRO, ENV_SIIGO, getActiveEnvironment, setActiveEnvironment } from "./environment.js";
@@ -178,6 +178,7 @@ function wireHeaderEvents(header, context) {
       event.preventDefault();
       setActiveEnvironment("");
       clearBannerDisplayCache();
+      clearUserContextCache();
       await supabase.auth.signOut();
       window.location.href = "/Plataforma_Restaurantes/index.html";
     };
