@@ -33,6 +33,9 @@ export async function signInWithPassword(email, password) {
   });
 
   if (error) throw error;
+
+  // Redirección inmediata tras autenticación exitosa.
+  window.location.href = DASHBOARD_URL;
   return data;
 }
 
@@ -59,7 +62,6 @@ function bindLoginForm() {
 
     try {
       await signInWithPassword(emailInput.value, passwordInput.value);
-      window.location.href = DASHBOARD_URL;
     } catch (error) {
       console.error("Error de inicio de sesión:", error);
       if (!errorEl) return;
