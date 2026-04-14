@@ -9,13 +9,8 @@ export const supabase = createClient(
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true
-    },
-    global: {
-      fetch: (url, options = {}) => fetch(url, {
-        ...options,
-        credentials: "include"
-      })
+      detectSessionInUrl: true,
+      storage: window.localStorage
     }
   }
 );
