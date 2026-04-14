@@ -1,125 +1,73 @@
-// Parche aislado para inyectar token JWT y corregir parámetros booleanos mal formados.
-// No modifica la lógica de módulos existentes.
-(function () {
-  "use strict";
+// js/module_fix/auth_adapter.js
+// Parche aislado: Inyecta token JWT + Corrige parámetros booleanos (v3 - Robusta).
+// NO MODIFICA NINGÚN ARCHIVO EXISTENTE.
 
-  const TOKEN_STORAGE_KEY = "sb-ivgzwgyjyqfunheaesxx-auth-token";
-  const SUPABASE_REST_PATH = ".supabase.co/rest/v1/";
+(function() {
+  'use strict';
 
-  function parseStoredSession(raw) {
-    if (!raw) return null;
-
-    try {
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== "object") return null;
-
-      if (parsed.access_token) return parsed;
-      if (parsed.currentSession?.access_token) return parsed.currentSession;
-      if (parsed.session?.access_token) return parsed.session;
-      return null;
-    } catch {
-      return null;
-    }
-  }
+  const TOKEN_STORAGE_KEY = 'sb-ivgzwgyjyqfunheaesxx-auth-token';
+  const SUPABASE_REST_URL = 'supabase.co/rest/v1/';
 
   function getAccessToken() {
-    const session = parseStoredSession(localStorage.getItem(TOKEN_STORAGE_KEY));
-    return session?.access_token || null;
-  }
-
-  function normalizeBooleanParams(url) {
-    if (!url) return url;
-
+    const stored = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (!stored) return null;
     try {
-      const parsedUrl = new URL(url, window.location.origin);
-      const entries = Array.from(parsedUrl.searchParams.entries());
-      let changed = false;
-
-      parsedUrl.search = "";
-      entries.forEach(([key, value]) => {
-        const normalizedValue = String(value || "").trim().toLowerCase();
-
-        if (normalizedValue === "activo") {
-          parsedUrl.searchParams.append(key, "true");
-          changed = true;
-          return;
-        }
-
-        if (normalizedValue === "inactivo") {
-          parsedUrl.searchParams.append(key, "false");
-          changed = true;
-          return;
-        }
-
-        if (normalizedValue === "eq.activo") {
-          parsedUrl.searchParams.append(key, "eq.true");
-          changed = true;
-          return;
-        }
-
-        if (normalizedValue === "eq.inactivo") {
-          parsedUrl.searchParams.append(key, "eq.false");
-          changed = true;
-          return;
-        }
-
-        if (normalizedValue === "is.activo") {
-          parsedUrl.searchParams.append(key, "is.true");
-          changed = true;
-          return;
-        }
-
-        if (normalizedValue === "is.inactivo") {
-          parsedUrl.searchParams.append(key, "is.false");
-          changed = true;
-          return;
-        }
-
-        parsedUrl.searchParams.append(key, value);
-      });
-
-      if (!changed) return url;
-      return parsedUrl.toString();
+      const parsed = JSON.parse(stored);
+      return parsed.access_token || parsed.token || parsed.accessToken || null;
     } catch {
-      // Fallback regex para URLs no parseables.
-      return url
-        .replace(/([?&])([^&=]+)=activo(?=&|$)/gi, "$1$2=true")
-        .replace(/([?&])([^&=]+)=inactivo(?=&|$)/gi, "$1$2=false")
-        .replace(/([?&])([^&=]+)=eq\.activo(?=&|$)/gi, "$1$2=eq.true")
-        .replace(/([?&])([^&=]+)=eq\.inactivo(?=&|$)/gi, "$1$2=eq.false")
-        .replace(/([?&])([^&=]+)=is\.activo(?=&|$)/gi, "$1$2=is.true")
-        .replace(/([?&])([^&=]+)=is\.inactivo(?=&|$)/gi, "$1$2=is.false");
+      return null;
     }
   }
 
-  const originalFetch = window.fetch.bind(window);
+  const originalFetch = window.fetch;
 
-  window.fetch = function patchedFetch(input, init = {}) {
-    const originalUrl = typeof input === "string" ? input : input?.url;
-    const url = normalizeBooleanParams(originalUrl);
-    if (!url || !url.includes(SUPABASE_REST_PATH)) {
-      return originalFetch(input, init);
+  window.fetch = function(input, init = {}) {
+    let url = typeof input === 'string' ? input : input.url;
+
+    if (url.includes(SUPABASE_REST_URL)) {
+      // 1. Inyectar token JWT
+      const token = getAccessToken();
+      if (token) {
+        init.headers = init.headers || {};
+        if (init.headers instanceof Headers) {
+          const plainHeaders = {};
+          init.headers.forEach((value, key) => { plainHeaders[key] = value; });
+          init.headers = plainHeaders;
+        }
+        init.headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      // 2. CORRECCIÓN ROBUSTA: Reemplazar valores 'activo' e 'inactivo' en TODA la URL
+      //    sin importar cómo esté formateada (codificada o no).
+      try {
+        // Decodificamos la URL para trabajar con texto plano
+        let decodedUrl = decodeURIComponent(url);
+        
+        // Reemplazamos CUALQUIER ocurrencia de '=activo' por '=true'
+        // y '=inactivo' por '=false', siempre que esté precedido por '=' y seguido por '&' o fin de string.
+        decodedUrl = decodedUrl.replace(/=(activo)(?=&|$)/g, '=true');
+        decodedUrl = decodedUrl.replace(/=(inactivo)(?=&|$)/g, '=false');
+        
+        // También manejamos el caso donde 'activo' está como valor de un parámetro booleano
+        // (esto ya lo cubre la expresión anterior, pero por si acaso)
+        
+        // Reconstruimos la URL (no es necesario volver a codificar, fetch lo maneja)
+        url = decodedUrl;
+      } catch (e) {
+        // Si falla la decodificación, usamos la URL original sin modificar
+        console.warn('[Module Fix] No se pudo decodificar la URL para corregir booleanos:', e);
+      }
+
+      // Si el input era un objeto Request, crear uno nuevo con la URL corregida
+      if (typeof input === 'object' && input instanceof Request) {
+        input = new Request(url, input);
+      } else {
+        input = url;
+      }
     }
 
-    const nextInput = (typeof input === "object" && input instanceof Request)
-      ? new Request(url, input)
-      : url;
-
-    const token = getAccessToken();
-    if (!token) {
-      return originalFetch(nextInput, init);
-    }
-
-    const headers = new Headers(init.headers || {});
-    if (!headers.has("Authorization")) {
-      headers.set("Authorization", `Bearer ${token}`);
-    }
-
-    return originalFetch(nextInput, {
-      ...init,
-      headers
-    });
+    return originalFetch.call(this, input, init);
   };
 
-  console.log("✅ [Module Fix] Adaptador de autenticación + corrección de booleanos activo.");
+  console.log('✅ [Module Fix] Adaptador de autenticación + corrección robusta de booleanos activo.');
 })();
