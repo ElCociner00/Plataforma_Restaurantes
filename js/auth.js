@@ -1,7 +1,9 @@
 import { supabase } from "./supabase.js";
+import { APP_ROUTES } from "./config.js";
 
-const DASHBOARD_REDIRECT_PATH = "/Plataforma_Restaurantes/dashboard/";
-const LOGIN_URL = "/Plataforma_Restaurantes/index.html";
+const DASHBOARD_REDIRECT_PATH = APP_ROUTES.dashboard;
+const LOGIN_URL = APP_ROUTES.login;
+const REDIRECT_AFTER_LOGIN_KEY = "redirect_after_login";
 
 /**
  * Obtiene el usuario actual desde la sesión activa de Supabase.
@@ -45,12 +47,28 @@ export async function signOut() {
   window.location.href = LOGIN_URL;
 }
 
+function consumeRedirectAfterLogin() {
+  try {
+    const nextPath = sessionStorage.getItem(REDIRECT_AFTER_LOGIN_KEY);
+    if (!nextPath) return null;
+    sessionStorage.removeItem(REDIRECT_AFTER_LOGIN_KEY);
+    return nextPath;
+  } catch (_error) {
+    return null;
+  }
+}
+
 function bindLoginForm() {
   const form = document.getElementById("loginForm");
   const emailInput = document.getElementById("emailInput") || document.getElementById("email");
   const statusEl = document.getElementById("status");
 
   if (!form || !emailInput) return;
+
+  const pendingRedirect = consumeRedirectAfterLogin();
+  if (statusEl && pendingRedirect) {
+    statusEl.textContent = "Tu sesión expiró. Inicia nuevamente para continuar.";
+  }
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();

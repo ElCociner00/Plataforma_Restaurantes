@@ -1,6 +1,10 @@
 import { supabase } from "./supabase.js";
+import { APP_ROUTES } from "./config.js";
 
-const LOGIN_URL = "/Plataforma_Restaurantes/index.html";
+const LOGIN_URL = APP_ROUTES.login;
+const DASHBOARD_URL = APP_ROUTES.dashboard;
+const REDIRECT_AFTER_LOGIN_KEY = "redirect_after_login";
+
 const DEFAULT_PUBLIC_PATHS = new Set([
   "/Plataforma_Restaurantes/index.html",
   "/Plataforma_Restaurantes/",
@@ -14,6 +18,14 @@ function normalizePath(pathname) {
     .replace(/\/index\.html$/i, "/")
     .replace(/\/+$/, "") || "/";
   return normalized;
+}
+
+function rememberRequestedPath() {
+  try {
+    sessionStorage.setItem(REDIRECT_AFTER_LOGIN_KEY, window.location.pathname);
+  } catch (_error) {
+    // noop
+  }
 }
 
 export function isPublicPath(customPublicPaths = []) {
@@ -30,6 +42,7 @@ export async function protectCurrentPage({ loginUrl = LOGIN_URL, publicPaths = [
 
   const { data } = await supabase.auth.getSession();
   if (!data?.session) {
+    rememberRequestedPath();
     window.location.href = loginUrl;
     return false;
   }
@@ -40,11 +53,13 @@ export async function protectCurrentPage({ loginUrl = LOGIN_URL, publicPaths = [
 export function initAuthRouter({ loginUrl = LOGIN_URL, publicPaths = [] } = {}) {
   supabase.auth.onAuthStateChange((event, session) => {
     if (event === "SIGNED_OUT" && !isPublicPath(publicPaths)) {
+      rememberRequestedPath();
       window.location.href = loginUrl;
+      return;
     }
 
     if (event === "SIGNED_IN" && session && normalizePath(window.location.pathname) === normalizePath(loginUrl)) {
-      window.location.href = "/Plataforma_Restaurantes/dashboard/";
+      window.location.href = DASHBOARD_URL;
     }
   });
 
