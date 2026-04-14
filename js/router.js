@@ -20,6 +20,11 @@ function normalizePath(pathname) {
   return normalized;
 }
 
+function revealPage() {
+  if (typeof document === "undefined" || !document.body) return;
+  document.body.style.display = "block";
+}
+
 function rememberRequestedPath() {
   try {
     sessionStorage.setItem(REDIRECT_AFTER_LOGIN_KEY, window.location.pathname);
@@ -38,7 +43,10 @@ export function isPublicPath(customPublicPaths = []) {
 }
 
 export async function protectCurrentPage({ loginUrl = LOGIN_URL, publicPaths = [] } = {}) {
-  if (isPublicPath(publicPaths)) return true;
+  if (isPublicPath(publicPaths)) {
+    revealPage();
+    return true;
+  }
 
   const { data } = await supabase.auth.getSession();
   if (!data?.session) {
@@ -47,6 +55,7 @@ export async function protectCurrentPage({ loginUrl = LOGIN_URL, publicPaths = [
     return false;
   }
 
+  revealPage();
   return true;
 }
 

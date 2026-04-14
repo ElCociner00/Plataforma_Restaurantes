@@ -1,35 +1,35 @@
 import { supabase } from "./supabase.js";
 import { APP_ROUTES } from "./config.js";
 
-const DASHBOARD_REDIRECT_PATH = APP_ROUTES.dashboard;
 const LOGIN_URL = APP_ROUTES.login;
-const REDIRECT_AFTER_LOGIN_KEY = "redirect_after_login";
+const DASHBOARD_URL = APP_ROUTES.dashboard;
 
 /**
- * Obtiene el usuario actual desde la sesión activa de Supabase.
+ * Verifica si hay una sesión activa.
  */
 export async function getCurrentUser() {
-  const { data, error } = await supabase.auth.getUser();
+  const { data: { user }, error } = await supabase.auth.getUser();
   if (error) {
-    console.error("Error al obtener usuario actual:", error);
+    console.error("Error al obtener usuario:", error);
     return null;
   }
-  return data?.user || null;
+  return user;
 }
 
 /**
- * Envía un Magic Link al correo indicado.
+ * Inicia sesión con Email y Contraseña.
  */
-export async function signInWithMagicLink(email) {
+export async function signInWithPassword(email, password) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
-  if (!normalizedEmail) throw new Error("Debes indicar un correo válido.");
+  const normalizedPassword = String(password || "");
 
-  const { data, error } = await supabase.auth.signInWithOtp({
+  if (!normalizedEmail || !normalizedPassword) {
+    throw new Error("Debes ingresar correo y contraseña.");
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: normalizedEmail,
-    options: {
-      emailRedirectTo: `${window.location.origin}${DASHBOARD_REDIRECT_PATH}`,
-      shouldCreateUser: true
-    }
+    password: normalizedPassword
   });
 
   if (error) throw error;
@@ -41,51 +41,34 @@ export async function signInWithMagicLink(email) {
  */
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
-  if (error) {
-    console.error("Error al cerrar sesión:", error);
-  }
+  if (error) console.error("Error al cerrar sesión:", error);
   window.location.href = LOGIN_URL;
-}
-
-function consumeRedirectAfterLogin() {
-  try {
-    const nextPath = sessionStorage.getItem(REDIRECT_AFTER_LOGIN_KEY);
-    if (!nextPath) return null;
-    sessionStorage.removeItem(REDIRECT_AFTER_LOGIN_KEY);
-    return nextPath;
-  } catch (_error) {
-    return null;
-  }
 }
 
 function bindLoginForm() {
   const form = document.getElementById("loginForm");
-  const emailInput = document.getElementById("emailInput") || document.getElementById("email");
-  const statusEl = document.getElementById("status");
+  const emailInput = document.getElementById("email");
+  const passwordInput = document.getElementById("password");
+  const errorEl = document.getElementById("error-message");
 
-  if (!form || !emailInput) return;
-
-  const pendingRedirect = consumeRedirectAfterLogin();
-  if (statusEl && pendingRedirect) {
-    statusEl.textContent = "Tu sesión expiró. Inicia nuevamente para continuar.";
-  }
+  if (!form || !emailInput || !passwordInput) return;
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-
-    const email = emailInput.value.trim();
-    if (statusEl) statusEl.textContent = "Enviando enlace mágico...";
+    if (errorEl) errorEl.textContent = "";
 
     try {
-      await signInWithMagicLink(email);
-      if (statusEl) {
-        statusEl.textContent = "✅ Revisa tu correo. Te enviamos un enlace para ingresar.";
-      }
-      emailInput.value = "";
+      await signInWithPassword(emailInput.value, passwordInput.value);
+      window.location.href = DASHBOARD_URL;
     } catch (error) {
-      console.error(error);
-      if (statusEl) {
-        statusEl.textContent = "❌ No pudimos enviar el enlace. Verifica el correo e intenta de nuevo.";
+      console.error("Error de inicio de sesión:", error);
+      if (!errorEl) return;
+
+      const message = String(error?.message || "");
+      if (message.toLowerCase().includes("invalid login credentials")) {
+        errorEl.textContent = "Correo o contraseña incorrectos.";
+      } else {
+        errorEl.textContent = "Error de conexión. Inténtalo de nuevo.";
       }
     }
   });

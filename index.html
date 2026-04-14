@@ -4,22 +4,26 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AXIOMA | Iniciar sesión</title>
-
   <link rel="stylesheet" href="css/main.css">
   <link rel="stylesheet" href="css/login.css">
 </head>
-
 <body>
-  <div class="main">
-    <h2>Iniciar sesión</h2>
-
-    <p>
-      Ingresa con Magic Link para acceder de forma segura.
-    </p>
+  <div class="main login-container">
+    <h2>Accede a tu cuenta</h2>
 
     <form id="loginForm">
-      <input id="emailInput" type="email" placeholder="Correo electrónico" autocomplete="email" required>
-      <button type="submit">Enviar enlace mágico</button>
+      <div class="form-group">
+        <label for="email">Correo electrónico</label>
+        <input type="email" id="email" name="email" required autocomplete="email">
+      </div>
+
+      <div class="form-group">
+        <label for="password">Contraseña</label>
+        <input type="password" id="password" name="password" required autocomplete="current-password">
+      </div>
+
+      <button type="submit">Iniciar sesión</button>
+      <p id="error-message" style="color: red; margin-top: 10px;"></p>
     </form>
 
     <p id="status" aria-live="polite"></p>
