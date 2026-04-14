@@ -1,41 +1,85 @@
 import { supabase } from "./supabase.js";
 import { getCurrentUser } from "./auth.js";
 
+let cachedContext = null;
+let authListenerInitialized = false;
+
 function normalizeRole(value) {
   return String(value || "operativo").trim().toLowerCase() || "operativo";
 }
 
-/**
- * Obtiene contexto de usuario desde RPC segura en Supabase.
- */
-export async function getUserContext() {
-  const user = await getCurrentUser();
-  if (!user) return null;
+function sanitizePermisos(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value;
+}
 
-  const { data, error } = await supabase.rpc("get_my_context");
-  if (error) {
-    console.error("Error obteniendo contexto vía RPC get_my_context:", error);
-    return null;
-  }
-
-  const row = Array.isArray(data) ? data[0] : null;
+function mapContextPayload(data, fallbackUser) {
+  const userId = data?.user?.id || fallbackUser?.id || null;
+  const email = data?.user?.email || fallbackUser?.email || null;
+  const rol = normalizeRole(data?.rol);
 
   return {
-    user,
-    rol: normalizeRole(row?.rol),
-    empresa_id: row?.empresa_id || null,
-    nombre: row?.nombre_completo || user.email,
-    super_admin: normalizeRole(row?.rol) === "admin_root"
+    user: {
+      id: userId,
+      email,
+      user_id: userId
+    },
+    empresa_id: data?.empresa_id || null,
+    rol,
+    nombre: data?.nombre || email || "Usuario",
+    plan: String(data?.plan || "free").trim().toLowerCase() || "free",
+    activa: data?.activa !== false,
+    permisos: sanitizePermisos(data?.permisos),
+    super_admin: rol === "admin_root"
   };
 }
 
-export function clearUserContextCache() {
-  // Sin cache local: se deja por compatibilidad con módulos existentes.
+function ensureAuthCacheInvalidation() {
+  if (authListenerInitialized) return;
+  authListenerInitialized = true;
+
+  supabase.auth.onAuthStateChange((event) => {
+    if (event === "SIGNED_OUT" || event === "USER_UPDATED") {
+      cachedContext = null;
+    }
+  });
+}
+
+export async function getUserContext() {
+  ensureAuthCacheInvalidation();
+
+  if (cachedContext) return cachedContext;
+
+  const user = await getCurrentUser();
+  if (!user) {
+    cachedContext = null;
+    return null;
+  }
+
+  const { data, error } = await supabase.rpc("get_my_context");
+  if (error) {
+    console.error("Error obteniendo contexto vía RPC:", error);
+    return null;
+  }
+
+  const payload = (data && typeof data === "object" && !Array.isArray(data))
+    ? data
+    : (Array.isArray(data) ? data[0] : null);
+
+  const context = mapContextPayload(payload || {}, user);
+  cachedContext = context;
+
+  console.log(`✅ Contexto cargado: ${context.empresa_id || "sin_empresa"} | Plan: ${context.plan} | Rol: ${context.rol}`);
+  return context;
 }
 
 export async function getCurrentEmpresaId() {
   const context = await getUserContext();
   return context?.empresa_id || null;
+}
+
+export function clearUserContextCache() {
+  cachedContext = null;
 }
 
 export async function obtenerUsuarioActual() {
