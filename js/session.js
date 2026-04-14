@@ -45,6 +45,67 @@ function ensureAuthCacheInvalidation() {
   });
 }
 
+async function getContextFromRpc() {
+  const { data, error } = await supabase.rpc("get_my_context");
+  if (error) {
+    console.warn("⚠️ RPC get_my_context no disponible, se intentará fallback por tablas:", error.message || error);
+    return null;
+  }
+
+  return (data && typeof data === "object" && !Array.isArray(data))
+    ? data
+    : (Array.isArray(data) ? data[0] : null);
+}
+
+async function getContextFromTables(user) {
+  const { data: usuarioSistema, error: usuarioError } = await supabase
+    .from("usuarios_sistema")
+    .select("id, empresa_id, nombre_completo, rol, activo")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (usuarioError || !usuarioSistema) {
+    console.error("No se pudo resolver usuarios_sistema para el usuario actual:", usuarioError);
+    return null;
+  }
+
+  const { data: empresa, error: empresaError } = await supabase
+    .from("empresas")
+    .select("id, plan, plan_actual, activa, activo")
+    .eq("id", usuarioSistema.empresa_id)
+    .maybeSingle();
+
+  if (empresaError) {
+    console.error("No se pudo resolver empresa asociada al usuario:", empresaError);
+    return null;
+  }
+
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      user_id: user.id
+    },
+    empresa_id: usuarioSistema.empresa_id || null,
+    rol: usuarioSistema.rol || "operativo",
+    nombre: usuarioSistema.nombre_completo || user.email || "Usuario",
+    plan: empresa?.plan || empresa?.plan_actual || "free",
+    activa: empresa?.activa !== false && empresa?.activo !== false,
+    permisos: {},
+    super_admin: String(usuarioSistema.rol || "").trim().toLowerCase() === "admin_root"
+  };
+}
+
+async function resolveAccessToken() {
+  const { data } = await supabase.auth.getSession();
+  const sessionToken = data?.session?.access_token;
+  if (sessionToken) return sessionToken;
+
+  const { data: refreshed, error } = await supabase.auth.refreshSession();
+  if (error) return null;
+  return refreshed?.session?.access_token || null;
+}
+
 export async function getUserContext() {
   ensureAuthCacheInvalidation();
 
@@ -56,17 +117,11 @@ export async function getUserContext() {
     return null;
   }
 
-  const { data, error } = await supabase.rpc("get_my_context");
-  if (error) {
-    console.error("Error obteniendo contexto vía RPC:", error);
-    return null;
-  }
+  const payload = await getContextFromRpc();
+  const fallbackPayload = payload || await getContextFromTables(user);
+  if (!fallbackPayload) return null;
 
-  const payload = (data && typeof data === "object" && !Array.isArray(data))
-    ? data
-    : (Array.isArray(data) ? data[0] : null);
-
-  const context = mapContextPayload(payload || {}, user);
+  const context = mapContextPayload(fallbackPayload, user);
   cachedContext = context;
 
   console.log(`✅ Contexto cargado: ${context.empresa_id || "sin_empresa"} | Plan: ${context.plan} | Rol: ${context.rol}`);
@@ -134,8 +189,7 @@ export async function getSessionConEmpresa() {
 
 export async function buildRequestHeaders({ includeTenant = true } = {}) {
   const headers = {};
-  const { data } = await supabase.auth.getSession();
-  const accessToken = data?.session?.access_token;
+  const accessToken = await resolveAccessToken();
 
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
