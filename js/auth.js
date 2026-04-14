@@ -32,6 +32,9 @@ export async function signInWithPassword(email, password) {
   });
 
   if (error) throw error;
+
+  // Redirección inmediata tras autenticación exitosa.
+  window.location.href = DASHBOARD_URL;
   return data;
 }
 
