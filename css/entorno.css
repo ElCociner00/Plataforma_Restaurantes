@@ -1,21 +1,57 @@
 .main.entorno-main {
-  max-width: 640px;
-  margin: 80px auto;
-  padding: 34px;
+  max-width: 680px;
+  margin: 64px auto;
+  padding: 38px 34px;
+  border-radius: 18px;
+  border: 1px solid #e9ddff;
+  box-shadow: 0 20px 40px rgba(91, 58, 143, 0.12);
+}
+
+.entorno-main h1 {
+  color: #2c1f47;
+  margin-bottom: 10px;
 }
 
 .entorno-main p {
-  margin-bottom: 24px;
+  margin-bottom: 26px;
+  color: #6b7280;
 }
 
 .entorno-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 14px;
 }
 
 .entorno-actions button {
   width: 100%;
+  min-height: 54px;
   font-size: 1rem;
-  padding: 14px;
+  font-weight: 700;
+  border-radius: 10px;
+  border: 1px solid #c4b5fd;
+  background: linear-gradient(135deg, #c4b5fd, #a78bfa);
+  color: #2c1f47;
+}
+
+.entorno-actions button:hover {
+  background: linear-gradient(135deg, #b79cff, #9579f5);
+}
+
+#status {
+  margin-top: 16px;
+  min-height: 24px;
+  color: #4b5563;
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .main.entorno-main {
+    margin: 24px 14px;
+    padding: 26px 20px;
+  }
+
+  .entorno-actions {
+    grid-template-columns: 1fr;
+  }
 }

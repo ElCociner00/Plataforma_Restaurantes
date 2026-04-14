@@ -1,3 +1,4 @@
+import { getCurrentEmpresaId } from "./session.js";
 import { supabase } from "./supabase.js";
 
 const normalizeText = (value) => String(value || "").trim();
@@ -71,6 +72,7 @@ export async function fetchUsuariosEmpresa(empresaId) {
 }
 
 export async function fetchResponsablesActivos(empresaId) {
-  const usuarios = await fetchUsuariosEmpresa(empresaId);
+  const resolvedEmpresaId = normalizeText(empresaId) || await getCurrentEmpresaId();
+  const usuarios = await fetchUsuariosEmpresa(resolvedEmpresaId);
   return usuarios.filter((row) => row.activo !== false);
 }
