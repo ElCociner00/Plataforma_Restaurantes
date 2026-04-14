@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AXIOMA | Iniciar sesión</title>
 
-  <!-- CSS GLOBAL (ruta corregida) -->
   <link rel="stylesheet" href="css/main.css">
   <link rel="stylesheet" href="css/login.css">
 </head>
@@ -15,14 +14,15 @@
     <h2>Iniciar sesión</h2>
 
     <p>
-      Accede a tu panel de gestión de Global Nexo
+      Ingresa con Magic Link para acceder de forma segura.
     </p>
 
     <form id="loginForm">
-      <input id="emailInput" type="email" placeholder="Correo electrónico" required>
-      <input id="passwordInput" type="password" placeholder="Contraseña" required>
-      <button type="submit">Entrar</button>
+      <input id="emailInput" type="email" placeholder="Correo electrónico" autocomplete="email" required>
+      <button type="submit">Enviar enlace mágico</button>
     </form>
+
+    <p id="status" aria-live="polite"></p>
 
     <div class="login-extra">
       <a href="./registro/index.html" class="registro-link">
@@ -31,7 +31,6 @@
     </div>
   </div>
 
-  <!-- JS (también corregido por consistencia) -->
   <script type="module" src="js/auth.js"></script>
   <script type="module" src="js/public_chrome.js"></script>
   <script type="module" src="js/footer.js"></script>
