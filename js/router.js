@@ -13,6 +13,8 @@ const DEFAULT_PUBLIC_PATHS = new Set([
   "/Plataforma_Restaurantes/registro/usuario.html"
 ]);
 
+let routerInitialized = false;
+
 function normalizePath(pathname) {
   const normalized = String(pathname || "/")
     .replace(/\/index\.html$/i, "/")
@@ -60,6 +62,12 @@ export async function protectCurrentPage({ loginUrl = LOGIN_URL, publicPaths = [
 }
 
 export function initAuthRouter({ loginUrl = LOGIN_URL, publicPaths = [] } = {}) {
+  if (routerInitialized) {
+    return protectCurrentPage({ loginUrl, publicPaths });
+  }
+
+  routerInitialized = true;
+
   supabase.auth.onAuthStateChange((event, session) => {
     if (event === "SIGNED_OUT" && !isPublicPath(publicPaths)) {
       rememberRequestedPath();
@@ -73,4 +81,11 @@ export function initAuthRouter({ loginUrl = LOGIN_URL, publicPaths = [] } = {}) 
   });
 
   return protectCurrentPage({ loginUrl, publicPaths });
+}
+
+if (typeof window !== "undefined") {
+  initAuthRouter().catch((error) => {
+    console.error("Error inicializando auth router:", error);
+    revealPage();
+  });
 }

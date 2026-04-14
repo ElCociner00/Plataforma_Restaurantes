@@ -1,3 +1,64 @@
-.main {
-  max-width: 380px;
+.main.login-container {
+  max-width: 460px;
+  margin: 72px auto;
+  padding: 34px 32px;
+  border-radius: 16px;
+  border: 1px solid #e9ddff;
+  box-shadow: 0 18px 36px rgba(91, 58, 143, 0.14);
+}
+
+.login-container h2 {
+  margin-bottom: 20px;
+  color: #2c1f47;
+}
+
+.login-container #loginForm {
+  gap: 16px;
+}
+
+.login-container .form-group {
+  display: grid;
+  gap: 8px;
+}
+
+.login-container .form-group label {
+  font-size: 0.9rem;
+  color: #4b5563;
+  font-weight: 600;
+}
+
+.login-container input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #d8c7ff;
+  background: #fcfaff;
+}
+
+.login-container input:focus {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18);
+}
+
+.login-container button {
+  margin-top: 4px;
+  min-height: 46px;
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+}
+
+.login-container button:hover {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+}
+
+#error-message {
+  min-height: 20px;
+  font-size: 0.9rem;
+  margin: 0;
+  text-align: left;
+}
+
+@media (max-width: 640px) {
+  .main.login-container {
+    margin: 24px 14px;
+    padding: 24px 20px;
+  }
 }
