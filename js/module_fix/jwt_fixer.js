@@ -1,5 +1,5 @@
 // js/module_fix/jwt_fixer.js
-// Reparador de token JWT - Versión CORREGIDA
+// Reparador de token JWT - Versión COMPATIBLE (objeto + string)
 (function() {
   'use strict';
 
@@ -9,28 +9,28 @@
     const stored = localStorage.getItem(TOKEN_STORAGE_KEY);
     if (!stored) return;
 
-    const parsed = JSON.parse(stored);
-    
-    // Extraer el access_token
-    let rawToken = null;
-    if (parsed.access_token && typeof parsed.access_token === 'string') {
-      rawToken = parsed.access_token;
-    } else if (typeof parsed === 'string' && parsed.split('.').length === 3) {
-      rawToken = parsed;
+    let parsed;
+    try {
+      parsed = JSON.parse(stored);
+    } catch(e) {
+      // Si ya es string, no hacer nada
+      return;
     }
     
-    if (rawToken) {
-      const parts = rawToken.split('.');
+    // Si es objeto con access_token
+    if (parsed && parsed.access_token && typeof parsed.access_token === 'string') {
+      const token = parsed.access_token;
+      const parts = token.split('.');
+      
       if (parts.length === 3) {
-        // 🔥 CAMBIO CRÍTICO: Guardar SOLO el string del token, no un objeto
-        localStorage.setItem(TOKEN_STORAGE_KEY, rawToken);
-        console.log('✅ [JWT Fixer] Token reparado guardado como string puro (3 partes)');
+        // 🔥 Guardar en DOS formatos para compatibilidad
+        // Formato 1: objeto (para supabase.js/auth.js)
+        // Formato 2: string (para módulos)
+        localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify({ access_token: token }));
+        localStorage.setItem(TOKEN_STORAGE_KEY + '_raw', token);
         
-        // Verificar el cambio
-        const verify = localStorage.getItem(TOKEN_STORAGE_KEY);
-        console.log('📦 Token guardado, primeras 50 chars:', verify.substring(0, 50));
-      } else {
-        console.warn('⚠️ [JWT Fixer] Token tiene', parts.length, 'partes, se esperaban 3');
+        console.log('✅ [JWT Fixer] Token reparado (formato objeto + raw)');
+        console.log('📦 Token raw (primeros 50 chars):', token.substring(0, 50));
       }
     }
   } catch (e) {
