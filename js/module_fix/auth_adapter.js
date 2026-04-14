@@ -1,5 +1,4 @@
 // js/module_fix/auth_adapter.js
-// Versión MEJORADA: Usa token raw si está disponible
 (function() {
   'use strict';
 
@@ -8,20 +7,21 @@
   const SUPABASE_REST_URL = 'supabase.co/rest/v1/';
 
   function getAccessToken() {
-    // PRIORIDAD 1: Token raw (formato puro)
-    let rawToken = localStorage.getItem(TOKEN_RAW_KEY);
+    // Prioridad 1: Token raw (formato puro de 3 partes)
+    const rawToken = localStorage.getItem(TOKEN_RAW_KEY);
     if (rawToken && rawToken.split('.').length === 3) {
+      console.log('🔑 Usando token raw');
       return rawToken;
     }
     
-    // PRIORIDAD 2: Token desde objeto
+    // Prioridad 2: Token desde objeto
     const stored = localStorage.getItem(TOKEN_STORAGE_KEY);
     if (!stored) return null;
     try {
       const parsed = JSON.parse(stored);
       return parsed.access_token || null;
     } catch {
-      return stored; // Si ya es string directo
+      return stored;
     }
   }
 
@@ -40,9 +40,6 @@
           init.headers = plainHeaders;
         }
         init.headers['Authorization'] = `Bearer ${token}`;
-        console.log('🔑 [Auth Adapter] Token inyectado en:', url.split('/').pop());
-      } else {
-        console.warn('⚠️ [Auth Adapter] No se encontró token para:', url);
       }
     }
 
