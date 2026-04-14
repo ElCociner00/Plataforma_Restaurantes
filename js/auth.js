@@ -1,6 +1,7 @@
 import { supabase } from "./supabase.js";
 import { APP_ROUTES } from "./config.js";
 
+const DASHBOARD_URL = '/Plataforma_Restaurantes/dashboard/';
 const LOGIN_URL = APP_ROUTES.login;
 
 /**
@@ -32,6 +33,9 @@ export async function signInWithPassword(email, password) {
   });
 
   if (error) throw error;
+
+  // Redirección inmediata tras autenticación exitosa.
+  window.location.href = DASHBOARD_URL;
   return data;
 }
 
