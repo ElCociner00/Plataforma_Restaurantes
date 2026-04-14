@@ -1,20 +1,27 @@
 // js/module_fix/auth_adapter.js
-// Versión MÍNIMA: SOLO inyecta el token JWT. No toca la URL.
+// Versión MEJORADA: Usa token raw si está disponible
 (function() {
   'use strict';
 
   const TOKEN_STORAGE_KEY = 'sb-ivgzwgyjyqfunheaesxx-auth-token';
+  const TOKEN_RAW_KEY = TOKEN_STORAGE_KEY + '_raw';
   const SUPABASE_REST_URL = 'supabase.co/rest/v1/';
 
   function getAccessToken() {
+    // PRIORIDAD 1: Token raw (formato puro)
+    let rawToken = localStorage.getItem(TOKEN_RAW_KEY);
+    if (rawToken && rawToken.split('.').length === 3) {
+      return rawToken;
+    }
+    
+    // PRIORIDAD 2: Token desde objeto
     const stored = localStorage.getItem(TOKEN_STORAGE_KEY);
     if (!stored) return null;
     try {
       const parsed = JSON.parse(stored);
-      // Devolver SOLO el string del token
       return parsed.access_token || null;
     } catch {
-      return null;
+      return stored; // Si ya es string directo
     }
   }
 
@@ -23,7 +30,6 @@
   window.fetch = function(input, init = {}) {
     const url = typeof input === 'string' ? input : input.url;
 
-    // SOLO inyectar token si es una llamada a la API REST de Supabase
     if (url.includes(SUPABASE_REST_URL)) {
       const token = getAccessToken();
       if (token) {
@@ -33,13 +39,15 @@
           init.headers.forEach((value, key) => { plainHeaders[key] = value; });
           init.headers = plainHeaders;
         }
-        // Asegurar que el header Authorization tenga el formato correcto
         init.headers['Authorization'] = `Bearer ${token}`;
+        console.log('🔑 [Auth Adapter] Token inyectado en:', url.split('/').pop());
+      } else {
+        console.warn('⚠️ [Auth Adapter] No se encontró token para:', url);
       }
     }
 
     return originalFetch.call(this, input, init);
   };
 
-  console.log('✅ [Module Fix] Adaptador de autenticación (token JWT) activo.');
+  console.log('✅ [Module Fix] Adaptador de autenticación (v2) activo.');
 })();
