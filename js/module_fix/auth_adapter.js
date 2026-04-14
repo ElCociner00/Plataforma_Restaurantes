@@ -30,14 +30,66 @@
   function normalizeBooleanParams(url) {
     if (!url) return url;
 
-    // Casos reportados (valor literal) y variantes comunes usadas por PostgREST.
-    return url
-      .replace(/([&?])(activo|activa)=activo([&]|$)/gi, "$1$2=true$3")
-      .replace(/([&?])(activo|activa)=inactivo([&]|$)/gi, "$1$2=false$3")
-      .replace(/([&?])(activo|activa)=eq\.activo([&]|$)/gi, "$1$2=eq.true$3")
-      .replace(/([&?])(activo|activa)=eq\.inactivo([&]|$)/gi, "$1$2=eq.false$3")
-      .replace(/([&?])(activo|activa)=is\.activo([&]|$)/gi, "$1$2=is.true$3")
-      .replace(/([&?])(activo|activa)=is\.inactivo([&]|$)/gi, "$1$2=is.false$3");
+    try {
+      const parsedUrl = new URL(url, window.location.origin);
+      const entries = Array.from(parsedUrl.searchParams.entries());
+      let changed = false;
+
+      parsedUrl.search = "";
+      entries.forEach(([key, value]) => {
+        const normalizedValue = String(value || "").trim().toLowerCase();
+
+        if (normalizedValue === "activo") {
+          parsedUrl.searchParams.append(key, "true");
+          changed = true;
+          return;
+        }
+
+        if (normalizedValue === "inactivo") {
+          parsedUrl.searchParams.append(key, "false");
+          changed = true;
+          return;
+        }
+
+        if (normalizedValue === "eq.activo") {
+          parsedUrl.searchParams.append(key, "eq.true");
+          changed = true;
+          return;
+        }
+
+        if (normalizedValue === "eq.inactivo") {
+          parsedUrl.searchParams.append(key, "eq.false");
+          changed = true;
+          return;
+        }
+
+        if (normalizedValue === "is.activo") {
+          parsedUrl.searchParams.append(key, "is.true");
+          changed = true;
+          return;
+        }
+
+        if (normalizedValue === "is.inactivo") {
+          parsedUrl.searchParams.append(key, "is.false");
+          changed = true;
+          return;
+        }
+
+        parsedUrl.searchParams.append(key, value);
+      });
+
+      if (!changed) return url;
+      return parsedUrl.toString();
+    } catch {
+      // Fallback regex para URLs no parseables.
+      return url
+        .replace(/([?&])([^&=]+)=activo(?=&|$)/gi, "$1$2=true")
+        .replace(/([?&])([^&=]+)=inactivo(?=&|$)/gi, "$1$2=false")
+        .replace(/([?&])([^&=]+)=eq\.activo(?=&|$)/gi, "$1$2=eq.true")
+        .replace(/([?&])([^&=]+)=eq\.inactivo(?=&|$)/gi, "$1$2=eq.false")
+        .replace(/([?&])([^&=]+)=is\.activo(?=&|$)/gi, "$1$2=is.true")
+        .replace(/([?&])([^&=]+)=is\.inactivo(?=&|$)/gi, "$1$2=is.false");
+    }
   }
 
   const originalFetch = window.fetch.bind(window);
