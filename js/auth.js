@@ -1,6 +1,7 @@
 import { supabase } from "./supabase.js";
 import { APP_ROUTES } from "./config.js";
 
+const DASHBOARD_URL = '/Plataforma_Restaurantes/dashboard/';
 const LOGIN_URL = APP_ROUTES.login;
 
 /**
