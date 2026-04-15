@@ -1,8 +1,6 @@
-// js/module_fix/auth_adapter.js - Versión MÍNIMA
+// js/module_fix/auth_adapter.js - Versión funcional
 (function() {
   'use strict';
-
-  const SUPABASE_REST_URL = 'supabase.co/rest/v1/';
 
   function getAccessToken() {
     const stored = localStorage.getItem('sb-ivgzwgyjyqfunheaesxx-auth-token');
@@ -20,7 +18,7 @@
   window.fetch = function(input, init = {}) {
     const url = typeof input === 'string' ? input : input.url;
 
-    if (url.includes(SUPABASE_REST_URL)) {
+    if (url && url.includes('supabase.co')) {
       const token = getAccessToken();
       if (token) {
         init.headers = init.headers || {};
@@ -36,5 +34,5 @@
     return originalFetch.call(this, input, init);
   };
 
-  console.log('✅ [Auth Adapter] Activado (versión mínima)');
+  console.log('✅ [Auth Adapter] Activado');
 })();
