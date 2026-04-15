@@ -1,9 +1,10 @@
 // js/module_fix/session_patch.js
-// Parchea el cliente de Supabase para que use el token correcto
+// Parche completo para Supabase (token + API key)
 (function() {
   'use strict';
 
   const TOKEN_KEY = 'sb-ivgzwgyjyqfunheaesxx-auth-token';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2Z3p3Z3lqeXFmdW5oZWFlc3h4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NjAxMDUsImV4cCI6MjA4NTQzNjEwNX0.5Q-MQ7fKfCG9Qo09G_vub3-Rn6FHLJ18sf8eKGndhbI';
 
   function getValidToken() {
     const stored = localStorage.getItem(TOKEN_KEY);
@@ -16,48 +17,39 @@
     }
   }
 
-  // Esperar a que se inicialice Supabase
   const originalFetch = window.fetch;
   
-  // Interceptar TODAS las llamadas a Supabase (incluyendo las del cliente interno)
   window.fetch = function(input, init = {}) {
     const url = typeof input === 'string' ? input : input.url;
     
-    // Si es una llamada a Supabase
     if (url && url.includes('supabase.co')) {
       const token = getValidToken();
+      
+      // Normalizar headers
+      let headers = init.headers || {};
+      if (headers instanceof Headers) {
+        const plainHeaders = {};
+        headers.forEach((value, key) => { plainHeaders[key] = value; });
+        headers = plainHeaders;
+      }
+      
+      // Forzar API key y token en TODAS las llamadas a Supabase
+      headers['apikey'] = SUPABASE_ANON_KEY;
+      
       if (token) {
-        init.headers = init.headers || {};
-        if (init.headers instanceof Headers) {
-          const plainHeaders = {};
-          init.headers.forEach((value, key) => { plainHeaders[key] = value; });
-          init.headers = plainHeaders;
-        }
-        // Forzar el token en cada llamada
-        init.headers['Authorization'] = `Bearer ${token}`;
-        init.headers['apikey'] = 'ivgzwgyjyqfunheaesxx'; // La anon key
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      init.headers = headers;
+      
+      // Log solo para auth (opcional)
+      if (url.includes('/auth/v1/')) {
+        console.log('🔑 [Session Patch] Auth call fixed');
       }
     }
     
     return originalFetch.call(this, input, init);
   };
 
-  // También interceptar el cliente de Supabase si ya existe
-  setTimeout(() => {
-    if (window.supabaseClient) {
-      const originalRequest = window.supabaseClient.request;
-      if (originalRequest) {
-        window.supabaseClient.request = function(...args) {
-          const token = getValidToken();
-          if (token && args[0]) {
-            args[0].headers = args[0].headers || {};
-            args[0].headers['Authorization'] = `Bearer ${token}`;
-          }
-          return originalRequest.apply(this, args);
-        };
-      }
-    }
-  }, 100);
-
-  console.log('✅ [Session Patch] Parche de sesión activo');
+  console.log('✅ [Session Patch] Activado con API key y token');
 })();
