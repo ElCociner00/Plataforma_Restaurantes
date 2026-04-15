@@ -1,21 +1,11 @@
-// js/module_fix/auth_adapter.js
+// js/module_fix/auth_adapter.js - Versión MÍNIMA
 (function() {
   'use strict';
 
-  const TOKEN_STORAGE_KEY = 'sb-ivgzwgyjyqfunheaesxx-auth-token';
-  const TOKEN_RAW_KEY = TOKEN_STORAGE_KEY + '_raw';
   const SUPABASE_REST_URL = 'supabase.co/rest/v1/';
 
   function getAccessToken() {
-    // Prioridad 1: Token raw (formato puro de 3 partes)
-    const rawToken = localStorage.getItem(TOKEN_RAW_KEY);
-    if (rawToken && rawToken.split('.').length === 3) {
-      console.log('🔑 Usando token raw');
-      return rawToken;
-    }
-    
-    // Prioridad 2: Token desde objeto
-    const stored = localStorage.getItem(TOKEN_STORAGE_KEY);
+    const stored = localStorage.getItem('sb-ivgzwgyjyqfunheaesxx-auth-token');
     if (!stored) return null;
     try {
       const parsed = JSON.parse(stored);
@@ -46,5 +36,5 @@
     return originalFetch.call(this, input, init);
   };
 
-  console.log('✅ [Module Fix] Adaptador de autenticación (v2) activo.');
+  console.log('✅ [Auth Adapter] Activado (versión mínima)');
 })();
