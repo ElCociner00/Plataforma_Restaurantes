@@ -733,11 +733,6 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const actualizarEstadoHoraFin = () => {
-    if (fechaEsPasada(fecha.value)) {
-      horaFin.value = "";
-      horaFin.disabled = true;
-      return;
-    }
     horaFin.disabled = false;
   };
 
