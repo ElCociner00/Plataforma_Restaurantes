@@ -1,55 +1,6 @@
 import { supabase } from "./supabase.js";
 import { getCurrentUser } from "./auth.js";
 
-// ========== FIX: Asegurar token limpio para Supabase ==========
-const TOKEN_KEY = 'sb-ivgzwgyjyqfunheaesxx-auth-token';
-
-function ensureCleanToken() {
-    const stored = localStorage.getItem(TOKEN_KEY);
-    if (!stored) return;
-    
-    try {
-        if (stored.trim().startsWith('{')) {
-            const parsed = JSON.parse(stored);
-            if (parsed.access_token && parsed.access_token.split('.').length === 3) {
-                localStorage.setItem(TOKEN_KEY, parsed.access_token);
-                console.log('🔧 [Session Fix] Token limpiado a string puro');
-            }
-        }
-    } catch(e) {
-        if (stored.split('.').length !== 3) {
-            console.warn('⚠️ [Session Fix] Token inválido detectado');
-        }
-    }
-}
-
-ensureCleanToken();
-
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2Z3p3Z3lqeXFmdW5oZWFlc3h4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NjAxMDUsImV4cCI6MjA4NTQzNjEwNX0.5Q-MQ7fKfCG9Qo09G_vub3-Rn6FHLJ18sf8eKGndhbI';
-
-const originalFrom = supabase.from;
-
-supabase.from = function(tableName) {
-    const builder = originalFrom.call(this, tableName);
-    const originalSelect = builder.select;
-    
-    builder.select = function(columns, options) {
-        const token = localStorage.getItem(TOKEN_KEY);
-        if (token && token.split('.').length === 3) {
-            if (this.headers) {
-                this.headers['Authorization'] = `Bearer ${token}`;
-                this.headers['apikey'] = SUPABASE_ANON_KEY;
-            }
-        }
-        return originalSelect.call(this, columns, options);
-    };
-    
-    return builder;
-};
-
-console.log('✅ [Session Fix] Parche aplicado - Token forzado en consultas');
-// ========== FIN DEL FIX ==========
-
 let cachedContext = null;
 let authListenerInitialized = false;
 
