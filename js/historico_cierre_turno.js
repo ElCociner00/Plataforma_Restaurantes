@@ -737,7 +737,7 @@ const buildDifferenceRowsHtml = (rows, colspan, title) => {
 const buildExcelStyles = () => `
   <style>
     body { font-family: Arial, sans-serif; color: #111827; margin: 12px; }
-    .excel-table { border-collapse: collapse; table-layout: fixed; min-width: 1800px; }
+    .excel-table { border-collapse: collapse; table-layout: fixed; min-width: 2600px; }
     .excel-table th, .excel-table td { border: 1px solid #d1d5db; padding: 6px 8px; white-space: nowrap; }
     .excel-table th { background: #eef2ff; font-weight: 700; text-align: left; }
     .num { mso-number-format: "\#\,\#\#0.00"; text-align: right; }
@@ -747,20 +747,28 @@ const buildExcelStyles = () => `
 const FLAT_EXCEL_HEADERS = [
   "RESPONSABLE TURNO",
   "FECHA TURNO",
+  "HORA LLEGADA",
+  "HORA SALIDA",
+  "EFECTIVO APERTURA",
+  "BOLSA",
+  "CAJA",
   "EFECTIVO SISTEMA",
-  "NEQUI SISTEMA",
-  "DAVIPLATA SISTEMA",
-  "TARJETA SISTEMA",
-  "TRANSFERENCIAS SISTEMA",
   "EFECTIVO REAL",
-  "NEQUI REAL",
-  "DAVIPLATA REAL",
-  "TARJETA REAL",
-  "TRANSFERENCIA REAL",
   "DIF EFECTIVO",
+  "NEQUI SISTEMA",
+  "NEQUI REAL",
   "DIF NEQUI",
+  "DAVIPLATA SISTEMA",
+  "DAVIPLATA REAL",
   "DIF DAVIPLATA",
+  "RAPPI SISTEMA",
+  "RAPPI REAL",
+  "DIF RAPPI",
+  "TARJETA SISTEMA",
+  "TARJETA REAL",
   "DIF TARJETA",
+  "TRANSFERENCIAS SISTEMA",
+  "TRANSFERENCIA REAL",
   "DIF TRANSFERENCIAS",
   "TOTAL SISTEMA",
   "TOTAL REAL",
@@ -826,9 +834,14 @@ const toFlatExcelRow = (row) => {
       detailBases: ["nequi"]
     }),
     daviplata: extractCanalValores(row, {
-      sistemaCandidates: ["daviplata_sistema", "sistema_daviplata", "rappi_sistema", "sistema_rappi"],
-      realCandidates: ["daviplata_real", "real_daviplata", "rappi_real", "real_rappi"],
-      detailBases: ["daviplata", "rappi"]
+      sistemaCandidates: ["daviplata_sistema", "sistema_daviplata"],
+      realCandidates: ["daviplata_real", "real_daviplata"],
+      detailBases: ["daviplata"]
+    }),
+    rappi: extractCanalValores(row, {
+      sistemaCandidates: ["rappi_sistema", "sistema_rappi"],
+      realCandidates: ["rappi_real", "real_rappi"],
+      detailBases: ["rappi"]
     }),
     tarjeta: extractCanalValores(row, {
       sistemaCandidates: ["tarjeta_sistema", "sistema_tarjeta", "datafono_sistema", "sistema_datafono"],
@@ -842,26 +855,34 @@ const toFlatExcelRow = (row) => {
     })
   };
 
-  const totalSistema = canales.efectivo.sistema + canales.nequi.sistema + canales.daviplata.sistema + canales.tarjeta.sistema + canales.transferencias.sistema;
-  const totalReal = canales.efectivo.real + canales.nequi.real + canales.daviplata.real + canales.tarjeta.real + canales.transferencias.real;
+  const totalSistema = canales.efectivo.sistema + canales.nequi.sistema + canales.daviplata.sistema + canales.rappi.sistema + canales.tarjeta.sistema + canales.transferencias.sistema;
+  const totalReal = canales.efectivo.real + canales.nequi.real + canales.daviplata.real + canales.rappi.real + canales.tarjeta.real + canales.transferencias.real;
 
   const valuesByHeader = {
     "RESPONSABLE TURNO": normalizeInlineText(formatCellValue(getGeneralByCandidates(general, ["responsable", "responsable_nombre", "nombre_responsable"]) || "")),
     "FECHA TURNO": normalizeInlineText(formatCellValue(getGeneralByCandidates(general, ["fecha_turno", "fecha", "created_at"]) || "")),
+    "HORA LLEGADA": normalizeInlineText(formatCellValue(getGeneralByCandidates(general, ["hora_inicio", "hora_llegada", "hora_entrada"]) || "")),
+    "HORA SALIDA": normalizeInlineText(formatCellValue(getGeneralByCandidates(general, ["hora_fin", "hora_salida"]) || "")),
+    "EFECTIVO APERTURA": toNumber(getGeneralByCandidates(general, ["efectivo_inicial", "apertura_efectivo", "efectivo_apertura"])) ?? 0,
+    "BOLSA": toNumber(getGeneralByCandidates(general, ["bolsa"])) ?? 0,
+    "CAJA": toNumber(getGeneralByCandidates(general, ["caja_final", "caja"])) ?? 0,
     "EFECTIVO SISTEMA": canales.efectivo.sistema,
-    "NEQUI SISTEMA": canales.nequi.sistema,
-    "DAVIPLATA SISTEMA": canales.daviplata.sistema,
-    "TARJETA SISTEMA": canales.tarjeta.sistema,
-    "TRANSFERENCIAS SISTEMA": canales.transferencias.sistema,
     "EFECTIVO REAL": canales.efectivo.real,
-    "NEQUI REAL": canales.nequi.real,
-    "DAVIPLATA REAL": canales.daviplata.real,
-    "TARJETA REAL": canales.tarjeta.real,
-    "TRANSFERENCIA REAL": canales.transferencias.real,
     "DIF EFECTIVO": canales.efectivo.real - canales.efectivo.sistema,
+    "NEQUI SISTEMA": canales.nequi.sistema,
+    "NEQUI REAL": canales.nequi.real,
     "DIF NEQUI": canales.nequi.real - canales.nequi.sistema,
+    "DAVIPLATA SISTEMA": canales.daviplata.sistema,
+    "DAVIPLATA REAL": canales.daviplata.real,
     "DIF DAVIPLATA": canales.daviplata.real - canales.daviplata.sistema,
+    "RAPPI SISTEMA": canales.rappi.sistema,
+    "RAPPI REAL": canales.rappi.real,
+    "DIF RAPPI": canales.rappi.real - canales.rappi.sistema,
+    "TARJETA SISTEMA": canales.tarjeta.sistema,
+    "TARJETA REAL": canales.tarjeta.real,
     "DIF TARJETA": canales.tarjeta.real - canales.tarjeta.sistema,
+    "TRANSFERENCIAS SISTEMA": canales.transferencias.sistema,
+    "TRANSFERENCIA REAL": canales.transferencias.real,
     "DIF TRANSFERENCIAS": canales.transferencias.real - canales.transferencias.sistema,
     "TOTAL SISTEMA": totalSistema,
     "TOTAL REAL": totalReal,
