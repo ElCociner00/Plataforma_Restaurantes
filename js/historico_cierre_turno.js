@@ -251,6 +251,12 @@ const sanitizeRow = (rawRow, index) => {
     if (!shouldExcludeGeneralField(key)) general[key] = value;
   });
 
+  const bolsaAlias = getGeneralValue(general, ["bolsa", "bolsa_global", "total_bolsa"]);
+  if (String(bolsaAlias || "").trim()) general.bolsa = bolsaAlias;
+
+  const cajaAlias = getGeneralValue(general, ["caja_final", "caja", "caja_global", "total_caja"]);
+  if (String(cajaAlias || "").trim()) general.caja_final = cajaAlias;
+
   general.responsable = resolveResponsableName(rawRow, state.responsableNamesById);
 
   const detailsRaw = Array.isArray(rawRow?.variables_detalle) ? rawRow.variables_detalle : (typeof rawRow?.variables_detalle === "string" ? (() => { try { const parsed = JSON.parse(rawRow.variables_detalle); return Array.isArray(parsed) ? parsed : []; } catch { return []; } })() : []);
@@ -265,7 +271,14 @@ const sanitizeRow = (rawRow, index) => {
   return {
     id: getRowId(rawRow, index),
     general,
-    details
+    details,
+    meta: {
+      source_id: String(rawRow?.id || "").trim(),
+      fecha_turno: String(getGeneralValue(rawRow, ["fecha_turno", "fecha"]) || "").trim(),
+      responsable_id: resolveResponsableId(rawRow),
+      hora_inicio: String(getGeneralValue(rawRow, ["hora_inicio", "hora_llegada", "hora_entrada"]) || "").trim(),
+      hora_fin: String(getGeneralValue(rawRow, ["hora_fin", "hora_salida"]) || "").trim()
+    }
   };
 };
 
@@ -345,6 +358,60 @@ const toNumber = (value) => {
   if (value === null || value === undefined || value === "") return null;
   const parsed = Number(String(value).replace(/,/g, ""));
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const enrichRowsWithCierreTurnoFinal = async (rows = [], empresaId = "") => {
+  if (!Array.isArray(rows) || !rows.length || !empresaId) return rows;
+
+  const { data, error } = await supabase
+    .from("cierres_turno_final")
+    .select("id, fecha_turno, responsable_id, hora_inicio, hora_fin, bolsa_global, caja_global, created_at")
+    .eq("empresa_id", empresaId)
+    .order("created_at", { ascending: false })
+    .limit(Math.max(250, rows.length * 8));
+
+  if (error || !Array.isArray(data) || !data.length) return rows;
+
+  const byId = new Map();
+  const byComposite = new Map();
+
+  data.forEach((item) => {
+    const sourceId = String(item?.id || "").trim();
+    if (sourceId) byId.set(sourceId, item);
+
+    const composite = [
+      String(item?.fecha_turno || "").trim(),
+      String(item?.responsable_id || "").trim(),
+      String(item?.hora_inicio || "").trim(),
+      String(item?.hora_fin || "").trim()
+    ].join("|");
+
+    if (!byComposite.has(composite)) byComposite.set(composite, item);
+  });
+
+  rows.forEach((row) => {
+    const currentBolsa = toNumber(getGeneralValue(row?.general || {}, ["bolsa", "bolsa_global", "total_bolsa"]));
+    const currentCaja = toNumber(getGeneralValue(row?.general || {}, ["caja_final", "caja", "caja_global", "total_caja"]));
+
+    const sourceMatch = row?.meta?.source_id ? byId.get(row.meta.source_id) : null;
+    const composite = [
+      String(row?.meta?.fecha_turno || row?.general?.fecha_turno || "").trim(),
+      String(row?.meta?.responsable_id || "").trim(),
+      String(row?.meta?.hora_inicio || row?.general?.hora_inicio || "").trim(),
+      String(row?.meta?.hora_fin || row?.general?.hora_fin || "").trim()
+    ].join("|");
+    const compositeMatch = byComposite.get(composite);
+    const fallback = sourceMatch || compositeMatch;
+    if (!fallback) return;
+
+    const fallbackBolsa = toNumber(fallback?.bolsa_global);
+    const fallbackCaja = toNumber(fallback?.caja_global);
+
+    if ((currentBolsa === null || currentBolsa === 0) && fallbackBolsa !== null) row.general.bolsa = fallbackBolsa;
+    if ((currentCaja === null || currentCaja === 0) && fallbackCaja !== null) row.general.caja_final = fallbackCaja;
+  });
+
+  return rows;
 };
 
 const summarizeDetailByVariable = (row) => {
@@ -778,9 +845,18 @@ const FLAT_EXCEL_HEADERS = [
 ];
 
 const getGeneralByCandidates = (general = {}, candidates = []) => {
+  const normalizedEntries = Object.entries(general).map(([key, value]) => ({
+    value,
+    normalized: normalizeFieldKey(key)
+  }));
+
   for (const key of candidates) {
     const value = general?.[key];
     if (value !== undefined && value !== null && String(value).trim() !== "") return value;
+
+    const normalizedCandidate = normalizeFieldKey(key);
+    const match = normalizedEntries.find((entry) => entry.normalized === normalizedCandidate);
+    if (match && match.value !== undefined && match.value !== null && String(match.value).trim() !== "") return match.value;
   }
   return null;
 };
@@ -880,7 +956,7 @@ const toFlatExcelRow = (row) => {
     }) ?? resolveFinancialValue(row, {
       detailBases: ["bolsa"]
     }) ?? 0,
-    "CAJA": toNumber(getGeneralByCandidates(general, ["caja_final", "caja"])) ?? 0,
+    "CAJA": toNumber(getGeneralByCandidates(general, ["caja_final", "caja", "caja_global", "total_caja"])) ?? 0,
     "EFECTIVO SISTEMA": canales.efectivo.sistema,
     "EFECTIVO REAL": canales.efectivo.real,
     "DIF EFECTIVO": canales.efectivo.real - canales.efectivo.sistema,
@@ -1167,7 +1243,8 @@ const loadInitialData = async () => {
       }
     }
 
-    state.allRows = normalizeRows(rowsData).map(sanitizeRow);
+    const sanitizedRows = normalizeRows(rowsData).map(sanitizeRow);
+    state.allRows = await enrichRowsWithCierreTurnoFinal(sanitizedRows, payload.empresa_id);
     state.filteredRows = [...state.allRows];
 
     const inferredGeneral = inferColumns(state.allRows, (row) => Object.keys(row.general));

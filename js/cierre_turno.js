@@ -865,7 +865,23 @@ document.addEventListener("DOMContentLoaded", () => {
       .filter((row) => row.visible)
       .map((row) => [row.nombre || "Gasto", row.input?.value || row.value || "0"]);
 
-    return { finanzas, gastos };
+    const totalSistema = getTotalIngresosSistema();
+    const totalReal = getTotalIngresosReales();
+    const totalGastos = getTotalGastosExtras();
+    const ventaBruta = totalReal;
+    const ventaNeta = totalReal - totalGastos;
+    const diferenciaGeneral = totalReal - totalSistema;
+
+    const totales = [
+      ["Total ingresos sistema", totalSistema],
+      ["Total ingresos reales", totalReal],
+      ["Total gastos", totalGastos],
+      ["Venta bruta", ventaBruta],
+      ["Venta neta", ventaNeta],
+      ["Diferencia general", diferenciaGeneral]
+    ];
+
+    return { finanzas, gastos, totales };
   };
 
   const descargarImagenResumen = ({ bloquearDespues = false } = {}) => {
@@ -878,7 +894,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const { finanzas, gastos } = buildSnapshotRows();
+    const { finanzas, gastos, totales } = buildSnapshotRows();
     const responsableTexto = responsable?.selectedOptions?.[0]?.textContent || "-";
     const horaLlegada = getHoraLlegadaCompleta() || "-";
     const empresaNombre = nombreEmpresaActual || "Empresa";
@@ -998,6 +1014,48 @@ document.addEventListener("DOMContentLoaded", () => {
     let gastoY = y + 14 + rowH;
     (gastos.length ? gastos : [["Sin gastos", "0"]]).forEach(([name, value]) => {
       drawGasto(gastoY, [name, formatCOP(value)]);
+      gastoY += rowH;
+    });
+
+    gastoY += 36;
+    ctx.fillStyle = "#5b21b6";
+    ctx.font = "bold 30px Arial";
+    ctx.fillText("Totales del turno", cardX + 36, gastoY);
+
+    gastoY += 20;
+    const totalCols = [0.65, 0.35].map((r) => Math.floor(tableW * r));
+    const drawTotal = (rowY, label, value, highlight = false) => {
+      let x = tableX;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(tableX, rowY, tableW, rowH);
+      ctx.strokeRect(tableX, rowY, tableW, rowH);
+
+      [label, value].forEach((col, i) => {
+        if (i > 0) {
+          ctx.beginPath();
+          ctx.moveTo(x, rowY);
+          ctx.lineTo(x, rowY + rowH);
+          ctx.stroke();
+        }
+
+        if (i === 0) {
+          ctx.textAlign = "left";
+          ctx.fillStyle = "#27272a";
+          ctx.font = "20px Arial";
+          ctx.fillText(String(col), x + 10, rowY + 27);
+        } else {
+          ctx.textAlign = "right";
+          ctx.fillStyle = highlight ? "#4c1d95" : "#312e81";
+          ctx.font = highlight ? "bold 20px Arial" : "20px Arial";
+          ctx.fillText(String(col), x + totalCols[i] - 10, rowY + 27);
+        }
+        x += totalCols[i];
+      });
+      ctx.textAlign = "left";
+    };
+
+    totales.forEach(([label, value], idx) => {
+      drawTotal(gastoY, label, formatCOP(value), idx === totales.length - 1);
       gastoY += rowH;
     });
 
