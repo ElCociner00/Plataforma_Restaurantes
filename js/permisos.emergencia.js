@@ -43,8 +43,8 @@ export function isEmergencyAllowed(role, moduleKey) {
 
 export function getEmergencyHomeByRole(role) {
   const roleKey = normalizeRole(role);
-  if (roleKey === "operativo") return "/Plataforma_Restaurantes/cierre_turno/";
-  return "/Plataforma_Restaurantes/dashboard/";
+  if (roleKey === "operativo") return APP_URLS.cierreTurno;
+  return APP_URLS.dashboard;
 }
 
 export function applyEmergencyRolePermissions(role, permisos) {
@@ -65,4 +65,5 @@ export function applyEmergencyRolePermissions(role, permisos) {
 
   return Array.from(current.entries()).map(([modulo, permitido]) => ({ modulo, permitido }));
 }
+import { APP_URLS } from "./urls.js";
 
