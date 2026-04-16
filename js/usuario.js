@@ -1,4 +1,5 @@
 import { WEBHOOK_REGISTRO_USUARIO } from "./webhooks.js";
+import { APP_URLS } from "./urls.js";
 
 const status = document.getElementById("status");
 const form = document.getElementById("registroUsuario");
@@ -61,7 +62,7 @@ form.addEventListener("submit", async (e) => {
     sessionStorage.removeItem("empresa_nit");
 
     alert("Registro exitoso. Ahora puedes iniciar sesión.");
-    window.location.href = "/Plataforma_Restaurantes/index.html";
+    window.location.href = APP_URLS.login;
 
   } catch (err) {
     status.innerText = "Error inesperado. Intenta nuevamente.";

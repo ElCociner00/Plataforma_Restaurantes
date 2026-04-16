@@ -1,5 +1,7 @@
+import { APP_URLS } from "./urls.js";
+
 const MOBILE_SHELL_STYLE_ID = "mobile-native-shell-css";
-const MOBILE_SHELL_CSS_PATH = "/Plataforma_Restaurantes/css/mobile_native.css";
+const MOBILE_SHELL_CSS_PATH = APP_URLS.mobileCss;
 const MOBILE_QUERY = "(max-width: 900px), (pointer: coarse)";
 
 const getViewportMeta = () => document.querySelector('meta[name="viewport"]');

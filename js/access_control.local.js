@@ -1,5 +1,6 @@
 import { ENV_LOGGRO, ENV_SIIGO } from "./environment.js";
 import { DEFAULT_ROLE_PERMISSIONS, PAGE_ENVIRONMENT } from "./permissions.js";
+import { APP_URLS } from "./urls.js";
 
 const normalizeRole = (value) => String(value || "").trim().toLowerCase() || "operativo";
 const normalizeModule = (value) => String(value || "").trim().toLowerCase();
@@ -24,29 +25,29 @@ export const LOCAL_ROLE_ACCESS = {
 };
 
 export const MODULE_ROUTE_MAP = {
-  dashboard: "/Plataforma_Restaurantes/dashboard/",
-  cierre_turno: "/Plataforma_Restaurantes/cierre_turno/",
-  historico_cierre_turno: "/Plataforma_Restaurantes/cierre_turno/historico_cierre_turno.html",
-  cierre_inventarios: "/Plataforma_Restaurantes/cierre_inventarios/",
-  historico_cierre_inventarios: "/Plataforma_Restaurantes/cierre_inventarios/historico_cierre_inventarios.html",
-  inventarios: "/Plataforma_Restaurantes/inventarios/",
-  configuracion: "/Plataforma_Restaurantes/configuracion/",
-  loggro: "/Plataforma_Restaurantes/configuracion/loggro.html",
-  visualizacion_cierre_turno: "/Plataforma_Restaurantes/configuracion/visualizacion_cierre_turno.html",
-  visualizacion_cierre_turno_historico: "/Plataforma_Restaurantes/configuracion/visualizacion_cierre_turno_historico.html",
-  visualizacion_cierre_inventarios: "/Plataforma_Restaurantes/configuracion/visualizacion_cierre_inventarios.html",
-  visualizacion_cierre_inventarios_historico: "/Plataforma_Restaurantes/configuracion/visualizacion_cierre_inventarios_historico.html",
-  permisos: "/Plataforma_Restaurantes/configuracion/permisos.html",
-  registro_empleados: "/Plataforma_Restaurantes/configuracion/registro_empleados.html",
-  registro_otros_usuarios: "/Plataforma_Restaurantes/configuracion/registro_otros_usuarios.html",
-  gestion_usuarios: "/Plataforma_Restaurantes/configuracion/gestion_usuarios.html",
-  gestion_empresas: "/Plataforma_Restaurantes/gestion_empresas/",
-  facturacion: "/Plataforma_Restaurantes/facturacion/",
-  dashboard_siigo: "/Plataforma_Restaurantes/siigo/dashboard_siigo/",
-  configuracion_siigo: "/Plataforma_Restaurantes/siigo/configuracion_siigo/",
-  subir_facturas_siigo: "/Plataforma_Restaurantes/siigo/subir_facturas_siigo/",
-  historico_facturas_siigo: "/Plataforma_Restaurantes/siigo/subir_facturas_siigo/",
-  nomina: "/Plataforma_Restaurantes/nomina/"
+  dashboard: APP_URLS.dashboard,
+  cierre_turno: APP_URLS.cierreTurno,
+  historico_cierre_turno: APP_URLS.historicoCierreTurno,
+  cierre_inventarios: APP_URLS.cierreInventarios,
+  historico_cierre_inventarios: APP_URLS.historicoCierreInventarios,
+  inventarios: APP_URLS.inventarios,
+  configuracion: APP_URLS.configuracion,
+  loggro: APP_URLS.loggro,
+  visualizacion_cierre_turno: APP_URLS.visualizacionCierreTurno,
+  visualizacion_cierre_turno_historico: APP_URLS.visualizacionCierreTurnoHistorico,
+  visualizacion_cierre_inventarios: APP_URLS.visualizacionCierreInventarios,
+  visualizacion_cierre_inventarios_historico: APP_URLS.visualizacionCierreInventariosHistorico,
+  permisos: APP_URLS.permisos,
+  registro_empleados: APP_URLS.registroEmpleados,
+  registro_otros_usuarios: APP_URLS.registroOtrosUsuarios,
+  gestion_usuarios: APP_URLS.gestionUsuarios,
+  gestion_empresas: APP_URLS.gestionEmpresas,
+  facturacion: APP_URLS.facturacion,
+  dashboard_siigo: APP_URLS.dashboardSiigo,
+  configuracion_siigo: APP_URLS.configuracionSiigo,
+  subir_facturas_siigo: APP_URLS.subirFacturasSiigo,
+  historico_facturas_siigo: APP_URLS.historicoFacturasSiigo,
+  nomina: APP_URLS.nomina
 };
 
 const LOGGRO_PRIORITY = [
@@ -109,19 +110,19 @@ export function hasLocalAccess(role, moduleKey) {
 
 export function getHomeByRole(role) {
   const safeRole = normalizeRole(role);
-  if (safeRole === "operativo") return "/Plataforma_Restaurantes/cierre_turno/";
-  return "/Plataforma_Restaurantes/dashboard/";
+  if (safeRole === "operativo") return APP_URLS.cierreTurno;
+  return APP_URLS.dashboard;
 }
 
 export function resolveDefaultRouteForRoleEnv(role, env) {
   const safeRole = normalizeRole(role);
   if (env === ENV_SIIGO) {
-    if (safeRole === "operativo") return "/Plataforma_Restaurantes/cierre_turno/";
-    return "/Plataforma_Restaurantes/siigo/dashboard_siigo/";
+    if (safeRole === "operativo") return APP_URLS.cierreTurno;
+    return APP_URLS.dashboardSiigo;
   }
   return safeRole === "operativo"
-    ? "/Plataforma_Restaurantes/cierre_turno/"
-    : "/Plataforma_Restaurantes/dashboard/";
+    ? APP_URLS.cierreTurno
+    : APP_URLS.dashboard;
 }
 
 export function buildAccessMap(role, permisosRows = []) {

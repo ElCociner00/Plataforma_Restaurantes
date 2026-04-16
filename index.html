@@ -37,6 +37,7 @@
 
   <script type="module">
     import { signInWithPassword } from "./js/auth.js";
+    import { APP_URLS } from "./js/urls.js";
 
     const form = document.getElementById("loginForm");
     const emailInput = document.getElementById("email");
@@ -52,7 +53,7 @@
 
       try {
         await signInWithPassword(email, password);
-        window.location.href = "/Plataforma_Restaurantes/dashboard/";
+        window.location.href = APP_URLS.dashboard;
       } catch (error) {
         console.error("Error de inicio de sesión:", error);
         const message = String(error?.message || "");

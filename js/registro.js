@@ -4,6 +4,7 @@ import {
   WEBHOOK_VERIFICAR_CODIGO,
   WEBHOOK_REGISTRO_EMPRESA
 } from "./webhooks.js";
+import { APP_URLS } from "./urls.js";
 
 const form = document.getElementById("registroEmpresa");
 const status = document.getElementById("status");
@@ -138,7 +139,7 @@ continuarBtn.addEventListener("click", async () => {
     // ✅ ÉXITO
     sessionStorage.setItem("empresa_nit", datosEmpresa.nit);
     sessionStorage.setItem("empresa_correo", datosEmpresa.correo_empresa);
-    window.location.href = "/Plataforma_Restaurantes/registro/usuario.html";
+    window.location.href = APP_URLS.registroUsuario;
 
   } catch (err) {
     alert("Error inesperado. Intenta nuevamente.");
