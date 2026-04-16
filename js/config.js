@@ -5,8 +5,8 @@ export const SUPABASE_CONFIG = {
 };
 
 export const APP_ROUTES = {
-  login: "/Plataforma_Restaurantes/index.html",
-  dashboard: "/Plataforma_Restaurantes/dashboard/"
+  login: "/index.html",
+  dashboard: "/dashboard/"
 };
 
 export const WEBHOOKS = {
