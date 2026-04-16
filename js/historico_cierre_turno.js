@@ -820,6 +820,15 @@ const extractCanalValores = (row, canal) => {
   };
 };
 
+const resolveFinancialValue = (row, { generalCandidates = [], detailBases = [], detailCategory = "" } = {}) => {
+  const general = row?.general || {};
+  const fromGeneral = toNumber(getGeneralByCandidates(general, generalCandidates));
+  if (fromGeneral !== null) return fromGeneral;
+
+  if (!detailBases.length) return null;
+  return findDetailValue(row?.details || [], detailBases, detailCategory);
+};
+
 const toFlatExcelRow = (row) => {
   const general = row?.general || {};
   const canales = {
@@ -864,7 +873,13 @@ const toFlatExcelRow = (row) => {
     "HORA LLEGADA": normalizeInlineText(formatCellValue(getGeneralByCandidates(general, ["hora_inicio", "hora_llegada", "hora_entrada"]) || "")),
     "HORA SALIDA": normalizeInlineText(formatCellValue(getGeneralByCandidates(general, ["hora_fin", "hora_salida"]) || "")),
     "EFECTIVO APERTURA": toNumber(getGeneralByCandidates(general, ["efectivo_inicial", "apertura_efectivo", "efectivo_apertura"])) ?? 0,
-    "BOLSA": toNumber(getGeneralByCandidates(general, ["bolsa"])) ?? 0,
+    "BOLSA": resolveFinancialValue(row, {
+      generalCandidates: ["bolsa", "bolsa_global", "total_bolsa"],
+      detailBases: ["bolsa"],
+      detailCategory: "real"
+    }) ?? resolveFinancialValue(row, {
+      detailBases: ["bolsa"]
+    }) ?? 0,
     "CAJA": toNumber(getGeneralByCandidates(general, ["caja_final", "caja"])) ?? 0,
     "EFECTIVO SISTEMA": canales.efectivo.sistema,
     "EFECTIVO REAL": canales.efectivo.real,
