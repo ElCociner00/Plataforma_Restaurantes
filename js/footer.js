@@ -1,12 +1,13 @@
 import "./mobile_shell.js";
+import { APP_URLS } from "./urls.js";
 const FOOTER_LINKS = [
-  { label: "Términos y Condiciones", href: "/Plataforma_Restaurantes/legal/terminos.html" },
-  { label: "Política de Privacidad", href: "/Plataforma_Restaurantes/legal/privacidad.html" },
-  { label: "Política de Cookies", href: "/Plataforma_Restaurantes/legal/cookies.html" },
-  { label: "Tratamiento de Datos", href: "/Plataforma_Restaurantes/legal/datos.html" },
-  { label: "Responsabilidad Legal", href: "/Plataforma_Restaurantes/legal/responsabilidad.html" },
-  { label: "Política de Seguridad", href: "/Plataforma_Restaurantes/legal/seguridad.html" },
-  { label: "Consentimientos", href: "/Plataforma_Restaurantes/legal/consentimientos.html" }
+  { label: "Términos y Condiciones", href: APP_URLS.legalTerminos },
+  { label: "Política de Privacidad", href: APP_URLS.legalPrivacidad },
+  { label: "Política de Cookies", href: APP_URLS.legalCookies },
+  { label: "Tratamiento de Datos", href: APP_URLS.legalDatos },
+  { label: "Responsabilidad Legal", href: APP_URLS.legalResponsabilidad },
+  { label: "Política de Seguridad", href: APP_URLS.legalSeguridad },
+  { label: "Consentimientos", href: APP_URLS.legalConsentimientos }
 ];
 
 const FOOTER_OFFSET_VAR = "--legal-footer-offset";

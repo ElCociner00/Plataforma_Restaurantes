@@ -1,17 +1,12 @@
 import { supabase } from "./supabase.js";
 import { APP_ROUTES } from "./config.js";
+import { PUBLIC_PATHS } from "./urls.js";
 
 const LOGIN_URL = APP_ROUTES.login;
 const DASHBOARD_URL = APP_ROUTES.dashboard;
 const REDIRECT_AFTER_LOGIN_KEY = "redirect_after_login";
 
-const DEFAULT_PUBLIC_PATHS = new Set([
-  "/Plataforma_Restaurantes/index.html",
-  "/Plataforma_Restaurantes/",
-  "/Plataforma_Restaurantes/registro/",
-  "/Plataforma_Restaurantes/registro/index.html",
-  "/Plataforma_Restaurantes/registro/usuario.html"
-]);
+const DEFAULT_PUBLIC_PATHS = new Set(PUBLIC_PATHS);
 
 let routerInitialized = false;
 

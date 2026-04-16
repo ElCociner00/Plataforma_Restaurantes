@@ -1,9 +1,10 @@
 import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 import { BILLING_PAYMENT_URL } from "./billing_config.js";
+import { APP_URLS } from "./urls.js";
 
-const BANNER_HTML_PATH = "/Plataforma_Restaurantes/components/banner_impago.html";
-const BANNER_CSS_PATH = "/Plataforma_Restaurantes/css/banner_impago.css";
+const BANNER_HTML_PATH = APP_URLS.impagoBannerHtml;
+const BANNER_CSS_PATH = APP_URLS.impagoBannerCss;
 const STORAGE_KEY = "axioma_billing_banner_daily_v6";
 const COLOMBIA_TIME_ZONE = "America/Bogota";
 const DAYS_BEFORE_DUE_TO_SHOW = 10;

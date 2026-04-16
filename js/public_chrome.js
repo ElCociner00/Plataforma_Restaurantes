@@ -1,11 +1,7 @@
 import "./mobile_shell.js";
+import { APP_URLS } from "./urls.js";
 
-const getLogoSrc = () => {
-  const path = window.location.pathname || "";
-  return path.startsWith("/Plataforma_Restaurantes/")
-    ? "/Plataforma_Restaurantes/images/Logo.webp"
-    : "/images/Logo.webp";
-};
+const getLogoSrc = () => APP_URLS.logoImage;
 
 function renderPublicHeader() {
   if (document.querySelector("header.app-header.public-header")) return;

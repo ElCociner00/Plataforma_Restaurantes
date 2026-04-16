@@ -5,6 +5,7 @@ import { clearBannerDisplayCache, verificarYMostrarAnuncio } from "./anuncio_imp
 import { ENV_LOGGRO, ENV_SIIGO, getActiveEnvironment, setActiveEnvironment } from "./environment.js";
 import { resolveFirstAllowedRoute } from "./access_control.local.js";
 import { getPermisosEfectivos } from "./permisos.core.js";
+import { APP_URLS } from "./urls.js";
 
 const HEADER_ID = "globalAppHeader";
 
@@ -16,12 +17,7 @@ const ensureViewportMeta = () => {
   document.head.appendChild(meta);
 };
 
-const getLogoSrc = () => {
-  const path = window.location.pathname || "";
-  return path.startsWith("/Plataforma_Restaurantes/")
-    ? "/Plataforma_Restaurantes/images/Logo.webp"
-    : "/images/Logo.webp";
-};
+const getLogoSrc = () => APP_URLS.logoImage;
 
 const resolveRouteForEnv = async (env, context) => {
   const userId = context?.user?.id || context?.user?.user_id;
@@ -56,7 +52,7 @@ function getOrCreateHeader() {
   header.innerHTML = `
     <div class="logo"><span class="logo-mark-wrap"><img src="${getLogoSrc()}" alt="Logo AXIOMA-tech" class="logo-mark" onerror="this.style.display='none'"/></span><span>AXIOMA-tech</span></div>
     <div class="empresa-header-nombre">Cargando plataforma...</div>
-    <nav><a class="nav-link-btn" href="/Plataforma_Restaurantes/facturacion/">Facturacion</a></nav>
+    <nav><a class="nav-link-btn" href="${APP_URLS.facturacion}">Facturacion</a></nav>
   `;
   document.body.prepend(header);
   return header;
@@ -69,38 +65,38 @@ function buildMenu({ context, environmentForMenu }) {
 
   if (environmentForMenu === ENV_LOGGRO) {
     if (context?.rol !== "operativo") {
-      menu += `<a class="nav-link-btn" href="/Plataforma_Restaurantes/dashboard/">Dashboard</a>`;
+      menu += `<a class="nav-link-btn" href="${APP_URLS.dashboard}">Dashboard</a>`;
     }
 
     menu += `
       <div class="nav-dropdown">
         <button type="button" class="nav-dropdown-toggle">Cierre de turno</button>
         <div class="nav-dropdown-menu">
-          <a href="/Plataforma_Restaurantes/cierre_turno/">Cierre de Turno</a>
-          <a href="/Plataforma_Restaurantes/cierre_turno/historico_cierre_turno.html">Historico cierre turno</a>
+          <a href="${APP_URLS.cierreTurno}">Cierre de Turno</a>
+          <a href="${APP_URLS.historicoCierreTurno}">Historico cierre turno</a>
         </div>
       </div>
       <div class="nav-dropdown">
         <button type="button" class="nav-dropdown-toggle">Cierre inventarios</button>
         <div class="nav-dropdown-menu">
-          <a href="/Plataforma_Restaurantes/cierre_inventarios/">Cierre inventarios</a>
-          <a href="/Plataforma_Restaurantes/cierre_inventarios/historico_cierre_inventarios.html">Historico cierre inventario</a>
+          <a href="${APP_URLS.cierreInventarios}">Cierre inventarios</a>
+          <a href="${APP_URLS.historicoCierreInventarios}">Historico cierre inventario</a>
         </div>
       </div>
     `;
   }
 
   if (environmentForMenu === ENV_SIIGO) {
-    menu += `<a class="nav-link-btn" href="/Plataforma_Restaurantes/siigo/dashboard_siigo/">Dashboard</a>`;
-    menu += `<a class="nav-link-btn" href="/Plataforma_Restaurantes/siigo/subir_facturas_siigo/">Ver o subir facturas correo</a>`;
-    menu += `<a class="nav-link-btn" href="/Plataforma_Restaurantes/nomina/">Nomina (borrador)</a>`;
+    menu += `<a class="nav-link-btn" href="${APP_URLS.dashboardSiigo}">Dashboard</a>`;
+    menu += `<a class="nav-link-btn" href="${APP_URLS.subirFacturasSiigo}">Ver o subir facturas correo</a>`;
+    menu += `<a class="nav-link-btn" href="${APP_URLS.nomina}">Nomina (borrador)</a>`;
   }
 
-  menu += `<a class="nav-link-btn" href="/Plataforma_Restaurantes/facturacion/">Facturacion</a>`;
+  menu += `<a class="nav-link-btn" href="${APP_URLS.facturacion}">Facturacion</a>`;
 
   const configLink = environmentForMenu === ENV_SIIGO
-    ? "/Plataforma_Restaurantes/siigo/configuracion_siigo/"
-    : "/Plataforma_Restaurantes/configuracion/";
+    ? APP_URLS.configuracionSiigo
+    : APP_URLS.configuracion;
 
   const environmentOptions = environmentForMenu === ENV_LOGGRO
     ? `<a href="#" data-switch-env="siigo">Siigo</a>`
@@ -155,7 +151,7 @@ function wireHeaderEvents(header, context) {
       clearBannerDisplayCache();
       clearUserContextCache();
       await supabase.auth.signOut();
-      window.location.href = "/Plataforma_Restaurantes/index.html";
+      window.location.href = APP_URLS.login;
     };
   }
 }
@@ -167,9 +163,9 @@ function renderFallbackHeader(message = "AXIOMA-tech") {
     <div class="logo"><span class="logo-mark-wrap"><img src="${getLogoSrc()}" alt="Logo AXIOMA-tech" class="logo-mark" onerror="this.style.display='none'"/></span><span>AXIOMA-tech</span></div>
     <div class="empresa-header-nombre">${title}</div>
     <nav>
-      <a class="nav-link-btn" href="/Plataforma_Restaurantes/dashboard/">Dashboard</a>
-      <a class="nav-link-btn" href="/Plataforma_Restaurantes/facturacion/">Facturacion</a>
-      <a class="nav-link-btn" href="/Plataforma_Restaurantes/index.html">Inicio</a>
+      <a class="nav-link-btn" href="${APP_URLS.dashboard}">Dashboard</a>
+      <a class="nav-link-btn" href="${APP_URLS.facturacion}">Facturacion</a>
+      <a class="nav-link-btn" href="${APP_URLS.login}">Inicio</a>
     </nav>
   `;
   return header;
