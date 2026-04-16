@@ -734,128 +734,159 @@ const buildDifferenceRowsHtml = (rows, colspan, title) => {
   `;
 };
 
-const buildRowsForExport = (rows) => rows.map((row) => {
-  const details = summarizeDetailByVariable(row);
-  return {
-    turno: row,
-    details: details.length ? details : [{}]
-  };
-});
-
 const buildExcelStyles = () => `
   <style>
-    body { font-family: Arial, sans-serif; color: #111827; margin: 14px; }
-    .turno-block { margin-bottom: 16px; }
-    .excel-table { border-collapse: collapse; table-layout: auto; width: auto; max-width: 100%; margin-bottom: 8px; }
-    .excel-table td, .excel-table th { border: 1px solid #e5e7eb; padding: 6px 8px; white-space: nowrap; }
-    .excel-general th { background: #ede9fe; font-weight: 700; text-align: left; }
-    .excel-detail th { background: #ede9fe; font-weight: 700; text-align: left; }
-    .excel-export-block { min-width: 720px; }
-    .excel-export-block th, .excel-export-block td { vertical-align: top; }
-    .cell-turno-title { background: #4f46e5; color: #ffffff; font-weight: 700; }
-    .cell-section-title { background: #eef2ff; color: #1f2937; font-weight: 700; }
+    body { font-family: Arial, sans-serif; color: #111827; margin: 12px; }
+    .excel-table { border-collapse: collapse; table-layout: fixed; min-width: 1800px; }
+    .excel-table th, .excel-table td { border: 1px solid #d1d5db; padding: 6px 8px; white-space: nowrap; }
+    .excel-table th { background: #eef2ff; font-weight: 700; text-align: left; }
     .num { mso-number-format: "\#\,\#\#0.00"; text-align: right; }
-    .diff-pos { color: #166534; font-weight: 700; }
-    .diff-neg { color: #b91c1c; font-weight: 700; }
   </style>
 `;
 
-const buildComparativeDetailRows = (row) => summarizeDetailByVariable(row).map((item) => ({
-  variable: toReadableLabel(item.variable),
-  sistema: item.sistema,
-  real: item.real,
-  diferencia: item.diferencia
-}));
+const FLAT_EXCEL_HEADERS = [
+  "RESPONSABLE TURNO",
+  "FECHA TURNO",
+  "EFECTIVO SISTEMA",
+  "NEQUI SISTEMA",
+  "DAVIPLATA SISTEMA",
+  "TARJETA SISTEMA",
+  "TRANSFERENCIAS SISTEMA",
+  "EFECTIVO REAL",
+  "NEQUI REAL",
+  "DAVIPLATA REAL",
+  "TARJETA REAL",
+  "TRANSFERENCIA REAL",
+  "DIF EFECTIVO",
+  "DIF NEQUI",
+  "DIF DAVIPLATA",
+  "DIF TARJETA",
+  "DIF TRANSFERENCIAS",
+  "TOTAL SISTEMA",
+  "TOTAL REAL",
+  "DIF TOTAL",
+  "COMENTARIOS RESPONSABLES",
+  "REVISADO POR"
+];
 
-const buildTurnoGeneralRows = (row) => {
-  const hidden = new Set(["created_at", "turno_nombre"]);
-  return state.visibleGeneralColumns
-    .filter((key) => !hidden.has(key))
-    .map((key) => ({
-      label: toReadableLabel(key),
-      value: normalizeInlineText(formatCellValue(row.general[key]))
-    }));
+const getGeneralByCandidates = (general = {}, candidates = []) => {
+  for (const key of candidates) {
+    const value = general?.[key];
+    if (value !== undefined && value !== null && String(value).trim() !== "") return value;
+  }
+  return null;
 };
 
-const buildExcelTurnoBlock = (row) => {
-  const turnoNombre = escapeHtml(normalizeInlineText(formatCellValue(row.general.turno_nombre || row.id)));
-  const generalRows = buildTurnoGeneralRows(row);
-  const generalRowsHtml = generalRows
-    .map((item) => `
-      <tr>
-        <th>${escapeHtml(item.label)}</th>
-        <td>${escapeHtml(item.value)}</td>
-        <td></td>
-        <td></td>
-      </tr>
-    `)
-    .join("");
+const findDetailValue = (details = [], baseCandidates = [], categoria = "") => {
+  const categoryNormalized = normalizeInlineText(categoria).toLowerCase();
+  for (const detail of details) {
+    const variableName = normalizeInlineText(detail?.variable || detail?.nombre || "").toLowerCase().replace(/\s+/g, "");
+    if (!variableName) continue;
 
-  const detailRows = buildComparativeDetailRows(row);
-  const detailRowsHtml = detailRows.length
-    ? detailRows
-      .map((item) => {
-        const diffClass = item.diferencia < 0 ? "diff-neg" : "diff-pos";
-        return `
-          <tr>
-            <td>${escapeHtml(item.variable)}</td>
-            <td class="num">${escapeHtml(formatCellValue(item.sistema))}</td>
-            <td class="num">${escapeHtml(formatCellValue(item.real))}</td>
-            <td class="num ${diffClass}">${escapeHtml(formatCellValue(item.diferencia))}</td>
-          </tr>
-        `;
-      })
-      .join("")
-    : `
-      <tr>
-        <td>Sin detalle visible para este turno.</td>
-        <td></td>
-        <td></td>
-        <td></td>
-      </tr>
-    `;
+    const matchesBase = baseCandidates.some((base) => variableName.includes(normalizeInlineText(base).toLowerCase().replace(/\s+/g, "")));
+    if (!matchesBase) continue;
 
-  return `
-    <div class="turno-block">
-      <table class="excel-table excel-export-block">
-        <tbody>
-          <tr>
-            <th class="cell-turno-title">Turno</th>
-            <td class="cell-turno-title">${turnoNombre}</td>
-            <td class="cell-turno-title"></td>
-            <td class="cell-turno-title"></td>
-          </tr>
-          <tr>
-            <th class="cell-section-title">Resumen general del turno</th>
-            <td class="cell-section-title"></td>
-            <td class="cell-section-title"></td>
-            <td class="cell-section-title"></td>
-          </tr>
-          ${generalRowsHtml}
-          <tr>
-            <th class="cell-section-title">Comparativo por producto/variable</th>
-            <td class="cell-section-title"></td>
-            <td class="cell-section-title"></td>
-            <td class="cell-section-title"></td>
-          </tr>
-          <tr>
-            <th>Producto / Variable</th>
-            <th>Sistema</th>
-            <th>Real</th>
-            <th>Diferencia</th>
-          </tr>
-          ${detailRowsHtml}
-        </tbody>
-      </table>
-    </div>
-  `;
+    const detailCategory = normalizeInlineText(detail?.categoria || "").toLowerCase();
+    if (categoryNormalized && detailCategory !== categoryNormalized) continue;
+
+    const numeric = toNumber(detail?.valor);
+    if (numeric !== null) return numeric;
+  }
+  return null;
+};
+
+const extractCanalValores = (row, canal) => {
+  const general = row?.general || {};
+  const details = row?.details || [];
+  const { sistemaCandidates, realCandidates, detailBases } = canal;
+
+  const sistemaGeneral = toNumber(getGeneralByCandidates(general, sistemaCandidates));
+  const realGeneral = toNumber(getGeneralByCandidates(general, realCandidates));
+
+  const sistemaDetalle = findDetailValue(details, detailBases, "sistema");
+  const realDetalle = findDetailValue(details, detailBases, "real");
+
+  return {
+    sistema: sistemaGeneral ?? sistemaDetalle ?? 0,
+    real: realGeneral ?? realDetalle ?? 0
+  };
+};
+
+const toFlatExcelRow = (row) => {
+  const general = row?.general || {};
+  const canales = {
+    efectivo: extractCanalValores(row, {
+      sistemaCandidates: ["efectivo_sistema", "sistema_efectivo"],
+      realCandidates: ["efectivo_real", "real_efectivo"],
+      detailBases: ["efectivo"]
+    }),
+    nequi: extractCanalValores(row, {
+      sistemaCandidates: ["nequi_sistema", "sistema_nequi"],
+      realCandidates: ["nequi_real", "real_nequi"],
+      detailBases: ["nequi"]
+    }),
+    daviplata: extractCanalValores(row, {
+      sistemaCandidates: ["daviplata_sistema", "sistema_daviplata", "rappi_sistema", "sistema_rappi"],
+      realCandidates: ["daviplata_real", "real_daviplata", "rappi_real", "real_rappi"],
+      detailBases: ["daviplata", "rappi"]
+    }),
+    tarjeta: extractCanalValores(row, {
+      sistemaCandidates: ["tarjeta_sistema", "sistema_tarjeta", "datafono_sistema", "sistema_datafono"],
+      realCandidates: ["tarjeta_real", "real_tarjeta", "datafono_real", "real_datafono"],
+      detailBases: ["tarjeta", "datafono"]
+    }),
+    transferencias: extractCanalValores(row, {
+      sistemaCandidates: ["transferencias_sistema", "transferencia_sistema", "sistema_transferencias", "sistema_transferencia"],
+      realCandidates: ["transferencias_real", "transferencia_real", "real_transferencias", "real_transferencia"],
+      detailBases: ["transferencias", "transferencia"]
+    })
+  };
+
+  const totalSistema = canales.efectivo.sistema + canales.nequi.sistema + canales.daviplata.sistema + canales.tarjeta.sistema + canales.transferencias.sistema;
+  const totalReal = canales.efectivo.real + canales.nequi.real + canales.daviplata.real + canales.tarjeta.real + canales.transferencias.real;
+
+  const valuesByHeader = {
+    "RESPONSABLE TURNO": normalizeInlineText(formatCellValue(getGeneralByCandidates(general, ["responsable", "responsable_nombre", "nombre_responsable"]) || "")),
+    "FECHA TURNO": normalizeInlineText(formatCellValue(getGeneralByCandidates(general, ["fecha_turno", "fecha", "created_at"]) || "")),
+    "EFECTIVO SISTEMA": canales.efectivo.sistema,
+    "NEQUI SISTEMA": canales.nequi.sistema,
+    "DAVIPLATA SISTEMA": canales.daviplata.sistema,
+    "TARJETA SISTEMA": canales.tarjeta.sistema,
+    "TRANSFERENCIAS SISTEMA": canales.transferencias.sistema,
+    "EFECTIVO REAL": canales.efectivo.real,
+    "NEQUI REAL": canales.nequi.real,
+    "DAVIPLATA REAL": canales.daviplata.real,
+    "TARJETA REAL": canales.tarjeta.real,
+    "TRANSFERENCIA REAL": canales.transferencias.real,
+    "DIF EFECTIVO": canales.efectivo.real - canales.efectivo.sistema,
+    "DIF NEQUI": canales.nequi.real - canales.nequi.sistema,
+    "DIF DAVIPLATA": canales.daviplata.real - canales.daviplata.sistema,
+    "DIF TARJETA": canales.tarjeta.real - canales.tarjeta.sistema,
+    "DIF TRANSFERENCIAS": canales.transferencias.real - canales.transferencias.sistema,
+    "TOTAL SISTEMA": totalSistema,
+    "TOTAL REAL": totalReal,
+    "DIF TOTAL": totalReal - totalSistema,
+    "COMENTARIOS RESPONSABLES": normalizeInlineText(formatCellValue(getGeneralByCandidates(general, ["comentarios_responsables", "comentarios", "observaciones", "notas"]) || "")),
+    "REVISADO POR": normalizeInlineText(formatCellValue(getGeneralByCandidates(general, ["revisado_por", "revisado", "auditado_por"]) || ""))
+  };
+
+  return FLAT_EXCEL_HEADERS.map((header) => valuesByHeader[header] ?? "");
 };
 
 const downloadExcel = (rows, fileName) => {
   if (!rows.length) return setStatus("No hay turnos para descargar con esos criterios.");
 
-  const blocks = rows.map(buildExcelTurnoBlock).join("");
-  const html = `<html><head><meta charset="utf-8"/>${buildExcelStyles()}</head><body>${blocks}</body></html>`;
+  const headHtml = `<tr>${FLAT_EXCEL_HEADERS.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>`;
+  const bodyHtml = rows
+    .map((row) => {
+      const values = toFlatExcelRow(row);
+      return `<tr>${values.map((value) => (typeof value === "number"
+        ? `<td class="num">${escapeHtml(formatCellValue(value))}</td>`
+        : `<td>${escapeHtml(normalizeInlineText(formatCellValue(value)))}</td>`)).join("")}</tr>`;
+    })
+    .join("");
+
+  const html = `<html><head><meta charset="utf-8"/>${buildExcelStyles()}</head><body><table class="excel-table"><thead>${headHtml}</thead><tbody>${bodyHtml}</tbody></table></body></html>`;
   const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
