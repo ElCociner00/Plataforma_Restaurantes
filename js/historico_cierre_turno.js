@@ -251,7 +251,7 @@ const sanitizeRow = (rawRow, index) => {
     if (!shouldExcludeGeneralField(key)) general[key] = value;
   });
 
-  const bolsaAlias = getGeneralValue(general, ["bolsa", "bolsa_global", "total_bolsa"]);
+  const bolsaAlias = getGeneralValue(general, ["bolsa", "bolsas", "bolsa_global", "total_bolsa"]);
   if (String(bolsaAlias || "").trim()) general.bolsa = bolsaAlias;
 
   const cajaAlias = getGeneralValue(general, ["caja_final", "caja", "caja_global", "total_caja"]);
@@ -390,7 +390,7 @@ const enrichRowsWithCierreTurnoFinal = async (rows = [], empresaId = "") => {
   });
 
   rows.forEach((row) => {
-    const currentBolsa = toNumber(getGeneralValue(row?.general || {}, ["bolsa", "bolsa_global", "total_bolsa"]));
+    const currentBolsa = toNumber(getGeneralValue(row?.general || {}, ["bolsa", "bolsas", "bolsa_global", "total_bolsa"]));
     const currentCaja = toNumber(getGeneralValue(row?.general || {}, ["caja_final", "caja", "caja_global", "total_caja"]));
 
     const sourceMatch = row?.meta?.source_id ? byId.get(row.meta.source_id) : null;
@@ -950,7 +950,7 @@ const toFlatExcelRow = (row) => {
     "HORA SALIDA": normalizeInlineText(formatCellValue(getGeneralByCandidates(general, ["hora_fin", "hora_salida"]) || "")),
     "EFECTIVO APERTURA": toNumber(getGeneralByCandidates(general, ["efectivo_inicial", "apertura_efectivo", "efectivo_apertura"])) ?? 0,
     "BOLSA": resolveFinancialValue(row, {
-      generalCandidates: ["bolsa", "bolsa_global", "total_bolsa"],
+      generalCandidates: ["bolsa", "bolsas", "bolsa_global", "total_bolsa"],
       detailBases: ["bolsa"],
       detailCategory: "real"
     }) ?? resolveFinancialValue(row, {
