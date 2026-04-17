@@ -979,9 +979,9 @@ document.addEventListener("DOMContentLoaded", () => {
   renderTotalizados();
   actualizarEstadoHoraFin();
   populateHoraLlegadaOptions();
-  if (apoyoCantidad && !apoyoCantidad.options.length) {
+  if (apoyoCantidad && apoyoCantidad.options.length <= 1) {
     apoyoCantidad.innerHTML = '<option value="">Selecciona</option>';
-    for (let n = 1; n <= 50; n += 1) {
+    for (let n = 1; n <= 30; n += 1) {
       const opt = document.createElement("option");
       opt.value = String(n);
       opt.textContent = String(n);
@@ -1164,31 +1164,41 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const drawHighlightedCards = (ctx) => {
-      const cards = [
+      const highlights = [
         ["Efectivo apertura", formatCOP(efectivoApertura?.value || 0)],
         ["Bolsa", formatCOP(bolsa?.value || 0)],
         ["Caja", formatCOP(caja?.value || 0)],
         ["Total ingresos reales", formatCOP(getTotalIngresosReales())]
       ];
-      const topY = cardY + 252;
-      const gap = 10;
-      const cardWidth = Math.floor((tableW - (gap * 3)) / 4);
-      const cardHeight = 88;
-      cards.forEach(([label, value], idx) => {
-        const x = tableX + (idx * (cardWidth + gap));
-        ctx.fillStyle = "#f5f3ff";
-        ctx.strokeStyle = "#7c3aed";
-        ctx.lineWidth = 2;
-        ctx.fillRect(x, topY, cardWidth, cardHeight);
-        ctx.strokeRect(x, topY, cardWidth, cardHeight);
+      const headerY = cardY + 258;
+      const rowY = headerY + 14;
+      const colW = [0.25, 0.25, 0.25, 0.25].map((r) => Math.floor(tableW * r));
+      const rowH = 58;
+
+      let x = tableX;
+      ctx.fillStyle = "#ede9fe";
+      ctx.strokeStyle = "#c4b5fd";
+      ctx.lineWidth = 1;
+      ctx.fillRect(tableX, rowY, tableW, rowH);
+      ctx.strokeRect(tableX, rowY, tableW, rowH);
+
+      highlights.forEach(([label, value], idx) => {
+        if (idx > 0) {
+          ctx.beginPath();
+          ctx.moveTo(x, rowY);
+          ctx.lineTo(x, rowY + rowH);
+          ctx.stroke();
+        }
         ctx.fillStyle = "#5b21b6";
-        ctx.font = "bold 16px Arial";
-        ctx.fillText(label, x + 10, topY + 30);
+        ctx.font = "bold 14px Arial";
+        ctx.fillText(label, x + 10, rowY + 22);
         ctx.fillStyle = "#312e81";
-        ctx.font = "bold 20px Arial";
-        ctx.fillText(value, x + 10, topY + 62);
+        ctx.font = "bold 18px Arial";
+        ctx.fillText(value, x + 10, rowY + 45);
+        x += colW[idx];
       });
-      return topY + cardHeight + 18;
+
+      return rowY + rowH + 18;
     };
 
     const buildCanvas = (pageApoyos = [], pageNumber = 1, totalPages = 1, isApoyoContinuation = false) => {
@@ -1665,7 +1675,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       await cargarPoliticaEmpresa(true);
       verificado = true;
-      setStatus((data.message || "") + " Verificación completada, ya puedes subir el cierre.");
+      const serverMsg = String(data?.message || "").trim();
+      setStatus(`${serverMsg ? `${serverMsg} ` : ""}Ya puedes subir el cierre.`);
       refreshEstadoBotonSubir();
     } catch (err) {
       setStatus(err?.name === "AbortError"
