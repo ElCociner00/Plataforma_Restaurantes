@@ -46,6 +46,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const totalVentaDiaBrutaEl = document.getElementById("totalVentaDiaBruta");
   const totalVentaDiaNetaEl = document.getElementById("totalVentaDiaNeta");
   const totalDiferenciaGeneralEl = document.getElementById("totalDiferenciaGeneral");
+  const apoyoHubo = document.getElementById("apoyo_hubo");
+  const apoyoCantidad = document.getElementById("apoyo_cantidad");
+  const apoyoCantidadWrap = document.getElementById("apoyoCantidadWrap");
+  const apoyoTablaWrap = document.getElementById("apoyoTablaWrap");
+  const apoyoRowsContainer = document.getElementById("apoyoRows");
   const correccionWrap = document.getElementById("correccionWrap");
   const btnSolicitarCorreccion = document.getElementById("solicitarCorreccion");
   const modalCorreccion = document.getElementById("modalCorreccion");
@@ -121,6 +126,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let modoEfectivoSistema = "bruto";
   let efectivoSistemaLoggro = 0;
   let nombreEmpresaActual = "";
+  let responsablesActivos = [];
   let resumenDescargado = false;
   let bloqueoConstanciaActivo = false;
   let verificado = false;
@@ -140,6 +146,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const miles = Math.abs(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
     const sign = amount < 0 ? "-" : "";
     return `${sign}$${miles},00`;
+  };
+
+  const formatDurationLabel = (minutesValue) => {
+    const minutes = Math.max(0, Number(minutesValue) || 0);
+    const hours = Math.floor(minutes / 60);
+    const remMinutes = minutes % 60;
+    return `${hours} horas ${remMinutes} minutos`;
   };
 
   const syncEfectivoRealFromCajaBolsa = () => {
@@ -517,16 +530,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const empresaId = contextPayload.empresa_id || contextPayload.tenant_id;
       const responsables = await fetchResponsablesActivos(empresaId);
+      responsablesActivos = Array.isArray(responsables) ? responsables : [];
 
 
 
 
       responsable.innerHTML = "<option value=\"\">Seleccione responsable</option>";
-      responsables.forEach((item) => {
+      responsablesActivos.forEach((item) => {
         const option = document.createElement("option");
         option.value = item.id ?? "";
         option.textContent = item.nombre_completo ?? item.id ?? option.value;
         responsable.appendChild(option);
+      });
+
+      Array.from(apoyoRowsContainer?.querySelectorAll('[data-field="responsable"]') || []).forEach((select) => {
+        const selectedValue = select.value;
+        select.innerHTML = getResponsableOptionsHtml(selectedValue);
       });
     } catch (error) {
       setStatus("No se pudieron cargar los responsables.");
@@ -608,6 +627,122 @@ document.addEventListener("DOMContentLoaded", () => {
     return `${hour}:${minute} ${momento}`;
   };
 
+  const buildApoyoTimeOptions = (selectedValue = "") => {
+    let html = '<option value="">Selecciona tiempo</option>';
+    for (let mins = 5; mins <= 960; mins += 5) {
+      const selected = String(selectedValue) === String(mins) ? "selected" : "";
+      html += `<option value="${mins}" ${selected}>${formatDurationLabel(mins)}</option>`;
+    }
+    return html;
+  };
+
+  const getResponsableOptionsHtml = (selectedValue = "") => {
+    const base = '<option value="">Selecciona responsable</option>';
+    const options = responsablesActivos.map((item) => {
+      const id = String(item?.id || "");
+      const name = String(item?.nombre_completo || item?.id || id);
+      const selected = id && id === String(selectedValue) ? "selected" : "";
+      return `<option value="${id}" ${selected}>${name}</option>`;
+    });
+    return [base, ...options].join("");
+  };
+
+  const normalizeApoyoPropinaInput = (input) => {
+    if (!input) return;
+    input.value = String(input.value || "").replace(/[^\d]/g, "");
+  };
+
+  const createApoyoRow = (index) => {
+    const row = document.createElement("div");
+    row.className = "apoyo-row";
+    row.dataset.index = String(index);
+    row.innerHTML = `
+      <select data-field="responsable">${getResponsableOptionsHtml()}</select>
+      <input data-field="propina" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0">
+      <select data-field="tiempo">${buildApoyoTimeOptions()}</select>
+    `;
+
+    const propinaInput = row.querySelector('[data-field="propina"]');
+    propinaInput?.addEventListener("input", () => {
+      normalizeApoyoPropinaInput(propinaInput);
+      marcarComoNoVerificado();
+    });
+    row.querySelector('[data-field="responsable"]')?.addEventListener("change", marcarComoNoVerificado);
+    row.querySelector('[data-field="tiempo"]')?.addEventListener("change", marcarComoNoVerificado);
+    return row;
+  };
+
+  const renderApoyoRows = (count) => {
+    if (!apoyoRowsContainer) return;
+    apoyoRowsContainer.innerHTML = "";
+    const safeCount = Math.max(0, Math.min(50, Number(count) || 0));
+    for (let i = 0; i < safeCount; i += 1) {
+      apoyoRowsContainer.appendChild(createApoyoRow(i + 1));
+    }
+    apoyoTablaWrap?.classList.toggle("is-hidden", safeCount === 0);
+  };
+
+  const buildApoyoPayload = (contextPayload) => {
+    const huboApoyos = (apoyoHubo?.value || "no") === "si";
+    const cantidad = Number(apoyoCantidad?.value || 0);
+    const rows = Array.from(apoyoRowsContainer?.querySelectorAll(".apoyo-row") || []);
+    const registros = rows.map((row) => {
+      const apoyoResponsableId = row.querySelector('[data-field="responsable"]')?.value || "";
+      const propinaValue = row.querySelector('[data-field="propina"]')?.value || "0";
+      const tiempoMinutos = Number(row.querySelector('[data-field="tiempo"]')?.value || 0);
+      return {
+        empresa_id: contextPayload?.empresa_id || "",
+        fecha: fecha.value || "",
+        hora_inicio: horaInicio.value || "",
+        hora_fin: horaFin.value || "",
+        responsable_turno_id: responsable.value || "",
+        apoyo_responsable_id: apoyoResponsableId,
+        propina: Number(propinaValue || 0),
+        tiempo_minutos: tiempoMinutos,
+        tiempo_texto: formatDurationLabel(tiempoMinutos)
+      };
+    });
+
+    return {
+      etiqueta: "apoyo",
+      empresa_id: contextPayload?.empresa_id || "",
+      fecha: fecha.value || "",
+      hora_inicio: horaInicio.value || "",
+      hora_fin: horaFin.value || "",
+      responsable_turno_id: responsable.value || "",
+      hubo_apoyos: huboApoyos,
+      cantidad_personas: huboApoyos ? cantidad : 0,
+      registros: huboApoyos ? registros : []
+    };
+  };
+
+  const validateApoyoRows = () => {
+    if ((apoyoHubo?.value || "no") !== "si") return true;
+    const cantidad = Number(apoyoCantidad?.value || 0);
+    if (!cantidad || cantidad < 1) {
+      setStatus("Indica cuántas personas participaron como apoyo.");
+      return false;
+    }
+
+    const rows = Array.from(apoyoRowsContainer?.querySelectorAll(".apoyo-row") || []);
+    if (rows.length !== cantidad) {
+      setStatus("La cantidad de filas de apoyos no coincide con el número de personas.");
+      return false;
+    }
+
+    for (let i = 0; i < rows.length; i += 1) {
+      const row = rows[i];
+      const responsableApoyo = row.querySelector('[data-field="responsable"]')?.value || "";
+      const propinaApoyo = row.querySelector('[data-field="propina"]')?.value || "";
+      const tiempoApoyo = row.querySelector('[data-field="tiempo"]')?.value || "";
+      if (!responsableApoyo || propinaApoyo === "" || !tiempoApoyo) {
+        setStatus(`Completa todos los campos del apoyo #${i + 1}.`);
+        return false;
+      }
+    }
+    return true;
+  };
+
   const toggleButtons = ({ consultar, verificar, enviar }) => {
     if (typeof consultar === "boolean") btnConsultar.disabled = !consultar;
     if (typeof verificar === "boolean") btnVerificar.disabled = !verificar;
@@ -630,6 +765,48 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       ...contextPayload
     };
+  };
+
+  const getMissingRequiredLabels = () => {
+    const requiredFields = [
+      { label: "Fecha", value: fecha?.value },
+      { label: "Responsable del turno", value: responsable?.value },
+      { label: "Hora de llegada", value: getHoraLlegadaCompleta() },
+      { label: "Hora inicio", value: horaInicio?.value },
+      { label: "Hora fin", value: horaFin?.value },
+      { label: "Efectivo apertura", value: efectivoApertura?.value },
+      { label: "Bolsa", value: bolsa?.value },
+      { label: "Caja", value: caja?.value },
+      { label: "Efectivo real", value: inputsFinanzas.efectivo.real?.value },
+      { label: "Datafono real", value: inputsFinanzas.datafono.real?.value },
+      { label: "Rappi real", value: inputsFinanzas.rappi.real?.value },
+      { label: "Nequi real", value: inputsFinanzas.nequi.real?.value },
+      { label: "Transferencias real", value: inputsFinanzas.transferencias.real?.value },
+      { label: "Bono regalo real", value: inputsFinanzas.bono_regalo.real?.value },
+      { label: "Propina", value: inputsSoloVista.propina?.value },
+      { label: "Domicilios", value: inputsSoloVista.domicilios?.value }
+    ];
+    return requiredFields
+      .filter((item) => String(item.value ?? "").trim() === "")
+      .map((item) => item.label);
+  };
+
+  const validateCamposObligatoriosCompletos = () => {
+    const missing = getMissingRequiredLabels();
+    if (missing.length) {
+      setStatus(`Completa estos campos obligatorios antes de continuar: ${missing.join(", ")}.`);
+      return false;
+    }
+    return true;
+  };
+
+  const confirmarCerosCriticos = () => {
+    const bolsaNum = Number(bolsa?.value || 0);
+    const cajaNum = Number(caja?.value || 0);
+    if (bolsaNum === 0 || cajaNum === 0) {
+      return window.confirm("Advertencia: estás dejando Bolsa o Caja en 0. ¿Confirmas que ese valor es correcto?");
+    }
+    return true;
   };
 
   const getVisibilitySettings = () => {
@@ -782,6 +959,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (horaLlegadaHora) horaLlegadaHora.value = "";
     if (horaLlegadaMinuto) horaLlegadaMinuto.value = "";
     if (horaLlegadaMomento) horaLlegadaMomento.value = "AM";
+    if (apoyoHubo) apoyoHubo.value = "no";
+    if (apoyoCantidad) apoyoCantidad.value = "";
+    apoyoCantidadWrap?.classList.add("is-hidden");
+    apoyoTablaWrap?.classList.add("is-hidden");
+    if (apoyoRowsContainer) apoyoRowsContainer.innerHTML = "";
     marcarComoNoVerificado();
     applyVisibilitySettings();
   };
@@ -797,6 +979,32 @@ document.addEventListener("DOMContentLoaded", () => {
   renderTotalizados();
   actualizarEstadoHoraFin();
   populateHoraLlegadaOptions();
+  if (apoyoCantidad && apoyoCantidad.options.length <= 1) {
+    apoyoCantidad.innerHTML = '<option value="">Selecciona</option>';
+    for (let n = 1; n <= 30; n += 1) {
+      const opt = document.createElement("option");
+      opt.value = String(n);
+      opt.textContent = String(n);
+      apoyoCantidad.appendChild(opt);
+    }
+  }
+  apoyoHubo?.addEventListener("change", () => {
+    const enabled = apoyoHubo.value === "si";
+    apoyoCantidadWrap?.classList.toggle("is-hidden", !enabled);
+    if (!enabled) {
+      if (apoyoCantidad) apoyoCantidad.value = "";
+      if (apoyoRowsContainer) apoyoRowsContainer.innerHTML = "";
+      apoyoTablaWrap?.classList.add("is-hidden");
+    } else {
+      renderApoyoRows(Number(apoyoCantidad?.value || 0));
+    }
+    marcarComoNoVerificado();
+  });
+  apoyoCantidad?.addEventListener("change", () => {
+    renderApoyoRows(Number(apoyoCantidad.value || 0));
+    marcarComoNoVerificado();
+  });
+
   cargarPoliticaEmpresa();
   cargarResponsables();
   cargarExtrasCatalogo();
@@ -865,154 +1073,333 @@ document.addEventListener("DOMContentLoaded", () => {
       .filter((row) => row.visible)
       .map((row) => [row.nombre || "Gasto", row.input?.value || row.value || "0"]);
 
-    return { finanzas, gastos };
+    const totalSistema = getTotalIngresosSistema();
+    const totalReal = getTotalIngresosReales();
+    const totalGastos = getTotalGastosExtras();
+    const ventaBruta = totalReal;
+    const ventaNeta = totalReal - totalGastos;
+    const diferenciaGeneral = totalReal - totalSistema;
+
+    const totales = [
+      ["Total ingresos sistema", totalSistema],
+      ["Total ingresos reales", totalReal],
+      ["Total gastos", totalGastos],
+      ["Venta bruta", ventaBruta],
+      ["Venta neta", ventaNeta],
+      ["Diferencia general", diferenciaGeneral]
+    ];
+
+    const apoyos = Array.from(apoyoRowsContainer?.querySelectorAll(".apoyo-row") || []).map((row) => {
+      const apoyoResponsableId = row.querySelector('[data-field="responsable"]')?.value || "";
+      const apoyoResponsableNombre = responsablesActivos.find((item) => String(item?.id || "") === apoyoResponsableId)?.nombre_completo || apoyoResponsableId || "-";
+      const propinaValue = row.querySelector('[data-field="propina"]')?.value || "0";
+      const tiempoMinutes = Number(row.querySelector('[data-field="tiempo"]')?.value || 0);
+      return {
+        responsable: apoyoResponsableNombre,
+        propina: propinaValue,
+        tiempo_minutos: tiempoMinutes,
+        tiempo_texto: formatDurationLabel(tiempoMinutes)
+      };
+    });
+
+    return { finanzas, gastos, totales, apoyos };
   };
 
   const descargarImagenResumen = ({ bloquearDespues = false } = {}) => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 1080;
-    canvas.height = 1920;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      setStatus("No se pudo generar la imagen del resumen.");
-      return;
-    }
-
-    const { finanzas, gastos } = buildSnapshotRows();
+    const { finanzas, gastos, totales, apoyos } = buildSnapshotRows();
     const responsableTexto = responsable?.selectedOptions?.[0]?.textContent || "-";
     const horaLlegada = getHoraLlegadaCompleta() || "-";
     const empresaNombre = nombreEmpresaActual || "Empresa";
     const marcaAxioma = "AXIOMA by Global Nexo Shop";
     const fechaExpedicion = new Date().toLocaleDateString("es-CO");
+    const fechaNombre = (fecha.value || new Date().toISOString().slice(0, 10));
 
-    ctx.fillStyle = "#f3edff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+    const PAGE_WIDTH = 1080;
+    const PAGE_HEIGHT = 1920;
     const cardX = 46;
     const cardY = 46;
-    const cardW = canvas.width - 92;
-    const cardH = canvas.height - 92;
-
-    ctx.fillStyle = "#ffffff";
-    ctx.strokeStyle = "#b8a6f8";
-    ctx.lineWidth = 4;
-    ctx.fillRect(cardX, cardY, cardW, cardH);
-    ctx.strokeRect(cardX, cardY, cardW, cardH);
-
-    let y = cardY + 54;
-    ctx.fillStyle = "#4c1d95";
-    ctx.font = "bold 44px Arial";
-    ctx.fillText("CIERRE DE TURNO", cardX + 36, y);
-
-    ctx.textAlign = "right";
-    ctx.fillStyle = "#312e81";
-    ctx.font = "bold 34px Arial";
-    ctx.fillText(empresaNombre, cardX + cardW - 36, y);
-    ctx.font = "bold 20px Arial";
-    ctx.fillStyle = "#6d28d9";
-    ctx.fillText(marcaAxioma, cardX + cardW - 36, y + 34);
-    ctx.textAlign = "left";
-
-    y += 48;
-    ctx.fillStyle = "#3f3f46";
-    ctx.font = "28px Arial";
-    ctx.fillText(`Fecha: ${fecha.value || "-"}`, cardX + 36, y);
-    y += 40;
-    ctx.fillText(`Responsable: ${responsableTexto}`, cardX + 36, y);
-    y += 40;
-    ctx.fillText(`Hora llegada: ${horaLlegada}`, cardX + 36, y);
-    y += 40;
-    ctx.fillText(`Inicio/Fin: ${horaInicio.value || "-"} / ${horaFin.value || "-"}`, cardX + 36, y);
-
-    y += 58;
-    ctx.fillStyle = "#5b21b6";
-    ctx.font = "bold 30px Arial";
-    ctx.fillText("Datos financieros del turno", cardX + 36, y);
-
-    y += 24;
+    const cardW = PAGE_WIDTH - 92;
+    const cardH = PAGE_HEIGHT - 92;
     const tableX = cardX + 32;
     const tableW = cardW - 64;
-    const colW = [0.36, 0.22, 0.22, 0.2].map((r) => Math.floor(tableW * r));
     const rowH = 42;
 
-    const drawRow = (rowY, cols, header = false) => {
+    const drawHeader = (ctx, pageNumber, totalPages) => {
+      ctx.fillStyle = "#f3edff";
+      ctx.fillRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = "#b8a6f8";
+      ctx.lineWidth = 4;
+      ctx.fillRect(cardX, cardY, cardW, cardH);
+      ctx.strokeRect(cardX, cardY, cardW, cardH);
+
+      let y = cardY + 54;
+      ctx.fillStyle = "#4c1d95";
+      ctx.font = "bold 44px Arial";
+      ctx.fillText("CIERRE DE TURNO", cardX + 36, y);
+
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#312e81";
+      ctx.font = "bold 34px Arial";
+      ctx.fillText(empresaNombre, cardX + cardW - 36, y);
+      ctx.font = "bold 20px Arial";
+      ctx.fillStyle = "#6d28d9";
+      ctx.fillText(marcaAxioma, cardX + cardW - 36, y + 34);
+      ctx.textAlign = "left";
+
+      y += 48;
+      ctx.fillStyle = "#3f3f46";
+      ctx.font = "28px Arial";
+      ctx.fillText(`Fecha: ${fecha.value || "-"}`, cardX + 36, y);
+      y += 40;
+      ctx.fillText(`Responsable: ${responsableTexto}`, cardX + 36, y);
+      y += 40;
+      ctx.fillText(`Hora llegada: ${horaLlegada}`, cardX + 36, y);
+      y += 40;
+      ctx.fillText(`Inicio/Fin: ${horaInicio.value || "-"} / ${horaFin.value || "-"}`, cardX + 36, y);
+      y += 20;
+      ctx.fillStyle = "#7c3aed";
+      ctx.font = "bold 18px Arial";
+      ctx.fillText(`Página ${pageNumber} de ${totalPages}`, cardX + 36, y);
+    };
+
+    const drawHighlightedCards = (ctx) => {
+      const highlights = [
+        ["Efectivo apertura", formatCOP(efectivoApertura?.value || 0)],
+        ["Bolsa", formatCOP(bolsa?.value || 0)],
+        ["Caja", formatCOP(caja?.value || 0)],
+        ["Total ingresos reales", formatCOP(getTotalIngresosReales())]
+      ];
+      const headerY = cardY + 258;
+      const rowY = headerY + 14;
+      const colW = [0.25, 0.25, 0.25, 0.25].map((r) => Math.floor(tableW * r));
+      const rowH = 58;
+
       let x = tableX;
-      ctx.strokeStyle = "#d8ccff";
+      ctx.fillStyle = "#ede9fe";
+      ctx.strokeStyle = "#c4b5fd";
       ctx.lineWidth = 1;
-      ctx.fillStyle = header ? "#ede9fe" : "#ffffff";
       ctx.fillRect(tableX, rowY, tableW, rowH);
       ctx.strokeRect(tableX, rowY, tableW, rowH);
-      cols.forEach((col, i) => {
-        if (i > 0) {
+
+      highlights.forEach(([label, value], idx) => {
+        if (idx > 0) {
           ctx.beginPath();
           ctx.moveTo(x, rowY);
           ctx.lineTo(x, rowY + rowH);
           ctx.stroke();
         }
-        ctx.fillStyle = "#27272a";
-        ctx.font = header ? "bold 20px Arial" : "19px Arial";
-        ctx.fillText(String(col), x + 8, rowY + 27);
-        x += colW[i];
+        ctx.fillStyle = "#5b21b6";
+        ctx.font = "bold 14px Arial";
+        ctx.fillText(label, x + 10, rowY + 22);
+        ctx.fillStyle = "#312e81";
+        ctx.font = "bold 18px Arial";
+        ctx.fillText(value, x + 10, rowY + 45);
+        x += colW[idx];
       });
+
+      return rowY + rowH + 18;
     };
 
-    drawRow(y + 14, ["Dato", "Sistema", "Real", "Diferencia"], true);
-    let tableY = y + 14 + rowH;
-    finanzas.forEach((row) => {
-      drawRow(tableY, [
-        row[0],
-        row[1] === "-" ? "-" : formatCOP(row[1]),
-        row[2] === "-" ? "-" : formatCOP(row[2]),
-        row[3] === "-" ? "-" : formatCOP(row[3])
-      ]);
-      tableY += rowH;
-    });
+    const buildCanvas = (pageApoyos = [], pageNumber = 1, totalPages = 1, isApoyoContinuation = false) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = PAGE_WIDTH;
+      canvas.height = PAGE_HEIGHT;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
 
-    y = tableY + 56;
-    ctx.fillStyle = "#5b21b6";
-    ctx.font = "bold 30px Arial";
-    ctx.fillText("Gastos", cardX + 36, y);
+      drawHeader(ctx, pageNumber, totalPages);
+      let y = drawHighlightedCards(ctx);
 
-    y += 16;
-    const gastosCols = [0.7, 0.3].map((r) => Math.floor(tableW * r));
-    const drawGasto = (rowY, cols, header = false) => {
-      let x = tableX;
-      ctx.fillStyle = header ? "#ede9fe" : "#ffffff";
-      ctx.fillRect(tableX, rowY, tableW, rowH);
-      ctx.strokeRect(tableX, rowY, tableW, rowH);
-      cols.forEach((col, i) => {
-        if (i > 0) {
-          ctx.beginPath();
-          ctx.moveTo(x, rowY);
-          ctx.lineTo(x, rowY + rowH);
-          ctx.stroke();
-        }
-        ctx.fillStyle = "#27272a";
-        ctx.font = header ? "bold 20px Arial" : "19px Arial";
-        ctx.fillText(String(col), x + 8, rowY + 27);
-        x += gastosCols[i];
+      ctx.fillStyle = "#5b21b6";
+      ctx.font = "bold 30px Arial";
+      ctx.fillText("Datos financieros del turno", cardX + 36, y);
+      y += 24;
+      const colW = [0.36, 0.22, 0.22, 0.2].map((r) => Math.floor(tableW * r));
+
+      const drawRow = (rowY, cols, header = false) => {
+        let x = tableX;
+        ctx.strokeStyle = "#d8ccff";
+        ctx.lineWidth = 1;
+        ctx.fillStyle = header ? "#ede9fe" : "#ffffff";
+        ctx.fillRect(tableX, rowY, tableW, rowH);
+        ctx.strokeRect(tableX, rowY, tableW, rowH);
+        cols.forEach((col, i) => {
+          if (i > 0) {
+            ctx.beginPath();
+            ctx.moveTo(x, rowY);
+            ctx.lineTo(x, rowY + rowH);
+            ctx.stroke();
+          }
+          ctx.fillStyle = "#27272a";
+          ctx.font = header ? "bold 20px Arial" : "19px Arial";
+          ctx.fillText(String(col), x + 8, rowY + 27);
+          x += colW[i];
+        });
+      };
+
+      drawRow(y + 14, ["Dato", "Sistema", "Real", "Diferencia"], true);
+      let tableY = y + 14 + rowH;
+      finanzas.forEach((row) => {
+        drawRow(tableY, [
+          row[0],
+          row[1] === "-" ? "-" : formatCOP(row[1]),
+          row[2] === "-" ? "-" : formatCOP(row[2]),
+          row[3] === "-" ? "-" : formatCOP(row[3])
+        ]);
+        tableY += rowH;
       });
+
+      y = tableY + 40;
+      ctx.fillStyle = "#5b21b6";
+      ctx.font = "bold 30px Arial";
+      ctx.fillText("Gastos", cardX + 36, y);
+
+      y += 16;
+      const gastosCols = [0.7, 0.3].map((r) => Math.floor(tableW * r));
+      const drawGasto = (rowY, cols, header = false) => {
+        let x = tableX;
+        ctx.fillStyle = header ? "#ede9fe" : "#ffffff";
+        ctx.fillRect(tableX, rowY, tableW, rowH);
+        ctx.strokeRect(tableX, rowY, tableW, rowH);
+        cols.forEach((col, i) => {
+          if (i > 0) {
+            ctx.beginPath();
+            ctx.moveTo(x, rowY);
+            ctx.lineTo(x, rowY + rowH);
+            ctx.stroke();
+          }
+          ctx.fillStyle = "#27272a";
+          ctx.font = header ? "bold 20px Arial" : "19px Arial";
+          ctx.fillText(String(col), x + 8, rowY + 27);
+          x += gastosCols[i];
+        });
+      };
+
+      drawGasto(y + 14, ["Gasto", "Valor"], true);
+      let gastoY = y + 14 + rowH;
+      (gastos.length ? gastos : [["Sin gastos", "0"]]).forEach(([name, value]) => {
+        drawGasto(gastoY, [name, formatCOP(value)]);
+        gastoY += rowH;
+      });
+
+      gastoY += 26;
+      ctx.fillStyle = "#5b21b6";
+      ctx.font = "bold 30px Arial";
+      ctx.fillText("Totales del turno", cardX + 36, gastoY);
+
+      gastoY += 20;
+      const totalCols = [0.65, 0.35].map((r) => Math.floor(tableW * r));
+      const drawTotal = (rowY, label, value, highlight = false) => {
+        let x = tableX;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(tableX, rowY, tableW, rowH);
+        ctx.strokeRect(tableX, rowY, tableW, rowH);
+
+        [label, value].forEach((col, i) => {
+          if (i > 0) {
+            ctx.beginPath();
+            ctx.moveTo(x, rowY);
+            ctx.lineTo(x, rowY + rowH);
+            ctx.stroke();
+          }
+
+          if (i === 0) {
+            ctx.textAlign = "left";
+            ctx.fillStyle = "#27272a";
+            ctx.font = "20px Arial";
+            ctx.fillText(String(col), x + 10, rowY + 27);
+          } else {
+            ctx.textAlign = "right";
+            ctx.fillStyle = highlight ? "#4c1d95" : "#312e81";
+            ctx.font = highlight ? "bold 20px Arial" : "20px Arial";
+            ctx.fillText(String(col), x + totalCols[i] - 10, rowY + 27);
+          }
+          x += totalCols[i];
+        });
+        ctx.textAlign = "left";
+      };
+
+      totales.forEach(([label, value], idx) => {
+        drawTotal(gastoY, label, formatCOP(value), idx === totales.length - 1);
+        gastoY += rowH;
+      });
+
+      if (isApoyoContinuation || pageApoyos.length) {
+        let apoyoY = gastoY + 26;
+        ctx.fillStyle = "#5b21b6";
+        ctx.font = "bold 30px Arial";
+        ctx.fillText(isApoyoContinuation ? "Apoyos (continuación)" : "Apoyos del turno", cardX + 36, apoyoY);
+        apoyoY += 16;
+
+        const apoyoCols = [0.45, 0.2, 0.35].map((r) => Math.floor(tableW * r));
+        const drawApoyo = (rowY, cols, header = false) => {
+          let x = tableX;
+          ctx.fillStyle = header ? "#ede9fe" : "#ffffff";
+          ctx.fillRect(tableX, rowY, tableW, rowH);
+          ctx.strokeRect(tableX, rowY, tableW, rowH);
+          cols.forEach((col, i) => {
+            if (i > 0) {
+              ctx.beginPath();
+              ctx.moveTo(x, rowY);
+              ctx.lineTo(x, rowY + rowH);
+              ctx.stroke();
+            }
+            ctx.fillStyle = "#27272a";
+            ctx.font = header ? "bold 19px Arial" : "18px Arial";
+            ctx.fillText(String(col), x + 8, rowY + 27);
+            x += apoyoCols[i];
+          });
+        };
+
+        drawApoyo(apoyoY + 14, ["Responsable", "Propina", "Tiempo"], true);
+        let rowY = apoyoY + 14 + rowH;
+        (pageApoyos.length ? pageApoyos : [["Sin apoyos", "0", "-"]]).forEach((item) => {
+          const cols = Array.isArray(item)
+            ? item
+            : [item.responsable || "-", formatCOP(item.propina || 0), item.tiempo_texto || "-"];
+          drawApoyo(rowY, cols);
+          rowY += rowH;
+        });
+      }
+
+      const selloY = cardY + cardH - 30;
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#4338ca";
+      ctx.font = "bold 20px Arial";
+      ctx.fillText(`Expedido por AXIOMA by Global Nexo Shop (${fechaExpedicion})`, cardX + (cardW / 2), selloY);
+      ctx.textAlign = "left";
+      return canvas;
     };
 
-    drawGasto(y + 14, ["Gasto", "Valor"], true);
-    let gastoY = y + 14 + rowH;
-    (gastos.length ? gastos : [["Sin gastos", "0"]]).forEach(([name, value]) => {
-      drawGasto(gastoY, [name, formatCOP(value)]);
-      gastoY += rowH;
+    const firstPageMax = 6;
+    const continuationMax = 18;
+    const pagesApoyos = [];
+    const apoyoItems = Array.isArray(apoyos) ? apoyos : [];
+    if (!apoyoItems.length) {
+      pagesApoyos.push([]);
+    } else {
+      pagesApoyos.push(apoyoItems.slice(0, firstPageMax));
+      let offset = firstPageMax;
+      while (offset < apoyoItems.length) {
+        pagesApoyos.push(apoyoItems.slice(offset, offset + continuationMax));
+        offset += continuationMax;
+      }
+    }
+
+    const canvases = pagesApoyos.map((slice, idx) => buildCanvas(slice, idx + 1, pagesApoyos.length, idx > 0)).filter(Boolean);
+    if (!canvases.length) {
+      setStatus("No se pudo generar la imagen del resumen.");
+      return false;
+    }
+
+    canvases.forEach((canvas, idx) => {
+      const link = document.createElement("a");
+      const suffix = canvases.length > 1 ? `_p${idx + 1}` : "";
+      link.download = `cierre_turno_${fechaNombre}${suffix}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
     });
-
-    const selloY = cardY + cardH - 30;
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#4338ca";
-    ctx.font = "bold 20px Arial";
-    ctx.fillText(`Expedido por AXIOMA by Global Nexo Shop (${fechaExpedicion})`, cardX + (cardW / 2), selloY);
-    ctx.textAlign = "left";
-
-    const link = document.createElement("a");
-    const fechaNombre = (fecha.value || new Date().toISOString().slice(0, 10));
-    link.download = `cierre_turno_${fechaNombre}.png`;
-    link.href = canvas.toDataURL("image/png");
-    link.click();
 
     resumenDescargado = true;
     aplicarBloqueoConstancia(Boolean(bloquearDespues));
@@ -1194,13 +1581,16 @@ document.addEventListener("DOMContentLoaded", () => {
       limpiarDiferencias();
       actualizarDomiciliosDesdeExtras();
 
-      if (!efectivoApertura?.value) {
-        setStatus("Atención: Completa el efectivo de apertura.");
+      if (!validateCamposObligatoriosCompletos()) return;
+      if (!validateApoyoRows()) return;
+      if (!confirmarCerosCriticos()) {
+        setStatus("Verificación cancelada por el usuario para revisar Bolsa/Caja en cero.");
         return;
       }
 
       const contextPayload = await getContextPayload();
       if (!contextPayload) return;
+      const apoyoPayload = buildApoyoPayload(contextPayload);
 
       const payload = {
         fecha: fecha.value,
@@ -1248,6 +1638,7 @@ document.addEventListener("DOMContentLoaded", () => {
         caja: caja?.value || 0,
         efectivo_apertura: efectivoApertura.value || 0,
         gastos_extras: buildExtrasPayload(),
+        apoyo: apoyoPayload,
         ...contextPayload
       };
 
@@ -1284,7 +1675,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       await cargarPoliticaEmpresa(true);
       verificado = true;
-      setStatus((data.message || "") + " Verificación completada, ya puedes subir el cierre.");
+      const serverMsg = String(data?.message || "").trim();
+      setStatus(`${serverMsg ? `${serverMsg} ` : ""}Ya puedes subir el cierre.`);
       refreshEstadoBotonSubir();
     } catch (err) {
       setStatus(err?.name === "AbortError"
@@ -1323,12 +1715,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const contextPayload = await getContextPayload();
     if (!contextPayload) return null;
 
-    if (!efectivoApertura?.value) {
-      setStatus("Atención: Completa el efectivo de apertura.");
+    if (!validateCamposObligatoriosCompletos()) return null;
+    if (!validateApoyoRows()) return null;
+    if (!confirmarCerosCriticos()) {
+      setStatus("Envío cancelado para revisar Bolsa/Caja en cero.");
       return null;
     }
 
     actualizarDomiciliosDesdeExtras();
+    const apoyoPayload = buildApoyoPayload(contextPayload);
 
     const fechaCompleta = formatFechaCompleta(fecha.value);
     const diferencias = {
@@ -1440,7 +1835,8 @@ document.addEventListener("DOMContentLoaded", () => {
         total_propinas: Number(inputsSoloVista.propina.value || 0),
         total_bolsa: Number(bolsa?.value || 0),
         caja_final: Number(caja?.value || 0)
-      }
+      },
+      apoyo: apoyoPayload
     };
   };
 
@@ -1450,6 +1846,8 @@ document.addEventListener("DOMContentLoaded", () => {
       confirmacionEnvio.classList.add("is-hidden");
       return;
     }
+    if (!validateCamposObligatoriosCompletos()) return;
+    if (!validateApoyoRows()) return;
     const estado = obtenerEstadoGlobalDiferencias();
     mensajeEnvio.textContent = obtenerMensajeEnvio(estado);
     confirmacionEnvio.classList.remove("is-hidden");
