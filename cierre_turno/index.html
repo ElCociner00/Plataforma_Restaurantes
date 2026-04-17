@@ -112,6 +112,34 @@
         </div>
       </div>
       <div id="status"></div>
+
+      <div class="apoyos-inline-block">
+        <h3>Apoyos del turno</h3>
+        <div class="apoyos-head-grid">
+          <label class="apoyos-question">
+            <span>¿Hubo apoyos durante el turno?</span>
+            <select id="apoyo_hubo">
+              <option value="no">NO</option>
+              <option value="si">SI</option>
+            </select>
+          </label>
+          <label id="apoyoCantidadWrap" class="apoyos-cantidad is-hidden">
+            <span>¿Cuántas personas?</span>
+            <select id="apoyo_cantidad">
+              <option value="">Selecciona</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="apoyoTablaWrap" class="apoyo-tabla-wrap is-hidden">
+          <div class="apoyo-tabla-head">
+            <span>Responsable</span>
+            <span>Propina</span>
+            <span>Tiempo</span>
+          </div>
+          <div id="apoyoRows" class="apoyo-rows"></div>
+        </div>
+      </div>
     </section>
 
     <section class="bloque">

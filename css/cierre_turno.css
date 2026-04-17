@@ -332,6 +332,20 @@ input:not([readonly]) {
   margin-bottom: 10px;
 }
 
+.apoyos-inline-block {
+  margin-top: 14px;
+  border: 1px solid #ddd6fe;
+  border-radius: 10px;
+  padding: 12px;
+  background: #faf5ff;
+}
+
+.apoyos-inline-block h3 {
+  margin: 0 0 10px;
+  color: #5b21b6;
+  font-size: 1rem;
+}
+
 .apoyos-question,
 .apoyos-cantidad {
   display: flex;

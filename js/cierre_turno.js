@@ -1170,7 +1170,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ["Caja", formatCOP(caja?.value || 0)],
         ["Total ingresos reales", formatCOP(getTotalIngresosReales())]
       ];
-      const headerY = cardY + 258;
+      const headerY = cardY + 334;
       const rowY = headerY + 14;
       const colW = [0.25, 0.25, 0.25, 0.25].map((r) => Math.floor(tableW * r));
       const rowH = 58;
@@ -1357,7 +1357,11 @@ document.addEventListener("DOMContentLoaded", () => {
         (pageApoyos.length ? pageApoyos : [["Sin apoyos", "0", "-"]]).forEach((item) => {
           const cols = Array.isArray(item)
             ? item
-            : [item.responsable || "-", formatCOP(item.propina || 0), item.tiempo_texto || "-"];
+            : [
+              item.responsable || "-",
+              typeof item.propina === "string" ? item.propina : formatCOP(item.propina || 0),
+              item.tiempo_texto || "-"
+            ];
           drawApoyo(rowY, cols);
           rowY += rowH;
         });
@@ -1377,7 +1381,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const pagesApoyos = [];
     const apoyoItems = Array.isArray(apoyos) ? apoyos : [];
     if (!apoyoItems.length) {
-      pagesApoyos.push([]);
+      pagesApoyos.push([{
+        responsable: "Turno culminado sin apoyos",
+        propina: "-",
+        tiempo_texto: "-"
+      }]);
     } else {
       pagesApoyos.push(apoyoItems.slice(0, firstPageMax));
       let offset = firstPageMax;
