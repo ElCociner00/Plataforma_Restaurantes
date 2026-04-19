@@ -391,6 +391,36 @@ input:not([readonly]) {
   margin: 0;
 }
 
+.apoyo-rango-wrap {
+  display: grid;
+  gap: 6px;
+}
+
+.apoyo-rango-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.apoyo-rango-box {
+  border: 1px solid #ddd6fe;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px;
+}
+
+.apoyo-rango-box small {
+  display: block;
+  color: #6b21a8;
+  margin-bottom: 4px;
+}
+
+.apoyo-rango-selects {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+}
+
 .totales-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -431,6 +461,11 @@ input:not([readonly]) {
 
   .apoyo-tabla-head,
   .apoyo-row {
+    grid-template-columns: 1fr;
+  }
+
+  .apoyo-rango-grid,
+  .apoyo-rango-selects {
     grid-template-columns: 1fr;
   }
 }

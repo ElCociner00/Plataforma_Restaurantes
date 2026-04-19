@@ -627,13 +627,67 @@ document.addEventListener("DOMContentLoaded", () => {
     return `${hour}:${minute} ${momento}`;
   };
 
-  const buildApoyoTimeOptions = (selectedValue = "") => {
-    let html = '<option value="">Selecciona tiempo</option>';
-    for (let mins = 5; mins <= 960; mins += 5) {
-      const selected = String(selectedValue) === String(mins) ? "selected" : "";
-      html += `<option value="${mins}" ${selected}>${formatDurationLabel(mins)}</option>`;
+  const buildHourOptions = () => {
+    let html = '<option value="">Hora</option>';
+    for (let hour = 1; hour <= 12; hour += 1) {
+      const value = String(hour).padStart(2, "0");
+      html += `<option value="${value}">${value}</option>`;
     }
     return html;
+  };
+
+  const buildMinuteOptions = () => {
+    let html = '<option value="">Min</option>';
+    for (let minute = 0; minute <= 55; minute += 5) {
+      const value = String(minute).padStart(2, "0");
+      html += `<option value="${value}">${value}</option>`;
+    }
+    return html;
+  };
+
+  const toMinutesFromRangeParts = (hour12, minute, ampm) => {
+    const h = Number(hour12);
+    const m = Number(minute);
+    if (!h || Number.isNaN(m) || !ampm) return null;
+    let hour24 = h % 12;
+    if (String(ampm).toUpperCase() === "PM") hour24 += 12;
+    return (hour24 * 60) + m;
+  };
+
+  const readApoyoRange = (row) => {
+    const fechaRango = row.querySelector('[data-field="fecha_rango"]')?.value || new Date().toISOString().slice(0, 10);
+    const inicioHora = row.querySelector('[data-field="inicio_hora"]')?.value || "";
+    const inicioMin = row.querySelector('[data-field="inicio_min"]')?.value || "";
+    const inicioMom = row.querySelector('[data-field="inicio_momento"]')?.value || "";
+    const finHora = row.querySelector('[data-field="fin_hora"]')?.value || "";
+    const finMin = row.querySelector('[data-field="fin_min"]')?.value || "";
+    const finMom = row.querySelector('[data-field="fin_momento"]')?.value || "";
+
+    const inicioMinutes = toMinutesFromRangeParts(inicioHora, inicioMin, inicioMom);
+    const finMinutes = toMinutesFromRangeParts(finHora, finMin, finMom);
+    if (inicioMinutes === null || finMinutes === null) {
+      return { complete: false, fechaRango, inicioHora, inicioMin, inicioMom, finHora, finMin, finMom };
+    }
+
+    let duration = finMinutes - inicioMinutes;
+    if (duration < 0) duration += 24 * 60;
+    const inicioTexto = `${inicioHora}:${inicioMin} ${inicioMom}`;
+    const finTexto = `${finHora}:${finMin} ${finMom}`;
+    return {
+      complete: true,
+      fechaRango,
+      inicioHora,
+      inicioMin,
+      inicioMom,
+      finHora,
+      finMin,
+      finMom,
+      inicioTexto,
+      finTexto,
+      rangoTexto: `${inicioTexto} - ${finTexto}`,
+      durationMinutes: duration,
+      durationText: formatDurationLabel(duration)
+    };
   };
 
   const getResponsableOptionsHtml = (selectedValue = "") => {
@@ -659,7 +713,27 @@ document.addEventListener("DOMContentLoaded", () => {
     row.innerHTML = `
       <select data-field="responsable">${getResponsableOptionsHtml()}</select>
       <input data-field="propina" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0">
-      <select data-field="tiempo">${buildApoyoTimeOptions()}</select>
+      <div class="apoyo-rango-wrap">
+        <input data-field="fecha_rango" type="date" value="${new Date().toISOString().slice(0, 10)}">
+        <div class="apoyo-rango-grid">
+          <div class="apoyo-rango-box">
+            <small>Inicio</small>
+            <div class="apoyo-rango-selects">
+              <select data-field="inicio_hora">${buildHourOptions()}</select>
+              <select data-field="inicio_min">${buildMinuteOptions()}</select>
+              <select data-field="inicio_momento"><option value="AM">AM</option><option value="PM">PM</option></select>
+            </div>
+          </div>
+          <div class="apoyo-rango-box">
+            <small>Fin</small>
+            <div class="apoyo-rango-selects">
+              <select data-field="fin_hora">${buildHourOptions()}</select>
+              <select data-field="fin_min">${buildMinuteOptions()}</select>
+              <select data-field="fin_momento"><option value="AM">AM</option><option value="PM">PM</option></select>
+            </div>
+          </div>
+        </div>
+      </div>
     `;
 
     const propinaInput = row.querySelector('[data-field="propina"]');
@@ -668,14 +742,16 @@ document.addEventListener("DOMContentLoaded", () => {
       marcarComoNoVerificado();
     });
     row.querySelector('[data-field="responsable"]')?.addEventListener("change", marcarComoNoVerificado);
-    row.querySelector('[data-field="tiempo"]')?.addEventListener("change", marcarComoNoVerificado);
+    row.querySelectorAll('select, input[type="date"]').forEach((el) => {
+      el.addEventListener("change", marcarComoNoVerificado);
+    });
     return row;
   };
 
   const renderApoyoRows = (count) => {
     if (!apoyoRowsContainer) return;
     apoyoRowsContainer.innerHTML = "";
-    const safeCount = Math.max(0, Math.min(50, Number(count) || 0));
+    const safeCount = Math.max(0, Math.min(30, Number(count) || 0));
     for (let i = 0; i < safeCount; i += 1) {
       apoyoRowsContainer.appendChild(createApoyoRow(i + 1));
     }
@@ -689,7 +765,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const registros = rows.map((row) => {
       const apoyoResponsableId = row.querySelector('[data-field="responsable"]')?.value || "";
       const propinaValue = row.querySelector('[data-field="propina"]')?.value || "0";
-      const tiempoMinutos = Number(row.querySelector('[data-field="tiempo"]')?.value || 0);
+      const range = readApoyoRange(row);
+      const tiempoMinutos = range.complete ? Number(range.durationMinutes || 0) : 0;
       return {
         empresa_id: contextPayload?.empresa_id || "",
         fecha: fecha.value || "",
@@ -699,7 +776,11 @@ document.addEventListener("DOMContentLoaded", () => {
         apoyo_responsable_id: apoyoResponsableId,
         propina: Number(propinaValue || 0),
         tiempo_minutos: tiempoMinutos,
-        tiempo_texto: formatDurationLabel(tiempoMinutos)
+        tiempo_texto: range.complete ? range.durationText : "0 horas 0 minutos",
+        rango_hora_inicio: range.complete ? range.inicioTexto : "",
+        rango_hora_fin: range.complete ? range.finTexto : "",
+        rango_hora_unificado: range.complete ? range.rangoTexto : "",
+        fecha_rango: range.fechaRango || ""
       };
     });
 
@@ -734,8 +815,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const row = rows[i];
       const responsableApoyo = row.querySelector('[data-field="responsable"]')?.value || "";
       const propinaApoyo = row.querySelector('[data-field="propina"]')?.value || "";
-      const tiempoApoyo = row.querySelector('[data-field="tiempo"]')?.value || "";
-      if (!responsableApoyo || propinaApoyo === "" || !tiempoApoyo) {
+      const range = readApoyoRange(row);
+      if (!responsableApoyo || propinaApoyo === "" || !range.complete) {
         setStatus(`Completa todos los campos del apoyo #${i + 1}.`);
         return false;
       }
@@ -1093,12 +1174,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const apoyoResponsableId = row.querySelector('[data-field="responsable"]')?.value || "";
       const apoyoResponsableNombre = responsablesActivos.find((item) => String(item?.id || "") === apoyoResponsableId)?.nombre_completo || apoyoResponsableId || "-";
       const propinaValue = row.querySelector('[data-field="propina"]')?.value || "0";
-      const tiempoMinutes = Number(row.querySelector('[data-field="tiempo"]')?.value || 0);
+      const range = readApoyoRange(row);
+      const tiempoMinutes = range.complete ? Number(range.durationMinutes || 0) : 0;
       return {
         responsable: apoyoResponsableNombre,
         propina: propinaValue,
         tiempo_minutos: tiempoMinutes,
-        tiempo_texto: formatDurationLabel(tiempoMinutes)
+        tiempo_texto: range.complete ? range.durationText : formatDurationLabel(tiempoMinutes)
       };
     });
 
