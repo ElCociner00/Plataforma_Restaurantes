@@ -251,6 +251,12 @@ const sanitizeRow = (rawRow, index) => {
     if (!shouldExcludeGeneralField(key)) general[key] = value;
   });
 
+  const bolsaAlias = getGeneralValue(general, ["bolsa", "bolsas", "bolsa_global", "total_bolsa"]);
+  if (String(bolsaAlias || "").trim()) general.bolsa = bolsaAlias;
+
+  const cajaAlias = getGeneralValue(general, ["caja_final", "caja", "caja_global", "total_caja"]);
+  if (String(cajaAlias || "").trim()) general.caja_final = cajaAlias;
+
   general.responsable = resolveResponsableName(rawRow, state.responsableNamesById);
 
   const detailsRaw = Array.isArray(rawRow?.variables_detalle) ? rawRow.variables_detalle : (typeof rawRow?.variables_detalle === "string" ? (() => { try { const parsed = JSON.parse(rawRow.variables_detalle); return Array.isArray(parsed) ? parsed : []; } catch { return []; } })() : []);
@@ -265,7 +271,15 @@ const sanitizeRow = (rawRow, index) => {
   return {
     id: getRowId(rawRow, index),
     general,
-    details
+    details,
+    apoyos: [],
+    meta: {
+      source_id: String(rawRow?.id || "").trim(),
+      fecha_turno: String(getGeneralValue(rawRow, ["fecha_turno", "fecha"]) || "").trim(),
+      responsable_id: resolveResponsableId(rawRow),
+      hora_inicio: String(getGeneralValue(rawRow, ["hora_inicio", "hora_llegada", "hora_entrada"]) || "").trim(),
+      hora_fin: String(getGeneralValue(rawRow, ["hora_fin", "hora_salida"]) || "").trim()
+    }
   };
 };
 
@@ -347,6 +361,113 @@ const toNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const enrichRowsWithCierreTurnoFinal = async (rows = [], empresaId = "") => {
+  if (!Array.isArray(rows) || !rows.length || !empresaId) return rows;
+
+  const { data, error } = await supabase
+    .from("cierres_turno_final")
+    .select("id, fecha_turno, responsable_id, hora_inicio, hora_fin, bolsa_global, caja_global, created_at")
+    .eq("empresa_id", empresaId)
+    .order("created_at", { ascending: false })
+    .limit(Math.max(250, rows.length * 8));
+
+  if (error || !Array.isArray(data) || !data.length) return rows;
+
+  const byId = new Map();
+  const byComposite = new Map();
+
+  data.forEach((item) => {
+    const sourceId = String(item?.id || "").trim();
+    if (sourceId) byId.set(sourceId, item);
+
+    const composite = [
+      String(item?.fecha_turno || "").trim(),
+      String(item?.responsable_id || "").trim(),
+      String(item?.hora_inicio || "").trim(),
+      String(item?.hora_fin || "").trim()
+    ].join("|");
+
+    if (!byComposite.has(composite)) byComposite.set(composite, item);
+  });
+
+  rows.forEach((row) => {
+    const currentBolsa = toNumber(getGeneralValue(row?.general || {}, ["bolsa", "bolsas", "bolsa_global", "total_bolsa"]));
+    const currentCaja = toNumber(getGeneralValue(row?.general || {}, ["caja_final", "caja", "caja_global", "total_caja"]));
+
+    const sourceMatch = row?.meta?.source_id ? byId.get(row.meta.source_id) : null;
+    const composite = [
+      String(row?.meta?.fecha_turno || row?.general?.fecha_turno || "").trim(),
+      String(row?.meta?.responsable_id || "").trim(),
+      String(row?.meta?.hora_inicio || row?.general?.hora_inicio || "").trim(),
+      String(row?.meta?.hora_fin || row?.general?.hora_fin || "").trim()
+    ].join("|");
+    const compositeMatch = byComposite.get(composite);
+    const fallback = sourceMatch || compositeMatch;
+    if (!fallback) return;
+
+    const fallbackBolsa = toNumber(fallback?.bolsa_global);
+    const fallbackCaja = toNumber(fallback?.caja_global);
+
+    if ((currentBolsa === null || currentBolsa === 0) && fallbackBolsa !== null) row.general.bolsa = fallbackBolsa;
+    if ((currentCaja === null || currentCaja === 0) && fallbackCaja !== null) row.general.caja_final = fallbackCaja;
+  });
+
+  return rows;
+};
+
+const enrichRowsWithApoyosTurno = async (rows = [], empresaId = "") => {
+  if (!Array.isArray(rows) || !rows.length || !empresaId) return rows;
+  const fechas = rows
+    .map((row) => String(row?.meta?.fecha_turno || row?.general?.fecha_turno || "").trim())
+    .filter(Boolean);
+  if (!fechas.length) return rows;
+
+  const fechaMin = [...fechas].sort()[0];
+  const fechaMax = [...fechas].sort()[fechas.length - 1];
+
+  const { data, error } = await supabase
+    .from("apoyos_turno")
+    .select("empresa_id, fecha_turno, hora_inicio, hora_fin, apoyo_responsable_id, responsable_turno_id, propina, tiempo_minutos, tiempo_texto")
+    .eq("empresa_id", empresaId)
+    .gte("fecha_turno", fechaMin)
+    .lte("fecha_turno", fechaMax)
+    .order("fecha_turno", { ascending: false });
+
+  if (error || !Array.isArray(data) || !data.length) return rows;
+
+  const byComposite = new Map();
+  data.forEach((item) => {
+    const key = [
+      String(item?.fecha_turno || "").trim(),
+      String(item?.hora_inicio || "").trim(),
+      String(item?.hora_fin || "").trim()
+    ].join("|");
+    const arr = byComposite.get(key) || [];
+    arr.push(item);
+    byComposite.set(key, arr);
+  });
+
+  rows.forEach((row) => {
+    const key = [
+      String(row?.meta?.fecha_turno || row?.general?.fecha_turno || "").trim(),
+      String(row?.meta?.hora_inicio || row?.general?.hora_inicio || "").trim(),
+      String(row?.meta?.hora_fin || row?.general?.hora_fin || "").trim()
+    ].join("|");
+    const found = byComposite.get(key) || [];
+    row.apoyos = found.map((item) => ({
+      apoyo_responsable_id: item.apoyo_responsable_id,
+      responsable_turno_id: item.responsable_turno_id,
+      apoyo_responsable_nombre: state.responsableNamesById?.[String(item.apoyo_responsable_id || "").trim()] || String(item.apoyo_responsable_id || ""),
+      responsable_turno_nombre: state.responsableNamesById?.[String(item.responsable_turno_id || "").trim()] || String(item.responsable_turno_id || ""),
+      propina: toNumber(item.propina) ?? 0,
+      tiempo_minutos: toNumber(item.tiempo_minutos) ?? 0,
+      tiempo_texto: String(item.tiempo_texto || "").trim()
+    }));
+  });
+
+  return rows;
+};
+
 const summarizeDetailByVariable = (row) => {
   const summary = new Map();
   getDetailRowsFor(row).forEach((detail) => {
@@ -400,6 +521,17 @@ const renderDetailSection = () => {
     </tr>
   `).join("");
 
+  const apoyosRows = Array.isArray(selected.apoyos) ? selected.apoyos : [];
+  const apoyosBody = apoyosRows.map((item) => `
+    <tr>
+      <td>${escapeHtml(toReadableLabel(item.apoyo_responsable_nombre || item.apoyo_responsable_id || "-"))}</td>
+      <td class="is-num">${escapeHtml(formatCellValue(item.propina || 0))}</td>
+      <td class="is-num">${escapeHtml(formatCellValue(item.tiempo_minutos || 0))}</td>
+      <td>${escapeHtml(normalizeInlineText(item.tiempo_texto || "-"))}</td>
+    </tr>
+  `).join("");
+  const sinApoyosBody = "<tr><td colspan='4'>Turno culminado sin apoyos.</td></tr>";
+
   detalleTurno.innerHTML = `
     <div class="detalle-header-actions">
       <h3>${escapeHtml(normalizeInlineText(formatCellValue(selected.general.turno_nombre || selected.id)))}</h3>
@@ -418,6 +550,19 @@ const renderDetailSection = () => {
           </thead>
           <tbody>
             ${groupedBody || "<tr><td colspan='4'>Sin detalle visible.</td></tr>"}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="detalle-card-grid" style="margin-top:14px;">
+      <div class="tabla-wrap detalle-wrap detalle-comparativo-wrap">
+        <table>
+          <thead>
+            <tr><th>Apoyo</th><th class="is-num">Propina</th><th class="is-num">Tiempo (min)</th><th>Tiempo texto</th></tr>
+          </thead>
+          <tbody>
+            ${apoyosBody || sinApoyosBody}
           </tbody>
         </table>
       </div>
@@ -777,10 +922,30 @@ const FLAT_EXCEL_HEADERS = [
   "REVISADO POR"
 ];
 
+const APOYO_EXCEL_HEADERS = [
+  "FECHA TURNO",
+  "HORA INICIO",
+  "HORA FIN",
+  "RESPONSABLE TURNO",
+  "APOYO",
+  "PROPINA",
+  "TIEMPO MINUTOS",
+  "TIEMPO TEXTO"
+];
+
 const getGeneralByCandidates = (general = {}, candidates = []) => {
+  const normalizedEntries = Object.entries(general).map(([key, value]) => ({
+    value,
+    normalized: normalizeFieldKey(key)
+  }));
+
   for (const key of candidates) {
     const value = general?.[key];
     if (value !== undefined && value !== null && String(value).trim() !== "") return value;
+
+    const normalizedCandidate = normalizeFieldKey(key);
+    const match = normalizedEntries.find((entry) => entry.normalized === normalizedCandidate);
+    if (match && match.value !== undefined && match.value !== null && String(match.value).trim() !== "") return match.value;
   }
   return null;
 };
@@ -818,6 +983,15 @@ const extractCanalValores = (row, canal) => {
     sistema: sistemaGeneral ?? sistemaDetalle ?? 0,
     real: realGeneral ?? realDetalle ?? 0
   };
+};
+
+const resolveFinancialValue = (row, { generalCandidates = [], detailBases = [], detailCategory = "" } = {}) => {
+  const general = row?.general || {};
+  const fromGeneral = toNumber(getGeneralByCandidates(general, generalCandidates));
+  if (fromGeneral !== null) return fromGeneral;
+
+  if (!detailBases.length) return null;
+  return findDetailValue(row?.details || [], detailBases, detailCategory);
 };
 
 const toFlatExcelRow = (row) => {
@@ -864,8 +1038,14 @@ const toFlatExcelRow = (row) => {
     "HORA LLEGADA": normalizeInlineText(formatCellValue(getGeneralByCandidates(general, ["hora_inicio", "hora_llegada", "hora_entrada"]) || "")),
     "HORA SALIDA": normalizeInlineText(formatCellValue(getGeneralByCandidates(general, ["hora_fin", "hora_salida"]) || "")),
     "EFECTIVO APERTURA": toNumber(getGeneralByCandidates(general, ["efectivo_inicial", "apertura_efectivo", "efectivo_apertura"])) ?? 0,
-    "BOLSA": toNumber(getGeneralByCandidates(general, ["bolsa"])) ?? 0,
-    "CAJA": toNumber(getGeneralByCandidates(general, ["caja_final", "caja"])) ?? 0,
+    "BOLSA": resolveFinancialValue(row, {
+      generalCandidates: ["bolsa", "bolsas", "bolsa_global", "total_bolsa"],
+      detailBases: ["bolsa"],
+      detailCategory: "real"
+    }) ?? resolveFinancialValue(row, {
+      detailBases: ["bolsa"]
+    }) ?? 0,
+    "CAJA": toNumber(getGeneralByCandidates(general, ["caja_final", "caja", "caja_global", "total_caja"])) ?? 0,
     "EFECTIVO SISTEMA": canales.efectivo.sistema,
     "EFECTIVO REAL": canales.efectivo.real,
     "DIF EFECTIVO": canales.efectivo.real - canales.efectivo.sistema,
@@ -894,28 +1074,83 @@ const toFlatExcelRow = (row) => {
   return FLAT_EXCEL_HEADERS.map((header) => valuesByHeader[header] ?? "");
 };
 
+const toApoyoExcelRows = (rows = []) => rows.flatMap((row) => {
+  const general = row?.general || {};
+  const fechaTurno = normalizeInlineText(formatCellValue(getGeneralByCandidates(general, ["fecha_turno", "fecha", "created_at"]) || ""));
+  const horaInicio = normalizeInlineText(formatCellValue(getGeneralByCandidates(general, ["hora_inicio", "hora_llegada", "hora_entrada"]) || ""));
+  const horaFin = normalizeInlineText(formatCellValue(getGeneralByCandidates(general, ["hora_fin", "hora_salida"]) || ""));
+  const responsableTurno = normalizeInlineText(formatCellValue(getGeneralByCandidates(general, ["responsable", "responsable_nombre", "nombre_responsable"]) || ""));
+  const apoyos = Array.isArray(row?.apoyos) ? row.apoyos : [];
+
+  if (!apoyos.length) {
+    return [[fechaTurno, horaInicio, horaFin, responsableTurno, "Turno culminado sin apoyos", 0, 0, "-"]];
+  }
+
+  return apoyos.map((item) => ([
+    fechaTurno,
+    horaInicio,
+    horaFin,
+    responsableTurno || normalizeInlineText(String(item?.responsable_turno_nombre || "")),
+    normalizeInlineText(String(item?.apoyo_responsable_nombre || item?.apoyo_responsable_id || "")),
+    toNumber(item?.propina) ?? 0,
+    toNumber(item?.tiempo_minutos) ?? 0,
+    normalizeInlineText(String(item?.tiempo_texto || ""))
+  ]));
+});
+
+const escapeXml = (value) => String(value ?? "")
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&apos;");
+
+const buildSpreadsheetWorksheet = (name, headers, rows) => {
+  const headerCells = headers.map((header) => `<Cell ss:StyleID="hdr"><Data ss:Type="String">${escapeXml(header)}</Data></Cell>`).join("");
+  const bodyRows = rows.map((row) => {
+    const cells = row.map((value) => {
+      const numeric = typeof value === "number" ? value : toNumber(value);
+      if (numeric !== null && numeric !== undefined && String(value ?? "").trim() !== "") {
+        return `<Cell ss:StyleID="num"><Data ss:Type="Number">${numeric}</Data></Cell>`;
+      }
+      return `<Cell><Data ss:Type="String">${escapeXml(normalizeInlineText(formatCellValue(value)))}</Data></Cell>`;
+    }).join("");
+    return `<Row>${cells}</Row>`;
+  }).join("");
+
+  return `<Worksheet ss:Name="${escapeXml(name)}"><Table><Row>${headerCells}</Row>${bodyRows}</Table></Worksheet>`;
+};
+
 const downloadExcel = (rows, fileName) => {
   if (!rows.length) return setStatus("No hay turnos para descargar con esos criterios.");
 
-  const headHtml = `<tr>${FLAT_EXCEL_HEADERS.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>`;
-  const bodyHtml = rows
-    .map((row) => {
-      const values = toFlatExcelRow(row);
-      return `<tr>${values.map((value) => (typeof value === "number"
-        ? `<td class="num">${escapeHtml(formatCellValue(value))}</td>`
-        : `<td>${escapeHtml(normalizeInlineText(formatCellValue(value)))}</td>`)).join("")}</tr>`;
-    })
-    .join("");
+  const turnosRows = rows.map((row) => toFlatExcelRow(row));
+  const apoyosRows = toApoyoExcelRows(rows);
+  const worksheetTurnos = buildSpreadsheetWorksheet("Turnos", FLAT_EXCEL_HEADERS, turnosRows);
+  const worksheetApoyos = buildSpreadsheetWorksheet("Apoyos", APOYO_EXCEL_HEADERS, apoyosRows);
+  const workbook = `<?xml version="1.0"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <Styles>
+  <Style ss:ID="Default" ss:Name="Normal"/>
+  <Style ss:ID="hdr"><Font ss:Bold="1"/><Interior ss:Color="#EDE9FE" ss:Pattern="Solid"/></Style>
+  <Style ss:ID="num"><NumberFormat ss:Format="#,##0.00"/></Style>
+ </Styles>
+ ${worksheetTurnos}
+ ${worksheetApoyos}
+</Workbook>`;
 
-  const html = `<html><head><meta charset="utf-8"/>${buildExcelStyles()}</head><body><table class="excel-table"><thead>${headHtml}</thead><tbody>${bodyHtml}</tbody></table></body></html>`;
-  const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+  const blob = new Blob([workbook], { type: "application/vnd.ms-excel;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = fileName;
   a.click();
   URL.revokeObjectURL(url);
-  setStatus(`Excel generado: ${rows.length} turno(s).`);
+  setStatus(`Excel generado con hojas Turnos y Apoyos: ${rows.length} turno(s).`);
 };
 
 const downloadTurnoPng = (row) => {
@@ -1152,7 +1387,9 @@ const loadInitialData = async () => {
       }
     }
 
-    state.allRows = normalizeRows(rowsData).map(sanitizeRow);
+    const sanitizedRows = normalizeRows(rowsData).map(sanitizeRow);
+    const enrichedRows = await enrichRowsWithCierreTurnoFinal(sanitizedRows, payload.empresa_id);
+    state.allRows = await enrichRowsWithApoyosTurno(enrichedRows, payload.empresa_id);
     state.filteredRows = [...state.allRows];
 
     const inferredGeneral = inferColumns(state.allRows, (row) => Object.keys(row.general));
