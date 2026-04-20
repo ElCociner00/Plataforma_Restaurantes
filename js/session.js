@@ -65,6 +65,35 @@ async function getContextFromTables(user) {
     .maybeSingle();
 
   if (usuarioError || !usuarioSistema) {
+    const email = String(user?.email || "").trim().toLowerCase();
+    const filters = [`id.eq.${user.id}`];
+    if (email) filters.push(`correo.eq.${email}`);
+
+    for (const tableName of ["system_users", "system_user"]) {
+      const { data: systemUser, error: systemError } = await supabase
+        .from(tableName)
+        .select("id, nombre, correo")
+        .or(filters.join(","))
+        .maybeSingle();
+
+      if (!systemError && systemUser) {
+        return {
+          user: {
+            id: user.id,
+            email: user.email,
+            user_id: user.id
+          },
+          empresa_id: null,
+          rol: "admin_root",
+          nombre: systemUser.nombre || user.email || "Superadmin",
+          plan: "enterprise",
+          activa: true,
+          permisos: {},
+          super_admin: true
+        };
+      }
+    }
+
     console.error("No se pudo resolver usuarios_sistema para el usuario actual:", usuarioError);
     return null;
   }
