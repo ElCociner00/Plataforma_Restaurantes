@@ -51,8 +51,8 @@ export const MODULE_ROUTE_MAP = {
 };
 
 const LOGGRO_PRIORITY = [
-  "gestion_usuarios",
   "gestion_empresas",
+  "gestion_usuarios",
   "dashboard",
   "cierre_turno",
   "cierre_inventarios",
@@ -110,7 +110,7 @@ export function hasLocalAccess(role, moduleKey) {
 
 export function getHomeByRole(role) {
   const safeRole = normalizeRole(role);
-  if (safeRole === "admin_root") return APP_URLS.gestionUsuarios;
+  if (safeRole === "admin_root") return APP_URLS.gestionEmpresas;
   if (safeRole === "operativo") return APP_URLS.cierreTurno;
   return APP_URLS.dashboard;
 }
@@ -123,7 +123,7 @@ export function resolveDefaultRouteForRoleEnv(role, env) {
     return APP_URLS.dashboardSiigo;
   }
 
-  if (safeRole === "admin_root") return APP_URLS.gestionUsuarios;
+  if (safeRole === "admin_root") return APP_URLS.gestionEmpresas;
 
   return safeRole === "operativo"
     ? APP_URLS.cierreTurno
