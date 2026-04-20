@@ -1,13 +1,34 @@
 import "./mobile_shell.js";
 import { supabase } from "./supabase.js";
 import { clearUserContextCache, getUserContext } from "./session.js";
-import { clearBannerDisplayCache, verificarYMostrarAnuncio } from "./anuncio_impago.js";
 import { ENV_LOGGRO, ENV_SIIGO, getActiveEnvironment, setActiveEnvironment } from "./environment.js";
 import { resolveFirstAllowedRoute } from "./access_control.local.js";
 import { getPermisosEfectivos } from "./permisos.core.js";
 import { APP_URLS } from "./urls.js";
 
 const HEADER_ID = "globalAppHeader";
+
+let anuncioModulePromise = null;
+
+async function loadAnuncioModuleSafe() {
+  if (!anuncioModulePromise) {
+    anuncioModulePromise = import("./anuncio_impago.js").catch((error) => {
+      console.warn("[header] anuncio_impago no disponible, se omite sin romper header:", error);
+      return null;
+    });
+  }
+  return anuncioModulePromise;
+}
+
+async function safeClearBannerDisplayCache() {
+  const mod = await loadAnuncioModuleSafe();
+  mod?.clearBannerDisplayCache?.();
+}
+
+async function safeVerificarYMostrarAnuncio() {
+  const mod = await loadAnuncioModuleSafe();
+  await mod?.verificarYMostrarAnuncio?.();
+}
 
 const ensureViewportMeta = () => {
   if (document.querySelector('meta[name="viewport"]')) return;
@@ -148,7 +169,7 @@ function wireHeaderEvents(header, context) {
     logoutBtn.onclick = async (event) => {
       event.preventDefault();
       setActiveEnvironment("");
-      clearBannerDisplayCache();
+      await safeClearBannerDisplayCache();
       clearUserContextCache();
       await supabase.auth.signOut();
       window.location.href = APP_URLS.login;
@@ -208,7 +229,7 @@ async function renderAuthenticatedHeader() {
 document.addEventListener("DOMContentLoaded", async () => {
   ensureViewportMeta();
   getOrCreateHeader();
-  verificarYMostrarAnuncio().catch(() => {});
+  safeVerificarYMostrarAnuncio().catch(() => {});
 
   try {
     await renderAuthenticatedHeader();
