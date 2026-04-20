@@ -1,7 +1,7 @@
 import { supabase } from "./supabase.js";
 import { buildRequestHeaders, getSessionConEmpresa } from "./session.js";
 import { WEBHOOKS } from "./webhooks.js";
-import { BILLING_PAYMENT_URL } from "./billing_config.js";
+import { BILLING_PAYMENT_CODES, BILLING_PAYMENT_URLS_FALLBACK } from "./billing_config.js";
 
 const getFacturaRoot = () => {
   const existing = document.getElementById("factura-contenido");
@@ -46,6 +46,31 @@ const normalizeInlineText = (value) => String(value || "")
   .trim();
 
 const getCurrentPeriod = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+async function loadPaymentLinks() {
+  const { data, error } = await supabase
+    .from("metodos_pago")
+    .select("codigo, nombre, tipo, data_qr_o_url, activo, orden")
+    .eq("activo", true)
+    .is("empresa_id", null)
+    .in("codigo", [BILLING_PAYMENT_CODES.puntual, BILLING_PAYMENT_CODES.suscripcion])
+    .order("orden", { ascending: true });
+
+  if (error) {
+    console.warn("No se pudieron cargar metodos_pago globales, se usarán fallbacks:", error.message || error);
+    return {
+      puntual: BILLING_PAYMENT_URLS_FALLBACK.puntual,
+      suscripcion: BILLING_PAYMENT_URLS_FALLBACK.suscripcion
+    };
+  }
+
+  const byCode = new Map((Array.isArray(data) ? data : []).map((row) => [String(row.codigo || "").trim().toLowerCase(), row]));
+
+  const puntual = String(byCode.get(BILLING_PAYMENT_CODES.puntual)?.data_qr_o_url || "").trim() || BILLING_PAYMENT_URLS_FALLBACK.puntual;
+  const suscripcion = String(byCode.get(BILLING_PAYMENT_CODES.suscripcion)?.data_qr_o_url || "").trim() || BILLING_PAYMENT_URLS_FALLBACK.suscripcion;
+
+  return { puntual, suscripcion };
+}
 
 async function loadFacturaByWebhook(empresaId) {
   const webhook = WEBHOOKS?.FACTURACION_RESUMEN;
@@ -139,7 +164,7 @@ async function resolveComprobanteUrl(path) {
   return data?.signedUrl || "";
 }
 
-function renderFactura({ descripcion, valorTotal, paymentMethod }) {
+function renderFactura({ descripcion, valorTotal, paymentMethod, paymentLinks }) {
   return `
     <article class="factura-sheet">
       <section class="factura-header">
@@ -212,8 +237,11 @@ function renderFactura({ descripcion, valorTotal, paymentMethod }) {
       </section>
 
       <section class="factura-payment">
-        <a class="btn-pago" href="${BILLING_PAYMENT_URL}" target="_blank" rel="noopener noreferrer">Ingresar al link para pagar</a>
-        <p>${BILLING_PAYMENT_URL}</p>
+        <div class="factura-payment-actions">
+          <a class="btn-pago" href="${escapeHtml(paymentLinks?.puntual)}" target="_blank" rel="noopener noreferrer">Pago puntual</a>
+          <a class="btn-pago btn-pago-alt" href="${escapeHtml(paymentLinks?.suscripcion)}" target="_blank" rel="noopener noreferrer">Suscribirme (auto mensual)</a>
+        </div>
+        <p class="factura-payment-note"><strong>Recomendado:</strong> suscribirte para evitar pagos manuales cada mes y mantener el servicio al día.</p>
         <p>Si ya pagaste, sube aquí tu comprobante para revisión.</p>
       </section>
     </article>
@@ -366,10 +394,10 @@ async function attachUploadHandler({ empresaId, cycleId }) {
   });
 }
 
-const renderStaticShell = (rootEl) => {
+const renderStaticShell = (rootEl, paymentLinks) => {
   const valorTotal = 59900;
   rootEl.innerHTML = [
-    renderFactura({ descripcion: "Servicio plataforma AXIOMA", valorTotal, paymentMethod: "Transferencia" }),
+    renderFactura({ descripcion: "Servicio plataforma AXIOMA", valorTotal, paymentMethod: "Transferencia", paymentLinks }),
     renderUploadForm(),
     `<section class="billing-panel"><p class="helper-text">Cargando historial de pagos...</p></section>`
   ].join("\n");
@@ -379,7 +407,9 @@ export async function cargarFactura() {
   const rootEl = getFacturaRoot();
   if (!rootEl) return;
 
-  renderStaticShell(rootEl);
+  const paymentLinks = await loadPaymentLinks();
+
+  renderStaticShell(rootEl, paymentLinks);
 
   try {
     const session = await getSessionConEmpresa().catch(() => null);
@@ -407,7 +437,7 @@ export async function cargarFactura() {
     })));
 
     rootEl.innerHTML = [
-      renderFactura({ descripcion, valorTotal, paymentMethod }),
+      renderFactura({ descripcion, valorTotal, paymentMethod, paymentLinks }),
       renderUploadForm(),
       renderHistory(attemptsWithUrls, cycles)
     ].join("\n");
@@ -416,7 +446,7 @@ export async function cargarFactura() {
   } catch (error) {
     const valorTotal = 59900;
     rootEl.innerHTML = [
-      renderFactura({ descripcion: "Servicio plataforma AXIOMA", valorTotal, paymentMethod: "Transferencia" }),
+      renderFactura({ descripcion: "Servicio plataforma AXIOMA", valorTotal, paymentMethod: "Transferencia", paymentLinks }),
       renderUploadForm(),
       `<section class="billing-panel"><p class="helper-text">No pudimos cargar tu historial en este momento. Puedes intentar nuevamente en unos minutos.</p></section>`
     ].join("\n");

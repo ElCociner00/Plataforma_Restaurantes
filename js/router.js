@@ -1,5 +1,6 @@
 import { supabase } from "./supabase.js";
 import { APP_ROUTES } from "./config.js";
+import { resolvePostLoginRoute } from "./post_login_route.js";
 import { PUBLIC_PATHS } from "./urls.js";
 
 const LOGIN_URL = APP_ROUTES.login;
@@ -9,6 +10,7 @@ const REDIRECT_AFTER_LOGIN_KEY = "redirect_after_login";
 const DEFAULT_PUBLIC_PATHS = new Set(PUBLIC_PATHS);
 
 let routerInitialized = false;
+
 
 function normalizePath(pathname) {
   const normalized = String(pathname || "/")
@@ -52,7 +54,8 @@ export async function protectCurrentPage({ loginUrl = LOGIN_URL, publicPaths = [
     return false;
   }
 
-  revealPage();
+  const deferReveal = document?.body?.dataset?.deferReveal === "true";
+  if (!deferReveal) revealPage();
   return true;
 }
 
@@ -71,7 +74,9 @@ export function initAuthRouter({ loginUrl = LOGIN_URL, publicPaths = [] } = {}) 
     }
 
     if (event === "SIGNED_IN" && session && normalizePath(window.location.pathname) === normalizePath(loginUrl)) {
-      window.location.href = DASHBOARD_URL;
+      resolvePostLoginRoute()
+        .then((route) => { window.location.href = route; })
+        .catch(() => { window.location.href = DASHBOARD_URL; });
     }
   });
 
