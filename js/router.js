@@ -1,9 +1,6 @@
 import { supabase } from "./supabase.js";
 import { APP_ROUTES } from "./config.js";
-import { getUserContext } from "./session.js";
-import { getPermisosEfectivos } from "./permisos.core.js";
-import { resolveFirstAllowedRoute } from "./access_control.local.js";
-import { ENV_LOGGRO } from "./environment.js";
+import { resolvePostLoginRoute } from "./post_login_route.js";
 import { PUBLIC_PATHS } from "./urls.js";
 
 const LOGIN_URL = APP_ROUTES.login;
@@ -13,15 +10,6 @@ const REDIRECT_AFTER_LOGIN_KEY = "redirect_after_login";
 const DEFAULT_PUBLIC_PATHS = new Set(PUBLIC_PATHS);
 
 let routerInitialized = false;
-
-async function resolvePostLoginRoute() {
-  const context = await getUserContext().catch(() => null);
-  if (!context) return DASHBOARD_URL;
-  const userId = context?.user?.id || context?.user?.user_id;
-  const empresaId = context?.empresa_id || null;
-  const permisos = userId ? await getPermisosEfectivos(userId, empresaId).catch(() => []) : [];
-  return resolveFirstAllowedRoute(context?.rol, ENV_LOGGRO, permisos);
-}
 
 
 function normalizePath(pathname) {
@@ -66,7 +54,8 @@ export async function protectCurrentPage({ loginUrl = LOGIN_URL, publicPaths = [
     return false;
   }
 
-  revealPage();
+  const deferReveal = document?.body?.dataset?.deferReveal === "true";
+  if (!deferReveal) revealPage();
   return true;
 }
 

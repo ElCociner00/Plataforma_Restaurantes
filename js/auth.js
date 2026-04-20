@@ -1,22 +1,7 @@
 import { supabase } from "./supabase.js";
 import { APP_URLS } from "./urls.js";
-import { getUserContext } from "./session.js";
-import { getPermisosEfectivos } from "./permisos.core.js";
-import { resolveFirstAllowedRoute } from "./access_control.local.js";
-import { ENV_LOGGRO } from "./environment.js";
 
-const DASHBOARD_URL = APP_URLS.dashboard;
 const LOGIN_URL = APP_URLS.login;
-
-async function resolvePostLoginRoute() {
-  const context = await getUserContext().catch(() => null);
-  if (!context) return DASHBOARD_URL;
-
-  const userId = context?.user?.id || context?.user?.user_id;
-  const empresaId = context?.empresa_id || null;
-  const permisos = userId ? await getPermisosEfectivos(userId, empresaId).catch(() => []) : [];
-  return resolveFirstAllowedRoute(context?.rol, ENV_LOGGRO, permisos);
-}
 
 /**
  * Verifica si hay una sesión activa.
@@ -48,8 +33,6 @@ export async function signInWithPassword(email, password) {
 
   if (error) throw error;
 
-  const targetRoute = await resolvePostLoginRoute().catch(() => DASHBOARD_URL);
-  window.location.href = targetRoute;
   return data;
 }
 

@@ -20,6 +20,12 @@ const setStatus = (message) => {
   if (statusEl) statusEl.textContent = message || "";
 };
 
+const revealDeferredPage = () => {
+  if (document?.body?.dataset?.deferReveal === "true") {
+    document.body.style.display = "block";
+  }
+};
+
 const fmtDate = (value) => {
   if (!value) return "-";
   const d = new Date(value);
@@ -229,6 +235,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.location.replace(APP_URLS.dashboard);
     return;
   }
+
+  revealDeferredPage();
 
   const session = await getSessionConEmpresa().catch(() => null);
   state.empresaActualId = session?.empresa?.id || null;
