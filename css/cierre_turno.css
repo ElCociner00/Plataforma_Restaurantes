@@ -520,3 +520,21 @@ input:not([readonly]) {
 .is-hidden {
   display: none !important;
 }
+
+
+.apoyos-consulta-box {
+  display: grid;
+  gap: 6px;
+  align-content: end;
+}
+
+.apoyos-consulta-box button {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.apoyos-consulta-box small {
+  font-size: 0.76rem;
+  color: #6b21a8;
+  line-height: 1.2;
+}

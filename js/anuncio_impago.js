@@ -1,6 +1,6 @@
 import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
-import { BILLING_PAYMENT_URL } from "./billing_config.js";
+import { IMPAGO_PAYMENT_METHOD_CODE, IMPAGO_PAYMENT_URL_FALLBACK } from "./anuncio_impago_config.js";
 import { APP_URLS } from "./urls.js";
 
 const BANNER_HTML_PATH = APP_URLS.impagoBannerHtml;
@@ -12,6 +12,20 @@ const SUSPENSION_DAY_OF_MONTH = 20;
 const UNPAID_STATES = ["pending_payment", "proof_submitted", "past_due", "suspended", "grace_manual", "draft"];
 
 let anuncioInyectado = false;
+
+async function resolveImpagoPaymentUrl() {
+  const { data, error } = await supabase
+    .from("metodos_pago")
+    .select("data_qr_o_url")
+    .eq("codigo", IMPAGO_PAYMENT_METHOD_CODE)
+    .eq("activo", true)
+    .is("empresa_id", null)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) return IMPAGO_PAYMENT_URL_FALLBACK;
+  return String(data?.data_qr_o_url || "").trim() || IMPAGO_PAYMENT_URL_FALLBACK;
+}
 
 function ensureBannerStyles() {
   if (document.getElementById("impagoBannerCss")) return;
@@ -279,7 +293,8 @@ async function mostrarAnuncio({ storageKey, estado, diasRestantes, fechaVencimie
 
   const btnPagar = modal.querySelector("#impagoModalPagar");
   if (btnPagar) {
-    btnPagar.setAttribute("href", BILLING_PAYMENT_URL);
+    const paymentUrl = await resolveImpagoPaymentUrl().catch(() => IMPAGO_PAYMENT_URL_FALLBACK);
+    btnPagar.setAttribute("href", paymentUrl);
     btnPagar.setAttribute("target", "_blank");
     btnPagar.setAttribute("rel", "noopener noreferrer");
   }
