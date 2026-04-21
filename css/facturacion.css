@@ -227,3 +227,21 @@
   .customer-list .kv-line { grid-template-columns: 1fr; }
   .factura-totals { margin-left: 0; }
 }
+
+
+.factura-payment-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn-pago-alt {
+  background: #0f766e;
+  border-color: #0f766e;
+}
+
+.factura-payment-note {
+  margin-top: 10px;
+  color: #0f172a;
+}

@@ -3,6 +3,7 @@ import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 import { fetchResponsablesActivos } from "./responsables.js";
 import { getEmpresaPolicy, puedeEnviarDatos } from "./permisos.core.js";
+import { initApoyosPropinaManager } from "./apoyos.js";
 import {
   WEBHOOK_CONSULTAR_DATOS_CIERRE,
   WEBHOOK_LISTAR_RESPONSABLES,
@@ -51,6 +52,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const apoyoCantidadWrap = document.getElementById("apoyoCantidadWrap");
   const apoyoTablaWrap = document.getElementById("apoyoTablaWrap");
   const apoyoRowsContainer = document.getElementById("apoyoRows");
+  const btnConsultarPropinaApoyos = document.getElementById("consultarPropinaApoyos");
+  const apoyosConsultaNota = document.getElementById("apoyosConsultaNota");
   const correccionWrap = document.getElementById("correccionWrap");
   const btnSolicitarCorreccion = document.getElementById("solicitarCorreccion");
   const modalCorreccion = document.getElementById("modalCorreccion");
@@ -671,8 +674,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let duration = finMinutes - inicioMinutes;
     if (duration < 0) duration += 24 * 60;
-    const inicioTexto = `${inicioHora}:${inicioMin} ${inicioMom}`;
-    const finTexto = `${finHora}:${finMin} ${finMom}`;
+    const inicioHoraSimple = `${inicioHora}:${inicioMin}`;
+    const finHoraSimple = `${finHora}:${finMin}`;
+    const inicioTexto = `${inicioHoraSimple} ${inicioMom}`;
+    const finTexto = `${finHoraSimple} ${finMom}`;
     return {
       complete: true,
       fechaRango,
@@ -682,6 +687,9 @@ document.addEventListener("DOMContentLoaded", () => {
       finHora,
       finMin,
       finMom,
+      inicioHoraSimple,
+      finHoraSimple,
+      fechaHoraInicio: `${fechaRango} ${inicioHoraSimple}`,
       inicioTexto,
       finTexto,
       rangoTexto: `${inicioTexto} - ${finTexto}`,
@@ -712,7 +720,7 @@ document.addEventListener("DOMContentLoaded", () => {
     row.dataset.index = String(index);
     row.innerHTML = `
       <select data-field="responsable">${getResponsableOptionsHtml()}</select>
-      <input data-field="propina" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0">
+      <input data-field="propina" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Automático" readonly>
       <div class="apoyo-rango-wrap">
         <input data-field="fecha_rango" type="date" value="${new Date().toISOString().slice(0, 10)}">
         <div class="apoyo-rango-grid">
@@ -736,11 +744,6 @@ document.addEventListener("DOMContentLoaded", () => {
       </div>
     `;
 
-    const propinaInput = row.querySelector('[data-field="propina"]');
-    propinaInput?.addEventListener("input", () => {
-      normalizeApoyoPropinaInput(propinaInput);
-      marcarComoNoVerificado();
-    });
     row.querySelector('[data-field="responsable"]')?.addEventListener("change", marcarComoNoVerificado);
     row.querySelectorAll('select, input[type="date"]').forEach((el) => {
       el.addEventListener("change", marcarComoNoVerificado);
@@ -780,6 +783,9 @@ document.addEventListener("DOMContentLoaded", () => {
         rango_hora_inicio: range.complete ? range.inicioTexto : "",
         rango_hora_fin: range.complete ? range.finTexto : "",
         rango_hora_unificado: range.complete ? range.rangoTexto : "",
+        rango_hora_inicio_simple: range.complete ? range.inicioHoraSimple : "",
+        rango_hora_fin_simple: range.complete ? range.finHoraSimple : "",
+        rango_fecha_hora_inicio: range.complete ? range.fechaHoraInicio : "",
         fecha_rango: range.fechaRango || ""
       };
     });
@@ -814,9 +820,8 @@ document.addEventListener("DOMContentLoaded", () => {
     for (let i = 0; i < rows.length; i += 1) {
       const row = rows[i];
       const responsableApoyo = row.querySelector('[data-field="responsable"]')?.value || "";
-      const propinaApoyo = row.querySelector('[data-field="propina"]')?.value || "";
       const range = readApoyoRange(row);
-      if (!responsableApoyo || propinaApoyo === "" || !range.complete) {
+      if (!responsableApoyo || !range.complete) {
         setStatus(`Completa todos los campos del apoyo #${i + 1}.`);
         return false;
       }
@@ -824,6 +829,21 @@ document.addEventListener("DOMContentLoaded", () => {
     return true;
   };
 
+
+
+  const apoyosPropinaManager = initApoyosPropinaManager({
+    apoyoHubo,
+    apoyoCantidad,
+    apoyoRowsContainer,
+    propinaInput: inputsSoloVista.propina,
+    btnConsultarPropina: btnConsultarPropinaApoyos,
+    noteEl: apoyosConsultaNota,
+    setStatus,
+    getContextPayload,
+    buildApoyoPayload,
+    validateApoyoRows,
+    marcarComoNoVerificado: () => marcarComoNoVerificado()
+  });
   const toggleButtons = ({ consultar, verificar, enviar }) => {
     if (typeof consultar === "boolean") btnConsultar.disabled = !consultar;
     if (typeof verificar === "boolean") btnVerificar.disabled = !verificar;
@@ -1045,6 +1065,7 @@ document.addEventListener("DOMContentLoaded", () => {
     apoyoCantidadWrap?.classList.add("is-hidden");
     apoyoTablaWrap?.classList.add("is-hidden");
     if (apoyoRowsContainer) apoyoRowsContainer.innerHTML = "";
+    apoyosPropinaManager?.reset?.();
     marcarComoNoVerificado();
     applyVisibilitySettings();
   };
@@ -1572,6 +1593,7 @@ document.addEventListener("DOMContentLoaded", () => {
       inputsFinanzas.transferencias.sistema.value = data.transferencias_sistema ?? "";
       inputsFinanzas.bono_regalo.sistema.value = data.bono_regalo_sistema ?? "";
       inputsSoloVista.propina.value = data.propina ?? "";
+      apoyosPropinaManager?.reset?.();
       actualizarDomiciliosDesdeExtras();
       limpiarDiferencias();
 

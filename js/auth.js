@@ -1,8 +1,7 @@
 import { supabase } from "./supabase.js";
-import { APP_ROUTES } from "./config.js";
+import { APP_URLS } from "./urls.js";
 
-const DASHBOARD_URL = APP_ROUTES.dashboard;
-const LOGIN_URL = APP_ROUTES.login;
+const LOGIN_URL = APP_URLS.login;
 
 /**
  * Verifica si hay una sesión activa.
@@ -34,8 +33,6 @@ export async function signInWithPassword(email, password) {
 
   if (error) throw error;
 
-  // Redirección inmediata tras autenticación exitosa.
-  window.location.href = DASHBOARD_URL;
   return data;
 }
 
