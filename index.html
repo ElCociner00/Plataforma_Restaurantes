@@ -37,8 +37,7 @@
 
   <script type="module">
     import { signInWithPassword } from "./js/auth.js";
-    import { APP_URLS } from "./js/urls.js";
-
+    import { resolvePostLoginRoute } from "./js/post_login_route.js";
     const form = document.getElementById("loginForm");
     const emailInput = document.getElementById("email");
     const passwordInput = document.getElementById("password");
@@ -53,7 +52,8 @@
 
       try {
         await signInWithPassword(email, password);
-        window.location.href = APP_URLS.dashboard;
+        const targetRoute = await resolvePostLoginRoute().catch(() => "./dashboard/");
+        window.location.href = targetRoute;
       } catch (error) {
         console.error("Error de inicio de sesión:", error);
         const message = String(error?.message || "");

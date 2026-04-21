@@ -3,6 +3,7 @@ import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 import { fetchResponsablesActivos } from "./responsables.js";
 import { getEmpresaPolicy, puedeEnviarDatos } from "./permisos.core.js";
+import { initApoyosPropinaManager } from "./apoyos.js";
 import {
   WEBHOOK_CONSULTAR_DATOS_CIERRE,
   WEBHOOK_LISTAR_RESPONSABLES,
@@ -51,6 +52,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const apoyoCantidadWrap = document.getElementById("apoyoCantidadWrap");
   const apoyoTablaWrap = document.getElementById("apoyoTablaWrap");
   const apoyoRowsContainer = document.getElementById("apoyoRows");
+  const btnConsultarPropinaApoyos = document.getElementById("consultarPropinaApoyos");
+  const apoyosConsultaNota = document.getElementById("apoyosConsultaNota");
   const correccionWrap = document.getElementById("correccionWrap");
   const btnSolicitarCorreccion = document.getElementById("solicitarCorreccion");
   const modalCorreccion = document.getElementById("modalCorreccion");
@@ -824,6 +827,21 @@ document.addEventListener("DOMContentLoaded", () => {
     return true;
   };
 
+
+
+  const apoyosPropinaManager = initApoyosPropinaManager({
+    apoyoHubo,
+    apoyoCantidad,
+    apoyoRowsContainer,
+    propinaInput: inputsSoloVista.propina,
+    btnConsultarPropina: btnConsultarPropinaApoyos,
+    noteEl: apoyosConsultaNota,
+    setStatus,
+    getContextPayload,
+    buildApoyoPayload,
+    validateApoyoRows,
+    marcarComoNoVerificado: () => marcarComoNoVerificado()
+  });
   const toggleButtons = ({ consultar, verificar, enviar }) => {
     if (typeof consultar === "boolean") btnConsultar.disabled = !consultar;
     if (typeof verificar === "boolean") btnVerificar.disabled = !verificar;
@@ -1045,6 +1063,7 @@ document.addEventListener("DOMContentLoaded", () => {
     apoyoCantidadWrap?.classList.add("is-hidden");
     apoyoTablaWrap?.classList.add("is-hidden");
     if (apoyoRowsContainer) apoyoRowsContainer.innerHTML = "";
+    apoyosPropinaManager?.reset?.();
     marcarComoNoVerificado();
     applyVisibilitySettings();
   };
@@ -1572,6 +1591,7 @@ document.addEventListener("DOMContentLoaded", () => {
       inputsFinanzas.transferencias.sistema.value = data.transferencias_sistema ?? "";
       inputsFinanzas.bono_regalo.sistema.value = data.bono_regalo_sistema ?? "";
       inputsSoloVista.propina.value = data.propina ?? "";
+      apoyosPropinaManager?.reset?.();
       actualizarDomiciliosDesdeExtras();
       limpiarDiferencias();
 
