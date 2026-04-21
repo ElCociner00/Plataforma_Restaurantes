@@ -1,4 +1,6 @@
 const WEBHOOK_CONSULTAR_PROPINA_APOYO = "https://n8n.enkrato.com/webhook/consultar_propina_apoyo";
+const BLOCK_MINUTES = 5;
+const ROUND_UNIT = 50;
 
 const asInt = (value) => {
   const n = Number(value);
@@ -6,39 +8,124 @@ const asInt = (value) => {
   return Math.max(0, Math.round(n));
 };
 
-const extractPropinaApoyos = (payload) => {
-  const candidates = [
-    payload?.propina_apoyos,
-    payload?.propina_apoyo,
-    payload?.valor_propina_apoyos,
-    payload?.valor,
-    payload?.propina,
-    payload?.data?.propina_apoyos,
-    payload?.data?.valor,
-    payload?.result?.propina_apoyos,
-    payload?.result?.valor
-  ];
-
-  const found = candidates.find((item) => item != null && item !== "");
-  return asInt(found);
+const toMinutes = (hhmm) => {
+  const [h, m] = String(hhmm || "").split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return (h * 60) + m;
 };
 
-const repartirPropina = ({ totalTurno, propinaApoyos, cantidadApoyos }) => {
-  const total = asInt(totalTurno);
-  const apoyoTotal = Math.min(total, asInt(propinaApoyos));
-  const personas = Math.max(1, asInt(cantidadApoyos) + 1);
+const normalizeRange = (start, end) => {
+  const s = toMinutes(start);
+  const e = toMinutes(end);
+  if (s == null || e == null) return null;
+  const safeEnd = e >= s ? e : e + (24 * 60);
+  return { start: s, end: safeEnd };
+};
 
-  const porPersona = Math.floor(apoyoTotal / personas);
-  const residual = apoyoTotal - (porPersona * personas);
+const normalizeResponseData = (payload) => {
+  if (!payload) return [];
+  if (Array.isArray(payload)) {
+    const first = payload[0];
+    if (Array.isArray(first?.data)) return first.data;
+    return payload;
+  }
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+};
 
-  const propinaBaseTurno = total - apoyoTotal;
-  const propinaFinalTurno = propinaBaseTurno + porPersona + residual;
+const roundToNearest = (value, unit = ROUND_UNIT) => {
+  if (!unit || unit <= 1) return asInt(value);
+  return Math.round(asInt(value) / unit) * unit;
+};
+
+const distributeByTimeline = ({
+  totalTurnoPropina,
+  turnoRange,
+  responsableId,
+  supportRows,
+  webhookRows
+}) => {
+  const totalTurno = asInt(totalTurnoPropina);
+  if (!turnoRange) {
+    return {
+      responsibleTip: totalTurno,
+      supportTips: Object.fromEntries(supportRows.map((row) => [row.apoyo_responsable_id, 0]))
+    };
+  }
+
+  const webhookMap = new Map(
+    (webhookRows || []).map((row) => [String(row?.apoyo_responsable_id || ""), asInt(row?.total_propina_periodo)])
+  );
+
+  const startCumulativeMap = new Map();
+  startCumulativeMap.set(turnoRange.start, totalTurno);
+
+  supportRows.forEach((row) => {
+    const key = String(row.apoyo_responsable_id || "");
+    const cumulative = webhookMap.get(key) || 0;
+    const current = startCumulativeMap.get(row.range.start);
+    if (current == null) {
+      startCumulativeMap.set(row.range.start, cumulative);
+      return;
+    }
+    // Si hay dos apoyos iniciando a la misma hora, debe coincidir. Se toma el mayor para no subestimar.
+    startCumulativeMap.set(row.range.start, Math.max(current, cumulative));
+  });
+
+  const sortedStarts = Array.from(startCumulativeMap.entries()).sort((a, b) => a[0] - b[0]);
+  const segmentTotals = [];
+
+  for (let i = 0; i < sortedStarts.length; i += 1) {
+    const [startMinute, currentCumulative] = sortedStarts[i];
+    const next = sortedStarts[i + 1];
+    const segmentEnd = next ? next[0] : turnoRange.end;
+    const nextCumulative = next ? next[1] : 0;
+    if (segmentEnd <= startMinute) continue;
+
+    const amount = Math.max(0, asInt(currentCumulative) - asInt(nextCumulative));
+    segmentTotals.push({ start: startMinute, end: segmentEnd, amount });
+  }
+
+  const totalsByPerson = new Map();
+  totalsByPerson.set(responsableId, 0);
+  supportRows.forEach((row) => totalsByPerson.set(String(row.apoyo_responsable_id || ""), 0));
+
+  segmentTotals.forEach((segment) => {
+    const duration = segment.end - segment.start;
+    const blocks = Math.max(1, Math.ceil(duration / BLOCK_MINUTES));
+    const blockValue = segment.amount / blocks;
+
+    for (let block = 0; block < blocks; block += 1) {
+      const blockStart = segment.start + (block * BLOCK_MINUTES);
+      const blockEnd = Math.min(segment.end, blockStart + BLOCK_MINUTES);
+      if (blockEnd <= blockStart) continue;
+
+      const present = [responsableId];
+      supportRows.forEach((row) => {
+        if (blockStart >= row.range.start && blockStart < row.range.end) {
+          present.push(String(row.apoyo_responsable_id || ""));
+        }
+      });
+
+      const share = blockValue / present.length;
+      present.forEach((id) => {
+        totalsByPerson.set(id, (totalsByPerson.get(id) || 0) + share);
+      });
+    }
+  });
+
+  const roundedSupport = {};
+  supportRows.forEach((row) => {
+    const key = String(row.apoyo_responsable_id || "");
+    roundedSupport[key] = roundToNearest(totalsByPerson.get(key) || 0);
+  });
+
+  const roundedSupportTotal = Object.values(roundedSupport).reduce((acc, value) => acc + asInt(value), 0);
+  const responsibleRounded = Math.max(0, totalTurno - roundedSupportTotal);
 
   return {
-    totalTurno: total,
-    apoyoTotal,
-    porPersona,
-    propinaFinalTurno
+    responsibleTip: responsibleRounded,
+    supportTips: roundedSupport
   };
 };
 
@@ -82,39 +169,53 @@ export function initApoyosPropinaManager({
     const context = await getContextPayload();
     if (!context) return null;
 
+    const apoyo = buildApoyoPayload(context);
+
     return {
       empresa_id: context.empresa_id,
       usuario_id: context.usuario_id,
       rol: context.rol,
       timestamp: context.timestamp,
-      apoyo: buildApoyoPayload(context)
+      apoyo
     };
   };
 
-  const applyDistribucion = ({ propinaApoyosWebhook }) => {
-    const rows = getApoyoRows();
-    const cantidadApoyos = rows.length;
+  const applyDistribucion = ({ consultaPayload, webhookPayload }) => {
+    const apoyo = consultaPayload?.apoyo || {};
+    const turnoRange = normalizeRange(apoyo?.hora_inicio, apoyo?.hora_fin);
 
-    const distribution = repartirPropina({
-      totalTurno: propinaInput.value,
-      propinaApoyos: propinaApoyosWebhook,
-      cantidadApoyos
+    const supportRows = (apoyo?.registros || [])
+      .map((row) => ({
+        ...row,
+        apoyo_responsable_id: String(row?.apoyo_responsable_id || ""),
+        range: normalizeRange(row?.rango_hora_inicio_simple, row?.rango_hora_fin_simple)
+      }))
+      .filter((row) => row.apoyo_responsable_id && row.range);
+
+    const result = distributeByTimeline({
+      totalTurnoPropina: propinaInput.value,
+      turnoRange,
+      responsableId: String(apoyo?.responsable_turno_id || "responsable_turno"),
+      supportRows,
+      webhookRows: normalizeResponseData(webhookPayload)
     });
 
-    rows.forEach((row) => {
+    getApoyoRows().forEach((row) => {
+      const apoyoId = String(row.querySelector('[data-field="responsable"]')?.value || "");
       const input = row.querySelector('[data-field="propina"]');
-      if (input) input.value = String(distribution.porPersona);
+      if (!input) return;
+      input.value = String(asInt(result.supportTips[apoyoId] || 0));
     });
 
-    propinaInput.value = String(distribution.propinaFinalTurno);
+    propinaInput.value = String(asInt(result.responsibleTip));
     ensureReadonlyApoyoPropinas();
     repartoActivo = true;
     marcarComoNoVerificado();
 
+    const supportTotal = Object.values(result.supportTips).reduce((acc, value) => acc + asInt(value), 0);
     setStatus(
-      `Propina apoyos consultada: ${distribution.apoyoTotal}. `
-      + `Reparto: ${distribution.porPersona} por persona. `
-      + `Propina final del turno: ${distribution.propinaFinalTurno}.`
+      `Propina apoyos distribuida por bloques de 5 minutos. `
+      + `Responsable: ${result.responsibleTip}. Apoyos: ${supportTotal}.`
     );
   };
 
@@ -125,12 +226,12 @@ export function initApoyosPropinaManager({
     }
 
     if (!validateApoyoRows()) {
-      setStatus("Completa los datos de apoyos antes de consultar propina (responsable, horario y filas completas).");
+      setStatus("Completa los datos de apoyos antes de consultar propina (responsable y horario). No se llena propina manual.");
       return;
     }
 
-    const payload = await buildConsultaPayload();
-    if (!payload) return;
+    const consultaPayload = await buildConsultaPayload();
+    if (!consultaPayload) return;
 
     setStatus("Consultando propina de apoyos...");
     btnConsultarPropina.disabled = true;
@@ -139,7 +240,7 @@ export function initApoyosPropinaManager({
       const response = await fetch(WEBHOOK_CONSULTAR_PROPINA_APOYO, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(consultaPayload)
       });
 
       const data = await response.json().catch(() => ({}));
@@ -148,8 +249,7 @@ export function initApoyosPropinaManager({
         return;
       }
 
-      const propinaApoyos = extractPropinaApoyos(data);
-      applyDistribucion({ propinaApoyosWebhook: propinaApoyos });
+      applyDistribucion({ consultaPayload, webhookPayload: data });
     } catch (error) {
       setStatus(`Error consultando propina de apoyos: ${error?.message || "sin detalle"}`);
     } finally {
@@ -170,7 +270,7 @@ export function initApoyosPropinaManager({
   apoyoCantidad?.addEventListener("change", notifyResetIfNeeded);
 
   if (noteEl) {
-    noteEl.textContent = "Antes de consultar, completa los datos de apoyos (responsable + horario) para enviarlos al webhook.";
+    noteEl.textContent = "Antes de consultar, completa los datos de apoyos (responsable + horario). La propina de apoyos es automática y no editable.";
   }
 
   ensureReadonlyApoyoPropinas();
@@ -182,7 +282,14 @@ export function initApoyosPropinaManager({
   return { reset };
 }
 
-export const APOYOS_PROPINA_RESPONSE_SAMPLE = {
-  header: "propina_apoyos",
-  valor: 3000
-};
+export const APOYOS_PROPINA_RESPONSE_SAMPLE = [
+  {
+    data: [
+      {
+        empresa_id: "empresa_id",
+        apoyo_responsable_id: "usuario_apoyo_id",
+        total_propina_periodo: 0
+      }
+    ]
+  }
+];
