@@ -63,7 +63,7 @@ export function initApoyosPropinaManager({
 
   const getApoyoRows = () => Array.from(apoyoRowsContainer.querySelectorAll(".apoyo-row"));
 
-  const lockApoyoPropinas = () => {
+  const ensureReadonlyApoyoPropinas = () => {
     getApoyoRows().forEach((row) => {
       const input = row.querySelector('[data-field="propina"]');
       if (!input) return;
@@ -73,19 +73,9 @@ export function initApoyosPropinaManager({
     });
   };
 
-  const unlockApoyoPropinas = () => {
-    getApoyoRows().forEach((row) => {
-      const input = row.querySelector('[data-field="propina"]');
-      if (!input) return;
-      input.readOnly = false;
-      input.removeAttribute("readonly");
-      input.removeAttribute("title");
-    });
-  };
-
   const reset = () => {
     repartoActivo = false;
-    unlockApoyoPropinas();
+    ensureReadonlyApoyoPropinas();
   };
 
   const buildConsultaPayload = async () => {
@@ -117,7 +107,7 @@ export function initApoyosPropinaManager({
     });
 
     propinaInput.value = String(distribution.propinaFinalTurno);
-    lockApoyoPropinas();
+    ensureReadonlyApoyoPropinas();
     repartoActivo = true;
     marcarComoNoVerificado();
 
@@ -168,6 +158,7 @@ export function initApoyosPropinaManager({
   });
 
   const notifyResetIfNeeded = () => {
+    ensureReadonlyApoyoPropinas();
     if (!repartoActivo) return;
     reset();
     setStatus("Se detectaron cambios en apoyos; vuelve a consultar propina para recalcular reparto.");
@@ -181,6 +172,12 @@ export function initApoyosPropinaManager({
   if (noteEl) {
     noteEl.textContent = "Antes de consultar, completa los datos de apoyos (responsable + horario) para enviarlos al webhook.";
   }
+
+  ensureReadonlyApoyoPropinas();
+  const observer = new MutationObserver(() => {
+    ensureReadonlyApoyoPropinas();
+  });
+  observer.observe(apoyoRowsContainer, { childList: true, subtree: true });
 
   return { reset };
 }
