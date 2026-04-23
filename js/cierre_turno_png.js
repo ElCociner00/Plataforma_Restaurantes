@@ -65,10 +65,10 @@ const getSnapshotRows = ({
 
   const totales = [
     ["Total ingresos sistema", totalSistema],
-    ["Total ingresos reales", totalReal],
+    ["Total ventas", totalReal],
     ["Total gastos", totalGastos],
-    ["Venta bruta", ventaBruta],
-    ["Venta neta", ventaNeta],
+    ["Venta bruta (sin gastos)", ventaBruta],
+    ["Venta neta (después de gastos)", ventaNeta],
     ["Diferencia general", diferenciaGeneral]
   ];
 
@@ -100,6 +100,19 @@ export const descargarImagenResumenCierreTurno = ({
   const marcaAxioma = "AXIOMA by Global Nexo Shop";
   const fechaExpedicion = new Date().toLocaleDateString("es-CO");
   const fechaNombre = (meta.fecha || new Date().toISOString().slice(0, 10));
+
+  // Obtener propina del responsable (primer apoyo o valor separado)
+  const propinaResponsable = snapshotContext.inputsSoloVista?.propina?.value || "0";
+  
+  // Agregar responsable a la lista de apoyos con su propina
+  const responsableRow = {
+    responsable: meta.responsableTexto || "Responsable",
+    propina: propinaResponsable,
+    tiempo_texto: `${meta.horaInicio || "00:00"} - ${meta.horaFin || "00:00"}`,
+    es_responsable: true
+  };
+  
+  const apoyosConResponsable = [responsableRow, ...apoyos];
 
   const PAGE_WIDTH = 1080;
   const PAGE_HEIGHT = 1920;
@@ -151,41 +164,44 @@ export const descargarImagenResumenCierreTurno = ({
   };
 
   const drawHighlightedCards = (ctx) => {
-    const highlights = [
-      ["Efectivo apertura", formatCOP(meta.efectivoApertura || 0)],
-      ["Bolsa", formatCOP(meta.bolsa || 0)],
-      ["Caja", formatCOP(meta.caja || 0)],
-      ["Total ingresos reales", formatCOP(snapshotContext.getTotalIngresosReales())]
-    ];
-    const headerY = cardY + 334;
-    const rowY = headerY + 14;
-    const colW = [0.25, 0.25, 0.25, 0.25].map((r) => Math.floor(tableW * r));
-    const rowHLocal = 58;
-
-    let x = tableX;
-    ctx.fillStyle = "#ede9fe";
-    ctx.strokeStyle = "#c4b5fd";
-    ctx.lineWidth = 1;
-    ctx.fillRect(tableX, rowY, tableW, rowHLocal);
-    ctx.strokeRect(tableX, rowY, tableW, rowHLocal);
-
-    highlights.forEach(([label, value], idx) => {
-      if (idx > 0) {
-        ctx.beginPath();
-        ctx.moveTo(x, rowY);
-        ctx.lineTo(x, rowY + rowHLocal);
-        ctx.stroke();
-      }
-      ctx.fillStyle = "#5b21b6";
-      ctx.font = "bold 14px Arial";
-      ctx.fillText(label, x + 10, rowY + 22);
-      ctx.fillStyle = "#312e81";
-      ctx.font = "bold 18px Arial";
-      ctx.fillText(value, x + 10, rowY + 45);
-      x += colW[idx];
-    });
-
-    return rowY + rowHLocal + 18;
+    let startY = cardY + 260;
+    const spacing = 48;
+    
+    // Efectivo apertura (separado)
+    ctx.fillStyle = "#5b21b6";
+    ctx.font = "bold 22px Arial";
+    ctx.fillText("Efectivo apertura:", tableX + 10, startY);
+    ctx.fillStyle = "#312e81";
+    ctx.font = "bold 22px Arial";
+    ctx.fillText(formatCOP(meta.efectivoApertura || 0), tableX + 280, startY);
+    startY += spacing;
+    
+    // Bolsa y Caja (juntos pero separados)
+    ctx.fillStyle = "#5b21b6";
+    ctx.font = "bold 22px Arial";
+    ctx.fillText("Bolsa:", tableX + 10, startY);
+    ctx.fillStyle = "#312e81";
+    ctx.font = "bold 22px Arial";
+    ctx.fillText(formatCOP(meta.bolsa || 0), tableX + 150, startY);
+    
+    ctx.fillStyle = "#5b21b6";
+    ctx.font = "bold 22px Arial";
+    ctx.fillText("Caja:", tableX + 350, startY);
+    ctx.fillStyle = "#312e81";
+    ctx.font = "bold 22px Arial";
+    ctx.fillText(formatCOP(meta.caja || 0), tableX + 490, startY);
+    startY += spacing;
+    
+    // Total ventas (sin efectivo apertura)
+    ctx.fillStyle = "#5b21b6";
+    ctx.font = "bold 22px Arial";
+    ctx.fillText("Total ventas (sin efectivo apertura):", tableX + 10, startY);
+    ctx.fillStyle = "#9b4d96";
+    ctx.font = "bold 26px Arial";
+    ctx.fillText(formatCOP(snapshotContext.getTotalIngresosReales()), tableX + 470, startY);
+    startY += spacing + 20;
+    
+    return startY;
   };
 
   const buildCanvas = (pageApoyos = [], pageNumber = 1, totalPages = 1, isApoyoContinuation = false) => {
@@ -201,7 +217,8 @@ export const descargarImagenResumenCierreTurno = ({
     ctx.fillStyle = "#5b21b6";
     ctx.font = "bold 30px Arial";
     ctx.fillText("Datos financieros del turno", cardX + 36, y);
-    y += 24;
+    y += 34;
+    
     const colW = [0.36, 0.22, 0.22, 0.2].map((r) => Math.floor(tableW * r));
 
     const drawRow = (rowY, cols, header = false) => {
@@ -316,13 +333,13 @@ export const descargarImagenResumenCierreTurno = ({
       let apoyoY = gastoY + 26;
       ctx.fillStyle = "#5b21b6";
       ctx.font = "bold 30px Arial";
-      ctx.fillText(isApoyoContinuation ? "Apoyos (continuación)" : "Apoyos del turno", cardX + 36, apoyoY);
+      ctx.fillText(isApoyoContinuation ? "Apoyos y propinas (continuación)" : "Apoyos y propinas", cardX + 36, apoyoY);
       apoyoY += 16;
 
       const apoyoCols = [0.45, 0.2, 0.35].map((r) => Math.floor(tableW * r));
-      const drawApoyo = (rowY, cols, header = false) => {
+      const drawApoyo = (rowY, cols, header = false, isResponsable = false) => {
         let x = tableX;
-        ctx.fillStyle = header ? "#ede9fe" : "#ffffff";
+        ctx.fillStyle = header ? "#ede9fe" : (isResponsable ? "#fae8ff" : "#ffffff");
         ctx.fillRect(tableX, rowY, tableW, rowH);
         ctx.strokeRect(tableX, rowY, tableW, rowH);
         cols.forEach((col, i) => {
@@ -332,14 +349,14 @@ export const descargarImagenResumenCierreTurno = ({
             ctx.lineTo(x, rowY + rowH);
             ctx.stroke();
           }
-          ctx.fillStyle = "#27272a";
+          ctx.fillStyle = isResponsable ? "#9b4d96" : "#27272a";
           ctx.font = header ? "bold 19px Arial" : "18px Arial";
           ctx.fillText(String(col), x + 8, rowY + 27);
           x += apoyoCols[i];
         });
       };
 
-      drawApoyo(apoyoY + 14, ["Responsable", "Propina", "Tiempo"], true);
+      drawApoyo(apoyoY + 14, ["Responsable / Apoyo", "Propina", "Tiempo / Rango"], true);
       let rowY = apoyoY + 14 + rowH;
       (pageApoyos.length ? pageApoyos : [["Sin apoyos", "0", "-"]]).forEach((item) => {
         const cols = Array.isArray(item)
@@ -349,7 +366,7 @@ export const descargarImagenResumenCierreTurno = ({
             typeof item.propina === "string" ? item.propina : formatCOP(item.propina || 0),
             item.tiempo_texto || "-"
           ];
-        drawApoyo(rowY, cols);
+        drawApoyo(rowY, cols, false, item?.es_responsable === true);
         rowY += rowH;
       });
     }
@@ -366,7 +383,7 @@ export const descargarImagenResumenCierreTurno = ({
   const firstPageMax = 6;
   const continuationMax = 18;
   const pagesApoyos = [];
-  const apoyoItems = Array.isArray(apoyos) ? apoyos : [];
+  const apoyoItems = Array.isArray(apoyosConResponsable) ? apoyosConResponsable : [];
   if (!apoyoItems.length) {
     pagesApoyos.push([{
       responsable: "Turno culminado sin apoyos",
