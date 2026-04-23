@@ -1,3 +1,29 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/visualizacion_cierre_inventarios_historico.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `getTimestamp` (línea aprox. 9): Obtiene un valor o recurso.
+ * - `getGeneralVisibilityKey` (línea aprox. 14): Obtiene un valor o recurso.
+ * - `getDetailVisibilityColumnsKey` (línea aprox. 15): Obtiene un valor o recurso.
+ * - `getProductVisibilityKey` (línea aprox. 16): Obtiene un valor o recurso.
+ * - `getDetailRowVisibilityKey` (línea aprox. 17): Obtiene un valor o recurso.
+ * - `getGeneralOrderKey` (línea aprox. 18): Obtiene un valor o recurso.
+ * - `getDetailOrderKey` (línea aprox. 19): Obtiene un valor o recurso.
+ * - `loadJson` (línea aprox. 21): Carga datos.
+ * - `saveJson` (línea aprox. 27): Guarda información.
+ * - `normalizeRows` (línea aprox. 32): Bloque funcional del módulo.
+ * - `renderList` (línea aprox. 42): Renderiza/actualiza UI.
+ * - `loadSettingsPanels` (línea aprox. 83): Carga datos.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { getUserContext } from "./session.js";
 import { WEBHOOK_HISTORICO_CIERRE_INVENTARIOS_DATOS } from "./webhooks.js";
 

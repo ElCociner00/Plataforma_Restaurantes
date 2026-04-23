@@ -1,3 +1,30 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/facturacion.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `getFacturaRoot` (línea aprox. 6): Obtiene un valor o recurso.
+ * - `fmtMoney` (línea aprox. 19): Bloque funcional del módulo.
+ * - `fmtDate` (línea aprox. 20): Bloque funcional del módulo.
+ * - `fmtDateTime` (línea aprox. 25): Bloque funcional del módulo.
+ * - `escapeHtml` (línea aprox. 31): Bloque funcional del módulo.
+ * - `normalizeInlineText` (línea aprox. 38): Bloque funcional del módulo.
+ * - `amountInWordsEs` (línea aprox. 137): Bloque funcional del módulo.
+ * - `attemptStatusBadge` (línea aprox. 141): Bloque funcional del módulo.
+ * - `cycleStatusLabel` (línea aprox. 148): Bloque funcional del módulo.
+ * - `renderFactura` (línea aprox. 167): Renderiza/actualiza UI.
+ * - `renderUploadForm` (línea aprox. 251): Renderiza/actualiza UI.
+ * - `renderHistory` (línea aprox. 266): Renderiza/actualiza UI.
+ * - `renderStaticShell` (línea aprox. 397): Renderiza/actualiza UI.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { supabase } from "./supabase.js";
 import { buildRequestHeaders, getSessionConEmpresa } from "./session.js";
 import { WEBHOOKS } from "./webhooks.js";

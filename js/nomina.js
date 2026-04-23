@@ -1,3 +1,28 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/nomina.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `fmtMoney` (línea aprox. 36): Bloque funcional del módulo.
+ * - `setStatus` (línea aprox. 42): Asigna/actualiza estado.
+ * - `setDefaultDates` (línea aprox. 46): Asigna/actualiza estado.
+ * - `renderEmpleadoOptions` (línea aprox. 55): Renderiza/actualiza UI.
+ * - `renderResumen` (línea aprox. 66): Renderiza/actualiza UI.
+ * - `renderMovimientos` (línea aprox. 82): Renderiza/actualiza UI.
+ * - `renderComprobanteHeader` (línea aprox. 113): Renderiza/actualiza UI.
+ * - `consultarNomina` (línea aprox. 130): Gestiona información financiera o de pagos.
+ * - `descargarComprobante` (línea aprox. 166): Bloque funcional del módulo.
+ * - `drawTable` (línea aprox. 221): Bloque funcional del módulo.
+ * - `init` (línea aprox. 269): Inicializa/configura comportamiento.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { getUserContext } from "./session.js";
 import { fetchResponsablesActivos } from "./responsables.js";
 import { getActiveEnvironment } from "./environment.js";

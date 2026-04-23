@@ -1,3 +1,32 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/gestion_usuarios.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `normalize` (línea aprox. 7): Bloque funcional del módulo.
+ * - `normalizeKey` (línea aprox. 8): Bloque funcional del módulo.
+ * - `escapeHtml` (línea aprox. 9): Bloque funcional del módulo.
+ * - `setEstado` (línea aprox. 16): Asigna/actualiza estado.
+ * - `getActivoDesdeEstado` (línea aprox. 20): Obtiene un valor o recurso.
+ * - `buildEmpresaName` (línea aprox. 33): Construye estructuras de datos.
+ * - `ensureFilters` (línea aprox. 35): Bloque funcional del módulo.
+ * - `hydrateEmpresaFilter` (línea aprox. 52): Trabaja con contexto o datos de empresa.
+ * - `cargarEmpresas` (línea aprox. 72): Trabaja con contexto o datos de empresa.
+ * - `cargarData` (línea aprox. 81): Bloque funcional del módulo.
+ * - `render` (línea aprox. 138): Renderiza/actualiza UI.
+ * - `syncEmpleadoEstado` (línea aprox. 195): Sincroniza valores/estado.
+ * - `actualizarEstadoUsuario` (línea aprox. 202): Bloque funcional del módulo.
+ * - `refreshData` (línea aprox. 221): Bloque funcional del módulo.
+ * - `init` (línea aprox. 228): Inicializa/configura comportamiento.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 

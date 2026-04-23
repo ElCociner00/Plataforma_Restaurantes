@@ -1,3 +1,30 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/permisos.core.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `normalizeEmail` (línea aprox. 15): Bloque funcional del módulo.
+ * - `normalizePlan` (línea aprox. 17): Bloque funcional del módulo.
+ * - `normalizeActiva` (línea aprox. 22): Bloque funcional del módulo.
+ * - `parseYmd` (línea aprox. 44): Interpreta/normaliza datos.
+ * - `toUtcMidday` (línea aprox. 50): Bloque funcional del módulo.
+ * - `diffDaysFromToday` (línea aprox. 55): Bloque funcional del módulo.
+ * - `getSuspensionDate` (línea aprox. 63): Obtiene un valor o recurso.
+ * - `resolveBillingReadOnlyState` (línea aprox. 70): Bloque funcional del módulo.
+ * - `normalizeModuleKey` (línea aprox. 162): Bloque funcional del módulo.
+ * - `normalizePermitido` (línea aprox. 163): Bloque funcional del módulo.
+ * - `normalizePermisosArray` (línea aprox. 164): Gestiona políticas de acceso/permisos.
+ * - `resolveRole` (línea aprox. 171): Bloque funcional del módulo.
+ * - `applyRowsAsAvailabilitySource` (línea aprox. 219): Aplica reglas o cambios.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { supabase } from "./supabase.js";
 import { getUserContext, obtenerUsuarioActual } from "./session.js";
 import { isEmpresaReadOnlyPlan, normalizeEmpresaActiva, resolveEmpresaPlan } from "./plan.js";

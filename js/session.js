@@ -1,3 +1,21 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/session.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `normalizeRole` (línea aprox. 7): Bloque funcional del módulo.
+ * - `sanitizePermisos` (línea aprox. 11): Gestiona políticas de acceso/permisos.
+ * - `mapContextPayload` (línea aprox. 16): Bloque funcional del módulo.
+ * - `ensureAuthCacheInvalidation` (línea aprox. 37): Bloque funcional del módulo.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { supabase } from "./supabase.js";
 import { getCurrentUser } from "./auth.js";
 

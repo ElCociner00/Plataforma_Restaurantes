@@ -1,3 +1,19 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/entorno_selector.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `goByRole` (línea aprox. 11): Bloque funcional del módulo.
+ * - `initRoleUi` (línea aprox. 27): Inicializa/configura comportamiento.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { getUserContext } from "./session.js";
 import { ENV_LOGGRO, ENV_SIIGO, setActiveEnvironment } from "./environment.js";
 import { getPermisosEfectivos } from "./permisos.core.js";

@@ -1,3 +1,22 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/revision_pagos.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `setStatus` (línea aprox. 14): Asigna/actualiza estado.
+ * - `fmtMoney` (línea aprox. 15): Bloque funcional del módulo.
+ * - `fmtDate` (línea aprox. 16): Bloque funcional del módulo.
+ * - `escapeHtml` (línea aprox. 20): Bloque funcional del módulo.
+ * - `render` (línea aprox. 33): Renderiza/actualiza UI.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { supabase } from "./supabase.js";
 import { esSuperAdmin } from "./permisos.core.js";
 import { getUserContext } from "./session.js";

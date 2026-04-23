@@ -1,3 +1,35 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/cierre_inventarios.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `setStatus` (línea aprox. 45): Asigna/actualiza estado.
+ * - `setLoading` (línea aprox. 50): Asigna/actualiza estado.
+ * - `getTimestamp` (línea aprox. 72): Obtiene un valor o recurso.
+ * - `readResponseBody` (línea aprox. 74): Bloque funcional del módulo.
+ * - `fetchWithTimeout` (línea aprox. 84): Consulta datos remotos.
+ * - `getContextPayload` (línea aprox. 98): Obtiene un valor o recurso.
+ * - `cargarPoliticaEmpresa` (línea aprox. 110): Trabaja con contexto o datos de empresa.
+ * - `cargarNombreEmpresa` (línea aprox. 119): Trabaja con contexto o datos de empresa.
+ * - `normalizeList` (línea aprox. 138): Bloque funcional del módulo.
+ * - `parsePossiblyWrappedJson` (línea aprox. 139): Interpreta/normaliza datos.
+ * - `extractFromObjectValues` (línea aprox. 182): Bloque funcional del módulo.
+ * - `normalizeIdentifier` (línea aprox. 257): Bloque funcional del módulo.
+ * - `normalizeProductId` (línea aprox. 259): Bloque funcional del módulo.
+ * - `getProductId` (línea aprox. 272): Obtiene un valor o recurso.
+ * - `getProductName` (línea aprox. 282): Obtiene un valor o recurso.
+ * - `buildRowIndex` (línea aprox. 285): Construye estructuras de datos.
+ * - `getVisibilityKey` (línea aprox. 297): Obtiene un valor o recurso.
+ * - `getVisibilitySettings` (línea aprox. 299): Obtiene un valor o recurso.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { enforceNumericInput } from "../js/input_utils.js";
 import { getUserContext } from "../js/session.js";
 import { supabase } from "../js/supabase.js";

@@ -1,3 +1,29 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/proveedores_siigo.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `setStatus` (línea aprox. 15): Asigna/actualiza estado.
+ * - `escapeHtml` (línea aprox. 19): Bloque funcional del módulo.
+ * - `getTimestamp` (línea aprox. 26): Obtiene un valor o recurso.
+ * - `parseResponse` (línea aprox. 28): Interpreta/normaliza datos.
+ * - `normalizeList` (línea aprox. 38): Bloque funcional del módulo.
+ * - `buildContextPayload` (línea aprox. 46): Construye estructuras de datos.
+ * - `mapProveedorRow` (línea aprox. 59): Bloque funcional del módulo.
+ * - `renderRows` (línea aprox. 67): Renderiza/actualiza UI.
+ * - `cargarProveedores` (línea aprox. 85): Bloque funcional del módulo.
+ * - `applyDefaultsByCodigoEspecial` (línea aprox. 118): Aplica reglas o cambios.
+ * - `validarFormulario` (línea aprox. 126): Bloque funcional del módulo.
+ * - `registrarNuevoProveedor` (línea aprox. 147): Bloque funcional del módulo.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { getUserContext } from "./session.js";
 import { WEBHOOK_SIIGO_PROVEEDORES_LISTAR, WEBHOOK_SIIGO_PROVEEDORES_REGISTRAR } from "./webhooks.js";
 import { enforceNumericInput } from "./input_utils.js";

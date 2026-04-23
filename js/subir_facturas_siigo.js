@@ -1,3 +1,35 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/subir_facturas_siigo.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `getTimestamp` (línea aprox. 37): Obtiene un valor o recurso.
+ * - `setStatus` (línea aprox. 68): Asigna/actualiza estado.
+ * - `format` (línea aprox. 69): Formatea datos para visualización.
+ * - `escapeCsv` (línea aprox. 70): Bloque funcional del módulo.
+ * - `escapeHtml` (línea aprox. 71): Bloque funcional del módulo.
+ * - `escapeAttr` (línea aprox. 77): Bloque funcional del módulo.
+ * - `normalizeBoolean` (línea aprox. 81): Bloque funcional del módulo.
+ * - `getInvoiceState` (línea aprox. 87): Obtiene un valor o recurso.
+ * - `ensureWarningModal` (línea aprox. 89): Bloque funcional del módulo.
+ * - `requestDeactivateConfirmation` (línea aprox. 111): Bloque funcional del módulo.
+ * - `close` (línea aprox. 115): Bloque funcional del módulo.
+ * - `onBackdrop` (línea aprox. 123): Gestiona un evento.
+ * - `onCancel` (línea aprox. 127): Gestiona un evento.
+ * - `onConfirm` (línea aprox. 128): Gestiona un evento.
+ * - `normalizeRows` (línea aprox. 139): Bloque funcional del módulo.
+ * - `safeParseJson` (línea aprox. 149): Bloque funcional del módulo.
+ * - `normalizeText` (línea aprox. 157): Bloque funcional del módulo.
+ * - `toReadableLabel` (línea aprox. 159): Bloque funcional del módulo.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 import {
