@@ -1,3 +1,35 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/cierre_turno.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `getTimestamp` (línea aprox. 129): Obtiene un valor o recurso.
+ * - `toNumberValue` (línea aprox. 143): Bloque funcional del módulo.
+ * - `formatCOP` (línea aprox. 148): Formatea datos para visualización.
+ * - `formatDurationLabel` (línea aprox. 155): Formatea datos para visualización.
+ * - `syncEfectivoRealFromCajaBolsa` (línea aprox. 162): Sincroniza valores/estado.
+ * - `getTotalGastosExtras` (línea aprox. 167): Obtiene un valor o recurso.
+ * - `getEfectivoSistemaBruto` (línea aprox. 171): Obtiene un valor o recurso.
+ * - `getEfectivoSistemaNeto` (línea aprox. 175): Obtiene un valor o recurso.
+ * - `getTotalIngresosSistema` (línea aprox. 177): Obtiene un valor o recurso.
+ * - `getTotalIngresosReales` (línea aprox. 186): Obtiene un valor o recurso.
+ * - `renderTotalizados` (línea aprox. 195): Renderiza/actualiza UI.
+ * - `syncEfectivoSistemaDisplay` (línea aprox. 211): Sincroniza valores/estado.
+ * - `syncTotalesExtras` (línea aprox. 224): Sincroniza valores/estado.
+ * - `setStatus` (línea aprox. 254): Asigna/actualiza estado.
+ * - `readResponseBody` (línea aprox. 258): Bloque funcional del módulo.
+ * - `enviarAlertaManipulacion` (línea aprox. 268): Bloque funcional del módulo.
+ * - `refreshEstadoBotonSubir` (línea aprox. 297): Bloque funcional del módulo.
+ * - `aplicarBloqueoConstancia` (línea aprox. 302): Bloque funcional del módulo.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { enforceNumericInput } from "./input_utils.js";
 import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";

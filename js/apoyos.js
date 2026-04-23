@@ -1,3 +1,29 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/apoyos.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `asInt` (línea aprox. 5): Bloque funcional del módulo.
+ * - `toMinutes` (línea aprox. 11): Bloque funcional del módulo.
+ * - `normalizeRange` (línea aprox. 17): Bloque funcional del módulo.
+ * - `normalizeResponseData` (línea aprox. 25): Bloque funcional del módulo.
+ * - `roundToNearest` (línea aprox. 36): Bloque funcional del módulo.
+ * - `distributeByTimeline` (línea aprox. 41): Bloque funcional del módulo.
+ * - `getApoyoRows` (línea aprox. 151): Obtiene un valor o recurso.
+ * - `ensureReadonlyApoyoPropinas` (línea aprox. 153): Bloque funcional del módulo.
+ * - `reset` (línea aprox. 163): Restablece estado.
+ * - `buildConsultaPayload` (línea aprox. 168): Construye estructuras de datos.
+ * - `applyDistribucion` (línea aprox. 183): Aplica reglas o cambios.
+ * - `notifyResetIfNeeded` (línea aprox. 260): Bloque funcional del módulo.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 const WEBHOOK_CONSULTAR_PROPINA_APOYO = "https://n8n.enkrato.com/webhook/consultar_propina_apoyo";
 const BLOCK_MINUTES = 5;
 const ROUND_UNIT = 50;

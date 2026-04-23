@@ -1,3 +1,31 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/permisos.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `normalizePages` (línea aprox. 35): Bloque funcional del módulo.
+ * - `formatPageLabel` (línea aprox. 38): Formatea datos para visualización.
+ * - `isBlockedPermission` (línea aprox. 44): Bloque funcional del módulo.
+ * - `getRoleDefaults` (línea aprox. 46): Obtiene un valor o recurso.
+ * - `mergeRoleDefaults` (línea aprox. 48): Bloque funcional del módulo.
+ * - `escapeHtml` (línea aprox. 52): Bloque funcional del módulo.
+ * - `renderSummary` (línea aprox. 59): Renderiza/actualiza UI.
+ * - `renderTable` (línea aprox. 92): Renderiza/actualiza UI.
+ * - `setStatus` (línea aprox. 141): Asigna/actualiza estado.
+ * - `persistPermissionChange` (línea aprox. 145): Bloque funcional del módulo.
+ * - `handleToggle` (línea aprox. 175): Maneja eventos/acciones.
+ * - `handleBulkAction` (línea aprox. 210): Maneja eventos/acciones.
+ * - `attachTableHandlers` (línea aprox. 255): Bloque funcional del módulo.
+ * - `loadPermissions` (línea aprox. 261): Carga datos.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { buildRequestHeaders, getCurrentEmpresaId, getUserContext } from "./session.js";
 import { WEBHOOKS } from "./webhooks.js";
 import { permisosCacheSet } from "./permisos.core.js";

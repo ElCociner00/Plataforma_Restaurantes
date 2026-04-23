@@ -1,3 +1,19 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/permisos.emergencia.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `normalizeRole` (línea aprox. 1): Bloque funcional del módulo.
+ * - `normalizeModule` (línea aprox. 2): Bloque funcional del módulo.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 const normalizeRole = (value) => String(value || "").trim().toLowerCase();
 const normalizeModule = (value) => String(value || "").trim().toLowerCase();
 

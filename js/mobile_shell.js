@@ -1,3 +1,26 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/mobile_shell.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `getViewportMeta` (línea aprox. 7): Obtiene un valor o recurso.
+ * - `safeMatchMedia` (línea aprox. 8): Bloque funcional del módulo.
+ * - `ensureViewportMeta` (línea aprox. 12): Bloque funcional del módulo.
+ * - `ensureMobileCss` (línea aprox. 28): Bloque funcional del módulo.
+ * - `getHeaderLabels` (línea aprox. 37): Obtiene un valor o recurso.
+ * - `enhanceTableForMobile` (línea aprox. 46): Bloque funcional del módulo.
+ * - `enhanceTables` (línea aprox. 66): Bloque funcional del módulo.
+ * - `syncMobileMode` (línea aprox. 71): Sincroniza valores/estado.
+ * - `start` (línea aprox. 106): Bloque funcional del módulo.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { APP_URLS } from "./urls.js";
 
 const MOBILE_SHELL_STYLE_ID = "mobile-native-shell-css";

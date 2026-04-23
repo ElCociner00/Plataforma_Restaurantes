@@ -1,3 +1,35 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/historico_cierre_inventarios.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `getTimestamp` (línea aprox. 22): Obtiene un valor o recurso.
+ * - `getGeneralVisibilityKey` (línea aprox. 23): Obtiene un valor o recurso.
+ * - `getDetailVisibilityKey` (línea aprox. 24): Obtiene un valor o recurso.
+ * - `getDetailProductVisibilityKey` (línea aprox. 25): Obtiene un valor o recurso.
+ * - `getDetailColumnsVisibilityKey` (línea aprox. 26): Obtiene un valor o recurso.
+ * - `getGeneralOrderKey` (línea aprox. 27): Obtiene un valor o recurso.
+ * - `getDetailOrderKey` (línea aprox. 28): Obtiene un valor o recurso.
+ * - `loadJson` (línea aprox. 41): Carga datos.
+ * - `setStatus` (línea aprox. 47): Asigna/actualiza estado.
+ * - `formatValue` (línea aprox. 48): Formatea datos para visualización.
+ * - `toDateValue` (línea aprox. 50): Bloque funcional del módulo.
+ * - `normalizeTime` (línea aprox. 71): Bloque funcional del módulo.
+ * - `normalizeRows` (línea aprox. 73): Bloque funcional del módulo.
+ * - `filteredProducts` (línea aprox. 83): Bloque funcional del módulo.
+ * - `renderDetail` (línea aprox. 94): Renderiza/actualiza UI.
+ * - `getPagedRows` (línea aprox. 112): Obtiene un valor o recurso.
+ * - `renderPagination` (línea aprox. 117): Renderiza/actualiza UI.
+ * - `bindHeaderDrag` (línea aprox. 133): Bloque funcional del módulo.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 

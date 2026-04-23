@@ -1,3 +1,25 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/visualizacion_cierre_turno.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `getTimestamp` (línea aprox. 19): Obtiene un valor o recurso.
+ * - `getSettings` (línea aprox. 24): Obtiene un valor o recurso.
+ * - `saveSettings` (línea aprox. 34): Guarda información.
+ * - `loadExtrasSettings` (línea aprox. 39): Carga datos.
+ * - `saveExtrasSettings` (línea aprox. 49): Guarda información.
+ * - `fetchWithTimeout` (línea aprox. 54): Consulta datos remotos.
+ * - `normalizeExtras` (línea aprox. 68): Bloque funcional del módulo.
+ * - `loadExtras` (línea aprox. 108): Carga datos.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { getUserContext } from "./session.js";
 import { WEBHOOK_CONSULTAR_GASTOS_VISUALIZACION } from "./webhooks.js";
 

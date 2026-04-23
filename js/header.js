@@ -1,3 +1,26 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/header.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `ensureViewportMeta` (línea aprox. 33): Bloque funcional del módulo.
+ * - `getLogoSrc` (línea aprox. 41): Obtiene un valor o recurso.
+ * - `resolveRouteForEnv` (línea aprox. 43): Bloque funcional del módulo.
+ * - `obtenerNombreEmpresa` (línea aprox. 50): Trabaja con contexto o datos de empresa.
+ * - `getOrCreateHeader` (línea aprox. 66): Obtiene un valor o recurso.
+ * - `buildMenu` (línea aprox. 82): Construye estructuras de datos.
+ * - `wireHeaderEvents` (línea aprox. 144): Bloque funcional del módulo.
+ * - `renderFallbackHeader` (línea aprox. 180): Renderiza/actualiza UI.
+ * - `inferEnvironmentFromPath` (línea aprox. 207): Bloque funcional del módulo.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import "./mobile_shell.js";
 import { supabase } from "./supabase.js";
 import { clearUserContextCache, getUserContext } from "./session.js";

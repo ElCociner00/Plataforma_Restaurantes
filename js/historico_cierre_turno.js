@@ -1,3 +1,35 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/historico_cierre_turno.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `normalizeFieldKey` (línea aprox. 34): Bloque funcional del módulo.
+ * - `shouldExcludeGeneralField` (línea aprox. 35): Bloque funcional del módulo.
+ * - `getTimestamp` (línea aprox. 36): Obtiene un valor o recurso.
+ * - `setStatus` (línea aprox. 57): Asigna/actualiza estado.
+ * - `setLoading` (línea aprox. 61): Asigna/actualiza estado.
+ * - `getGeneralVisibilityKey` (línea aprox. 80): Obtiene un valor o recurso.
+ * - `getGeneralOrderKey` (línea aprox. 81): Obtiene un valor o recurso.
+ * - `getDetailVisibilityKey` (línea aprox. 82): Obtiene un valor o recurso.
+ * - `getDetailItemVisibilityKey` (línea aprox. 83): Obtiene un valor o recurso.
+ * - `loadJson` (línea aprox. 85): Carga datos.
+ * - `saveJson` (línea aprox. 95): Guarda información.
+ * - `fetchWithTimeout` (línea aprox. 97): Consulta datos remotos.
+ * - `normalizeRows` (línea aprox. 99): Bloque funcional del módulo.
+ * - `formatCellValue` (línea aprox. 122): Formatea datos para visualización.
+ * - `normalizeInlineText` (línea aprox. 129): Bloque funcional del módulo.
+ * - `formatSummaryMetric` (línea aprox. 139): Formatea datos para visualización.
+ * - `toReadableLabel` (línea aprox. 141): Bloque funcional del módulo.
+ * - `normalizeSearchText` (línea aprox. 146): Bloque funcional del módulo.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { buildRequestHeaders, getUserContext } from "./session.js";
 import { fetchResponsablesActivos } from "./responsables.js";
 import { supabase } from "./supabase.js";

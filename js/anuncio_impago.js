@@ -1,3 +1,35 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/anuncio_impago.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `ensureBannerStyles` (línea aprox. 30): Bloque funcional del módulo.
+ * - `getBogotaTodayYmd` (línea aprox. 39): Obtiene un valor o recurso.
+ * - `getBogotaDayKey` (línea aprox. 54): Obtiene un valor o recurso.
+ * - `extractYmd` (línea aprox. 59): Bloque funcional del módulo.
+ * - `ymdToUtcMidday` (línea aprox. 70): Bloque funcional del módulo.
+ * - `fmtDate` (línea aprox. 75): Bloque funcional del módulo.
+ * - `diffInDaysFromToday` (línea aprox. 86): Bloque funcional del módulo.
+ * - `getSuspensionDate` (línea aprox. 93): Obtiene un valor o recurso.
+ * - `isTruthy` (línea aprox. 100): Bloque funcional del módulo.
+ * - `isCycleUnpaid` (línea aprox. 104): Bloque funcional del módulo.
+ * - `shouldShowForDays` (línea aprox. 109): Bloque funcional del módulo.
+ * - `pickRelevantCycle` (línea aprox. 113): Bloque funcional del módulo.
+ * - `getCurrentPeriod` (línea aprox. 125): Obtiene un valor o recurso.
+ * - `getDisplayKey` (línea aprox. 130): Obtiene un valor o recurso.
+ * - `markAsShown` (línea aprox. 141): Bloque funcional del módulo.
+ * - `wasAlreadyShown` (línea aprox. 145): Bloque funcional del módulo.
+ * - `getMensajeHtml` (línea aprox. 165): Obtiene un valor o recurso.
+ * - `ocultarAnuncio` (línea aprox. 219): Bloque funcional del módulo.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 import { IMPAGO_PAYMENT_METHOD_CODE, IMPAGO_PAYMENT_URL_FALLBACK } from "./anuncio_impago_config.js";

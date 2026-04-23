@@ -1,3 +1,20 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/router.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `normalizePath` (línea aprox. 15): Bloque funcional del módulo.
+ * - `revealPage` (línea aprox. 22): Bloque funcional del módulo.
+ * - `rememberRequestedPath` (línea aprox. 27): Bloque funcional del módulo.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { supabase } from "./supabase.js";
 import { APP_ROUTES } from "./config.js";
 import { resolvePostLoginRoute } from "./post_login_route.js";

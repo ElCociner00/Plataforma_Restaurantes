@@ -1,3 +1,30 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/visualizacion_cierre_turno_historico.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `getTimestamp` (línea aprox. 12): Obtiene un valor o recurso.
+ * - `setStatus` (línea aprox. 14): Asigna/actualiza estado.
+ * - `getGeneralVisibilityKey` (línea aprox. 18): Obtiene un valor o recurso.
+ * - `getDetailVisibilityKey` (línea aprox. 19): Obtiene un valor o recurso.
+ * - `getDetailItemVisibilityKey` (línea aprox. 20): Obtiene un valor o recurso.
+ * - `loadSettings` (línea aprox. 22): Carga datos.
+ * - `saveSettings` (línea aprox. 32): Guarda información.
+ * - `fetchWithTimeout` (línea aprox. 37): Consulta datos remotos.
+ * - `normalizeRows` (línea aprox. 47): Bloque funcional del módulo.
+ * - `getDetailItemKey` (línea aprox. 59): Obtiene un valor o recurso.
+ * - `buildColumns` (línea aprox. 61): Construye estructuras de datos.
+ * - `renderSwitches` (línea aprox. 87): Renderiza/actualiza UI.
+ * - `loadColumns` (línea aprox. 113): Carga datos.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { getUserContext } from "./session.js";
 import { WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS } from "./webhooks.js";
 

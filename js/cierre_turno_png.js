@@ -1,3 +1,25 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/cierre_turno_png.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `getSnapshotRows` (línea aprox. 1): Obtiene un valor o recurso.
+ * - `drawHeader` (línea aprox. 92): Bloque funcional del módulo.
+ * - `drawHighlightedCards` (línea aprox. 131): Bloque funcional del módulo.
+ * - `buildCanvas` (línea aprox. 169): Construye estructuras de datos.
+ * - `drawRow` (línea aprox. 185): Bloque funcional del módulo.
+ * - `drawGasto` (línea aprox. 225): Bloque funcional del módulo.
+ * - `drawTotal` (línea aprox. 258): Bloque funcional del módulo.
+ * - `drawApoyo` (línea aprox. 301): Bloque funcional del módulo.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 const getSnapshotRows = ({
   snapshotContext
 }) => {

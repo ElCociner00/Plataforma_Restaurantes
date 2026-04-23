@@ -1,3 +1,24 @@
+/**
+ * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
+ * Archivo: js/visualizacion_cierre_inventarios.js
+ *
+ * Partes del archivo:
+ * 1) Imports/constantes de configuración (dependencias y estado base).
+ * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
+ * 3) Lógica principal del módulo (flujo funcional).
+ * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
+ *
+ * Índice de funciones/bloques para ubicarte rápido:
+ * - `getTimestamp` (línea aprox. 6): Obtiene un valor o recurso.
+ * - `setStatus` (línea aprox. 8): Asigna/actualiza estado.
+ * - `normalizeList` (línea aprox. 12): Bloque funcional del módulo.
+ * - `getVisibilityKey` (línea aprox. 56): Obtiene un valor o recurso.
+ * - `saveSettings` (línea aprox. 58): Guarda información.
+ * - `loadSettings` (línea aprox. 63): Carga datos.
+ * - `loadProducts` (línea aprox. 73): Carga datos.
+ *
+ * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ */
 import { getUserContext } from "../js/session.js";
 import { WEBHOOK_CIERRE_INVENTARIOS_VISUALIZACION_PRODUCTOS } from "../js/webhooks.js";
 
