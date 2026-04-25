@@ -30,7 +30,6 @@ import { supabase } from "./supabase.js";
 import { WEBHOOK_NOMINA_CONSULTAR } from "./webhooks.js";
 import { drawPngBrandWatermark } from "./png_branding.js";
 
-const empresaInput = document.getElementById("nominaEmpresaContexto");
 const fechaInicioInput = document.getElementById("nominaFechaInicio");
 const fechaFinInput = document.getElementById("nominaFechaFin");
 const corteSelect = document.getElementById("nominaCorte");
@@ -56,7 +55,9 @@ const state = {
   context: null,
   responsables: [],
   empresa: null,
-  movimientos: []
+  movimientos: [],
+  empleadoDetalle: null,
+  periodoDetalle: null
 };
 
 const fmtMoney = (value) => Number(value || 0).toLocaleString("es-CO", {
@@ -157,14 +158,81 @@ const renderMovimientos = () => {
 };
 
 const renderComprobanteHeader = (empleado) => {
-  const fechaComprobante = fechaFinInput.value || new Date().toISOString().slice(0, 10);
+  const empleadoNombre = state.empleadoDetalle?.nombre || empleado?.nombre_completo || "-";
+  const empleadoCargo = state.empleadoDetalle?.cargo || empleado?.rol || "-";
+  const periodoInicio = state.periodoDetalle?.inicio || fechaInicioInput.value || "-";
+  const periodoFin = state.periodoDetalle?.fin || fechaFinInput.value || "-";
   empleadoDataEl.innerHTML = `
-    <div><strong>${empleado?.nombre_completo || "-"}</strong></div>
-    <div>${fechaComprobante}</div>
+    <div><strong>${empleadoNombre}</strong></div>
+    <div>Cargo: ${empleadoCargo}</div>
+    <div>Periodo: ${periodoInicio} - ${periodoFin}</div>
+    <div>Fecha: ${periodoFin}</div>
   `;
 };
 
-const normalizeNominaWebhookRows = (payload) => {
+const normalizeNominaWebhookRows = (payload, empleadoSeleccionado = null) => {
+  const fromPrototypePayload = (candidate) => {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return null;
+    const hasPrototype = candidate?.empleado && candidate?.periodo && candidate?.detalle_horas;
+    if (!hasPrototype) return null;
+
+    const horas = Object.entries(candidate.detalle_horas || {}).map(([tipo, value]) => ({
+      tipo: `Horas ${tipo.replaceAll("_", " ")}`,
+      naturaleza: "Devengo",
+      valor: Number(value?.total || 0),
+      fuente: "webhook",
+      metadata: { horas: Number(value?.horas || 0), valor_unitario: Number(value?.valor_unitario || 0) },
+      created_at: new Date().toISOString()
+    }));
+
+    const ingresosExtra = [
+      { key: "auxilio_transporte", label: "Auxilio de transporte" },
+      { key: "propinas", label: "Propinas" }
+    ].map((item) => ({
+      tipo: item.label,
+      naturaleza: "Devengo",
+      valor: Number(candidate?.[item.key] || 0),
+      fuente: "webhook",
+      metadata: null,
+      created_at: new Date().toISOString()
+    })).filter((item) => item.valor > 0);
+
+    const descuentos = (Array.isArray(candidate?.descuentos) ? candidate.descuentos : []).map((item) => ({
+      tipo: item?.concepto || "Descuento",
+      naturaleza: "Deducción",
+      valor: Number(item?.monto || 0),
+      fuente: "webhook",
+      metadata: null,
+      created_at: new Date().toISOString()
+    }));
+
+    const diferenciaCaja = Number(candidate?.diferencias_caja || 0);
+    if (diferenciaCaja !== 0) {
+      descuentos.push({
+        tipo: "Diferencias de caja",
+        naturaleza: "Deducción",
+        valor: Math.abs(diferenciaCaja),
+        fuente: "webhook",
+        metadata: { original: diferenciaCaja },
+        created_at: new Date().toISOString()
+      });
+    }
+
+    state.empleadoDetalle = {
+      nombre: candidate?.empleado?.nombre || empleadoSeleccionado?.nombre_completo || "-",
+      cargo: candidate?.empleado?.cargo || empleadoSeleccionado?.rol || "-"
+    };
+    state.periodoDetalle = {
+      inicio: candidate?.periodo?.inicio || fechaInicioInput.value,
+      fin: candidate?.periodo?.fin || fechaFinInput.value
+    };
+
+    return [...horas, ...ingresosExtra, ...descuentos];
+  };
+
+  const fromPrototype = fromPrototypePayload(payload);
+  if (fromPrototype) return fromPrototype;
+
   const pickRows = (candidate) => {
     if (Array.isArray(candidate)) return candidate;
     if (Array.isArray(candidate?.data)) return candidate.data;
@@ -174,6 +242,14 @@ const normalizeNominaWebhookRows = (payload) => {
   };
 
   const rows = pickRows(payload);
+  state.empleadoDetalle = {
+    nombre: payload?.empleado?.nombre || empleadoSeleccionado?.nombre_completo || "-",
+    cargo: payload?.empleado?.cargo || empleadoSeleccionado?.rol || "-"
+  };
+  state.periodoDetalle = {
+    inicio: payload?.periodo?.inicio || fechaInicioInput.value,
+    fin: payload?.periodo?.fin || fechaFinInput.value
+  };
   return rows.map((item) => ({
     tipo: item?.tipo || item?.concepto || "-",
     naturaleza: item?.naturaleza || item?.categoria || "-",
@@ -211,7 +287,7 @@ const consultarNomina = async () => {
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const webhookData = await response.json().catch(() => []);
-    rows = normalizeNominaWebhookRows(webhookData);
+    rows = normalizeNominaWebhookRows(webhookData, state.responsables.find((item) => item.id === empleadoId));
   } catch (_error) {
     const { data, error } = await supabase
       .from("nomina_movimientos")
@@ -230,6 +306,8 @@ const consultarNomina = async () => {
     }
 
     rows = Array.isArray(data) ? data : [];
+    state.empleadoDetalle = null;
+    state.periodoDetalle = null;
   }
 
   const empleado = state.responsables.find((item) => item.id === empleadoId);
@@ -280,10 +358,15 @@ const descargarComprobante = () => {
   ctx.fillText(`NIT ${state.empresa?.nit || "-"}`, leftX, y);
 
   let ry = 140;
-  const fechaComprobante = fechaFinInput.value || "-";
+  const empleadoNombre = state.empleadoDetalle?.nombre || empleado.nombre_completo || "-";
+  const empleadoCargo = state.empleadoDetalle?.cargo || empleado.rol || "-";
+  const periodoInicio = state.periodoDetalle?.inicio || fechaInicioInput.value || "-";
+  const periodoFin = state.periodoDetalle?.fin || fechaFinInput.value || "-";
   const lines = [
-    `Nombre: ${empleado.nombre_completo || "-"}`,
-    `Fecha: ${fechaComprobante}`
+    `Nombre: ${empleadoNombre}`,
+    `Cargo: ${empleadoCargo}`,
+    `Periodo: ${periodoInicio} - ${periodoFin}`,
+    `Fecha: ${periodoFin}`
   ];
   ctx.textAlign = "right";
   lines.forEach((line, index) => {
@@ -371,6 +454,7 @@ const init = async () => {
   empresaNombreEl.textContent = state.empresa?.nombre_comercial || "EMPRESA";
   empresaNitEl.textContent = `NIT ${state.empresa?.nit || "-"}`;
   renderMovimientos();
+  renderComprobanteHeader(null);
 };
 
 consultarBtn?.addEventListener("click", consultarNomina);
