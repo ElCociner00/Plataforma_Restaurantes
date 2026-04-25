@@ -16,6 +16,7 @@
  */
 import "./mobile_shell.js";
 import { APP_URLS } from "./urls.js";
+import { BRAND } from "./branding.js";
 const FOOTER_LINKS = [
   { label: "Términos y Condiciones", href: APP_URLS.legalTerminos },
   { label: "Política de Privacidad", href: APP_URLS.legalPrivacidad },
@@ -47,7 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   footer.innerHTML = `
     <div class="legal-footer-inner">
-      <p class="legal-copy">© 2026 AXIOMA-tech by Global Nexo SAS</p>
+      <p class="legal-copy">© 2026 ${BRAND.legalSignature}</p>
       <nav class="legal-links" aria-label="Legal">
         ${linksHtml}
       </nav>

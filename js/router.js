@@ -19,6 +19,7 @@ import { supabase } from "./supabase.js";
 import { APP_ROUTES } from "./config.js";
 import { resolvePostLoginRoute } from "./post_login_route.js";
 import { PUBLIC_PATHS } from "./urls.js";
+import { applyBrandingToDocumentTitle } from "./branding.js";
 
 const LOGIN_URL = APP_ROUTES.login;
 const DASHBOARD_URL = APP_ROUTES.dashboard;
@@ -101,6 +102,7 @@ export function initAuthRouter({ loginUrl = LOGIN_URL, publicPaths = [] } = {}) 
 }
 
 if (typeof window !== "undefined") {
+  applyBrandingToDocumentTitle();
   initAuthRouter().catch((error) => {
     console.error("Error inicializando auth router:", error);
     revealPage();
