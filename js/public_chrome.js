@@ -16,6 +16,7 @@
  */
 import "./mobile_shell.js";
 import { APP_URLS } from "./urls.js";
+import { BRAND, applyBrandingToDocumentTitle } from "./branding.js";
 
 const getLogoSrc = () => APP_URLS.logoImage;
 
@@ -25,8 +26,8 @@ function renderPublicHeader() {
   header.className = "app-header public-header";
   header.innerHTML = `
     <div class="logo public-logo">
-      <span class="logo-mark-wrap"><img src="${getLogoSrc()}" alt="Logo AXIOMA-tech" class="logo-mark" onerror="this.style.display='none'"/></span>
-      <span>AXIOMA-tech</span>
+      <span class="logo-mark-wrap"><img src="${getLogoSrc()}" alt="${BRAND.logoAlt}" class="logo-mark" onerror="this.style.display='none'"/></span>
+      <span>${BRAND.platformName}</span>
     </div>
   `;
   document.body.prepend(header);
@@ -34,6 +35,7 @@ function renderPublicHeader() {
 
 document.addEventListener("DOMContentLoaded", () => {
   try {
+    applyBrandingToDocumentTitle();
     if (!document.querySelector('meta[name="viewport"]')) {
       const meta = document.createElement("meta");
       meta.name = "viewport";

@@ -28,8 +28,9 @@ import { fetchResponsablesActivos } from "./responsables.js";
 import { getActiveEnvironment } from "./environment.js";
 import { supabase } from "./supabase.js";
 import { WEBHOOK_NOMINA_CONSULTAR } from "./webhooks.js";
+import { drawPngBrandWatermark } from "./png_branding.js";
 
-const empresaInput = document.getElementById("nominaEmpresa");
+const empresaInput = document.getElementById("nominaEmpresaContexto");
 const fechaInicioInput = document.getElementById("nominaFechaInicio");
 const fechaFinInput = document.getElementById("nominaFechaFin");
 const corteSelect = document.getElementById("nominaCorte");
@@ -40,7 +41,6 @@ const descargarBtn = document.getElementById("descargarComprobanteNomina");
 const totalDevengadoEl = document.getElementById("nominaTotalDevengado");
 const totalDeduccionesEl = document.getElementById("nominaTotalDeducciones");
 const totalNetoEl = document.getElementById("nominaTotalNeto");
-const movimientosBody = document.getElementById("nominaMovimientosBody");
 const statusEl = document.getElementById("nominaStatus");
 
 const empresaNombreEl = document.getElementById("nominaEmpresaNombre");
@@ -70,13 +70,45 @@ const setStatus = (message) => {
 };
 
 const setDefaultDates = () => {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth(), 15);
-  fechaInicioInput.value = start.toISOString().slice(0, 10);
-  fechaFinInput.value = end.toISOString().slice(0, 10);
   corteSelect.value = "quincenal";
+  updateDatesByCut();
 };
+
+const toIsoDate = (value) => new Date(value.getTime() - (value.getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
+
+const CUT_BACK_DAYS = {
+  semanal: 6,
+  quincenal: 14,
+  mensual: 29,
+  trimestral: 89,
+  semestral: 181,
+  anual: 364
+};
+
+const getTodayStart = () => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+};
+
+function updateDatesByCut() {
+  const today = getTodayStart();
+  const cut = corteSelect.value || "quincenal";
+  const backDays = CUT_BACK_DAYS[cut] ?? CUT_BACK_DAYS.quincenal;
+  const start = new Date(today);
+  start.setDate(today.getDate() - backDays);
+
+  const todayIso = toIsoDate(today);
+  fechaFinInput.max = todayIso;
+  fechaInicioInput.max = todayIso;
+  fechaFinInput.value = todayIso;
+  fechaInicioInput.value = toIsoDate(start);
+}
+
+function clampDatesToToday() {
+  const todayIso = toIsoDate(getTodayStart());
+  if (fechaFinInput.value > todayIso) fechaFinInput.value = todayIso;
+  if (fechaInicioInput.value > fechaFinInput.value) fechaInicioInput.value = fechaFinInput.value;
+}
 
 const renderEmpleadoOptions = () => {
   if (!empleadoSelect) return;
@@ -107,23 +139,11 @@ const renderResumen = () => {
 
 const renderMovimientos = () => {
   if (!state.movimientos.length) {
-    movimientosBody.innerHTML = "<tr><td colspan='6'>No hay movimientos para este período y empleado.</td></tr>";
     ingresosBody.innerHTML = "<tr><td>Sin ingresos</td><td>0</td><td>$0</td></tr>";
     deduccionesBody.innerHTML = "<tr><td>Sin deducciones</td><td>0</td><td>$0</td></tr>";
     renderResumen();
     return;
   }
-
-  movimientosBody.innerHTML = state.movimientos.map((item) => `
-    <tr>
-      <td>${item.empleado_nombre || "-"}</td>
-      <td>${item.tipo || "-"}</td>
-      <td>${item.naturaleza || "-"}</td>
-      <td>${fmtMoney(item.valor)}</td>
-      <td>${item.fuente || "-"}</td>
-      <td>${item.estado || "Registrado"}</td>
-    </tr>
-  `).join("");
 
   const ingresos = state.movimientos.filter((item) => String(item.naturaleza || "").toLowerCase().includes("devengo"));
   const deducciones = state.movimientos.filter((item) => String(item.naturaleza || "").toLowerCase().includes("dedu"));
@@ -137,19 +157,10 @@ const renderMovimientos = () => {
 };
 
 const renderComprobanteHeader = (empleado) => {
-  const periodo = `${fechaInicioInput.value || "-"} - ${fechaFinInput.value || "-"}`;
-  const comprobanteNumero = `NOM-${(Date.now()).toString().slice(-6)}`;
-  const salarioBase = state.movimientos
-    .filter((item) => String(item.tipo || "").toLowerCase().includes("base"))
-    .reduce((acc, item) => acc + Number(item.valor || 0), 0);
-
+  const fechaComprobante = fechaFinInput.value || new Date().toISOString().slice(0, 10);
   empleadoDataEl.innerHTML = `
-    <div>Periodo de Pago: ${periodo}</div>
-    <div>Comprobante Número: ${comprobanteNumero}</div>
-    <div><strong>Nombre: ${empleado?.nombre_completo || "-"}</strong></div>
-    <div>Identificación: ${empleado?.cedula || "-"}</div>
-    <div>Cargo: ${empleado?.rol || "operativo"}</div>
-    <div>Salario básico: ${fmtMoney(salarioBase)}</div>
+    <div><strong>${empleado?.nombre_completo || "-"}</strong></div>
+    <div>${fechaComprobante}</div>
   `;
 };
 
@@ -261,7 +272,6 @@ const descargarComprobante = () => {
   ctx.textAlign = "left";
 
   const leftX = 70;
-  const rightX = 1040;
   let y = 140;
   ctx.font = "bold 24px Arial";
   ctx.fillText(state.empresa?.nombre_comercial || "EMPRESA", leftX, y);
@@ -270,20 +280,18 @@ const descargarComprobante = () => {
   ctx.fillText(`NIT ${state.empresa?.nit || "-"}`, leftX, y);
 
   let ry = 140;
-  const periodo = `${fechaInicioInput.value || "-"} - ${fechaFinInput.value || "-"}`;
+  const fechaComprobante = fechaFinInput.value || "-";
   const lines = [
-    `Periodo de Pago: ${periodo}`,
-    `Comprobante Número: NOM-${Date.now().toString().slice(-6)}`,
     `Nombre: ${empleado.nombre_completo || "-"}`,
-    `Identificación: ${empleado.cedula || "-"}`,
-    `Cargo: ${empleado.rol || "operativo"}`,
-    `Salario básico: ${fmtMoney(ingresos.filter((i) => String(i.tipo || "").toLowerCase().includes("base")).reduce((a, i) => a + Number(i.valor || 0), 0))}`
+    `Fecha: ${fechaComprobante}`
   ];
+  ctx.textAlign = "right";
   lines.forEach((line, index) => {
-    ctx.font = index === 2 ? "bold 22px Arial" : "20px Arial";
-    ctx.fillText(line, rightX, ry);
+    ctx.font = index === 0 ? "bold 22px Arial" : "20px Arial";
+    ctx.fillText(line, 1820, ry);
     ry += 34;
   });
+  ctx.textAlign = "left";
 
   const tableTop = 360;
   const tableHeight = 490;
@@ -327,7 +335,13 @@ const descargarComprobante = () => {
 
   ctx.fillStyle = "#6b7280";
   ctx.font = "16px Arial";
-  ctx.fillText("Este comprobante fue generado por AXIOMA.", 70, 1030);
+  drawPngBrandWatermark(ctx, {
+    canvasWidth: canvas.width,
+    canvasHeight: canvas.height,
+    empresaNombre: state.empresa?.nombre_comercial || "EMPRESA",
+    moduloNombre: "Comprobante de Nómina",
+    fechaTexto: fechaFinInput.value || new Date().toISOString().slice(0, 10)
+  });
 
   const link = document.createElement("a");
   link.download = `comprobante_nomina_${(fechaFinInput.value || new Date().toISOString().slice(0, 10))}.png`;
@@ -344,7 +358,6 @@ const init = async () => {
     return;
   }
 
-  empresaInput.value = state.context.empresa_id;
   state.responsables = await fetchResponsablesActivos(state.context.empresa_id).catch(() => []);
   renderEmpleadoOptions();
 
@@ -354,6 +367,7 @@ const init = async () => {
     .eq("id", state.context.empresa_id)
     .maybeSingle();
   state.empresa = empresa || null;
+  empresaInput.value = state.empresa?.nombre_comercial || "";
   empresaNombreEl.textContent = state.empresa?.nombre_comercial || "EMPRESA";
   empresaNitEl.textContent = `NIT ${state.empresa?.nit || "-"}`;
   renderMovimientos();
@@ -361,5 +375,8 @@ const init = async () => {
 
 consultarBtn?.addEventListener("click", consultarNomina);
 descargarBtn?.addEventListener("click", descargarComprobante);
+corteSelect?.addEventListener("change", updateDatesByCut);
+fechaInicioInput?.addEventListener("change", clampDatesToToday);
+fechaFinInput?.addEventListener("change", clampDatesToToday);
 
 init();

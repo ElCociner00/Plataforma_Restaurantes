@@ -28,6 +28,7 @@ import { ENV_LOGGRO, ENV_SIIGO, getActiveEnvironment, setActiveEnvironment } fro
 import { resolveFirstAllowedRoute } from "./access_control.local.js";
 import { getPermisosEfectivos } from "./permisos.core.js";
 import { APP_URLS } from "./urls.js";
+import { BRAND, applyBrandingToDocumentTitle } from "./branding.js";
 
 const HEADER_ID = "globalAppHeader";
 
@@ -94,7 +95,7 @@ function getOrCreateHeader() {
   header.id = HEADER_ID;
   header.className = "app-header";
   header.innerHTML = `
-    <div class="logo"><span class="logo-mark-wrap"><img src="${getLogoSrc()}" alt="Logo AXIOMA-tech" class="logo-mark" onerror="this.style.display='none'"/></span><span>AXIOMA-tech</span></div>
+    <div class="logo"><span class="logo-mark-wrap"><img src="${getLogoSrc()}" alt="${BRAND.logoAlt}" class="logo-mark" onerror="this.style.display='none'"/></span><span>${BRAND.platformName}</span></div>
     <div class="empresa-header-nombre">Cargando plataforma...</div>
     <nav><a class="nav-link-btn" href="${APP_URLS.facturacion}">Facturacion</a></nav>
   `;
@@ -201,11 +202,11 @@ function wireHeaderEvents(header, context) {
   }
 }
 
-function renderFallbackHeader(message = "AXIOMA-tech") {
+function renderFallbackHeader(message = BRAND.platformName) {
   const header = getOrCreateHeader();
-  const title = message || "AXIOMA-tech";
+  const title = message || BRAND.platformName;
   header.innerHTML = `
-    <div class="logo"><span class="logo-mark-wrap"><img src="${getLogoSrc()}" alt="Logo AXIOMA-tech" class="logo-mark" onerror="this.style.display='none'"/></span><span>AXIOMA-tech</span></div>
+    <div class="logo"><span class="logo-mark-wrap"><img src="${getLogoSrc()}" alt="${BRAND.logoAlt}" class="logo-mark" onerror="this.style.display='none'"/></span><span>${BRAND.platformName}</span></div>
     <div class="empresa-header-nombre">${title}</div>
     <nav>
       <a class="nav-link-btn" href="${APP_URLS.dashboard}">Dashboard</a>
@@ -242,7 +243,7 @@ async function renderAuthenticatedHeader() {
   const menu = buildMenu({ context, environmentForMenu });
 
   header.innerHTML = `
-    <div class="logo"><span class="logo-mark-wrap"><img src="${getLogoSrc()}" alt="Logo AXIOMA-tech" class="logo-mark" onerror="this.style.display='none'"/></span><span>AXIOMA-tech</span></div>
+    <div class="logo"><span class="logo-mark-wrap"><img src="${getLogoSrc()}" alt="${BRAND.logoAlt}" class="logo-mark" onerror="this.style.display='none'"/></span><span>${BRAND.platformName}</span></div>
     <div class="empresa-header-nombre">${nombreEmpresa || ""}</div>
     <nav>${menu}</nav>
   `;
@@ -251,6 +252,7 @@ async function renderAuthenticatedHeader() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  applyBrandingToDocumentTitle();
   ensureViewportMeta();
   getOrCreateHeader();
   safeVerificarYMostrarAnuncio().catch(() => {});
