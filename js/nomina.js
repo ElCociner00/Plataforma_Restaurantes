@@ -450,6 +450,7 @@ const init = async () => {
     .eq("id", state.context.empresa_id)
     .maybeSingle();
   state.empresa = empresa || null;
+  empresaInput.value = state.empresa?.nombre_comercial || "";
   empresaNombreEl.textContent = state.empresa?.nombre_comercial || "EMPRESA";
   empresaNitEl.textContent = `NIT ${state.empresa?.nit || "-"}`;
   renderMovimientos();
