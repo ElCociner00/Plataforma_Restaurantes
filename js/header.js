@@ -134,7 +134,7 @@ function buildMenu({ context, environmentForMenu }) {
   if (environmentForMenu === ENV_SIIGO) {
     menu += `<a class="nav-link-btn" href="${APP_URLS.dashboardSiigo}">Dashboard</a>`;
     menu += `<a class="nav-link-btn" href="${APP_URLS.subirFacturasSiigo}">Ver o subir facturas correo</a>`;
-    menu += `<a class="nav-link-btn" href="${APP_URLS.nomina}">Nomina (borrador)</a>`;
+    menu += `<a class="nav-link-btn" href="${APP_URLS.nomina}">Nomina</a>`;
   }
 
   menu += `<a class="nav-link-btn" href="${APP_URLS.facturacion}">Facturacion</a>`;

@@ -357,7 +357,6 @@ const init = async () => {
   empresaNombreEl.textContent = state.empresa?.nombre_comercial || "EMPRESA";
   empresaNitEl.textContent = `NIT ${state.empresa?.nit || "-"}`;
   renderMovimientos();
-  setStatus(`Módulo de nómina listo en modo compartido (${getActiveEnvironment() || "global"}).`);
 };
 
 consultarBtn?.addEventListener("click", consultarNomina);
