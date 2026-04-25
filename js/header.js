@@ -128,12 +128,13 @@ function buildMenu({ context, environmentForMenu }) {
         </div>
       </div>
     `;
+    menu += `<a class="nav-link-btn" href="${APP_URLS.nomina}">Nomina</a>`;
   }
 
   if (environmentForMenu === ENV_SIIGO) {
     menu += `<a class="nav-link-btn" href="${APP_URLS.dashboardSiigo}">Dashboard</a>`;
     menu += `<a class="nav-link-btn" href="${APP_URLS.subirFacturasSiigo}">Ver o subir facturas correo</a>`;
-    menu += `<a class="nav-link-btn" href="${APP_URLS.nomina}">Nomina (borrador)</a>`;
+    menu += `<a class="nav-link-btn" href="${APP_URLS.nomina}">Nomina</a>`;
   }
 
   menu += `<a class="nav-link-btn" href="${APP_URLS.facturacion}">Facturacion</a>`;
@@ -228,7 +229,7 @@ async function renderAuthenticatedHeader() {
   const isGlobalNoTenantPage = currentPath.includes("/gestion_empresas/") || currentPath.includes("/facturacion/");
 
   const inferEnvironmentFromPath = () => {
-    if (currentPath.includes("/siigo/") || currentPath.includes("/nomina/")) return ENV_SIIGO;
+    if (currentPath.includes("/siigo/")) return ENV_SIIGO;
     return ENV_LOGGRO;
   };
 

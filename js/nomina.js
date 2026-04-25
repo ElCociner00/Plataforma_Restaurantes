@@ -27,6 +27,7 @@ import { getUserContext } from "./session.js";
 import { fetchResponsablesActivos } from "./responsables.js";
 import { getActiveEnvironment } from "./environment.js";
 import { supabase } from "./supabase.js";
+import { WEBHOOK_NOMINA_CONSULTAR } from "./webhooks.js";
 
 const empresaInput = document.getElementById("nominaEmpresa");
 const fechaInicioInput = document.getElementById("nominaFechaInicio");
@@ -152,6 +153,26 @@ const renderComprobanteHeader = (empleado) => {
   `;
 };
 
+const normalizeNominaWebhookRows = (payload) => {
+  const pickRows = (candidate) => {
+    if (Array.isArray(candidate)) return candidate;
+    if (Array.isArray(candidate?.data)) return candidate.data;
+    if (Array.isArray(candidate?.items)) return candidate.items;
+    if (Array.isArray(candidate?.movimientos)) return candidate.movimientos;
+    return [];
+  };
+
+  const rows = pickRows(payload);
+  return rows.map((item) => ({
+    tipo: item?.tipo || item?.concepto || "-",
+    naturaleza: item?.naturaleza || item?.categoria || "-",
+    valor: Number(item?.valor || item?.monto || 0),
+    fuente: item?.fuente || item?.origen || "webhook",
+    metadata: item?.metadata || null,
+    created_at: item?.created_at || item?.fecha || new Date().toISOString()
+  }));
+};
+
 const consultarNomina = async () => {
   const empleadoId = empleadoSelect.value;
   if (!empleadoId) {
@@ -160,24 +181,48 @@ const consultarNomina = async () => {
   }
 
   setStatus("Consultando movimientos de nómina...");
-  const { data, error } = await supabase
-    .from("nomina_movimientos")
-    .select("tipo,naturaleza,valor,fuente,metadata,created_at")
-    .eq("empresa_id", state.context.empresa_id)
-    .eq("usuario_id", empleadoId)
-    .gte("created_at", `${fechaInicioInput.value}T00:00:00Z`)
-    .lte("created_at", `${fechaFinInput.value}T23:59:59Z`)
-    .order("created_at", { ascending: true });
+  const payload = {
+    empresa_id: state.context.empresa_id,
+    usuario_id: empleadoId,
+    fecha_inicio: fechaInicioInput.value,
+    fecha_fin: fechaFinInput.value,
+    corte: corteSelect.value || "quincenal",
+    entorno: getActiveEnvironment() || "global"
+  };
 
-  if (error) {
-    state.movimientos = [];
-    renderMovimientos();
-    setStatus(`Error consultando nómina: ${error.message || "sin detalle"}`);
-    return;
+  let rows = [];
+
+  try {
+    const response = await fetch(WEBHOOK_NOMINA_CONSULTAR, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const webhookData = await response.json().catch(() => []);
+    rows = normalizeNominaWebhookRows(webhookData);
+  } catch (_error) {
+    const { data, error } = await supabase
+      .from("nomina_movimientos")
+      .select("tipo,naturaleza,valor,fuente,metadata,created_at")
+      .eq("empresa_id", state.context.empresa_id)
+      .eq("usuario_id", empleadoId)
+      .gte("created_at", `${fechaInicioInput.value}T00:00:00Z`)
+      .lte("created_at", `${fechaFinInput.value}T23:59:59Z`)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      state.movimientos = [];
+      renderMovimientos();
+      setStatus(`Error consultando nómina: ${error.message || "sin detalle"}`);
+      return;
+    }
+
+    rows = Array.isArray(data) ? data : [];
   }
 
   const empleado = state.responsables.find((item) => item.id === empleadoId);
-  state.movimientos = (Array.isArray(data) ? data : []).map((item) => ({
+  state.movimientos = rows.map((item) => ({
     ...item,
     empleado_nombre: empleado?.nombre_completo || "Empleado",
     estado: "Liquidable"
@@ -312,7 +357,6 @@ const init = async () => {
   empresaNombreEl.textContent = state.empresa?.nombre_comercial || "EMPRESA";
   empresaNitEl.textContent = `NIT ${state.empresa?.nit || "-"}`;
   renderMovimientos();
-  setStatus(`Módulo de nómina listo en modo compartido (${getActiveEnvironment() || "global"}).`);
 };
 
 consultarBtn?.addEventListener("click", consultarNomina);
