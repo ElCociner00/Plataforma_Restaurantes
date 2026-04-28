@@ -121,6 +121,10 @@ export const WEBHOOK_SIIGO_PROVEEDORES_LISTAR =
 export const WEBHOOK_SIIGO_PROVEEDORES_REGISTRAR =
   "https://n8n.enkrato.com/webhook/siigo_proveedores_registrar";
 
+// nomina/index.html (botón: "Consultar nómina")
+export const WEBHOOK_NOMINA_CONSULTAR =
+  "https://n8n.enkrato.com/webhook/consultar_nomina";
+
 /**
  * WEBHOOKS CENTRALIZADOS
  * Instrucción: Para modificar URLs, cambiar SOLO aquí
@@ -171,6 +175,13 @@ WEBHOOKS.FACTURACION_RESUMEN = {
   archivos_que_usan: ["js/facturacion.js"],
   metodo: "POST",
   descripcion: "Fuente opcional para obtener datos de factura por tenant cuando Supabase no responda o se quiera usar intermediario"
+};
+
+WEBHOOKS.NOMINA_CONSULTAR = {
+  url: WEBHOOK_NOMINA_CONSULTAR,
+  archivos_que_usan: ["js/nomina.js"],
+  metodo: "POST",
+  descripcion: "Consulta movimientos de nómina por empresa, empleado y rango de fechas"
 };
 
 
