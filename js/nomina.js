@@ -45,6 +45,8 @@ const statusEl = document.getElementById("nominaStatus");
 const empresaNombreEl = document.getElementById("nominaEmpresaNombre");
 const empresaNitEl = document.getElementById("nominaEmpresaNit");
 const empleadoDataEl = document.getElementById("nominaEmpleadoData");
+const horasBody = document.getElementById("nominaHorasBody");
+const totalHorasTablaEl = document.getElementById("nominaTotalHorasTabla");
 const ingresosBody = document.getElementById("nominaIngresosBody");
 const deduccionesBody = document.getElementById("nominaDeduccionesBody");
 const totalIngresosTablaEl = document.getElementById("nominaTotalIngresosTabla");
@@ -57,7 +59,8 @@ const state = {
   empresa: null,
   movimientos: [],
   empleadoDetalle: null,
-  periodoDetalle: null
+  periodoDetalle: null,
+  horasDetalle: null
 };
 
 const fmtMoney = (value) => Number(value || 0).toLocaleString("es-CO", {
@@ -65,6 +68,7 @@ const fmtMoney = (value) => Number(value || 0).toLocaleString("es-CO", {
   currency: "COP",
   maximumFractionDigits: 0
 });
+const fmtHours = (value) => Number(value || 0).toFixed(2);
 
 const setStatus = (message) => {
   if (statusEl) statusEl.textContent = message || "";
@@ -139,6 +143,18 @@ const renderResumen = () => {
 };
 
 const renderMovimientos = () => {
+  const horas = state.horasDetalle || {};
+  const horasRows = [
+    ["Diurnas", horas.diurnas],
+    ["Nocturnas", horas.nocturnas],
+    ["Dominicales diurnas", horas.dominicales_diurnas],
+    ["Dominicales nocturnas", horas.dominicales_nocturnas]
+  ];
+  if (horasBody) {
+    horasBody.innerHTML = horasRows.map(([label, value]) => `<tr><td>${label}</td><td>${fmtHours(value)}</td></tr>`).join("");
+  }
+  if (totalHorasTablaEl) totalHorasTablaEl.textContent = fmtHours(horas.total || 0);
+
   if (!state.movimientos.length) {
     ingresosBody.innerHTML = "<tr><td>Sin ingresos</td><td>0</td><td>$0</td></tr>";
     deduccionesBody.innerHTML = "<tr><td>Sin deducciones</td><td>0</td><td>$0</td></tr>";
@@ -170,7 +186,50 @@ const renderComprobanteHeader = (empleado) => {
   `;
 };
 
-const normalizeNominaWebhookRows = (payload, empleadoSeleccionado = null) => {
+const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) => {
+  const resolveEmpleadoById = async (usuarioId) => {
+    if (!usuarioId) return null;
+    const { data, error } = await supabase
+      .from("usuarios_sistema")
+      .select("nombre_completo,rol")
+      .eq("id", usuarioId)
+      .maybeSingle();
+    if (error) return null;
+    return data || null;
+  };
+
+  const fromCurrentPayrollJson = async (candidate) => {
+    if (!Array.isArray(candidate) || !candidate.length || !candidate[0]?.horas_dinero) return null;
+    const item = candidate[0];
+    const horasDinero = item?.horas_dinero || {};
+    const extras = item?.extras || {};
+    const horasValor = item?.horas_valor || {};
+
+    const rows = [
+      { tipo: "Horas diurnas por tarifa", naturaleza: "Devengo", valor: Number(horasDinero.diurnas_por_tarifa || 0), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
+      { tipo: "Horas nocturnas por tarifa", naturaleza: "Devengo", valor: Number(horasDinero.nocturnas_por_tarifa || 0), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
+      { tipo: "Dominicales diurnas por tarifa", naturaleza: "Devengo", valor: Number(horasDinero.dominicales_diurnas_por_tarifa || 0), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
+      { tipo: "Dominicales nocturnas por tarifa", naturaleza: "Devengo", valor: Number(horasDinero.dominicales_nocturnas_por_tarifa || 0), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
+      { tipo: "Propinas", naturaleza: "Devengo", valor: Number(extras.propinas || 0), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
+      { tipo: "Auxilio de transporte", naturaleza: "Devengo", valor: Number(extras.auxilio_de_transporte || 0), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
+      { tipo: "Diferencia de caja", naturaleza: "Deducción", valor: Math.abs(Number(extras.diferencia_caja || 0)), fuente: "webhook", metadata: { original: Number(extras.diferencia_caja || 0) }, created_at: new Date().toISOString() }
+    ].filter((row) => row.valor > 0);
+
+    const empleado = await resolveEmpleadoById(empleadoSelect.value);
+    state.empleadoDetalle = {
+      nombre: empleado?.nombre_completo || empleadoSeleccionado?.nombre_completo || "-",
+      cargo: empleado?.rol || empleadoSeleccionado?.rol || "-"
+    };
+    state.periodoDetalle = { inicio: fechaInicioInput.value, fin: fechaFinInput.value };
+    state.horasDetalle = {
+      total: Number(horasValor.total || 0),
+      diurnas: Number(horasValor.diurnas || 0),
+      nocturnas: Number(horasValor.nocturnas || 0),
+      dominicales_diurnas: Number(horasValor.dominicales_diurnas || 0),
+      dominicales_nocturnas: Number(horasValor.dominicales_nocturnas || 0)
+    };
+    return rows;
+  };
   const fromPrototypePayload = (candidate) => {
     if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return null;
     const hasPrototype = candidate?.empleado && candidate?.periodo && candidate?.detalle_horas;
@@ -230,6 +289,9 @@ const normalizeNominaWebhookRows = (payload, empleadoSeleccionado = null) => {
     return [...horas, ...ingresosExtra, ...descuentos];
   };
 
+  const fromCurrent = await fromCurrentPayrollJson(payload);
+  if (fromCurrent) return fromCurrent;
+
   const fromPrototype = fromPrototypePayload(payload);
   if (fromPrototype) return fromPrototype;
 
@@ -250,6 +312,7 @@ const normalizeNominaWebhookRows = (payload, empleadoSeleccionado = null) => {
     inicio: payload?.periodo?.inicio || fechaInicioInput.value,
     fin: payload?.periodo?.fin || fechaFinInput.value
   };
+  state.horasDetalle = null;
   return rows.map((item) => ({
     tipo: item?.tipo || item?.concepto || "-",
     naturaleza: item?.naturaleza || item?.categoria || "-",
@@ -287,7 +350,7 @@ const consultarNomina = async () => {
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const webhookData = await response.json().catch(() => []);
-    rows = normalizeNominaWebhookRows(webhookData, state.responsables.find((item) => item.id === empleadoId));
+    rows = await normalizeNominaWebhookRows(webhookData, state.responsables.find((item) => item.id === empleadoId));
   } catch (_error) {
     const { data, error } = await supabase
       .from("nomina_movimientos")
@@ -308,6 +371,7 @@ const consultarNomina = async () => {
     rows = Array.isArray(data) ? data : [];
     state.empleadoDetalle = null;
     state.periodoDetalle = null;
+    state.horasDetalle = null;
   }
 
   const empleado = state.responsables.find((item) => item.id === empleadoId);
@@ -446,12 +510,11 @@ const init = async () => {
 
   const { data: empresa } = await supabase
     .from("empresas")
-    .select("nombre_comercial,nit")
+    .select("nombre_comercial,razon_social,nit")
     .eq("id", state.context.empresa_id)
     .maybeSingle();
   state.empresa = empresa || null;
-  empresaInput.value = state.empresa?.nombre_comercial || "";
-  empresaNombreEl.textContent = state.empresa?.nombre_comercial || "EMPRESA";
+  empresaNombreEl.textContent = state.empresa?.razon_social || state.empresa?.nombre_comercial || "EMPRESA";
   empresaNitEl.textContent = `NIT ${state.empresa?.nit || "-"}`;
   renderMovimientos();
   renderComprobanteHeader(null);
