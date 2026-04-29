@@ -161,53 +161,6 @@ const parseWebhookPayloadSafe = async (response) => {
   } catch (_jsonError) {
     return [];
   }
-
-  if (current && typeof current === "object" && !Array.isArray(current)) {
-    const nestedCandidates = [current.data, current.body, current.output, current.payload, current.result, current.response];
-    for (const candidate of nestedCandidates) {
-      if (candidate === undefined || candidate === null) continue;
-      const normalizedNested = normalizeJsonLikeValue(candidate, maxDepth - 1);
-      if (Array.isArray(normalizedNested) && normalizedNested.length) return normalizedNested;
-      if (normalizedNested && typeof normalizedNested === "object" && !Array.isArray(normalizedNested)) return normalizedNested;
-    }
-  }
-
-  return current;
-};
-
-const parseWebhookPayloadSafe = async (response) => {
-  const tryParse = (raw) => {
-    if (raw === undefined || raw === null) return [];
-    if (typeof raw === "string") {
-      if (!raw.trim()) return [];
-      try {
-        return normalizeJsonLikeValue(JSON.parse(raw));
-      } catch (_error) {
-        return normalizeJsonLikeValue(raw);
-      }
-    }
-    return normalizeJsonLikeValue(raw);
-  };
-
-  // Leer primero desde clone evita perder el body cuando response.json() falla.
-  let rawText = "";
-  try {
-    rawText = await response.clone().text();
-  } catch (_cloneError) {
-    rawText = "";
-  }
-
-  const fromRawText = tryParse(rawText);
-  if (Array.isArray(fromRawText) ? fromRawText.length : Boolean(fromRawText && typeof fromRawText === "object")) {
-    return fromRawText;
-  }
-
-  try {
-    const jsonPayload = await response.json();
-    return tryParse(jsonPayload);
-  } catch (_jsonError) {
-    return [];
-  }
 };
 
 const extractPayrollArrayCandidates = (value, maxDepth = 8) => {
@@ -476,6 +429,19 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
   }));
 };
 
+
+const hasMeaningfulRows = (rows) => Array.isArray(rows) && rows.some((row) => toNumeric(row?.valor ?? 0) > 0);
+
+const normalizeWithRetries = async (webhookData, empleadoSeleccionado, retries = 3) => {
+  let lastRows = [];
+  for (let i = 0; i < retries; i += 1) {
+    lastRows = await normalizeNominaWebhookRows(webhookData, empleadoSeleccionado);
+    if (hasMeaningfulRows(lastRows)) return lastRows;
+    await sleep(150);
+  }
+  return lastRows;
+};
+
 const consultarNomina = async () => {
   const empleadoId = empleadoSelect.value;
   if (!empleadoId) {
@@ -483,6 +449,9 @@ const consultarNomina = async () => {
     return;
   }
 
+  state.periodoDetalle = { inicio: fechaInicioInput.value || "-", fin: fechaFinInput.value || "-" };
+  const empleadoSeleccionado = state.responsables.find((item) => item.id === empleadoId);
+  state.empleadoDetalle = { nombre: empleadoSeleccionado?.nombre_completo || "-", cargo: empleadoSeleccionado?.rol || "-" };
   setStatus("Consultando movimientos de nómina...");
   const loadingStart = Date.now();
   const payload = {
@@ -505,7 +474,7 @@ const consultarNomina = async () => {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const webhookData = await parseWebhookPayloadSafe(response);
     setStatus("Datos recibidos. Procesando nómina...");
-    rows = await normalizeNominaWebhookRows(webhookData, state.responsables.find((item) => item.id === empleadoId));
+    rows = await normalizeWithRetries(webhookData, empleadoSeleccionado, 4);
     if (!rows.length) {
       const shape = Array.isArray(webhookData) ? "array" : typeof webhookData;
       const preview = typeof webhookData === "string" ? webhookData.slice(0, 120) : JSON.stringify(webhookData || {}).slice(0, 120);
@@ -538,7 +507,7 @@ const consultarNomina = async () => {
   const elapsed = Date.now() - loadingStart;
   if (elapsed < 1000) await sleep(1000 - elapsed);
 
-  const empleado = state.responsables.find((item) => item.id === empleadoId);
+  const empleado = empleadoSeleccionado;
   state.movimientos = rows.map((item) => ({
     ...item,
     empleado_nombre: empleado?.nombre_completo || "Empleado",
