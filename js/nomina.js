@@ -117,15 +117,54 @@ const parseWebhookPayloadSafe = async (response) => {
     return normalizeJsonLikeValue(raw);
   };
 
+  // Leer primero desde clone evita perder el body cuando response.json() falla.
+  let rawText = "";
+  try {
+    rawText = await response.clone().text();
+  } catch (_cloneError) {
+    rawText = "";
+  }
+
+  const fromRawText = tryParse(rawText);
+  if (Array.isArray(fromRawText) ? fromRawText.length : Boolean(fromRawText && typeof fromRawText === "object")) {
+    return fromRawText;
+  }
+
   try {
     const jsonPayload = await response.json();
     return tryParse(jsonPayload);
   } catch (_jsonError) {
-    const raw = await response.text().catch(() => "");
-    return tryParse(raw);
+    return [];
   }
 };
 
+const extractPayrollArrayCandidates = (value, maxDepth = 8) => {
+  const visited = new WeakSet();
+  const queue = [{ node: value, depth: 0 }];
+
+  while (queue.length) {
+    const { node, depth } = queue.shift();
+    if (depth > maxDepth || node === null || node === undefined) continue;
+
+    if (Array.isArray(node) && node.length && node.some((item) => item && typeof item === "object" && item.horas_dinero)) {
+      return node;
+    }
+
+    if (typeof node === "string") {
+      const parsed = normalizeJsonLikeValue(node, maxDepth - depth);
+      if (parsed !== node) queue.push({ node: parsed, depth: depth + 1 });
+      continue;
+    }
+
+    if (typeof node === "object") {
+      if (visited.has(node)) continue;
+      visited.add(node);
+      Object.values(node).forEach((child) => queue.push({ node: child, depth: depth + 1 }));
+    }
+  }
+
+  return null;
+};
 const setDefaultDates = () => {
   corteSelect.value = "quincenal";
   updateDatesByCut();
@@ -341,7 +380,8 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
     return [...horas, ...ingresosExtra, ...descuentos];
   };
 
-  const fromCurrent = await fromCurrentPayrollJson(payload);
+  const directPayrollArray = extractPayrollArrayCandidates(payload) || payload;
+  const fromCurrent = await fromCurrentPayrollJson(directPayrollArray);
   if (fromCurrent) return fromCurrent;
 
   const fromPrototype = fromPrototypePayload(payload);
@@ -403,8 +443,10 @@ const consultarNomina = async () => {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const webhookData = await parseWebhookPayloadSafe(response);
     rows = await normalizeNominaWebhookRows(webhookData, state.responsables.find((item) => item.id === empleadoId));
-    if (!rows.length && Array.isArray(webhookData) && webhookData.length) {
-      setStatus("Respuesta recibida, pero sin filas compatibles para nómina. Revisa el contrato del webhook.");
+    if (!rows.length) {
+      const shape = Array.isArray(webhookData) ? "array" : typeof webhookData;
+      const preview = typeof webhookData === "string" ? webhookData.slice(0, 120) : JSON.stringify(webhookData || {}).slice(0, 120);
+      setStatus(`Respuesta recibida (${shape}) pero sin filas compatibles. Vista previa: ${preview}`);
     }
   } catch (_error) {
     const { data, error } = await supabase
