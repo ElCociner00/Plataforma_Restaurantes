@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>AXIOMA | Nómina</title>
+  <title>Enkrato | Nómina</title>
   <link rel="stylesheet" href="../css/main.css">
   <link rel="stylesheet" href="../css/nomina.css">
 </head>
@@ -17,13 +17,14 @@
     <section class="bloque">
       <h2>Periodo de nómina</h2>
       <div class="nomina-grid">
-        <label>Empresa
-          <input id="nominaEmpresa" type="text" readonly>
-        </label>
         <label>Corte
           <select id="nominaCorte">
+            <option value="semanal">Semanal</option>
             <option value="quincenal">Quincenal</option>
             <option value="mensual">Mensual</option>
+            <option value="trimestral">Trimestral</option>
+            <option value="semestral">Semestral</option>
+            <option value="anual">Anual</option>
           </select>
         </label>
         <label>Fecha inicio
@@ -60,42 +61,26 @@
       </div>
     </section>
 
-    <section class="bloque">
-      <h2>Detalle de ingresos y deducciones</h2>
-      <div class="tabla-wrap">
-        <table class="nomina-table">
-          <thead>
-            <tr>
-              <th>Empleado</th>
-              <th>Tipo</th>
-              <th>Naturaleza</th>
-              <th>Valor</th>
-              <th>Fuente</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody id="nominaMovimientosBody">
-            <tr>
-              <td colspan="6">Sin datos para mostrar.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
     <section class="bloque comprobante-wrap">
       <h2>Comprobante de nómina</h2>
       <article id="nominaComprobante" class="comprobante">
-        <header class="comprobante-title">Comprobante de Nómina</header>
         <div class="comprobante-top">
           <div class="empresa-data">
-            <div class="empresa-logo">AXIOMA</div>
+            <div class="empresa-logo">ENKRATO</div>
             <strong id="nominaEmpresaNombre">EMPRESA</strong>
             <span id="nominaEmpresaNit">NIT -</span>
           </div>
           <div class="empleado-data" id="nominaEmpleadoData"></div>
         </div>
         <div class="comprobante-table">
+          <div class="comprobante-col">
+            <h3>Detalle de horas (período)</h3>
+            <table>
+              <thead><tr><th>Tipo</th><th>Horas</th></tr></thead>
+              <tbody id="nominaHorasBody"></tbody>
+              <tfoot><tr><td>Total horas</td><td id="nominaTotalHorasTabla">0.00</td></tr></tfoot>
+            </table>
+          </div>
           <div class="comprobante-col">
             <h3>Ingresos</h3>
             <table>
