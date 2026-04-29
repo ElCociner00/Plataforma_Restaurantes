@@ -74,6 +74,20 @@ const setStatus = (message) => {
   if (statusEl) statusEl.textContent = message || "";
 };
 
+const parseWebhookPayloadSafe = async (response) => {
+  try {
+    return await response.json();
+  } catch (_jsonError) {
+    const raw = await response.text().catch(() => "");
+    if (!raw) return [];
+    try {
+      return JSON.parse(raw);
+    } catch (_parseError) {
+      return [];
+    }
+  }
+};
+
 const setDefaultDates = () => {
   corteSelect.value = "quincenal";
   updateDatesByCut();
@@ -349,8 +363,11 @@ const consultarNomina = async () => {
       body: JSON.stringify(payload)
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const webhookData = await response.json().catch(() => []);
+    const webhookData = await parseWebhookPayloadSafe(response);
     rows = await normalizeNominaWebhookRows(webhookData, state.responsables.find((item) => item.id === empleadoId));
+    if (!rows.length && Array.isArray(webhookData) && webhookData.length) {
+      setStatus("Respuesta recibida, pero sin filas compatibles para nómina. Revisa el contrato del webhook.");
+    }
   } catch (_error) {
     const { data, error } = await supabase
       .from("nomina_movimientos")
