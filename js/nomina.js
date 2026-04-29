@@ -99,33 +99,56 @@ const setStatus = (message) => {
   if (statusEl) statusEl.textContent = message || "";
 };
 
-const normalizeJsonLikeValue = (value, maxDepth = 6) => {
-  let current = value;
-  for (let i = 0; i < maxDepth; i += 1) {
-    if (typeof current !== "string") break;
-    const trimmed = current.trim();
-    if (!trimmed) return [];
-    const startsLikeJson = trimmed.startsWith("{") || trimmed.startsWith("[") || trimmed.startsWith('"{') || trimmed.startsWith('"[');
-    if (!startsLikeJson) break;
+const parseWebhookResponseSafe = async (response) => {
+  try {
+    const rawText = await response.text();
+    if (!rawText || !rawText.trim()) return null;
+
+    const parseRecursively = (value, depth = 0) => {
+      if (depth > 8) return value;
+      if (typeof value !== "string") return value;
+      const t = value.trim();
+      if (!t) return null;
+      try {
+        return parseRecursively(JSON.parse(t), depth + 1);
+      } catch (_e) {
+        return value;
+      }
+    };
+
+    return parseRecursively(rawText);
+  } catch (_error) {
+    return null;
+  }
+};
+
+const deepExtractPayrollArray = (node, depth = 0, maxDepth = 12) => {
+  if (depth > maxDepth || node === null || node === undefined) return null;
+  if (typeof node === "string") {
     try {
-      current = JSON.parse(trimmed);
-      continue;
-    } catch (_parseError) {
-      break;
+      const parsed = JSON.parse(node);
+      return deepExtractPayrollArray(parsed, depth + 1, maxDepth);
+    } catch (_e) {
+      return null;
     }
   }
-
-  if (current && typeof current === "object" && !Array.isArray(current)) {
-    const nestedCandidates = [current.data, current.body, current.output, current.payload, current.result, current.response];
-    for (const candidate of nestedCandidates) {
-      if (candidate === undefined || candidate === null) continue;
-      const normalizedNested = normalizeJsonLikeValue(candidate, maxDepth - 1);
-      if (Array.isArray(normalizedNested) && normalizedNested.length) return normalizedNested;
-      if (normalizedNested && typeof normalizedNested === "object" && !Array.isArray(normalizedNested)) return normalizedNested;
+  if (Array.isArray(node)) {
+    if (node.length && node.some((item) => item && typeof item === "object" && (item.horas_dinero || item.horas_valor))) {
+      return node;
+    }
+    for (const item of node) {
+      const found = deepExtractPayrollArray(item, depth + 1, maxDepth);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (typeof node === "object") {
+    for (const value of Object.values(node)) {
+      const found = deepExtractPayrollArray(value, depth + 1, maxDepth);
+      if (found) return found;
     }
   }
-
-  return current;
+  return null;
 };
 
 const parseWebhookPayloadSafe = async (response) => {
@@ -394,7 +417,7 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
     return [...horas, ...ingresosExtra, ...descuentos];
   };
 
-  const directPayrollArray = extractPayrollArrayCandidates(payload) || payload;
+  const directPayrollArray = deepExtractPayrollArray(payload) || payload;
   const fromCurrent = fromCurrentPayrollJson(directPayrollArray);
   if (fromCurrent) return fromCurrent;
 
@@ -442,6 +465,25 @@ const normalizeWithRetries = async (webhookData, empleadoSeleccionado, retries =
   return lastRows;
 };
 
+
+
+const startMappingRecoveryLoop = (webhookData, empleadoSeleccionado) => {
+  let attempts = 0;
+  const timer = setInterval(async () => {
+    attempts += 1;
+    const rows = await normalizeNominaWebhookRows(webhookData, empleadoSeleccionado);
+    if (hasMeaningfulRows(rows)) {
+      state.movimientos = rows.map((item) => ({ ...item, empleado_nombre: empleadoSeleccionado?.nombre_completo || "Empleado", estado: "Liquidable" }));
+      renderMovimientos();
+      renderComprobanteHeader(empleadoSeleccionado);
+      setStatus(`Consulta completada. ${state.movimientos.length} movimientos encontrados.`);
+      clearInterval(timer);
+      return;
+    }
+    if (attempts >= 4) clearInterval(timer);
+  }, 2000);
+};
+
 const consultarNomina = async () => {
   const empleadoId = empleadoSelect.value;
   if (!empleadoId) {
@@ -472,9 +514,10 @@ const consultarNomina = async () => {
       body: JSON.stringify(payload)
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const webhookData = await parseWebhookPayloadSafe(response);
+    const webhookData = await parseWebhookResponseSafe(response);
     setStatus("Datos recibidos. Procesando nómina...");
     rows = await normalizeWithRetries(webhookData, empleadoSeleccionado, 4);
+    if (!hasMeaningfulRows(rows) && webhookData) startMappingRecoveryLoop(webhookData, empleadoSeleccionado);
     if (!rows.length) {
       const shape = Array.isArray(webhookData) ? "array" : typeof webhookData;
       const preview = typeof webhookData === "string" ? webhookData.slice(0, 120) : JSON.stringify(webhookData || {}).slice(0, 120);

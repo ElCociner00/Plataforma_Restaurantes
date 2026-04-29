@@ -541,3 +541,26 @@ Recuperar comportamiento esperado del módulo:
 - Cabecera lateral empleado/cargo/período visible: **funciona**.
 - Ingresos y deducciones como comparativo principal + detalle de horas subordinado: **funciona**.
 - Reintentos de mapeo cuando primer parse no trae filas significativas: **funciona**.
+
+---
+
+## PARCHE 11 — 2026-04-29 — Parseo de respuesta en lectura única + bucle tardío de recuperación de mapeo
+
+### Objetivo
+Corregir el caso donde la data llega pero el mapeo no se refleja en UI: se implementa parseo en lectura única de response y re-ejecución tardía de normalización cada 2 segundos por ventana acotada.
+
+### Archivos implicados
+- `js/nomina.js`
+  - `parseWebhookResponseSafe`: reemplaza flujo previo por lectura única con `response.text()` y parseo recursivo de JSON serializado.
+  - `deepExtractPayrollArray`: extracción profunda real para estructura con `horas_dinero/horas_valor` en cualquier nivel.
+  - `startMappingRecoveryLoop`: intervalo de 2 segundos (hasta 4 intentos) para reintentar mapeo cuando primera pasada no trae filas significativas.
+  - `consultarNomina`: usa parser nuevo y activa recovery loop si no hay filas con valor > 0.
+
+### Reversión
+1. Restituir parser anterior y extractor previo.
+2. Eliminar `startMappingRecoveryLoop` y su invocación en `consultarNomina`.
+
+### Checklist funcional
+- Respuesta webhook parseada una sola vez (sin doble consumo de body): **funciona**.
+- Extracción profunda de array con payroll en objetos anidados: **funciona**.
+- Reintentos tardíos de mapeo cada 2s tras consultar: **funciona**.
