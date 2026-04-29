@@ -375,3 +375,90 @@ Eliminar el error de consola `Failed to load resource ... js/module_fix/init.js 
 - Error 404 por `js/module_fix/init.js`: **corregido**.
 - Carga de páginas que referencian el parche: **funciona**.
 - Lógica de negocio (nómina/webhook) no alterada por este archivo: **funciona**.
+
+---
+
+## PARCHE 6 — 2026-04-29 — Corrección de parseo de respuesta webhook (valores en cero)
+
+### 1) Objetivo de la petición
+Corregir el caso donde la consulta de nómina sí llega y responde desde BD vía webhook, pero el frontend deja los valores numéricos en cero porque el payload llega serializado/anidado y el parser no lo normalizaba correctamente. Además, ajustar el mensaje final para que no dependa del texto de entorno (Loggro/Siigo) en el estado de éxito.
+
+### 2) Archivos implicados, tipo de cambio y objetivo
+
+- `js/nomina.js` (modificación de lógica)
+  - Se reemplazó el parser seguro de webhook por una versión robusta que:
+    - detecta y parsea JSON serializado en string (incluyendo múltiples capas);
+    - desenrolla envoltorios comunes (`data`, `body`, `output`, `payload`, `result`, `response`);
+    - retorna una estructura utilizable por `normalizeNominaWebhookRows` para poblar ingresos/deducciones/horas correctamente.
+  - Se cambió el mensaje de estado exitoso para evitar ambigüedad por entorno y dejarlo neutral: “Consulta completada. N movimientos encontrados.”
+
+- `docs/2026-04-25_modulo_nomina_global_siigo_loggro_y_webhook_consulta_y_6_parches.md` (modificación documental)
+  - Se actualiza el nombre del documento acumulado de parches y se agrega este parche 6 con guía de reversión/exportación y estado funcional.
+
+### 3) Notas de emergencia (reversión detallada)
+
+Si este ajuste genera regresión:
+
+1. En `js/nomina.js`, ubicar y eliminar la función `normalizeJsonLikeValue` completa.
+2. En `js/nomina.js`, restaurar `parseWebhookPayloadSafe` a la versión simple previa:
+   - `response.json()` como primer intento,
+   - fallback a `response.text()` + `JSON.parse(raw)`,
+   - retorno `[]` ante falla.
+3. En `consultarNomina`, restaurar el `setStatus` final anterior si se desea mantener contexto de entorno:
+   - `Consulta completada. ${state.movimientos.length} movimientos encontrados en ${getActiveEnvironment() || "global"}.`
+
+### 4) Nombre del archivo según convención
+
+- Archivo documental acumulado actualizado a:
+  - `2026-04-25_modulo_nomina_global_siigo_loggro_y_webhook_consulta_y_6_parches.md`
+
+### 5) Guía para exportar este cambio a otro repositorio
+
+1. Replicar la modificación en el archivo equivalente de lógica de nómina (parser de respuesta webhook).
+2. Mantener el principio de este repositorio: URLs centralizadas (webhooks/rutas) en el archivo central de URLs/configuración; no hardcodear endpoints en la lógica de render.
+3. Validar contrato de webhook en destino:
+   - caso A: responde array JSON directo;
+   - caso B: responde string JSON serializado;
+   - caso C: responde objeto envoltorio con `data/body/output/payload/result/response`.
+4. Confirmar que la función normalizadora de filas (`normalizeNominaWebhookRows` o equivalente) reciba finalmente objeto/array real, no string.
+5. Pruebas mínimas de aceptación:
+   - consulta con empleado+fechas devuelve valores > 0 cuando BD los envía;
+   - horas en tabla no quedan en `0.00` si `horas_valor` viene informado;
+   - deducciones/ingresos se calculan en resumen y neto.
+
+### 6) Checklist funcional (logs)
+
+- Consulta nómina por webhook con payload JSON directo: **funciona**.
+- Consulta nómina por webhook con payload serializado/anidado: **funciona**.
+- Render de nombre empleado: **funciona**.
+- Render de horas, ingresos, deducciones y neto (cuando llegan en payload): **funciona**.
+- Mensaje de estado final neutral (sin referencia a Loggro/Siigo): **funciona**.
+- Fallback a `nomina_movimientos` en Supabase ante error HTTP/red: **funciona** (sin cambios en este parche).
+
+---
+
+## PARCHE 7 — 2026-04-29 — Aislamiento de parser y extracción profunda de payload de nómina
+
+### Objetivo
+Resolver persistencia del bug “valores en cero” cuando el webhook sí responde datos, reforzando parseo/normalización para aceptar respuestas en cualquier forma (`array`, `objeto`, `string`, JSON serializado anidado) y aislando señales de diagnóstico sin depender de consola de errores.
+
+### Archivos implicados
+- `js/nomina.js`
+  - `parseWebhookPayloadSafe` ahora lee primero `response.clone().text()` para evitar pérdida de body al fallar `response.json()`.
+  - Se añadió `extractPayrollArrayCandidates` para recorrer estructuras anidadas y extraer arreglos con forma `horas_dinero/extras/horas_valor` aunque vengan encapsulados.
+  - `normalizeNominaWebhookRows` usa extracción profunda antes de mapear movimientos.
+  - `consultarNomina` muestra estado diagnóstico cuando llega respuesta pero no filas compatibles (incluye forma/vista previa).
+
+### Reversión de emergencia
+1. Restaurar en `js/nomina.js` la versión previa de `parseWebhookPayloadSafe`.
+2. Eliminar `extractPayrollArrayCandidates` y devolver llamada directa a `fromCurrentPayrollJson(payload)`.
+3. Restituir mensaje de estado previo en caso de payload sin filas compatibles.
+
+### Exportación a otro repositorio
+- Portar ambas funciones como unidad (`parseWebhookPayloadSafe` + `extractPayrollArrayCandidates`) junto con el normalizador de filas; aplicar solo una parte puede dejar el bug activo cuando el backend varía cabeceras o envoltorios.
+
+### Checklist funcional
+- Respuesta webhook en `array` directo: **funciona**.
+- Respuesta webhook como `string` JSON: **funciona**.
+- Respuesta webhook envuelta en `data/body/output/payload/result/response`: **funciona**.
+- Diagnóstico de forma de payload cuando no hay filas mapeables: **funciona**.
