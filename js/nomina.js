@@ -63,6 +63,31 @@ const state = {
   horasDetalle: null
 };
 
+
+const toNumeric = (value) => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (value === null || value === undefined) return 0;
+  let text = String(value).trim();
+  if (!text) return 0;
+  text = text.replace(/\$/g, "").replace(/\s+/g, "");
+  const hasComma = text.includes(",");
+  const hasDot = text.includes(".");
+  if (hasComma && hasDot) {
+    // 1.234.567,89 -> 1234567.89 | 1,234,567.89 -> 1234567.89
+    if (text.lastIndexOf(",") > text.lastIndexOf(".")) {
+      text = text.replace(/\./g, "").replace(",", ".");
+    } else {
+      text = text.replace(/,/g, "");
+    }
+  } else if (hasComma && !hasDot) {
+    text = text.replace(/\./g, "").replace(/,/g, ".");
+  }
+  const parsed = Number(text.replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const fmtMoney = (value) => Number(value || 0).toLocaleString("es-CO", {
   style: "currency",
   currency: "COP",
@@ -297,13 +322,13 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
     const horasValor = item?.horas_valor || {};
 
     const rows = [
-      { tipo: "Horas diurnas por tarifa", naturaleza: "Devengo", valor: Number(horasDinero.diurnas_por_tarifa || 0), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
-      { tipo: "Horas nocturnas por tarifa", naturaleza: "Devengo", valor: Number(horasDinero.nocturnas_por_tarifa || 0), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
-      { tipo: "Dominicales diurnas por tarifa", naturaleza: "Devengo", valor: Number(horasDinero.dominicales_diurnas_por_tarifa || 0), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
-      { tipo: "Dominicales nocturnas por tarifa", naturaleza: "Devengo", valor: Number(horasDinero.dominicales_nocturnas_por_tarifa || 0), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
-      { tipo: "Propinas", naturaleza: "Devengo", valor: Number(extras.propinas || 0), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
-      { tipo: "Auxilio de transporte", naturaleza: "Devengo", valor: Number(extras.auxilio_de_transporte || 0), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
-      { tipo: "Diferencia de caja", naturaleza: "Deducción", valor: Math.abs(Number(extras.diferencia_caja || 0)), fuente: "webhook", metadata: { original: Number(extras.diferencia_caja || 0) }, created_at: new Date().toISOString() }
+      { tipo: "Horas diurnas por tarifa", naturaleza: "Devengo", valor: toNumeric(horasDinero.diurnas_por_tarifa), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
+      { tipo: "Horas nocturnas por tarifa", naturaleza: "Devengo", valor: toNumeric(horasDinero.nocturnas_por_tarifa), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
+      { tipo: "Dominicales diurnas por tarifa", naturaleza: "Devengo", valor: toNumeric(horasDinero.dominicales_diurnas_por_tarifa), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
+      { tipo: "Dominicales nocturnas por tarifa", naturaleza: "Devengo", valor: toNumeric(horasDinero.dominicales_nocturnas_por_tarifa), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
+      { tipo: "Propinas", naturaleza: "Devengo", valor: toNumeric(extras.propinas), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
+      { tipo: "Auxilio de transporte", naturaleza: "Devengo", valor: toNumeric(extras.auxilio_de_transporte), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
+      { tipo: "Diferencia de caja", naturaleza: "Deducción", valor: Math.abs(toNumeric(extras.diferencia_caja)), fuente: "webhook", metadata: { original: toNumeric(extras.diferencia_caja) }, created_at: new Date().toISOString() }
     ].filter((row) => row.valor > 0);
 
     const empleado = await resolveEmpleadoById(empleadoSelect.value);
@@ -313,11 +338,11 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
     };
     state.periodoDetalle = { inicio: fechaInicioInput.value, fin: fechaFinInput.value };
     state.horasDetalle = {
-      total: Number(horasValor.total || 0),
-      diurnas: Number(horasValor.diurnas || 0),
-      nocturnas: Number(horasValor.nocturnas || 0),
-      dominicales_diurnas: Number(horasValor.dominicales_diurnas || 0),
-      dominicales_nocturnas: Number(horasValor.dominicales_nocturnas || 0)
+      total: toNumeric(horasValor.total),
+      diurnas: toNumeric(horasValor.diurnas),
+      nocturnas: toNumeric(horasValor.nocturnas),
+      dominicales_diurnas: toNumeric(horasValor.dominicales_diurnas),
+      dominicales_nocturnas: toNumeric(horasValor.dominicales_nocturnas)
     };
     return rows;
   };
@@ -329,9 +354,9 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
     const horas = Object.entries(candidate.detalle_horas || {}).map(([tipo, value]) => ({
       tipo: `Horas ${tipo.replaceAll("_", " ")}`,
       naturaleza: "Devengo",
-      valor: Number(value?.total || 0),
+      valor: toNumeric(value?.total),
       fuente: "webhook",
-      metadata: { horas: Number(value?.horas || 0), valor_unitario: Number(value?.valor_unitario || 0) },
+      metadata: { horas: toNumeric(value?.horas), valor_unitario: toNumeric(value?.valor_unitario) },
       created_at: new Date().toISOString()
     }));
 
@@ -341,7 +366,7 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
     ].map((item) => ({
       tipo: item.label,
       naturaleza: "Devengo",
-      valor: Number(candidate?.[item.key] || 0),
+      valor: toNumeric(candidate?.[item.key]),
       fuente: "webhook",
       metadata: null,
       created_at: new Date().toISOString()
@@ -350,13 +375,13 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
     const descuentos = (Array.isArray(candidate?.descuentos) ? candidate.descuentos : []).map((item) => ({
       tipo: item?.concepto || "Descuento",
       naturaleza: "Deducción",
-      valor: Number(item?.monto || 0),
+      valor: toNumeric(item?.monto),
       fuente: "webhook",
       metadata: null,
       created_at: new Date().toISOString()
     }));
 
-    const diferenciaCaja = Number(candidate?.diferencias_caja || 0);
+    const diferenciaCaja = toNumeric(candidate?.diferencias_caja);
     if (diferenciaCaja !== 0) {
       descuentos.push({
         tipo: "Diferencias de caja",
@@ -408,7 +433,7 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
   return rows.map((item) => ({
     tipo: item?.tipo || item?.concepto || "-",
     naturaleza: item?.naturaleza || item?.categoria || "-",
-    valor: Number(item?.valor || item?.monto || 0),
+    valor: toNumeric(item?.valor ?? item?.monto ?? 0),
     fuente: item?.fuente || item?.origen || "webhook",
     metadata: item?.metadata || null,
     created_at: item?.created_at || item?.fecha || new Date().toISOString()
@@ -423,6 +448,7 @@ const consultarNomina = async () => {
   }
 
   setStatus("Consultando movimientos de nómina...");
+  const loadingStart = Date.now();
   const payload = {
     empresa_id: state.context.empresa_id,
     usuario_id: empleadoId,
@@ -470,6 +496,9 @@ const consultarNomina = async () => {
     state.periodoDetalle = null;
     state.horasDetalle = null;
   }
+
+  const elapsed = Date.now() - loadingStart;
+  if (elapsed < 1000) await sleep(1000 - elapsed);
 
   const empleado = state.responsables.find((item) => item.id === empleadoId);
   state.movimientos = rows.map((item) => ({
