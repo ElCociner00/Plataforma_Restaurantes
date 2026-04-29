@@ -152,3 +152,7 @@
   border-radius: 8px;
   background: #eef2ff;
 }
+
+
+.comprobante-table.comparativo { grid-template-columns: 1fr 1fr; }
+.comprobante-table.detalles-horas { grid-template-columns: 1fr; margin-top: 12px; }
