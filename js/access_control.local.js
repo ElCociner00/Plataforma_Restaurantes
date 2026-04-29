@@ -70,6 +70,7 @@ const LOGGRO_PRIORITY = [
   "gestion_empresas",
   "gestion_usuarios",
   "dashboard",
+  "nomina",
   "cierre_turno",
   "cierre_inventarios",
   "historico_cierre_turno",
@@ -113,7 +114,7 @@ export const MODULE_ENV_MAP = {
   configuracion_siigo: ENV_SIIGO,
   historico_facturas_siigo: ENV_SIIGO,
   facturacion: ENV_SIIGO,
-  nomina: ENV_SIIGO
+  nomina: [ENV_SIIGO, ENV_LOGGRO]
 };
 
 export function hasLocalAccess(role, moduleKey) {
