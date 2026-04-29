@@ -74,17 +74,55 @@ const setStatus = (message) => {
   if (statusEl) statusEl.textContent = message || "";
 };
 
+const normalizeJsonLikeValue = (value, maxDepth = 6) => {
+  let current = value;
+  for (let i = 0; i < maxDepth; i += 1) {
+    if (typeof current !== "string") break;
+    const trimmed = current.trim();
+    if (!trimmed) return [];
+    const startsLikeJson = trimmed.startsWith("{") || trimmed.startsWith("[") || trimmed.startsWith('"{') || trimmed.startsWith('"[');
+    if (!startsLikeJson) break;
+    try {
+      current = JSON.parse(trimmed);
+      continue;
+    } catch (_parseError) {
+      break;
+    }
+  }
+
+  if (current && typeof current === "object" && !Array.isArray(current)) {
+    const nestedCandidates = [current.data, current.body, current.output, current.payload, current.result, current.response];
+    for (const candidate of nestedCandidates) {
+      if (candidate === undefined || candidate === null) continue;
+      const normalizedNested = normalizeJsonLikeValue(candidate, maxDepth - 1);
+      if (Array.isArray(normalizedNested) && normalizedNested.length) return normalizedNested;
+      if (normalizedNested && typeof normalizedNested === "object" && !Array.isArray(normalizedNested)) return normalizedNested;
+    }
+  }
+
+  return current;
+};
+
 const parseWebhookPayloadSafe = async (response) => {
+  const tryParse = (raw) => {
+    if (raw === undefined || raw === null) return [];
+    if (typeof raw === "string") {
+      if (!raw.trim()) return [];
+      try {
+        return normalizeJsonLikeValue(JSON.parse(raw));
+      } catch (_error) {
+        return normalizeJsonLikeValue(raw);
+      }
+    }
+    return normalizeJsonLikeValue(raw);
+  };
+
   try {
-    return await response.json();
+    const jsonPayload = await response.json();
+    return tryParse(jsonPayload);
   } catch (_jsonError) {
     const raw = await response.text().catch(() => "");
-    if (!raw) return [];
-    try {
-      return JSON.parse(raw);
-    } catch (_parseError) {
-      return [];
-    }
+    return tryParse(raw);
   }
 };
 
@@ -400,7 +438,7 @@ const consultarNomina = async () => {
 
   renderMovimientos();
   renderComprobanteHeader(empleado);
-  setStatus(`Consulta completada. ${state.movimientos.length} movimientos encontrados en ${getActiveEnvironment() || "global"}.`);
+  setStatus(`Consulta completada. ${state.movimientos.length} movimientos encontrados.`);
 };
 
 const descargarComprobante = () => {
