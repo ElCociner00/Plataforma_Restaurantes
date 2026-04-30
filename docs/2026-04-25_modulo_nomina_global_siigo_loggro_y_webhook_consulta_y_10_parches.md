@@ -610,3 +610,22 @@ Eliminar bloqueo de ejecución del módulo causado por error de sintaxis/redecla
 
 ### Reversión
 - Volver `hasMeaningfulRows` a constante flecha si se confirma entorno sin inyección/recarga duplicada.
+
+---
+
+## PARCHE 14 — 2026-04-30 — Soporte explícito a payload objeto raíz (`horas_dinero/extras/horas_valor`)
+
+### Hallazgo confirmado por logs
+`webhook.parsed.type: object` y `normalize.generic.rows: 0` indicaban que la normalización esperaba array/prototipo, pero la respuesta real venía como **objeto raíz único** con `horas_dinero`, `extras`, `horas_valor`.
+
+### Cambio aplicado
+- `js/nomina.js`
+  - `fromCurrentPayrollJson` ahora acepta tanto array como objeto raíz.
+  - `normalizeNominaWebhookRows` prioriza `payload` raíz si contiene `horas_dinero|horas_valor|extras` antes de intentar rutas genéricas.
+
+### Resultado esperado
+Cuando webhook responde:
+```json
+{"horas_dinero": {...}, "extras": {...}, "horas_valor": {...}}
+```
+se generan filas de devengo/deducción y dejan de aparecer `0 movimientos` por falso negativo de shape.

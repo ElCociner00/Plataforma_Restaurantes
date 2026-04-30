@@ -162,7 +162,6 @@ const deepExtractPayrollArray = (node, depth = 0, maxDepth = 12) => {
       const found = deepExtractPayrollArray(value, depth + 1, maxDepth);
       if (found) return found;
     }
-    return null;
   }
   return null;
 };
@@ -309,8 +308,8 @@ const renderComprobanteHeader = (empleado) => {
 const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) => {
 
   const fromCurrentPayrollJson = (candidate) => {
-    if (!Array.isArray(candidate) || !candidate.length || !candidate[0]?.horas_dinero) return null;
-    const item = candidate[0];
+    const item = Array.isArray(candidate) ? candidate[0] : candidate;
+    if (!item || typeof item !== "object" || (!item?.horas_dinero && !item?.horas_valor && !item?.extras)) return null;
     const horasDinero = item?.horas_dinero || {};
     const extras = item?.extras || {};
     const horasValor = item?.horas_valor || {};
@@ -399,9 +398,12 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
   };
 
   const directPayrollArray = deepExtractPayrollArray(payload) || payload;
-  nominaLog("normalize.directPayrollArray", Array.isArray(directPayrollArray) ? `array(${directPayrollArray.length})` : typeof directPayrollArray);
-  const fromCurrent = fromCurrentPayrollJson(directPayrollArray);
+  const rootPayrollObject = payload && typeof payload === "object" && (payload.horas_dinero || payload.horas_valor || payload.extras) ? payload : null;
+  const payrollCandidate = rootPayrollObject || directPayrollArray;
+  nominaLog("normalize.directPayrollArray", Array.isArray(payrollCandidate) ? `array(${payrollCandidate.length})` : typeof payrollCandidate);
+  const fromCurrent = fromCurrentPayrollJson(payrollCandidate);
   if (fromCurrent) { nominaLog("normalize.fromCurrent.rows", fromCurrent.length); return fromCurrent; }
+  if (rootPayrollObject) nominaWarn("normalize.rootPayrollObject.noRows", rootPayrollObject);
 
   const fromPrototype = fromPrototypePayload(payload);
   if (fromPrototype) { nominaLog("normalize.fromPrototype.rows", fromPrototype.length); return fromPrototype; }
