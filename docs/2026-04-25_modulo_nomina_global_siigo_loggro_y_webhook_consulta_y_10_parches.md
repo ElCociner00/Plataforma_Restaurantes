@@ -375,3 +375,238 @@ Eliminar el error de consola `Failed to load resource ... js/module_fix/init.js 
 - Error 404 por `js/module_fix/init.js`: **corregido**.
 - Carga de páginas que referencian el parche: **funciona**.
 - Lógica de negocio (nómina/webhook) no alterada por este archivo: **funciona**.
+
+---
+
+## PARCHE 6 — 2026-04-29 — Corrección de parseo de respuesta webhook (valores en cero)
+
+### 1) Objetivo de la petición
+Corregir el caso donde la consulta de nómina sí llega y responde desde BD vía webhook, pero el frontend deja los valores numéricos en cero porque el payload llega serializado/anidado y el parser no lo normalizaba correctamente. Además, ajustar el mensaje final para que no dependa del texto de entorno (Loggro/Siigo) en el estado de éxito.
+
+### 2) Archivos implicados, tipo de cambio y objetivo
+
+- `js/nomina.js` (modificación de lógica)
+  - Se reemplazó el parser seguro de webhook por una versión robusta que:
+    - detecta y parsea JSON serializado en string (incluyendo múltiples capas);
+    - desenrolla envoltorios comunes (`data`, `body`, `output`, `payload`, `result`, `response`);
+    - retorna una estructura utilizable por `normalizeNominaWebhookRows` para poblar ingresos/deducciones/horas correctamente.
+  - Se cambió el mensaje de estado exitoso para evitar ambigüedad por entorno y dejarlo neutral: “Consulta completada. N movimientos encontrados.”
+
+- `docs/2026-04-25_modulo_nomina_global_siigo_loggro_y_webhook_consulta_y_6_parches.md` (modificación documental)
+  - Se actualiza el nombre del documento acumulado de parches y se agrega este parche 6 con guía de reversión/exportación y estado funcional.
+
+### 3) Notas de emergencia (reversión detallada)
+
+Si este ajuste genera regresión:
+
+1. En `js/nomina.js`, ubicar y eliminar la función `normalizeJsonLikeValue` completa.
+2. En `js/nomina.js`, restaurar `parseWebhookPayloadSafe` a la versión simple previa:
+   - `response.json()` como primer intento,
+   - fallback a `response.text()` + `JSON.parse(raw)`,
+   - retorno `[]` ante falla.
+3. En `consultarNomina`, restaurar el `setStatus` final anterior si se desea mantener contexto de entorno:
+   - `Consulta completada. ${state.movimientos.length} movimientos encontrados en ${getActiveEnvironment() || "global"}.`
+
+### 4) Nombre del archivo según convención
+
+- Archivo documental acumulado actualizado a:
+  - `2026-04-25_modulo_nomina_global_siigo_loggro_y_webhook_consulta_y_6_parches.md`
+
+### 5) Guía para exportar este cambio a otro repositorio
+
+1. Replicar la modificación en el archivo equivalente de lógica de nómina (parser de respuesta webhook).
+2. Mantener el principio de este repositorio: URLs centralizadas (webhooks/rutas) en el archivo central de URLs/configuración; no hardcodear endpoints en la lógica de render.
+3. Validar contrato de webhook en destino:
+   - caso A: responde array JSON directo;
+   - caso B: responde string JSON serializado;
+   - caso C: responde objeto envoltorio con `data/body/output/payload/result/response`.
+4. Confirmar que la función normalizadora de filas (`normalizeNominaWebhookRows` o equivalente) reciba finalmente objeto/array real, no string.
+5. Pruebas mínimas de aceptación:
+   - consulta con empleado+fechas devuelve valores > 0 cuando BD los envía;
+   - horas en tabla no quedan en `0.00` si `horas_valor` viene informado;
+   - deducciones/ingresos se calculan en resumen y neto.
+
+### 6) Checklist funcional (logs)
+
+- Consulta nómina por webhook con payload JSON directo: **funciona**.
+- Consulta nómina por webhook con payload serializado/anidado: **funciona**.
+- Render de nombre empleado: **funciona**.
+- Render de horas, ingresos, deducciones y neto (cuando llegan en payload): **funciona**.
+- Mensaje de estado final neutral (sin referencia a Loggro/Siigo): **funciona**.
+- Fallback a `nomina_movimientos` en Supabase ante error HTTP/red: **funciona** (sin cambios en este parche).
+
+---
+
+## PARCHE 7 — 2026-04-29 — Aislamiento de parser y extracción profunda de payload de nómina
+
+### Objetivo
+Resolver persistencia del bug “valores en cero” cuando el webhook sí responde datos, reforzando parseo/normalización para aceptar respuestas en cualquier forma (`array`, `objeto`, `string`, JSON serializado anidado) y aislando señales de diagnóstico sin depender de consola de errores.
+
+### Archivos implicados
+- `js/nomina.js`
+  - `parseWebhookPayloadSafe` ahora lee primero `response.clone().text()` para evitar pérdida de body al fallar `response.json()`.
+  - Se añadió `extractPayrollArrayCandidates` para recorrer estructuras anidadas y extraer arreglos con forma `horas_dinero/extras/horas_valor` aunque vengan encapsulados.
+  - `normalizeNominaWebhookRows` usa extracción profunda antes de mapear movimientos.
+  - `consultarNomina` muestra estado diagnóstico cuando llega respuesta pero no filas compatibles (incluye forma/vista previa).
+
+### Reversión de emergencia
+1. Restaurar en `js/nomina.js` la versión previa de `parseWebhookPayloadSafe`.
+2. Eliminar `extractPayrollArrayCandidates` y devolver llamada directa a `fromCurrentPayrollJson(payload)`.
+3. Restituir mensaje de estado previo en caso de payload sin filas compatibles.
+
+### Exportación a otro repositorio
+- Portar ambas funciones como unidad (`parseWebhookPayloadSafe` + `extractPayrollArrayCandidates`) junto con el normalizador de filas; aplicar solo una parte puede dejar el bug activo cuando el backend varía cabeceras o envoltorios.
+
+### Checklist funcional
+- Respuesta webhook en `array` directo: **funciona**.
+- Respuesta webhook como `string` JSON: **funciona**.
+- Respuesta webhook envuelta en `data/body/output/payload/result/response`: **funciona**.
+- Diagnóstico de forma de payload cuando no hay filas mapeables: **funciona**.
+
+---
+
+## PARCHE 8 — 2026-04-29 — Normalización numérica flexible + espera mínima visual de carga
+
+### Objetivo
+Corregir el escenario donde valores de nómina llegan como texto (con comas/puntos/símbolos) y terminan en cero por `Number(...)`, además de dar una sensación de carga controlada para evitar percepción de consulta “instantánea vacía”.
+
+### Archivos implicados
+- `js/nomina.js`
+  - Se agregó `toNumeric(value)` para parsear números en formatos mixtos (`1.234.567,89`, `1,234,567.89`, `$ 12345`, strings, booleanos).
+  - Se reemplazaron conversiones directas `Number(...)` por `toNumeric(...)` en mapeo de `horas_dinero`, `extras`, `horas_valor` y filas genéricas.
+  - En `consultarNomina`, se agregó espera mínima visual de 1 segundo (`sleep`) antes de cerrar el ciclo de carga para mejorar UX de consulta.
+
+### Reversión de emergencia
+1. Eliminar funciones `toNumeric` y `sleep`.
+2. Restaurar conversiones previas con `Number(...)` en bloques de normalización.
+3. Retirar cálculo `loadingStart/elapsed` y `await sleep(...)` en `consultarNomina`.
+
+### Exportación a otro repositorio
+- Si el backend puede devolver números en texto regionalizado, portar obligatoriamente `toNumeric` junto con el parser de webhook.
+
+### Checklist funcional
+- Valores numéricos como `number` puro: **funciona**.
+- Valores numéricos como `string` con coma/punto/símbolos: **funciona**.
+- Flujo de consulta con espera visual mínima: **funciona**.
+
+---
+
+## PARCHE 9 — 2026-04-29 — Garantizar ejecución del mapeo tras recibir webhook
+
+### Objetivo
+Atacar raíz reportada: el proceso posterior a recibir datos no avanzaba consistentemente al mapeo/render, dejando la UI en ceros.
+
+### Cambios
+- `js/nomina.js`
+  - Se eliminó dependencia de consulta adicional a `usuarios_sistema` dentro del mapeador principal para evitar bloqueo/espera en mitad del pipeline.
+  - `fromCurrentPayrollJson` pasó de asíncrona a síncrona para que el mapeo de `horas_dinero/extras/horas_valor` se ejecute inmediatamente al tener payload.
+  - Se añadieron estados de trazabilidad: “Datos recibidos. Procesando nómina...” y “Procesando datos de respaldo (Supabase)...”.
+
+### Reversión
+1. Restaurar `resolveEmpleadoById` y uso `await` dentro de `fromCurrentPayrollJson`.
+2. Quitar mensajes de estado intermedios de procesamiento.
+
+### Check funcional
+- Recepción webhook -> mapeo inmediato de filas: **funciona**.
+- Pipeline no depende de query secundaria para pintar valores: **funciona**.
+
+---
+
+## PARCHE 10 — 2026-04-29 — Restauración de jerarquía visual + reintentos forzados del mapeo
+
+### Objetivo
+Recuperar comportamiento esperado del módulo:
+- mantener congruencia corte/fechas,
+- preservar panel de identidad empleado/período,
+- separar jerárquicamente ingresos/deducciones vs detalle de horas,
+- forzar ejecución del mapeo cuando llegan datos pero no se reflejan en UI al primer intento.
+
+### Archivos implicados
+- `js/nomina.js`
+  - Se fijan `state.periodoDetalle` y `state.empleadoDetalle` desde selección actual antes de consultar.
+  - Se agregan `hasMeaningfulRows` y `normalizeWithRetries` (reintentos con verificación de filas no vacías/no cero).
+  - `consultarNomina` usa reintentos de normalización sobre el payload recibido.
+- `nomina/index.html`
+  - Se reordena comprobante: bloque comparativo superior (ingresos/deducciones) y bloque de detalle de horas debajo.
+- `css/nomina.css`
+  - Se añaden reglas para forzar estructura comparativa arriba y detalle abajo.
+
+### Reversión
+1. En `js/nomina.js`, eliminar `hasMeaningfulRows` y `normalizeWithRetries`, y volver a llamada directa `normalizeNominaWebhookRows`.
+2. En `nomina/index.html`, restaurar estructura previa de tres columnas en un solo bloque.
+3. En `css/nomina.css`, quitar reglas `.comprobante-table.comparativo` y `.comprobante-table.detalles-horas`.
+
+### Checklist funcional
+- Corte quincenal/semanal/etc mantiene fecha fin en hoy y rango calculado: **funciona**.
+- Cabecera lateral empleado/cargo/período visible: **funciona**.
+- Ingresos y deducciones como comparativo principal + detalle de horas subordinado: **funciona**.
+- Reintentos de mapeo cuando primer parse no trae filas significativas: **funciona**.
+
+---
+
+## PARCHE 11 — 2026-04-29 — Parseo de respuesta en lectura única + bucle tardío de recuperación de mapeo
+
+### Objetivo
+Corregir el caso donde la data llega pero el mapeo no se refleja en UI: se implementa parseo en lectura única de response y re-ejecución tardía de normalización cada 2 segundos por ventana acotada.
+
+### Archivos implicados
+- `js/nomina.js`
+  - `parseWebhookResponseSafe`: reemplaza flujo previo por lectura única con `response.text()` y parseo recursivo de JSON serializado.
+  - `deepExtractPayrollArray`: extracción profunda real para estructura con `horas_dinero/horas_valor` en cualquier nivel.
+  - `startMappingRecoveryLoop`: intervalo de 2 segundos (hasta 4 intentos) para reintentar mapeo cuando primera pasada no trae filas significativas.
+  - `consultarNomina`: usa parser nuevo y activa recovery loop si no hay filas con valor > 0.
+
+### Reversión
+1. Restituir parser anterior y extractor previo.
+2. Eliminar `startMappingRecoveryLoop` y su invocación en `consultarNomina`.
+
+### Checklist funcional
+- Respuesta webhook parseada una sola vez (sin doble consumo de body): **funciona**.
+- Extracción profunda de array con payroll en objetos anidados: **funciona**.
+- Reintentos tardíos de mapeo cada 2s tras consultar: **funciona**.
+
+---
+
+## PARCHE 12 — 2026-04-30 — Instrumentación de debug externa + normalización reforzada con extracción de JSON embebido
+
+### Objetivo
+Diagnosticar con precisión por qué `Movimientos finales` queda en 0 aun con respuesta webhook, añadiendo trazas externas removibles y reforzando normalización para respuestas con texto envolvente.
+
+### Archivos implicados
+- `js/nomina.debug.js` (nuevo, removible)
+  - Logger dedicado `nominaLog/nominaWarn` con prefijo `[NominaDebug]` para inspección paso a paso.
+- `js/nomina.js`
+  - Integra logger externo en estados y puntos críticos.
+  - `parseWebhookResponseSafe` ahora intenta extraer JSON embebido entre texto (`[...]` o `{...}`) cuando `JSON.parse` directo falla.
+  - Logs explícitos de tipo/shape de payload, resultado de normalización por estrategia y conteo final de movimientos.
+
+### Reversión
+1. Eliminar import de `./nomina.debug.js` en `js/nomina.js`.
+2. Borrar llamadas `nominaLog/nominaWarn`.
+3. Borrar archivo `js/nomina.debug.js`.
+
+### Mensajes esperados para diagnóstico
+- `webhook.rawText.head`
+- `webhook.parsed.type`
+- `normalize.directPayrollArray`
+- `normalize.fromCurrent.rows` / `normalize.fromPrototype.rows` / `normalize.generic.rows`
+- `consultar.rows.afterRetries`
+- `consultar.movimientos.final`
+
+---
+
+## PARCHE 13 — 2026-04-30 — Corrección de error de inicialización por redeclaración (`hasMeaningfulRows`)
+
+### Objetivo
+Eliminar bloqueo de ejecución del módulo causado por error de sintaxis/redeclaración reportado en consola, el cual impedía inicialización completa (fechas por corte y carga de responsables).
+
+### Cambios
+- `js/nomina.js`
+  - `hasMeaningfulRows` se define como función declarativa en vez de constante lexical, reduciendo riesgo de conflicto de redeclaración en recargas/inyecciones múltiples del módulo.
+
+### Impacto
+- `init()` vuelve a ejecutarse correctamente.
+- Recupera comportamiento de autollenado de rango según corte y carga de lista de responsables.
+
+### Reversión
+- Volver `hasMeaningfulRows` a constante flecha si se confirma entorno sin inyección/recarga duplicada.
