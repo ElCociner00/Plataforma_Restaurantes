@@ -162,53 +162,7 @@ const deepExtractPayrollArray = (node, depth = 0, maxDepth = 12) => {
       const found = deepExtractPayrollArray(value, depth + 1, maxDepth);
       if (found) return found;
     }
-    for (const item of node) {
-      const found = deepExtractPayrollArray(item, depth + 1, maxDepth);
-      if (found) return found;
-    }
     return null;
-  }
-  if (typeof node === "object") {
-    for (const value of Object.values(node)) {
-      const found = deepExtractPayrollArray(value, depth + 1, maxDepth);
-      if (found) return found;
-    }
-  }
-  return null;
-};
-
-const parseWebhookPayloadSafe = async (response) => {
-  const tryParse = (raw) => {
-    if (raw === undefined || raw === null) return [];
-    if (typeof raw === "string") {
-      if (!raw.trim()) return [];
-      try {
-        return normalizeJsonLikeValue(JSON.parse(raw));
-      } catch (_error) {
-        return normalizeJsonLikeValue(raw);
-      }
-    }
-    return normalizeJsonLikeValue(raw);
-  };
-
-  // Leer primero desde clone evita perder el body cuando response.json() falla.
-  let rawText = "";
-  try {
-    rawText = await response.clone().text();
-  } catch (_cloneError) {
-    rawText = "";
-  }
-
-  const fromRawText = tryParse(rawText);
-  if (Array.isArray(fromRawText) ? fromRawText.length : Boolean(fromRawText && typeof fromRawText === "object")) {
-    return fromRawText;
-  }
-
-  try {
-    const jsonPayload = await response.json();
-    return tryParse(jsonPayload);
-  } catch (_jsonError) {
-    return [];
   }
   return null;
 };
@@ -483,7 +437,7 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
 };
 
 
-const hasMeaningfulRows = (rows) => Array.isArray(rows) && rows.some((row) => toNumeric(row?.valor ?? 0) > 0);
+function hasMeaningfulRows(rows) { return Array.isArray(rows) && rows.some((row) => toNumeric(row?.valor ?? 0) > 0); }
 
 const normalizeWithRetries = async (webhookData, empleadoSeleccionado, retries = 3) => {
   let lastRows = [];
@@ -506,38 +460,6 @@ const startMappingRecoveryLoop = (webhookData, empleadoSeleccionado) => {
       state.movimientos = rows.map((item) => ({ ...item, empleado_nombre: empleadoSeleccionado?.nombre_completo || "Empleado", estado: "Liquidable" }));
       nominaLog("consultar.movimientos.final", state.movimientos.length);
   renderMovimientos();
-      renderComprobanteHeader(empleadoSeleccionado);
-      setStatus(`Consulta completada. ${state.movimientos.length} movimientos encontrados.`);
-      clearInterval(timer);
-      return;
-    }
-    if (attempts >= 4) clearInterval(timer);
-  }, 2000);
-};
-
-
-const hasMeaningfulRows = (rows) => Array.isArray(rows) && rows.some((row) => toNumeric(row?.valor ?? 0) > 0);
-
-const normalizeWithRetries = async (webhookData, empleadoSeleccionado, retries = 3) => {
-  let lastRows = [];
-  for (let i = 0; i < retries; i += 1) {
-    lastRows = await normalizeNominaWebhookRows(webhookData, empleadoSeleccionado);
-    if (hasMeaningfulRows(lastRows)) return lastRows;
-    await sleep(150);
-  }
-  return lastRows;
-};
-
-
-
-const startMappingRecoveryLoop = (webhookData, empleadoSeleccionado) => {
-  let attempts = 0;
-  const timer = setInterval(async () => {
-    attempts += 1;
-    const rows = await normalizeNominaWebhookRows(webhookData, empleadoSeleccionado);
-    if (hasMeaningfulRows(rows)) {
-      state.movimientos = rows.map((item) => ({ ...item, empleado_nombre: empleadoSeleccionado?.nombre_completo || "Empleado", estado: "Liquidable" }));
-      renderMovimientos();
       renderComprobanteHeader(empleadoSeleccionado);
       setStatus(`Consulta completada. ${state.movimientos.length} movimientos encontrados.`);
       clearInterval(timer);

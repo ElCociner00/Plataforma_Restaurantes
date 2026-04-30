@@ -592,3 +592,21 @@ Diagnosticar con precisión por qué `Movimientos finales` queda en 0 aun con re
 - `normalize.fromCurrent.rows` / `normalize.fromPrototype.rows` / `normalize.generic.rows`
 - `consultar.rows.afterRetries`
 - `consultar.movimientos.final`
+
+---
+
+## PARCHE 13 — 2026-04-30 — Corrección de error de inicialización por redeclaración (`hasMeaningfulRows`)
+
+### Objetivo
+Eliminar bloqueo de ejecución del módulo causado por error de sintaxis/redeclaración reportado en consola, el cual impedía inicialización completa (fechas por corte y carga de responsables).
+
+### Cambios
+- `js/nomina.js`
+  - `hasMeaningfulRows` se define como función declarativa en vez de constante lexical, reduciendo riesgo de conflicto de redeclaración en recargas/inyecciones múltiples del módulo.
+
+### Impacto
+- `init()` vuelve a ejecutarse correctamente.
+- Recupera comportamiento de autollenado de rango según corte y carga de lista de responsables.
+
+### Reversión
+- Volver `hasMeaningfulRows` a constante flecha si se confirma entorno sin inyección/recarga duplicada.
