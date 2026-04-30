@@ -166,6 +166,35 @@ const deepExtractPayrollArray = (node, depth = 0, maxDepth = 12) => {
   return null;
 };
 
+const deepExtractPayrollObject = (node, depth = 0, maxDepth = 12, visited = new WeakSet()) => {
+  if (depth > maxDepth || node === null || node === undefined) return null;
+  if (typeof node === "string") {
+    try {
+      const parsed = JSON.parse(node);
+      return deepExtractPayrollObject(parsed, depth + 1, maxDepth, visited);
+    } catch (_e) {
+      return null;
+    }
+  }
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = deepExtractPayrollObject(item, depth + 1, maxDepth, visited);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (typeof node === "object") {
+    if (visited.has(node)) return null;
+    visited.add(node);
+    if (node.horas_dinero || node.horas_valor || node.extras) return node;
+    for (const value of Object.values(node)) {
+      const found = deepExtractPayrollObject(value, depth + 1, maxDepth, visited);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
 const extractPayrollArrayCandidates = (value, maxDepth = 8) => {
   const visited = new WeakSet();
   const queue = [{ node: value, depth: 0 }];
@@ -397,9 +426,9 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
     return [...horas, ...ingresosExtra, ...descuentos];
   };
 
-  const directPayrollArray = deepExtractPayrollArray(payload) || payload;
-  const rootPayrollObject = payload && typeof payload === "object" && (payload.horas_dinero || payload.horas_valor || payload.extras) ? payload : null;
-  const payrollCandidate = rootPayrollObject || directPayrollArray;
+  const directPayrollArray = deepExtractPayrollArray(payload);
+  const rootPayrollObject = deepExtractPayrollObject(payload);
+  const payrollCandidate = directPayrollArray || rootPayrollObject || payload;
   nominaLog("normalize.directPayrollArray", Array.isArray(payrollCandidate) ? `array(${payrollCandidate.length})` : typeof payrollCandidate);
   const fromCurrent = fromCurrentPayrollJson(payrollCandidate);
   if (fromCurrent) { nominaLog("normalize.fromCurrent.rows", fromCurrent.length); return fromCurrent; }
@@ -413,6 +442,11 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
     if (Array.isArray(candidate?.data)) return candidate.data;
     if (Array.isArray(candidate?.items)) return candidate.items;
     if (Array.isArray(candidate?.movimientos)) return candidate.movimientos;
+    if (candidate && typeof candidate === "object") {
+      for (const value of Object.values(candidate)) {
+        if (Array.isArray(value)) return value;
+      }
+    }
     return [];
   };
 
