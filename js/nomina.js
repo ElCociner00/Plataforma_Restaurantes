@@ -29,6 +29,7 @@ import { getActiveEnvironment } from "./environment.js";
 import { supabase } from "./supabase.js";
 import { WEBHOOK_NOMINA_CONSULTAR } from "./webhooks.js";
 import { drawPngBrandWatermark } from "./png_branding.js";
+import { nominaLog, nominaWarn } from "./nomina.debug.js";
 
 const fechaInicioInput = document.getElementById("nominaFechaInicio");
 const fechaFinInput = document.getElementById("nominaFechaFin");
@@ -97,11 +98,13 @@ const fmtHours = (value) => Number(value || 0).toFixed(2);
 
 const setStatus = (message) => {
   if (statusEl) statusEl.textContent = message || "";
+  nominaLog("status", message || "");
 };
 
 const parseWebhookResponseSafe = async (response) => {
   try {
     const rawText = await response.text();
+    nominaLog("webhook.rawText.head", (rawText || "").slice(0, 220));
     if (!rawText || !rawText.trim()) return null;
 
     const parseRecursively = (value, depth = 0) => {
@@ -112,12 +115,24 @@ const parseWebhookResponseSafe = async (response) => {
       try {
         return parseRecursively(JSON.parse(t), depth + 1);
       } catch (_e) {
+        // intento extra: extraer JSON embebido entre texto
+        const first = t.indexOf("[");
+        const last = t.lastIndexOf("]");
+        const firstObj = t.indexOf("{");
+        const lastObj = t.lastIndexOf("}");
+        const candidate = (first >= 0 && last > first) ? t.slice(first, last + 1) : ((firstObj >=0 && lastObj > firstObj) ? t.slice(firstObj, lastObj + 1) : null);
+        if (candidate) {
+          try { return parseRecursively(JSON.parse(candidate), depth + 1); } catch (_e2) {}
+        }
         return value;
       }
     };
 
-    return parseRecursively(rawText);
+    const parsed = parseRecursively(rawText);
+    nominaLog("webhook.parsed.type", Array.isArray(parsed) ? `array(${parsed.length})` : typeof parsed);
+    return parsed;
   } catch (_error) {
+    nominaWarn("webhook.parse.error", _error?.message || _error);
     return null;
   }
 };
@@ -135,6 +150,17 @@ const deepExtractPayrollArray = (node, depth = 0, maxDepth = 12) => {
   if (Array.isArray(node)) {
     if (node.length && node.some((item) => item && typeof item === "object" && (item.horas_dinero || item.horas_valor))) {
       return node;
+    }
+    for (const item of node) {
+      const found = deepExtractPayrollArray(item, depth + 1, maxDepth);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (typeof node === "object") {
+    for (const value of Object.values(node)) {
+      const found = deepExtractPayrollArray(value, depth + 1, maxDepth);
+      if (found) return found;
     }
     for (const item of node) {
       const found = deepExtractPayrollArray(item, depth + 1, maxDepth);
@@ -184,6 +210,7 @@ const parseWebhookPayloadSafe = async (response) => {
   } catch (_jsonError) {
     return [];
   }
+  return null;
 };
 
 const extractPayrollArrayCandidates = (value, maxDepth = 8) => {
@@ -418,11 +445,12 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
   };
 
   const directPayrollArray = deepExtractPayrollArray(payload) || payload;
+  nominaLog("normalize.directPayrollArray", Array.isArray(directPayrollArray) ? `array(${directPayrollArray.length})` : typeof directPayrollArray);
   const fromCurrent = fromCurrentPayrollJson(directPayrollArray);
-  if (fromCurrent) return fromCurrent;
+  if (fromCurrent) { nominaLog("normalize.fromCurrent.rows", fromCurrent.length); return fromCurrent; }
 
   const fromPrototype = fromPrototypePayload(payload);
-  if (fromPrototype) return fromPrototype;
+  if (fromPrototype) { nominaLog("normalize.fromPrototype.rows", fromPrototype.length); return fromPrototype; }
 
   const pickRows = (candidate) => {
     if (Array.isArray(candidate)) return candidate;
@@ -442,7 +470,7 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
     fin: payload?.periodo?.fin || fechaFinInput.value
   };
   state.horasDetalle = null;
-  return rows.map((item) => ({
+  const mapped = rows.map((item) => ({
     tipo: item?.tipo || item?.concepto || "-",
     naturaleza: item?.naturaleza || item?.categoria || "-",
     valor: toNumeric(item?.valor ?? item?.monto ?? 0),
@@ -450,6 +478,41 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
     metadata: item?.metadata || null,
     created_at: item?.created_at || item?.fecha || new Date().toISOString()
   }));
+  nominaLog("normalize.generic.rows", mapped.length);
+  return mapped;
+};
+
+
+const hasMeaningfulRows = (rows) => Array.isArray(rows) && rows.some((row) => toNumeric(row?.valor ?? 0) > 0);
+
+const normalizeWithRetries = async (webhookData, empleadoSeleccionado, retries = 3) => {
+  let lastRows = [];
+  for (let i = 0; i < retries; i += 1) {
+    lastRows = await normalizeNominaWebhookRows(webhookData, empleadoSeleccionado);
+    if (hasMeaningfulRows(lastRows)) return lastRows;
+    await sleep(150);
+  }
+  return lastRows;
+};
+
+
+
+const startMappingRecoveryLoop = (webhookData, empleadoSeleccionado) => {
+  let attempts = 0;
+  const timer = setInterval(async () => {
+    attempts += 1;
+    const rows = await normalizeNominaWebhookRows(webhookData, empleadoSeleccionado);
+    if (hasMeaningfulRows(rows)) {
+      state.movimientos = rows.map((item) => ({ ...item, empleado_nombre: empleadoSeleccionado?.nombre_completo || "Empleado", estado: "Liquidable" }));
+      nominaLog("consultar.movimientos.final", state.movimientos.length);
+  renderMovimientos();
+      renderComprobanteHeader(empleadoSeleccionado);
+      setStatus(`Consulta completada. ${state.movimientos.length} movimientos encontrados.`);
+      clearInterval(timer);
+      return;
+    }
+    if (attempts >= 4) clearInterval(timer);
+  }, 2000);
 };
 
 
@@ -517,6 +580,7 @@ const consultarNomina = async () => {
     const webhookData = await parseWebhookResponseSafe(response);
     setStatus("Datos recibidos. Procesando nómina...");
     rows = await normalizeWithRetries(webhookData, empleadoSeleccionado, 4);
+    nominaLog("consultar.rows.afterRetries", rows.length);
     if (!hasMeaningfulRows(rows) && webhookData) startMappingRecoveryLoop(webhookData, empleadoSeleccionado);
     if (!rows.length) {
       const shape = Array.isArray(webhookData) ? "array" : typeof webhookData;

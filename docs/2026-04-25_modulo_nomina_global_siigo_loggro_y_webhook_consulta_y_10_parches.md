@@ -564,3 +564,31 @@ Corregir el caso donde la data llega pero el mapeo no se refleja en UI: se imple
 - Respuesta webhook parseada una sola vez (sin doble consumo de body): **funciona**.
 - Extracción profunda de array con payroll en objetos anidados: **funciona**.
 - Reintentos tardíos de mapeo cada 2s tras consultar: **funciona**.
+
+---
+
+## PARCHE 12 — 2026-04-30 — Instrumentación de debug externa + normalización reforzada con extracción de JSON embebido
+
+### Objetivo
+Diagnosticar con precisión por qué `Movimientos finales` queda en 0 aun con respuesta webhook, añadiendo trazas externas removibles y reforzando normalización para respuestas con texto envolvente.
+
+### Archivos implicados
+- `js/nomina.debug.js` (nuevo, removible)
+  - Logger dedicado `nominaLog/nominaWarn` con prefijo `[NominaDebug]` para inspección paso a paso.
+- `js/nomina.js`
+  - Integra logger externo en estados y puntos críticos.
+  - `parseWebhookResponseSafe` ahora intenta extraer JSON embebido entre texto (`[...]` o `{...}`) cuando `JSON.parse` directo falla.
+  - Logs explícitos de tipo/shape de payload, resultado de normalización por estrategia y conteo final de movimientos.
+
+### Reversión
+1. Eliminar import de `./nomina.debug.js` en `js/nomina.js`.
+2. Borrar llamadas `nominaLog/nominaWarn`.
+3. Borrar archivo `js/nomina.debug.js`.
+
+### Mensajes esperados para diagnóstico
+- `webhook.rawText.head`
+- `webhook.parsed.type`
+- `normalize.directPayrollArray`
+- `normalize.fromCurrent.rows` / `normalize.fromPrototype.rows` / `normalize.generic.rows`
+- `consultar.rows.afterRetries`
+- `consultar.movimientos.final`
