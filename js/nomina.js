@@ -29,6 +29,7 @@ import { getActiveEnvironment } from "./environment.js";
 import { supabase } from "./supabase.js";
 import { WEBHOOK_NOMINA_CONSULTAR } from "./webhooks.js";
 import { drawPngBrandWatermark } from "./png_branding.js";
+import { nominaLog, nominaWarn } from "./nomina.debug.js";
 
 const fechaInicioInput = document.getElementById("nominaFechaInicio");
 const fechaFinInput = document.getElementById("nominaFechaFin");
@@ -63,6 +64,31 @@ const state = {
   horasDetalle: null
 };
 
+
+const toNumeric = (value) => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (value === null || value === undefined) return 0;
+  let text = String(value).trim();
+  if (!text) return 0;
+  text = text.replace(/\$/g, "").replace(/\s+/g, "");
+  const hasComma = text.includes(",");
+  const hasDot = text.includes(".");
+  if (hasComma && hasDot) {
+    // 1.234.567,89 -> 1234567.89 | 1,234,567.89 -> 1234567.89
+    if (text.lastIndexOf(",") > text.lastIndexOf(".")) {
+      text = text.replace(/\./g, "").replace(",", ".");
+    } else {
+      text = text.replace(/,/g, "");
+    }
+  } else if (hasComma && !hasDot) {
+    text = text.replace(/\./g, "").replace(/,/g, ".");
+  }
+  const parsed = Number(text.replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const fmtMoney = (value) => Number(value || 0).toLocaleString("es-CO", {
   style: "currency",
   currency: "COP",
@@ -72,20 +98,72 @@ const fmtHours = (value) => Number(value || 0).toFixed(2);
 
 const setStatus = (message) => {
   if (statusEl) statusEl.textContent = message || "";
+  nominaLog("status", message || "");
 };
 
-const parseWebhookPayloadSafe = async (response) => {
+const parseWebhookResponseSafe = async (response) => {
   try {
-    return await response.json();
-  } catch (_jsonError) {
-    const raw = await response.text().catch(() => "");
-    if (!raw) return [];
+    const rawText = await response.text();
+    nominaLog("webhook.rawText.head", (rawText || "").slice(0, 220));
+    if (!rawText || !rawText.trim()) return null;
+
+    const parseRecursively = (value, depth = 0) => {
+      if (depth > 8) return value;
+      if (typeof value !== "string") return value;
+      const t = value.trim();
+      if (!t) return null;
+      try {
+        return parseRecursively(JSON.parse(t), depth + 1);
+      } catch (_e) {
+        // intento extra: extraer JSON embebido entre texto
+        const first = t.indexOf("[");
+        const last = t.lastIndexOf("]");
+        const firstObj = t.indexOf("{");
+        const lastObj = t.lastIndexOf("}");
+        const candidate = (first >= 0 && last > first) ? t.slice(first, last + 1) : ((firstObj >=0 && lastObj > firstObj) ? t.slice(firstObj, lastObj + 1) : null);
+        if (candidate) {
+          try { return parseRecursively(JSON.parse(candidate), depth + 1); } catch (_e2) {}
+        }
+        return value;
+      }
+    };
+
+    const parsed = parseRecursively(rawText);
+    nominaLog("webhook.parsed.type", Array.isArray(parsed) ? `array(${parsed.length})` : typeof parsed);
+    return parsed;
+  } catch (_error) {
+    nominaWarn("webhook.parse.error", _error?.message || _error);
+    return null;
+  }
+};
+
+const deepExtractPayrollArray = (node, depth = 0, maxDepth = 12) => {
+  if (depth > maxDepth || node === null || node === undefined) return null;
+  if (typeof node === "string") {
     try {
-      return JSON.parse(raw);
-    } catch (_parseError) {
-      return [];
+      const parsed = JSON.parse(node);
+      return deepExtractPayrollArray(parsed, depth + 1, maxDepth);
+    } catch (_e) {
+      return null;
     }
   }
+  if (Array.isArray(node)) {
+    if (node.length && node.some((item) => item && typeof item === "object" && (item.horas_dinero || item.horas_valor))) {
+      return node;
+    }
+    for (const item of node) {
+      const found = deepExtractPayrollArray(item, depth + 1, maxDepth);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (typeof node === "object") {
+    for (const value of Object.values(node)) {
+      const found = deepExtractPayrollArray(value, depth + 1, maxDepth);
+      if (found) return found;
+    }
+  }
+  return null;
 };
 
 const setDefaultDates = () => {
@@ -201,46 +279,35 @@ const renderComprobanteHeader = (empleado) => {
 };
 
 const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) => {
-  const resolveEmpleadoById = async (usuarioId) => {
-    if (!usuarioId) return null;
-    const { data, error } = await supabase
-      .from("usuarios_sistema")
-      .select("nombre_completo,rol")
-      .eq("id", usuarioId)
-      .maybeSingle();
-    if (error) return null;
-    return data || null;
-  };
 
-  const fromCurrentPayrollJson = async (candidate) => {
-    if (!Array.isArray(candidate) || !candidate.length || !candidate[0]?.horas_dinero) return null;
-    const item = candidate[0];
+  const fromCurrentPayrollJson = (candidate) => {
+    const item = Array.isArray(candidate) ? candidate[0] : candidate;
+    if (!item || typeof item !== "object" || (!item?.horas_dinero && !item?.horas_valor && !item?.extras)) return null;
     const horasDinero = item?.horas_dinero || {};
     const extras = item?.extras || {};
     const horasValor = item?.horas_valor || {};
 
     const rows = [
-      { tipo: "Horas diurnas por tarifa", naturaleza: "Devengo", valor: Number(horasDinero.diurnas_por_tarifa || 0), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
-      { tipo: "Horas nocturnas por tarifa", naturaleza: "Devengo", valor: Number(horasDinero.nocturnas_por_tarifa || 0), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
-      { tipo: "Dominicales diurnas por tarifa", naturaleza: "Devengo", valor: Number(horasDinero.dominicales_diurnas_por_tarifa || 0), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
-      { tipo: "Dominicales nocturnas por tarifa", naturaleza: "Devengo", valor: Number(horasDinero.dominicales_nocturnas_por_tarifa || 0), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
-      { tipo: "Propinas", naturaleza: "Devengo", valor: Number(extras.propinas || 0), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
-      { tipo: "Auxilio de transporte", naturaleza: "Devengo", valor: Number(extras.auxilio_de_transporte || 0), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
-      { tipo: "Diferencia de caja", naturaleza: "Deducción", valor: Math.abs(Number(extras.diferencia_caja || 0)), fuente: "webhook", metadata: { original: Number(extras.diferencia_caja || 0) }, created_at: new Date().toISOString() }
+      { tipo: "Horas diurnas por tarifa", naturaleza: "Devengo", valor: toNumeric(horasDinero.diurnas_por_tarifa), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
+      { tipo: "Horas nocturnas por tarifa", naturaleza: "Devengo", valor: toNumeric(horasDinero.nocturnas_por_tarifa), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
+      { tipo: "Dominicales diurnas por tarifa", naturaleza: "Devengo", valor: toNumeric(horasDinero.dominicales_diurnas_por_tarifa), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
+      { tipo: "Dominicales nocturnas por tarifa", naturaleza: "Devengo", valor: toNumeric(horasDinero.dominicales_nocturnas_por_tarifa), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
+      { tipo: "Propinas", naturaleza: "Devengo", valor: toNumeric(extras.propinas), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
+      { tipo: "Auxilio de transporte", naturaleza: "Devengo", valor: toNumeric(extras.auxilio_de_transporte), fuente: "webhook", metadata: null, created_at: new Date().toISOString() },
+      { tipo: "Diferencia de caja", naturaleza: "Deducción", valor: Math.abs(toNumeric(extras.diferencia_caja)), fuente: "webhook", metadata: { original: toNumeric(extras.diferencia_caja) }, created_at: new Date().toISOString() }
     ].filter((row) => row.valor > 0);
 
-    const empleado = await resolveEmpleadoById(empleadoSelect.value);
     state.empleadoDetalle = {
-      nombre: empleado?.nombre_completo || empleadoSeleccionado?.nombre_completo || "-",
-      cargo: empleado?.rol || empleadoSeleccionado?.rol || "-"
+      nombre: empleadoSeleccionado?.nombre_completo || "-",
+      cargo: empleadoSeleccionado?.rol || "-"
     };
     state.periodoDetalle = { inicio: fechaInicioInput.value, fin: fechaFinInput.value };
     state.horasDetalle = {
-      total: Number(horasValor.total || 0),
-      diurnas: Number(horasValor.diurnas || 0),
-      nocturnas: Number(horasValor.nocturnas || 0),
-      dominicales_diurnas: Number(horasValor.dominicales_diurnas || 0),
-      dominicales_nocturnas: Number(horasValor.dominicales_nocturnas || 0)
+      total: toNumeric(horasValor.total),
+      diurnas: toNumeric(horasValor.diurnas),
+      nocturnas: toNumeric(horasValor.nocturnas),
+      dominicales_diurnas: toNumeric(horasValor.dominicales_diurnas),
+      dominicales_nocturnas: toNumeric(horasValor.dominicales_nocturnas)
     };
     return rows;
   };
@@ -252,9 +319,9 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
     const horas = Object.entries(candidate.detalle_horas || {}).map(([tipo, value]) => ({
       tipo: `Horas ${tipo.replaceAll("_", " ")}`,
       naturaleza: "Devengo",
-      valor: Number(value?.total || 0),
+      valor: toNumeric(value?.total),
       fuente: "webhook",
-      metadata: { horas: Number(value?.horas || 0), valor_unitario: Number(value?.valor_unitario || 0) },
+      metadata: { horas: toNumeric(value?.horas), valor_unitario: toNumeric(value?.valor_unitario) },
       created_at: new Date().toISOString()
     }));
 
@@ -264,7 +331,7 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
     ].map((item) => ({
       tipo: item.label,
       naturaleza: "Devengo",
-      valor: Number(candidate?.[item.key] || 0),
+      valor: toNumeric(candidate?.[item.key]),
       fuente: "webhook",
       metadata: null,
       created_at: new Date().toISOString()
@@ -273,13 +340,13 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
     const descuentos = (Array.isArray(candidate?.descuentos) ? candidate.descuentos : []).map((item) => ({
       tipo: item?.concepto || "Descuento",
       naturaleza: "Deducción",
-      valor: Number(item?.monto || 0),
+      valor: toNumeric(item?.monto),
       fuente: "webhook",
       metadata: null,
       created_at: new Date().toISOString()
     }));
 
-    const diferenciaCaja = Number(candidate?.diferencias_caja || 0);
+    const diferenciaCaja = toNumeric(candidate?.diferencias_caja);
     if (diferenciaCaja !== 0) {
       descuentos.push({
         tipo: "Diferencias de caja",
@@ -303,11 +370,16 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
     return [...horas, ...ingresosExtra, ...descuentos];
   };
 
-  const fromCurrent = await fromCurrentPayrollJson(payload);
-  if (fromCurrent) return fromCurrent;
+  const directPayrollArray = deepExtractPayrollArray(payload) || payload;
+  const rootPayrollObject = payload && typeof payload === "object" && (payload.horas_dinero || payload.horas_valor || payload.extras) ? payload : null;
+  const payrollCandidate = rootPayrollObject || directPayrollArray;
+  nominaLog("normalize.directPayrollArray", Array.isArray(payrollCandidate) ? `array(${payrollCandidate.length})` : typeof payrollCandidate);
+  const fromCurrent = fromCurrentPayrollJson(payrollCandidate);
+  if (fromCurrent) { nominaLog("normalize.fromCurrent.rows", fromCurrent.length); return fromCurrent; }
+  if (rootPayrollObject) nominaWarn("normalize.rootPayrollObject.noRows", rootPayrollObject);
 
   const fromPrototype = fromPrototypePayload(payload);
-  if (fromPrototype) return fromPrototype;
+  if (fromPrototype) { nominaLog("normalize.fromPrototype.rows", fromPrototype.length); return fromPrototype; }
 
   const pickRows = (candidate) => {
     if (Array.isArray(candidate)) return candidate;
@@ -327,14 +399,49 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
     fin: payload?.periodo?.fin || fechaFinInput.value
   };
   state.horasDetalle = null;
-  return rows.map((item) => ({
+  const mapped = rows.map((item) => ({
     tipo: item?.tipo || item?.concepto || "-",
     naturaleza: item?.naturaleza || item?.categoria || "-",
-    valor: Number(item?.valor || item?.monto || 0),
+    valor: toNumeric(item?.valor ?? item?.monto ?? 0),
     fuente: item?.fuente || item?.origen || "webhook",
     metadata: item?.metadata || null,
     created_at: item?.created_at || item?.fecha || new Date().toISOString()
   }));
+  nominaLog("normalize.generic.rows", mapped.length);
+  return mapped;
+};
+
+
+function hasMeaningfulRows(rows) { return Array.isArray(rows) && rows.some((row) => toNumeric(row?.valor ?? 0) > 0); }
+
+const normalizeWithRetries = async (webhookData, empleadoSeleccionado, retries = 3) => {
+  let lastRows = [];
+  for (let i = 0; i < retries; i += 1) {
+    lastRows = await normalizeNominaWebhookRows(webhookData, empleadoSeleccionado);
+    if (hasMeaningfulRows(lastRows)) return lastRows;
+    await sleep(150);
+  }
+  return lastRows;
+};
+
+
+
+const startMappingRecoveryLoop = (webhookData, empleadoSeleccionado) => {
+  let attempts = 0;
+  const timer = setInterval(async () => {
+    attempts += 1;
+    const rows = await normalizeNominaWebhookRows(webhookData, empleadoSeleccionado);
+    if (hasMeaningfulRows(rows)) {
+      state.movimientos = rows.map((item) => ({ ...item, empleado_nombre: empleadoSeleccionado?.nombre_completo || "Empleado", estado: "Liquidable" }));
+      nominaLog("consultar.movimientos.final", state.movimientos.length);
+  renderMovimientos();
+      renderComprobanteHeader(empleadoSeleccionado);
+      setStatus(`Consulta completada. ${state.movimientos.length} movimientos encontrados.`);
+      clearInterval(timer);
+      return;
+    }
+    if (attempts >= 4) clearInterval(timer);
+  }, 2000);
 };
 
 const consultarNomina = async () => {
@@ -344,7 +451,11 @@ const consultarNomina = async () => {
     return;
   }
 
+  state.periodoDetalle = { inicio: fechaInicioInput.value || "-", fin: fechaFinInput.value || "-" };
+  const empleadoSeleccionado = state.responsables.find((item) => item.id === empleadoId);
+  state.empleadoDetalle = { nombre: empleadoSeleccionado?.nombre_completo || "-", cargo: empleadoSeleccionado?.rol || "-" };
   setStatus("Consultando movimientos de nómina...");
+  const loadingStart = Date.now();
   const payload = {
     empresa_id: state.context.empresa_id,
     usuario_id: empleadoId,
@@ -363,10 +474,15 @@ const consultarNomina = async () => {
       body: JSON.stringify(payload)
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const webhookData = await parseWebhookPayloadSafe(response);
-    rows = await normalizeNominaWebhookRows(webhookData, state.responsables.find((item) => item.id === empleadoId));
-    if (!rows.length && Array.isArray(webhookData) && webhookData.length) {
-      setStatus("Respuesta recibida, pero sin filas compatibles para nómina. Revisa el contrato del webhook.");
+    const webhookData = await parseWebhookResponseSafe(response);
+    setStatus("Datos recibidos. Procesando nómina...");
+    rows = await normalizeWithRetries(webhookData, empleadoSeleccionado, 4);
+    nominaLog("consultar.rows.afterRetries", rows.length);
+    if (!hasMeaningfulRows(rows) && webhookData) startMappingRecoveryLoop(webhookData, empleadoSeleccionado);
+    if (!rows.length) {
+      const shape = Array.isArray(webhookData) ? "array" : typeof webhookData;
+      const preview = typeof webhookData === "string" ? webhookData.slice(0, 120) : JSON.stringify(webhookData || {}).slice(0, 120);
+      setStatus(`Respuesta recibida (${shape}) pero sin filas compatibles. Vista previa: ${preview}`);
     }
   } catch (_error) {
     const { data, error } = await supabase
@@ -386,12 +502,16 @@ const consultarNomina = async () => {
     }
 
     rows = Array.isArray(data) ? data : [];
+    setStatus("Procesando datos de respaldo (Supabase)...");
     state.empleadoDetalle = null;
     state.periodoDetalle = null;
     state.horasDetalle = null;
   }
 
-  const empleado = state.responsables.find((item) => item.id === empleadoId);
+  const elapsed = Date.now() - loadingStart;
+  if (elapsed < 1000) await sleep(1000 - elapsed);
+
+  const empleado = empleadoSeleccionado;
   state.movimientos = rows.map((item) => ({
     ...item,
     empleado_nombre: empleado?.nombre_completo || "Empleado",
@@ -400,7 +520,7 @@ const consultarNomina = async () => {
 
   renderMovimientos();
   renderComprobanteHeader(empleado);
-  setStatus(`Consulta completada. ${state.movimientos.length} movimientos encontrados en ${getActiveEnvironment() || "global"}.`);
+  setStatus(`Consulta completada. ${state.movimientos.length} movimientos encontrados.`);
 };
 
 const descargarComprobante = () => {
