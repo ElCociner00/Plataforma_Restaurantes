@@ -166,6 +166,33 @@ const deepExtractPayrollArray = (node, depth = 0, maxDepth = 12) => {
   return null;
 };
 
+const extractPayrollArrayCandidates = (value, maxDepth = 8) => {
+  const visited = new WeakSet();
+  const queue = [{ node: value, depth: 0 }];
+
+  while (queue.length) {
+    const { node, depth } = queue.shift();
+    if (depth > maxDepth || node === null || node === undefined) continue;
+
+    if (Array.isArray(node) && node.length && node.some((item) => item && typeof item === "object" && item.horas_dinero)) {
+      return node;
+    }
+
+    if (typeof node === "string") {
+      const parsed = normalizeJsonLikeValue(node, maxDepth - depth);
+      if (parsed !== node) queue.push({ node: parsed, depth: depth + 1 });
+      continue;
+    }
+
+    if (typeof node === "object") {
+      if (visited.has(node)) continue;
+      visited.add(node);
+      Object.values(node).forEach((child) => queue.push({ node: child, depth: depth + 1 }));
+    }
+  }
+
+  return null;
+};
 const setDefaultDates = () => {
   corteSelect.value = "quincenal";
   updateDatesByCut();
