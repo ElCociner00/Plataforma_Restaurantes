@@ -117,18 +117,29 @@ export const descargarImagenResumenCierreTurno = ({
   const apoyosConResponsable = [responsableRow, ...apoyos];
 
   const PAGE_WIDTH = 1080;
-  const PAGE_HEIGHT = 1920;
+  const MIN_PAGE_HEIGHT = 1920;
   const cardX = 46;
   const cardY = 46;
   const cardW = PAGE_WIDTH - 92;
-  const cardH = PAGE_HEIGHT - 92;
   const tableX = cardX + 32;
   const tableW = cardW - 64;
   const rowH = 42;
+  const baseContentHeight = 260 + 34 + 14 + rowH + (finanzas.length * rowH) + 40 + 16 + 14 + rowH + 26 + 30 + 20 + (totales.length * rowH);
 
-  const drawHeader = (ctx, pageNumber, totalPages) => {
+  const getRequiredPageHeight = (pageApoyos = [], isApoyoContinuation = false) => {
+    const apoyoRowsCount = Math.max(pageApoyos.length, 1);
+    const apoyosHeight = (isApoyoContinuation || pageApoyos.length)
+      ? (26 + 30 + 16 + 14 + rowH + (apoyoRowsCount * rowH))
+      : 0;
+    const headerAndFooter = 230; // cabecera + sello
+    const requiredCardContent = baseContentHeight + apoyosHeight + headerAndFooter;
+    return Math.max(MIN_PAGE_HEIGHT, requiredCardContent + (cardY * 2));
+  };
+
+  const drawHeader = (ctx, pageHeight, pageNumber, totalPages) => {
+    const cardH = pageHeight - 92;
     ctx.fillStyle = "#f3edff";
-    ctx.fillRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
+    ctx.fillRect(0, 0, PAGE_WIDTH, pageHeight);
     ctx.fillStyle = "#ffffff";
     ctx.strokeStyle = "#b8a6f8";
     ctx.lineWidth = 4;
@@ -207,13 +218,15 @@ export const descargarImagenResumenCierreTurno = ({
   };
 
   const buildCanvas = (pageApoyos = [], pageNumber = 1, totalPages = 1, isApoyoContinuation = false) => {
+    const pageHeight = getRequiredPageHeight(pageApoyos, isApoyoContinuation);
+    const cardH = pageHeight - 92;
     const canvas = document.createElement("canvas");
     canvas.width = PAGE_WIDTH;
-    canvas.height = PAGE_HEIGHT;
+    canvas.height = pageHeight;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
-    drawHeader(ctx, pageNumber, totalPages);
+    drawHeader(ctx, pageHeight, pageNumber, totalPages);
     let y = drawHighlightedCards(ctx);
 
     ctx.fillStyle = "#5b21b6";
