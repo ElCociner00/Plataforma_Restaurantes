@@ -82,7 +82,8 @@ const getSnapshotRows = ({
       responsable: apoyoResponsableNombre,
       propina: propinaValue,
       tiempo_minutos: tiempoMinutes,
-      tiempo_texto: range.complete ? range.durationText : formatDurationLabel(tiempoMinutes)
+      tiempo_texto: range.complete ? range.durationText : formatDurationLabel(tiempoMinutes),
+      rango_texto: range.complete ? range.rangoTexto : "-"
     };
   });
 
@@ -108,25 +109,37 @@ export const descargarImagenResumenCierreTurno = ({
   const responsableRow = {
     responsable: meta.responsableTexto || "Responsable",
     propina: propinaResponsable,
-    tiempo_texto: `${meta.horaInicio || "00:00"} - ${meta.horaFin || "00:00"}`,
+    tiempo_texto: "-",
+    rango_texto: `${meta.horaInicio || "00:00"} - ${meta.horaFin || "00:00"}`,
     es_responsable: true
   };
   
   const apoyosConResponsable = [responsableRow, ...apoyos];
 
   const PAGE_WIDTH = 1080;
-  const PAGE_HEIGHT = 1920;
+  const MIN_PAGE_HEIGHT = 1920;
   const cardX = 46;
   const cardY = 46;
   const cardW = PAGE_WIDTH - 92;
-  const cardH = PAGE_HEIGHT - 92;
   const tableX = cardX + 32;
   const tableW = cardW - 64;
   const rowH = 42;
+  const baseContentHeight = 260 + 34 + 14 + rowH + (finanzas.length * rowH) + 40 + 16 + 14 + rowH + 26 + 30 + 20 + (totales.length * rowH);
 
-  const drawHeader = (ctx, pageNumber, totalPages) => {
+  const getRequiredPageHeight = (pageApoyos = [], isApoyoContinuation = false) => {
+    const apoyoRowsCount = Math.max(pageApoyos.length, 1);
+    const apoyosHeight = (isApoyoContinuation || pageApoyos.length)
+      ? (26 + 30 + 16 + 14 + rowH + (apoyoRowsCount * rowH))
+      : 0;
+    const headerAndFooter = 230; // cabecera + sello
+    const requiredCardContent = baseContentHeight + apoyosHeight + headerAndFooter;
+    return Math.max(MIN_PAGE_HEIGHT, requiredCardContent + (cardY * 2));
+  };
+
+  const drawHeader = (ctx, pageHeight, pageNumber, totalPages) => {
+    const cardH = pageHeight - 92;
     ctx.fillStyle = "#f3edff";
-    ctx.fillRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
+    ctx.fillRect(0, 0, PAGE_WIDTH, pageHeight);
     ctx.fillStyle = "#ffffff";
     ctx.strokeStyle = "#b8a6f8";
     ctx.lineWidth = 4;
@@ -205,13 +218,15 @@ export const descargarImagenResumenCierreTurno = ({
   };
 
   const buildCanvas = (pageApoyos = [], pageNumber = 1, totalPages = 1, isApoyoContinuation = false) => {
+    const pageHeight = getRequiredPageHeight(pageApoyos, isApoyoContinuation);
+    const cardH = pageHeight - 92;
     const canvas = document.createElement("canvas");
     canvas.width = PAGE_WIDTH;
-    canvas.height = PAGE_HEIGHT;
+    canvas.height = pageHeight;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
-    drawHeader(ctx, pageNumber, totalPages);
+    drawHeader(ctx, pageHeight, pageNumber, totalPages);
     let y = drawHighlightedCards(ctx);
 
     ctx.fillStyle = "#5b21b6";
@@ -336,7 +351,17 @@ export const descargarImagenResumenCierreTurno = ({
       ctx.fillText(isApoyoContinuation ? "Apoyos y propinas (continuación)" : "Apoyos y propinas", cardX + 36, apoyoY);
       apoyoY += 16;
 
-      const apoyoCols = [0.45, 0.2, 0.35].map((r) => Math.floor(tableW * r));
+      const apoyoCols = [0.34, 0.16, 0.18, 0.32].map((r) => Math.floor(tableW * r));
+      const fitText = (text, maxWidth) => {
+        const source = String(text || "");
+        if (ctx.measureText(source).width <= maxWidth) return source;
+        let trimmed = source;
+        while (trimmed.length > 0 && ctx.measureText(`${trimmed}…`).width > maxWidth) {
+          trimmed = trimmed.slice(0, -1);
+        }
+        return trimmed ? `${trimmed}…` : "";
+      };
+
       const drawApoyo = (rowY, cols, header = false, isResponsable = false) => {
         let x = tableX;
         ctx.fillStyle = header ? "#ede9fe" : (isResponsable ? "#fae8ff" : "#ffffff");
@@ -351,20 +376,22 @@ export const descargarImagenResumenCierreTurno = ({
           }
           ctx.fillStyle = isResponsable ? "#9b4d96" : "#27272a";
           ctx.font = header ? "bold 19px Arial" : "18px Arial";
-          ctx.fillText(String(col), x + 8, rowY + 27);
+          const text = fitText(col, apoyoCols[i] - 16);
+          ctx.fillText(text, x + 8, rowY + 27);
           x += apoyoCols[i];
         });
       };
 
-      drawApoyo(apoyoY + 14, ["Responsable / Apoyo", "Propina", "Tiempo / Rango"], true);
+      drawApoyo(apoyoY + 14, ["Responsable / Apoyo", "Propina", "Tiempo", "Rango"], true);
       let rowY = apoyoY + 14 + rowH;
-      (pageApoyos.length ? pageApoyos : [["Sin apoyos", "0", "-"]]).forEach((item) => {
+      (pageApoyos.length ? pageApoyos : [["Sin apoyos", "0", "-", "-"]]).forEach((item) => {
         const cols = Array.isArray(item)
           ? item
           : [
             item.responsable || "-",
             typeof item.propina === "string" ? item.propina : formatCOP(item.propina || 0),
-            item.tiempo_texto || "-"
+            item.tiempo_texto || "-",
+            item.rango_texto || "-"
           ];
         drawApoyo(rowY, cols, false, item?.es_responsable === true);
         rowY += rowH;
@@ -388,7 +415,8 @@ export const descargarImagenResumenCierreTurno = ({
     pagesApoyos.push([{
       responsable: "Turno culminado sin apoyos",
       propina: "-",
-      tiempo_texto: "-"
+      tiempo_texto: "-",
+      rango_texto: "-"
     }]);
   } else {
     pagesApoyos.push(apoyoItems.slice(0, firstPageMax));
