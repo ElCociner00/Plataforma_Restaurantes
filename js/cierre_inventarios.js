@@ -327,15 +327,21 @@ const buildRowIndex = () => {
 };
 
 const getVisibilityKey = (tenantId) => `cierre_inventarios_visibilidad_${tenantId || "global"}`;
+const getLegacyVisibilityKeys = (tenantId) => [
+  getVisibilityKey(tenantId),
+  getVisibilityKey("global")
+];
 
 const getVisibilitySettings = (tenantId) => {
-  const stored = localStorage.getItem(getVisibilityKey(tenantId));
-  if (!stored) return {};
-  try {
-    return JSON.parse(stored);
-  } catch (error) {
-    return {};
+  for (const key of getLegacyVisibilityKeys(tenantId)) {
+    const stored = localStorage.getItem(key);
+    if (!stored) continue;
+    try {
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed === "object") return parsed;
+    } catch (_error) {}
   }
+  return {};
 };
 
 const productRows = new Map();
@@ -657,7 +663,7 @@ const fetchProductosConfigurados = async (contextPayload) => {
 const getProductosVisibles = (productos, visibilidad) => {
   return productos.filter((item) => {
     if (!item || typeof item !== "object") return false;
-    const productId = String(item.id ?? item.producto_id ?? item.codigo ?? "");
+    const productId = normalizeProductId(item.id ?? item.producto_id ?? item.product_id ?? item.productoId ?? item.codigo);
     if (!productId) return false;
     return visibilidad[productId] !== false;
   });
@@ -670,7 +676,7 @@ const renderProductRows = (productos) => {
   const fragment = document.createDocumentFragment();
 
   for (const item of productos) {
-    const productId = String(item.id ?? item.producto_id ?? item.codigo ?? "");
+    const productId = normalizeProductId(item.id ?? item.producto_id ?? item.product_id ?? item.productoId ?? item.codigo);
     const nombre = item.nombre ?? item.name ?? item.descripcion ?? `Producto ${productId}`;
 
     const tr = document.createElement("tr");
@@ -734,7 +740,7 @@ const renderProducts = async () => {
   setLoading(true, "Cargando configuración de visibilidad...");
 
   try {
-    const visibilidad = getVisibilitySettings(contextPayload.tenant_id);
+    const visibilidad = getVisibilitySettings(contextPayload.tenant_id || contextPayload.empresa_id);
     setStatus("Cargando productos...");
 
     const productos = await fetchProductosConfigurados(contextPayload);

@@ -74,21 +74,42 @@ const normalizeList = (raw, keys = []) => {
     }));
 };
 
+
+const normalizeIdentifier = (value) => String(value ?? "").trim();
+
+const normalizeProductId = (value) => {
+  const raw = normalizeIdentifier(value);
+  if (!raw) return "";
+  const objectIdMatch = raw.match(/^ObjectId\((?:"|')?([a-fA-F0-9]{24})(?:"|')?\)$/);
+  if (objectIdMatch) return objectIdMatch[1].toLowerCase();
+  if (/^[a-fA-F0-9]{24}$/.test(raw)) return raw.toLowerCase();
+  return raw;
+};
+
+const resolveTenantId = (context = {}) => context?.empresa_id || context?.tenant_id || "global";
 const getVisibilityKey = (tenantId) => `cierre_inventarios_visibilidad_${tenantId || "global"}`;
+const getLegacyVisibilityKeys = (tenantId) => [
+  getVisibilityKey(tenantId),
+  getVisibilityKey("global")
+];
 
 const saveSettings = (tenantId, settings) => {
-  localStorage.setItem(getVisibilityKey(tenantId), JSON.stringify(settings));
+  const key = getVisibilityKey(tenantId);
+  localStorage.setItem(key, JSON.stringify(settings));
+  if (tenantId && tenantId !== "global") localStorage.setItem(getVisibilityKey("global"), JSON.stringify(settings));
   setStatus("Preferencias guardadas.");
 };
 
 const loadSettings = (tenantId) => {
-  const stored = localStorage.getItem(getVisibilityKey(tenantId));
-  if (!stored) return {};
-  try {
-    return JSON.parse(stored);
-  } catch (error) {
-    return {};
+  for (const key of getLegacyVisibilityKeys(tenantId)) {
+    const stored = localStorage.getItem(key);
+    if (!stored) continue;
+    try {
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed === "object") return parsed;
+    } catch (_error) {}
   }
+  return {};
 };
 
 const loadProducts = async () => {
@@ -114,13 +135,14 @@ const loadProducts = async () => {
     });
     const data = await res.json();
 
-    const settings = loadSettings(context.empresa_id);
+    const tenantId = resolveTenantId(context);
+    const settings = loadSettings(tenantId);
     const productos = normalizeList(data, ["productos", "items"]);
 
     panel.innerHTML = "";
 
     productos.forEach((item) => {
-      const productId = String(item.id ?? item.producto_id ?? item.codigo ?? "");
+      const productId = normalizeProductId(item.id ?? item.producto_id ?? item.product_id ?? item.productoId ?? item.codigo);
       if (!productId) return;
       const nombre = item.nombre ?? item.name ?? item.descripcion ?? `Producto ${productId}`;
       const visible = settings[productId] !== false;
@@ -138,7 +160,7 @@ const loadProducts = async () => {
 
       row.querySelector("input").addEventListener("change", (event) => {
         settings[productId] = event.target.checked;
-        saveSettings(context.empresa_id, settings);
+        saveSettings(tenantId, settings);
       });
     });
 
