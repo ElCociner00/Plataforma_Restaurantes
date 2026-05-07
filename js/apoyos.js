@@ -25,8 +25,6 @@
  * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
  */
 const WEBHOOK_CONSULTAR_PROPINA_APOYO = "https://n8n.enkrato.com/webhook/consultar_propina_apoyo";
-const BLOCK_MINUTES = 5;
-const ROUND_UNIT = 50;
 
 const asInt = (value) => {
   const n = Number(value);
@@ -59,100 +57,39 @@ const normalizeResponseData = (payload) => {
   return [];
 };
 
-const roundToNearest = (value, unit = ROUND_UNIT) => {
-  if (!unit || unit <= 1) return asInt(value);
-  return Math.round(asInt(value) / unit) * unit;
-};
+const parseWebhookDetalleRows = (webhookPayload) => {
+  const normalized = normalizeResponseData(webhookPayload);
+  const sourceRows = [];
 
-const distributeByTimeline = ({
-  totalTurnoPropina,
-  turnoRange,
-  responsableId,
-  supportRows,
-  webhookRows
-}) => {
-  const totalTurno = asInt(totalTurnoPropina);
-  if (!turnoRange) {
-    return {
-      responsibleTip: totalTurno,
-      supportTips: Object.fromEntries(supportRows.map((row) => [row.apoyo_responsable_id, 0]))
-    };
-  }
-
-  const webhookMap = new Map(
-    (webhookRows || []).map((row) => [String(row?.apoyo_responsable_id || ""), asInt(row?.total_propina_periodo)])
-  );
-
-  const startCumulativeMap = new Map();
-  startCumulativeMap.set(turnoRange.start, totalTurno);
-
-  supportRows.forEach((row) => {
-    const key = String(row.apoyo_responsable_id || "");
-    const cumulative = webhookMap.get(key) || 0;
-    const current = startCumulativeMap.get(row.range.start);
-    if (current == null) {
-      startCumulativeMap.set(row.range.start, cumulative);
+  normalized.forEach((row) => {
+    if (Array.isArray(row?.detalles)) {
+      row.detalles.forEach((detalle) => sourceRows.push(detalle));
       return;
     }
-    // Si hay dos apoyos iniciando a la misma hora, debe coincidir. Se toma el mayor para no subestimar.
-    startCumulativeMap.set(row.range.start, Math.max(current, cumulative));
+    sourceRows.push(row);
   });
 
-  const sortedStarts = Array.from(startCumulativeMap.entries()).sort((a, b) => a[0] - b[0]);
-  const segmentTotals = [];
+  return sourceRows
+    .map((row) => {
+      const tipo = String(row?.tipo || '').toLowerCase();
+      const id = String(row?.id || row?.apoyo_responsable_id || '');
+      const propina = asInt(row?.propina_correspondiente ?? row?.total_propina_periodo);
+      return { id, tipo, propina };
+    })
+    .filter((row) => row.id);
+};
 
-  for (let i = 0; i < sortedStarts.length; i += 1) {
-    const [startMinute, currentCumulative] = sortedStarts[i];
-    const next = sortedStarts[i + 1];
-    const segmentEnd = next ? next[0] : turnoRange.end;
-    const nextCumulative = next ? next[1] : 0;
-    if (segmentEnd <= startMinute) continue;
+const extractWebhookTotals = (webhookPayload) => {
+  const normalized = normalizeResponseData(webhookPayload);
+  let totalDia = 0;
+  let totalDistribuida = 0;
 
-    const amount = Math.max(0, asInt(currentCumulative) - asInt(nextCumulative));
-    segmentTotals.push({ start: startMinute, end: segmentEnd, amount });
-  }
-
-  const totalsByPerson = new Map();
-  totalsByPerson.set(responsableId, 0);
-  supportRows.forEach((row) => totalsByPerson.set(String(row.apoyo_responsable_id || ""), 0));
-
-  segmentTotals.forEach((segment) => {
-    const duration = segment.end - segment.start;
-    const blocks = Math.max(1, Math.ceil(duration / BLOCK_MINUTES));
-    const blockValue = segment.amount / blocks;
-
-    for (let block = 0; block < blocks; block += 1) {
-      const blockStart = segment.start + (block * BLOCK_MINUTES);
-      const blockEnd = Math.min(segment.end, blockStart + BLOCK_MINUTES);
-      if (blockEnd <= blockStart) continue;
-
-      const present = [responsableId];
-      supportRows.forEach((row) => {
-        if (blockStart >= row.range.start && blockStart < row.range.end) {
-          present.push(String(row.apoyo_responsable_id || ""));
-        }
-      });
-
-      const share = blockValue / present.length;
-      present.forEach((id) => {
-        totalsByPerson.set(id, (totalsByPerson.get(id) || 0) + share);
-      });
-    }
+  normalized.forEach((row) => {
+    totalDia = Math.max(totalDia, asInt(row?.total_propina_dia));
+    totalDistribuida = Math.max(totalDistribuida, asInt(row?.total_propina_distribuida));
   });
 
-  const roundedSupport = {};
-  supportRows.forEach((row) => {
-    const key = String(row.apoyo_responsable_id || "");
-    roundedSupport[key] = roundToNearest(totalsByPerson.get(key) || 0);
-  });
-
-  const roundedSupportTotal = Object.values(roundedSupport).reduce((acc, value) => acc + asInt(value), 0);
-  const responsibleRounded = Math.max(0, totalTurno - roundedSupportTotal);
-
-  return {
-    responsibleTip: responsibleRounded,
-    supportTips: roundedSupport
-  };
+  return { totalDia, totalDistribuida };
 };
 
 export function initApoyosPropinaManager({
@@ -208,40 +145,39 @@ export function initApoyosPropinaManager({
 
   const applyDistribucion = ({ consultaPayload, webhookPayload }) => {
     const apoyo = consultaPayload?.apoyo || {};
-    const turnoRange = normalizeRange(apoyo?.hora_inicio, apoyo?.hora_fin);
+    const responsableId = String(apoyo?.responsable_turno_id || "");
+    const detalleRows = parseWebhookDetalleRows(webhookPayload);
+    const { totalDia, totalDistribuida } = extractWebhookTotals(webhookPayload);
 
-    const supportRows = (apoyo?.registros || [])
-      .map((row) => ({
-        ...row,
-        apoyo_responsable_id: String(row?.apoyo_responsable_id || ""),
-        range: normalizeRange(row?.rango_hora_inicio_simple, row?.rango_hora_fin_simple)
-      }))
-      .filter((row) => row.apoyo_responsable_id && row.range);
-
-    const result = distributeByTimeline({
-      totalTurnoPropina: propinaInput.value,
-      turnoRange,
-      responsableId: String(apoyo?.responsable_turno_id || "responsable_turno"),
-      supportRows,
-      webhookRows: normalizeResponseData(webhookPayload)
-    });
+    const tipsById = new Map(detalleRows.map((row) => [row.id, row.propina]));
+    const responsableRow = detalleRows.find((row) => row.tipo === "responsable" && (!responsableId || row.id === responsableId));
 
     getApoyoRows().forEach((row) => {
       const apoyoId = String(row.querySelector('[data-field="responsable"]')?.value || "");
       const input = row.querySelector('[data-field="propina"]');
       if (!input) return;
-      input.value = String(asInt(result.supportTips[apoyoId] || 0));
+      input.value = String(asInt(tipsById.get(apoyoId) || 0));
     });
 
-    propinaInput.value = String(asInt(result.responsibleTip));
+    const responsableTip = asInt(responsableRow?.propina ?? tipsById.get(responsableId) ?? 0);
+    propinaInput.value = String(responsableTip);
+
     ensureReadonlyApoyoPropinas();
     repartoActivo = true;
     marcarComoNoVerificado();
 
-    const supportTotal = Object.values(result.supportTips).reduce((acc, value) => acc + asInt(value), 0);
+    const supportTotal = getApoyoRows().reduce((acc, row) => {
+      const input = row.querySelector('[data-field="propina"]');
+      return acc + asInt(input?.value || 0);
+    }, 0);
+    const sumaRepartida = responsableTip + supportTotal;
+    const totalComparacion = totalDistribuida || totalDia;
+    const coherente = totalComparacion > 0 ? sumaRepartida === totalComparacion : true;
+
     setStatus(
-      `Propina apoyos distribuida por bloques de 5 minutos. `
-      + `Responsable: ${result.responsibleTip}. Apoyos: ${supportTotal}.`
+      `Propina aplicada desde BD/webhook. Responsable: ${responsableTip}. Apoyos: ${supportTotal}. `
+      + `Suma reparto: ${sumaRepartida}${totalComparacion > 0 ? ` / Total referencia: ${totalComparacion}` : ""}. `
+      + `${coherente ? "Coherencia OK." : "Advertencia: la suma no coincide con el total de referencia."}`
     );
   };
 
@@ -296,7 +232,7 @@ export function initApoyosPropinaManager({
   apoyoCantidad?.addEventListener("change", notifyResetIfNeeded);
 
   if (noteEl) {
-    noteEl.textContent = "Antes de consultar, completa los datos de apoyos (responsable + horario). La propina de apoyos es automática y no editable.";
+    noteEl.textContent = "Antes de consultar, completa los datos de apoyos (responsable + horario). La propina de apoyos/responsable viene desde BD por webhook y no es editable.";
   }
 
   ensureReadonlyApoyoPropinas();
@@ -310,12 +246,22 @@ export function initApoyosPropinaManager({
 
 export const APOYOS_PROPINA_RESPONSE_SAMPLE = [
   {
-    data: [
+    ok: true,
+    fecha: "2026-05-05",
+    total_propina_dia: 70798,
+    detalles: [
       {
-        empresa_id: "empresa_id",
-        apoyo_responsable_id: "usuario_apoyo_id",
-        total_propina_periodo: 0
+        id: "responsable_id",
+        tipo: "responsable",
+        propina_correspondiente: 47267
+      },
+      {
+        id: "apoyo_id",
+        tipo: "apoyo",
+        propina_correspondiente: 0
       }
-    ]
+    ],
+    total_propina_distribuida: 47267,
+    coinciden_totales: false
   }
 ];
