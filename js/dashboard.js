@@ -6,8 +6,6 @@ const DASHBOARD_FETCH_TIMEOUT_MS = 7000;
 const fetchDashboardSignal = async () => {
   const context = await getUserContext();
   if (!context) return;
-  if (String(context.rol || "").toLowerCase() !== "admin") return;
-
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DASHBOARD_FETCH_TIMEOUT_MS);
 
@@ -15,7 +13,7 @@ const fetchDashboardSignal = async () => {
     await fetch(WEBHOOK_DASHBOARD_DATOS, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ empresa_id: context.empresa_id || "" }),
+      body: JSON.stringify({ tenant_id: context.empresa_id || "", empresa_id: context.empresa_id || "" }),
       signal: controller.signal
     });
   } catch (_error) {
