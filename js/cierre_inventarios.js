@@ -127,6 +127,18 @@ const fetchWithTimeout = async (url, options = {}, timeoutMs = MAX_LOADING_MS) =
   }
 };
 
+
+const normalizeUnidadMedida = (unidad) => {
+  const unidadLimpia = String(unidad ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return unidadLimpia ? unidadLimpia.toUpperCase() : "N/A";
+};
+
 const getContextPayload = async () => {
   const context = await getUserContext();
   if (!context) return null;
@@ -695,6 +707,15 @@ const renderProductRows = (productos) => {
     stockCell.appendChild(stockInput);
     tr.appendChild(stockCell);
 
+    const unidadCell = document.createElement("td");
+    const unidadInput = document.createElement("input");
+    unidadInput.type = "text";
+    unidadInput.className = "unidad-medida";
+    unidadInput.readOnly = true;
+    unidadInput.value = normalizeUnidadMedida(item.unidad);
+    unidadCell.appendChild(unidadInput);
+    tr.appendChild(unidadCell);
+
     const gastadoCell = document.createElement("td");
     const gastadoInput = document.createElement("input");
     gastadoInput.type = "text";
@@ -719,6 +740,7 @@ const renderProductRows = (productos) => {
       nombre,
       productId,
       stockInput,
+      unidadInput,
       gastadoInput,
       restanteInput,
       visible: true
@@ -846,6 +868,7 @@ btnConsultar.addEventListener("click", async () => {
       if (!row) return;
       const stockValue = item.stock ?? item.stock_actual ?? item.value ?? 0;
       row.stockInput.value = String(stockValue);
+      if (row.unidadInput) row.unidadInput.value = normalizeUnidadMedida(item.unidad ?? row.unidadInput.value);
     });
 
     setButtonState({ verificar: true });
@@ -1015,7 +1038,7 @@ const descargarImagenInventario = ({ bloquearDespues = false } = {}) => {
   y += 52;
   const tableX = cardX + 28;
   const tableW = cardW - 56;
-  const cols = [0.42, 0.19, 0.19, 0.20].map((r) => Math.floor(tableW * r));
+  const cols = [0.32, 0.15, 0.18, 0.15, 0.2].map((r) => Math.floor(tableW * r));
   const rowH = 40;
 
   const drawRow = (rowY, values, header = false) => {
@@ -1039,15 +1062,16 @@ const descargarImagenInventario = ({ bloquearDespues = false } = {}) => {
     });
   };
 
-  drawRow(y, ["Producto", "Sistema", "Stock actual", "Restante"], true);
+  drawRow(y, ["Producto", "Sistema", "Unidad", "Stock actual", "Restante"], true);
   y += rowH;
 
   const rows = Array.from(productRows.values());
-  (rows.length ? rows : [{ nombre: "Sin productos", stockInput: { value: 0 }, gastadoInput: { value: 0 }, restanteInput: { value: 0 } }])
+  (rows.length ? rows : [{ nombre: "Sin productos", stockInput: { value: 0 }, unidadInput: { value: "N/A" }, gastadoInput: { value: 0 }, restanteInput: { value: 0 } }])
     .forEach((row) => {
       drawRow(y, [
         row.nombre || "Producto",
         row.stockInput?.value || 0,
+        row.unidadInput?.value || "N/A",
         row.gastadoInput?.value || 0,
         row.restanteInput?.value || 0
       ]);
