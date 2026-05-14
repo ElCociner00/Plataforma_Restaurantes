@@ -15,6 +15,16 @@
     <p class="intro">Administra usuarios de la empresa y su estado activo/inactivo en un solo lugar.</p>
     <div id="gestionUsuariosEstado" class="status"></div>
     <div id="gestionUsuariosPanel"></div>
+
+    <section class="bloque" style="margin-top:20px;max-width:480px">
+      <h2>Cambiar tu contraseña</h2>
+      <form id="cambiarContrasenaForm">
+        <label for="nuevoPassword">Nueva contraseña</label>
+        <input id="nuevoPassword" type="password" autocomplete="new-password" required>
+        <button type="submit">Actualizar contraseña</button>
+      </form>
+      <div id="cambiarContrasenaEstado"></div>
+    </section>
   </div>
 
   <script type="module" src="../js/gestion_usuarios.js"></script>

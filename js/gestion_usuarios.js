@@ -32,6 +32,9 @@ import { supabase } from "./supabase.js";
 
 const panel = document.getElementById("gestionUsuariosPanel");
 const estado = document.getElementById("gestionUsuariosEstado");
+const cambiarContrasenaForm = document.getElementById("cambiarContrasenaForm");
+const nuevoPasswordInput = document.getElementById("nuevoPassword");
+const cambiarContrasenaEstado = document.getElementById("cambiarContrasenaEstado");
 
 const normalize = (value) => String(value || "").trim();
 const normalizeKey = (value) => normalize(value).toLowerCase();
@@ -46,6 +49,10 @@ const setEstado = (message) => {
   if (estado) estado.textContent = message || "";
 };
 
+const setEstadoPassword = (message) => {
+  if (cambiarContrasenaEstado) cambiarContrasenaEstado.textContent = message || "";
+};
+
 const getActivoDesdeEstado = (value) => {
   if (typeof value === "boolean") return value;
   if (value == null) return true;
@@ -57,6 +64,14 @@ const state = {
   empresas: [],
   selectedEmpresaId: "",
   rows: []
+};
+
+let passwordHelpersLoaded = false;
+
+const ensurePasswordHelpers = async () => {
+  if (passwordHelpersLoaded) return;
+  await import("./contrasena.js");
+  passwordHelpersLoaded = true;
 };
 
 const buildEmpresaName = (empresa) => empresa?.nombre_comercial || empresa?.razon_social || empresa?.id || "(Sin nombre)";
@@ -108,7 +123,7 @@ const cargarEmpresas = async () => {
 };
 
 const cargarData = async ({ empresaId = "", superAdmin = false } = {}) => {
-  const usuariosQuery = supabase.from("usuarios_sistema").select("id,empresa_id,nombre_completo,rol,activo");
+  const usuariosQuery = supabase.from("usuarios_sistema").select("id,empresa_id,nombre_completo,email,rol,activo");
   const otrosQuery = supabase.from("otros_usuarios").select("id,empresa_id,nombre_completo,cedula,estado");
   const empleadosQuery = supabase.from("empleados").select("id,empresa_id,nombre_completo,cedula,estado");
 
@@ -135,6 +150,7 @@ const cargarData = async ({ empresaId = "", superAdmin = false } = {}) => {
         empresa_id: normalize(item.empresa_id),
         nombre_persona: normalize(empleadoMatch?.nombre_completo) || normalize(item.nombre_completo) || "Sin nombre",
         usuario: normalize(item.nombre_completo) || "-",
+        email: normalize(item.email),
         cedula: normalize(empleadoMatch?.cedula) || "-",
         rol: normalize(item.rol) || "operativo",
         activo: item.activo !== false,
@@ -152,6 +168,7 @@ const cargarData = async ({ empresaId = "", superAdmin = false } = {}) => {
         empresa_id: normalize(item.empresa_id),
         nombre_persona: normalize(empleadoMatch?.nombre_completo) || normalize(item.nombre_completo) || "Sin nombre",
         usuario: normalize(item.nombre_completo) || "-",
+        email: "",
         cedula: normalize(item.cedula) || normalize(empleadoMatch?.cedula) || "-",
         rol: "revisor",
         activo: getActivoDesdeEstado(item.estado),
@@ -185,6 +202,7 @@ const render = (rows) => {
             <th>Rol</th>
             <th>Tipo</th>
             <th>Activo</th>
+            <th>Reset contraseña</th>
           </tr>
         </thead>
         <tbody>
@@ -211,6 +229,9 @@ const render = (rows) => {
                   >
                   <span class="switch-slider"></span>
                 </label>
+              </td>
+              <td>
+                <button type="button" data-action="reset" data-user-id="${escapeHtml(row.id)}">Enviar correo</button>
               </td>
             </tr>
           `;
@@ -297,6 +318,50 @@ const init = async () => {
     } finally {
       input.disabled = false;
     }
+  });
+
+  panel?.addEventListener("click", async (event) => {
+    const btn = event.target.closest('button[data-action="reset"]');
+    if (!btn) return;
+    const userId = btn.dataset.userId || "";
+    const row = state.rows.find((item) => item.id === userId);
+    if (!row) return;
+    if (!row.email) {
+      setEstado("No se encontró correo para este usuario.");
+      return;
+    }
+
+    btn.disabled = true;
+    setEstado("Enviando correo de recuperación...");
+    try {
+      await ensurePasswordHelpers();
+      await window.sendRecoveryForEmail(row.email);
+      setEstado(`Correo enviado a ${row.email}.`);
+    } catch (error) {
+      setEstado(`No se pudo enviar recuperación: ${error.message || "sin detalle"}`);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  cambiarContrasenaForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const newPassword = String(nuevoPasswordInput?.value || "").trim();
+    if (!newPassword) {
+      setEstadoPassword("Ingresa una contraseña nueva.");
+      return;
+    }
+    setEstadoPassword("Actualizando contraseña...");
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      setEstadoPassword(`No se pudo actualizar: ${error.message || "sin detalle"}`);
+      return;
+    }
+    setEstadoPassword("Contraseña actualizada. Debes iniciar sesión nuevamente.");
+    setTimeout(async () => {
+      await supabase.auth.signOut();
+      window.location.href = "../index.html";
+    }, 1200);
   });
 };
 
