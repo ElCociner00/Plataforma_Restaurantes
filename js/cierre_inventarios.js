@@ -445,7 +445,7 @@ const saveInconsistenciasDraft = () => {
 
 const renderInconsistenciasRows = () => {
   if (!inconsistenciasBody) return;
-  saveInconsistenciasDraft();
+  if (!inconsistenciasDraft.length) saveInconsistenciasDraft();
 
   const isEnabled = isDetallesAdicionalesEnabled();
   const count = isEnabled ? Number(cantidadInconsistencias?.value || 0) : 0;

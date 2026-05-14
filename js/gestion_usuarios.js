@@ -1,90 +1,73 @@
-/**
- * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
- * Archivo: js/gestion_usuarios.js
- *
- * Partes del archivo:
- * 1) Imports/constantes de configuración (dependencias y estado base).
- * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
- * 3) Lógica principal del módulo (flujo funcional).
- * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
- *
- * Índice de funciones/bloques para ubicarte rápido:
- * - `normalize` (línea aprox. 7): Bloque funcional del módulo.
- * - `normalizeKey` (línea aprox. 8): Bloque funcional del módulo.
- * - `escapeHtml` (línea aprox. 9): Bloque funcional del módulo.
- * - `setEstado` (línea aprox. 16): Asigna/actualiza estado.
- * - `getActivoDesdeEstado` (línea aprox. 20): Obtiene un valor o recurso.
- * - `buildEmpresaName` (línea aprox. 33): Construye estructuras de datos.
- * - `ensureFilters` (línea aprox. 35): Bloque funcional del módulo.
- * - `hydrateEmpresaFilter` (línea aprox. 52): Trabaja con contexto o datos de empresa.
- * - `cargarEmpresas` (línea aprox. 72): Trabaja con contexto o datos de empresa.
- * - `cargarData` (línea aprox. 81): Bloque funcional del módulo.
- * - `render` (línea aprox. 138): Renderiza/actualiza UI.
- * - `syncEmpleadoEstado` (línea aprox. 195): Sincroniza valores/estado.
- * - `actualizarEstadoUsuario` (línea aprox. 202): Bloque funcional del módulo.
- * - `refreshData` (línea aprox. 221): Bloque funcional del módulo.
- * - `init` (línea aprox. 228): Inicializa/configura comportamiento.
- *
- * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
- */
 import { buildRequestHeaders, getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
+import { fetchUsuariosEmpresa } from "./responsables.js";
+import { WEBHOOK_REGISTRAR_EMPLEADO, WEBHOOK_REGISTRO_OTROS_USUARIOS } from "./webhooks.js";
 
-const panel = document.getElementById("gestionUsuariosPanel");
-const estado = document.getElementById("gestionUsuariosEstado");
-const cambiarContrasenaForm = document.getElementById("cambiarContrasenaForm");
-const nuevoPasswordInput = document.getElementById("nuevoPassword");
-const cambiarContrasenaEstado = document.getElementById("cambiarContrasenaEstado");
-const actualPasswordInput = document.getElementById("actualPassword");
-const tipoRegistroUsuario = document.getElementById("tipoRegistroUsuario");
-const formRegistroEmpleado = document.getElementById("formRegistroEmpleado");
-const formRegistroOtro = document.getElementById("formRegistroOtro");
-const registroInlineEstado = document.getElementById("registroInlineEstado");
+// Funciones auxiliares
+const normalize = (v) => String(v || "").trim();
+const normalizeKey = (v) => normalize(v).toLowerCase();
+const escapeHtml = (str) => String(str || "").replace(/[&<>]/g, (m) => ({ 
+  '&': '&amp;', 
+  '<': '&lt;', 
+  '>': '&gt;' 
+}[m]));
+const getActivoDesdeEstado = (estado) => estado === "activo";
 
-const normalize = (value) => String(value || "").trim();
-const normalizeKey = (value) => normalize(value).toLowerCase();
-const escapeHtml = (value) => normalize(value)
-  .replaceAll("&", "&amp;")
-  .replaceAll("<", "&lt;")
-  .replaceAll(">", "&gt;")
-  .replaceAll('"', "&quot;")
-  .replaceAll("'", "&#39;");
-
-const setEstado = (message) => {
-  if (estado) estado.textContent = message || "";
+const setEstado = (m) => { 
+  const estado = document.getElementById("gestionUsuariosEstado");
+  if (estado) estado.textContent = m || ""; 
 };
 
-const setEstadoPassword = (message) => {
-  if (cambiarContrasenaEstado) cambiarContrasenaEstado.textContent = message || "";
+const setEstadoPassword = (m) => { 
+  const cambiarContrasenaEstado = document.getElementById("cambiarContrasenaEstado");
+  if (cambiarContrasenaEstado) cambiarContrasenaEstado.textContent = m || ""; 
 };
 
-const getActivoDesdeEstado = (value) => {
-  if (typeof value === "boolean") return value;
-  if (value == null) return true;
-  return normalizeKey(value) !== "inactivo";
+const setRegistroEstado = (m) => { 
+  const registroInlineEstado = document.getElementById("registroInlineEstado");
+  if (registroInlineEstado) registroInlineEstado.textContent = m || ""; 
 };
 
-const state = {
-  context: null,
-  rows: []
+const state = { 
+  context: null, 
+  rows: [], 
+  empresas: [],
+  selectedEmpresaId: "" 
 };
 
-let passwordHelpersLoaded = false;
-
-const ensurePasswordHelpers = async () => {
-  if (passwordHelpersLoaded) return;
-  await import("./contrasena.js");
-  passwordHelpersLoaded = true;
+const buildEmpresaName = (empresa) => {
+  return empresa?.nombre_comercial || empresa?.razon_social || "Sin nombre";
 };
 
-<<<<<<< codex/update-user-and-inventory-management
-const buildEmpresaName = () => "";
-=======
-const buildEmpresaName = (empresa) => empresa?.nombre_comercial || empresa?.razon_social || empresa?.id || "(Sin nombre)";
->>>>>>> main
+const renderAlta = () => {
+  const tipoRegistroUsuario = document.getElementById("tipoRegistroUsuario");
+  const formRegistroEmpleado = document.getElementById("formRegistroEmpleado");
+  const formRegistroOtro = document.getElementById("formRegistroOtro");
+  
+  const t = tipoRegistroUsuario?.value || "";
+  if (formRegistroEmpleado) { 
+    formRegistroEmpleado.hidden = t !== "empleado"; 
+    formRegistroEmpleado.style.display = t === "empleado" ? "block" : "none"; 
+  }
+  if (formRegistroOtro) { 
+    formRegistroOtro.hidden = t !== "otro"; 
+    formRegistroOtro.style.display = t === "otro" ? "block" : "none"; 
+  }
+};
+
+const cargarEmpresas = async () => {
+  const { data } = await supabase
+    .from("empresas")
+    .select("id, nombre_comercial, razon_social")
+    .order("nombre_comercial", { ascending: true });
+
+  state.empresas = Array.isArray(data) ? data : [];
+};
 
 const ensureFilters = () => {
+  const panel = document.getElementById("gestionUsuariosPanel");
   if (!panel) return null;
+  
   let wrapper = document.getElementById("gestionUsuariosFiltros");
   if (wrapper) return wrapper;
 
@@ -120,27 +103,27 @@ const hydrateEmpresaFilter = () => {
   };
 };
 
-const cargarEmpresas = async () => {
-  const { data } = await supabase
-    .from("empresas")
-    .select("id, nombre_comercial, razon_social")
-    .order("nombre_comercial", { ascending: true });
+const cargarData = async () => {
+  const empresaId = state.context?.super_admin ? state.selectedEmpresaId : state.context?.empresa_id;
+  const superAdmin = state.context?.super_admin === true;
 
-  state.empresas = Array.isArray(data) ? data : [];
-};
-
-const cargarData = async ({ empresaId = "", superAdmin = false } = {}) => {
   const usuariosQuery = supabase.from("usuarios_sistema").select("id,empresa_id,nombre_completo,email,rol,activo");
   const otrosQuery = supabase.from("otros_usuarios").select("id,empresa_id,nombre_completo,cedula,estado");
   const empleadosQuery = supabase.from("empleados").select("id,empresa_id,nombre_completo,cedula,estado");
 
   if (!superAdmin || empresaId) {
-    usuariosQuery.eq("empresa_id", empresaId);
-    otrosQuery.eq("empresa_id", empresaId);
-    empleadosQuery.eq("empresa_id", empresaId);
+    if (empresaId) {
+      usuariosQuery.eq("empresa_id", empresaId);
+      otrosQuery.eq("empresa_id", empresaId);
+      empleadosQuery.eq("empresa_id", empresaId);
+    }
   }
 
-  const [usuariosSistemaRes, otrosUsuariosRes, empleadosRes] = await Promise.all([usuariosQuery, otrosQuery, empleadosQuery]);
+  const [usuariosSistemaRes, otrosUsuariosRes, empleadosRes] = await Promise.all([
+    usuariosQuery, 
+    otrosQuery, 
+    empleadosQuery
+  ]);
 
   const empleados = Array.isArray(empleadosRes.data) ? empleadosRes.data : [];
   const byEmpleadoId = new Map(empleados.map((item) => [normalize(item.id), item]));
@@ -189,223 +172,246 @@ const cargarData = async ({ empresaId = "", superAdmin = false } = {}) => {
 };
 
 const render = (rows) => {
+  const panel = document.getElementById("gestionUsuariosPanel");
   if (!panel) return;
-  if (!rows.length) {
-    panel.innerHTML = "<p>No hay usuarios para gestionar en el alcance seleccionado.</p>";
-    return;
-  }
-
-  const showEmpresa = state.context?.super_admin === true;
-
-  panel.innerHTML = `
-    <div class="tabla-wrap">
-      <table class="usuarios-tabla">
-        <thead>
-          <tr>
-            ${showEmpresa ? "<th>Empresa</th>" : ""}
-            <th>Nombre completo</th>
-            <th>Usuario</th>
-            <th>Identificación</th>
-            <th>Rol</th>
-            <th>Tipo</th>
-            <th>Activo</th>
-            <th>Reset contraseña</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows.map((row) => {
-            const empresaName = buildEmpresaName(state.empresas.find((item) => item.id === row.empresa_id));
-            return `
-            <tr>
-              ${showEmpresa ? `<td>${escapeHtml(empresaName)}</td>` : ""}
-              <td>${escapeHtml(row.nombre_persona)}</td>
-              <td>${escapeHtml(row.usuario)}</td>
-              <td>${escapeHtml(row.cedula)}</td>
-              <td>${escapeHtml(row.rol)}</td>
-              <td><span class="badge ${row.source === "usuarios_sistema" ? "empleado" : "otro"}">${row.source === "usuarios_sistema" ? "Empleado" : "Otro usuario"}</span></td>
-              <td>
-                <label class="switch-cell">
-                  <input
-                    type="checkbox"
-                    data-action="toggle"
-                    data-source="${escapeHtml(row.source)}"
-                    data-user-id="${escapeHtml(row.id)}"
-                    data-empleado-id="${escapeHtml(row.empleado_id)}"
-                    ${row.empresa_id ? `data-empresa-id="${escapeHtml(row.empresa_id)}"` : ""}
-                    ${row.activo ? "checked" : ""}
-                  >
-                  <span class="switch-slider"></span>
-                </label>
-              </td>
-              <td>
-                <button type="button" data-action="reset" data-user-id="${escapeHtml(row.id)}">Enviar correo</button>
-              </td>
-            </tr>
-          `;
-          }).join("")}
-        </tbody>
-      </table>
-    </div>
-  `;
-};
-
-const syncEmpleadoEstado = async (empleadoId, activo) => {
-  const id = normalize(empleadoId);
-  if (!id) return;
-  const { error } = await supabase.from("empleados").update({ estado: activo ? "activo" : "inactivo" }).eq("id", id);
-  if (error) throw error;
-};
-
-const actualizarEstadoUsuario = async ({ source, userId, activo, empleadoId, empresaId }) => {
-  if (source === "otros_usuarios") {
-    const res1 = await supabase.from("otros_usuarios").update({ estado: activo }).eq("id", userId);
-    const usuariosUpdate = supabase.from("usuarios_sistema").update({ activo }).eq("id", userId).neq("rol", "admin_root");
-    if (empresaId) usuariosUpdate.eq("empresa_id", empresaId);
-    const res2 = await usuariosUpdate;
-    if (res1.error) throw res1.error;
-    if (res2.error) throw res2.error;
-  } else {
-    const usuariosUpdate = supabase.from("usuarios_sistema").update({ activo }).eq("id", userId).neq("rol", "admin_root");
-    if (empresaId) usuariosUpdate.eq("empresa_id", empresaId);
-    const res1 = await usuariosUpdate;
-    const res2 = await supabase.from("otros_usuarios").update({ estado: activo }).eq("id", userId);
-    if (res1.error) throw res1.error;
-    if (res2.error && !String(res2.error.message || "").toLowerCase().includes("0 rows")) throw res2.error;
-  }
-  await syncEmpleadoEstado(empleadoId, activo);
+  
+  panel.innerHTML = rows.length ? `
+    <div class="tabla-wrap"><table class="usuarios-tabla"><thead>
+    <tr>
+      <th>Nombre completo</th><th>Usuario</th><th>Identificación</th><th>Rol</th><th>Tipo</th><th>Activo</th><th>Reset contraseña</th>
+    </tr></thead><tbody>
+    ${rows.map((r) => `
+      <tr>
+        <td>${escapeHtml(r.nombre_persona)}</td>
+        <td>${escapeHtml(r.usuario)}</td>
+        <td>${escapeHtml(r.cedula)}</td>
+        <td>${escapeHtml(r.rol)}</td>
+        <td>${r.source === "usuarios_sistema" ? "Empleado" : "Otro usuario"}</td>
+        <td><input type="checkbox" data-action="toggle" data-source="${r.source}" data-user-id="${r.id}" ${r.activo ? "checked" : ""}></td>
+        <td><button type="button" data-action="reset" data-user-id="${r.id}">Enviar correo</button></td>
+      </tr>
+    `).join("")}
+    </tbody></table></div>` : "<p>No hay usuarios para gestionar.</p>";
 };
 
 const refreshData = async () => {
-  const empresaId = state.context?.empresa_id;
-  state.rows = await cargarData({ empresaId, superAdmin: false });
+  state.rows = await cargarData();
   render(state.rows);
   setEstado(`Usuarios gestionables: ${state.rows.length}`);
 };
 
+const ensurePasswordHelpers = async () => import("./contrasena.js");
+
 const init = async () => {
+  // Obtener contexto del usuario
   state.context = await getUserContext().catch(() => null);
-
-  if (!state.context) {
-    setEstado("No se pudo validar la sesión.");
-    return;
-  }
-
-  if (!state.context?.empresa_id && state.context?.super_admin !== true) {
+  if (!state.context?.empresa_id && !state.context?.super_admin) {
     setEstado("No se pudo validar la empresa actual.");
     return;
   }
 
-  setEstado("Cargando usuarios...");
+  // Cargar empresas para super admin
+  if (state.context?.super_admin) {
+    await cargarEmpresas();
+    hydrateEmpresaFilter();
+  }
 
   await refreshData();
 
-  panel?.addEventListener("change", async (event) => {
-    const input = event.target.closest('input[data-action="toggle"]');
-    if (!input) return;
-
-    input.disabled = true;
-    setEstado("Actualizando estado de usuario...");
-    try {
-      await actualizarEstadoUsuario({
-        source: input.dataset.source,
-        userId: input.dataset.userId,
-        activo: input.checked,
-        empleadoId: input.dataset.empleadoId,
-        empresaId: input.dataset.empresaId
-      });
-      await refreshData();
-      setEstado("Estado actualizado correctamente.");
-    } catch (error) {
-      setEstado(`No se pudo actualizar el usuario: ${error.message || "sin detalle"}`);
-    } finally {
-      input.disabled = false;
-    }
-  });
-
+  // Event listener para reset de contraseña y toggle de activo
+  const panel = document.getElementById("gestionUsuariosPanel");
   panel?.addEventListener("click", async (event) => {
-    const btn = event.target.closest('button[data-action="reset"]');
-    if (!btn) return;
-    const userId = btn.dataset.userId || "";
-    const row = state.rows.find((item) => item.id === userId);
-    if (!row) return;
-    if (!row.email) {
-      setEstado("No se encontró correo para este usuario.");
+    // Reset contraseña
+    const resetBtn = event.target.closest('button[data-action="reset"]');
+    if (resetBtn) {
+      const row = state.rows.find((r) => r.id === (resetBtn.dataset.userId || ""));
+      if (!row?.email) {
+        setEstado("No se encontró correo para este usuario.");
+        return;
+      }
+      try {
+        await ensurePasswordHelpers();
+        await window.sendRecoveryForEmail(row.email);
+        setEstado(`Correo enviado a ${row.email}.`);
+      } catch (error) {
+        setEstado(`No se pudo enviar recuperación: ${error.message || "sin detalle"}`);
+      }
       return;
     }
 
-    btn.disabled = true;
-    setEstado("Enviando correo de recuperación...");
-    try {
-      await ensurePasswordHelpers();
-      await window.sendRecoveryForEmail(row.email);
-      setEstado(`Correo enviado a ${row.email}.`);
-    } catch (error) {
-      setEstado(`No se pudo enviar recuperación: ${error.message || "sin detalle"}`);
-    } finally {
-      btn.disabled = false;
+    // Toggle activo/inactivo
+    const toggleCheckbox = event.target.closest('input[data-action="toggle"]');
+    if (toggleCheckbox && toggleCheckbox.type === "checkbox") {
+      // Implementar lógica de toggle
+      const userId = toggleCheckbox.dataset.userId;
+      const source = toggleCheckbox.dataset.source;
+      const isActive = toggleCheckbox.checked;
+      
+      const table = source === "usuarios_sistema" ? "usuarios_sistema" : "otros_usuarios";
+      const updateField = source === "usuarios_sistema" ? "activo" : "estado";
+      const updateValue = source === "usuarios_sistema" ? isActive : (isActive ? "activo" : "inactivo");
+      
+      const { error } = await supabase
+        .from(table)
+        .update({ [updateField]: updateValue })
+        .eq("id", userId);
+      
+      if (error) {
+        setEstado(`Error al actualizar: ${error.message}`);
+        toggleCheckbox.checked = !isActive;
+      } else {
+        setEstado(`Usuario ${isActive ? "activado" : "desactivado"} correctamente.`);
+        await refreshData();
+      }
     }
   });
 
+  // Toggle mostrar/ocultar contraseña
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-toggle-pass]");
+    if (!b) return;
+    const input = document.getElementById(b.dataset.togglePass || "");
+    if (input) input.type = input.type === "password" ? "text" : "password";
+  });
+
+  // Cambiar tipo de registro
+  const tipoRegistroUsuario = document.getElementById("tipoRegistroUsuario");
+  tipoRegistroUsuario?.addEventListener("change", renderAlta);
+  renderAlta();
+
+  // Cambiar contraseña
+  const cambiarContrasenaForm = document.getElementById("cambiarContrasenaForm");
+  const actualPasswordInput = document.getElementById("actualPassword");
+  const nuevoPasswordInput = document.getElementById("nuevoPassword");
+  
   cambiarContrasenaForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-<<<<<<< codex/update-user-and-inventory-management
-    const currentPassword = String(actualPasswordInput?.value || "").trim();
-    const newPassword = String(nuevoPasswordInput?.value || "").trim();
-    if (!currentPassword) { setEstadoPassword("Ingresa tu contraseña actual."); return; }
-=======
-    const newPassword = String(nuevoPasswordInput?.value || "").trim();
->>>>>>> main
-    if (!newPassword) {
-      setEstadoPassword("Ingresa una contraseña nueva.");
+    const currentPassword = normalize(actualPasswordInput?.value);
+    const newPassword = normalize(nuevoPasswordInput?.value);
+    
+    if (!currentPassword || !newPassword) {
+      setEstadoPassword("Completa contraseña actual y nueva.");
       return;
     }
-<<<<<<< codex/update-user-and-inventory-management
+
+    const email = state.context?.user?.email;
+    if (!email) {
+      setEstadoPassword("No se encontró usuario autenticado.");
+      return;
+    }
+
     setEstadoPassword("Validando contraseña actual...");
-    const email = state.context?.user?.email || "";
-    const authCheck = await supabase.auth.signInWithPassword({ email, password: currentPassword });
-    if (authCheck.error) { setEstadoPassword("La contraseña actual no coincide."); return; }
-=======
->>>>>>> main
+    const { error: authError } = await supabase.auth.signInWithPassword({ 
+      email, 
+      password: currentPassword 
+    });
+    
+    if (authError) {
+      setEstadoPassword("La contraseña actual es incorrecta.");
+      return;
+    }
+
     setEstadoPassword("Actualizando contraseña...");
     const { error } = await supabase.auth.updateUser({ password: newPassword });
+    
     if (error) {
       setEstadoPassword(`No se pudo actualizar: ${error.message || "sin detalle"}`);
       return;
     }
+
     setEstadoPassword("Contraseña actualizada. Debes iniciar sesión nuevamente.");
     setTimeout(async () => {
       await supabase.auth.signOut();
       window.location.href = "../index.html";
     }, 1200);
   });
+
+  // Registrar empleado
+  const formRegistroEmpleado = document.getElementById("formRegistroEmpleado");
+  formRegistroEmpleado?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    
+    const emp_nombre = document.getElementById("emp_nombre");
+    const emp_cedula = document.getElementById("emp_cedula");
+    const emp_fecha_ingreso = document.getElementById("emp_fecha_ingreso");
+    const emp_email = document.getElementById("emp_email");
+    const emp_password = document.getElementById("emp_password");
+    
+    if (!emp_nombre?.value || !emp_email?.value || !emp_password?.value) {
+      setRegistroEstado("Complete todos los campos requeridos.");
+      return;
+    }
+    
+    const payload = {
+      nombre: emp_nombre.value.trim(),
+      cedula: emp_cedula?.value.trim() || "",
+      fecha_ingreso: emp_fecha_ingreso?.value || "",
+      email: emp_email.value.trim(),
+      password: emp_password.value,
+      empresa_id: state.context.empresa_id,
+      tenant_id: state.context.empresa_id,
+      usuario_id: state.context.user?.id || state.context.user?.user_id,
+      registrado_por: state.context.user?.id || state.context.user?.user_id,
+      timestamp: new Date().toISOString()
+    };
+    
+    const headers = await buildRequestHeaders({ includeTenant: true });
+    const res = await fetch(WEBHOOK_REGISTRAR_EMPLEADO, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(payload)
+    });
+    
+    setRegistroEstado(res.ok ? "Empleado registrado correctamente." : "Error registrando empleado.");
+    if (res.ok) {
+      formRegistroEmpleado.reset();
+      await refreshData();
+    }
+  });
+
+  // Registrar otro usuario
+  const formRegistroOtro = document.getElementById("formRegistroOtro");
+  formRegistroOtro?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    
+    const otro_nombre = document.getElementById("otro_nombre");
+    const otro_cedula = document.getElementById("otro_cedula");
+    const otro_email = document.getElementById("otro_email");
+    const otro_password = document.getElementById("otro_password");
+    const otro_rol = document.getElementById("otro_rol");
+    
+    if (!otro_nombre?.value || !otro_email?.value || !otro_password?.value) {
+      setRegistroEstado("Complete todos los campos requeridos.");
+      return;
+    }
+    
+    const payload = {
+      nombre: otro_nombre.value.trim(),
+      cedula: otro_cedula?.value.trim() || "",
+      email: otro_email.value.trim(),
+      password: otro_password.value,
+      rol: otro_rol?.value || "revisor",
+      empresa_id: state.context.empresa_id,
+      tenant_id: state.context.empresa_id,
+      usuario_id: state.context.user?.id || state.context.user?.user_id,
+      registrado_por: state.context.user?.id || state.context.user?.user_id,
+      timestamp: new Date().toISOString()
+    };
+    
+    const headers = await buildRequestHeaders({ includeTenant: true });
+    const res = await fetch(WEBHOOK_REGISTRO_OTROS_USUARIOS, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(payload)
+    });
+    
+    setRegistroEstado(res.ok ? "Usuario registrado correctamente." : "Error registrando usuario.");
+    if (res.ok) {
+      formRegistroOtro.reset();
+      await refreshData();
+    }
+  });
 };
 
+// Inicializar la aplicación
 init();
-
-
-const setRegistroEstado = (m) => { if (registroInlineEstado) registroInlineEstado.textContent = m || ""; };
-const renderAlta = () => {
-  const t = tipoRegistroUsuario?.value || "";
-  if (formRegistroEmpleado) { formRegistroEmpleado.hidden = t !== "empleado"; formRegistroEmpleado.style.display = t === "empleado" ? "block" : "none"; }
-  if (formRegistroOtro) { formRegistroOtro.hidden = t !== "otro"; formRegistroOtro.style.display = t === "otro" ? "block" : "none"; }
-};
-tipoRegistroUsuario?.addEventListener("change", renderAlta);
-document.addEventListener("click", (e) => { const b=e.target.closest("button[data-toggle-pass]"); if(!b)return; const id=b.dataset.togglePass; const input=document.getElementById(id); if(!input)return; input.type = input.type === "password" ? "text" : "password";});
-
-formRegistroEmpleado?.addEventListener("submit", async (e)=>{
- e.preventDefault();
- const context = await getUserContext(); if(!context?.empresa_id){setRegistroEstado("No se pudo validar sesión"); return;}
- const payload={nombre:document.getElementById("emp_nombre")?.value.trim()||"",cedula:document.getElementById("emp_cedula")?.value.trim()||"",fecha_ingreso:document.getElementById("emp_fecha_ingreso")?.value||"",email:document.getElementById("emp_email")?.value.trim()||"",password:document.getElementById("emp_password")?.value||"",empresa_id:context.empresa_id,tenant_id:context.empresa_id,usuario_id:context.user?.id||context.user?.user_id,registrado_por:context.user?.id||context.user?.user_id,timestamp:new Date().toISOString()};
- const { WEBHOOK_REGISTRAR_EMPLEADO } = await import("./webhooks.js");
- const headers = await buildRequestHeaders({ includeTenant: true });
- const res=await fetch(WEBHOOK_REGISTRAR_EMPLEADO,{method:"POST",headers:{"Content-Type":"application/json",...headers},body:JSON.stringify(payload)});
- setRegistroEstado(res.ok?"Empleado registrado correctamente.":"Error registrando empleado."); if(res.ok){formRegistroEmpleado.reset(); await refreshData();}
-});
-formRegistroOtro?.addEventListener("submit", async (e)=>{
- e.preventDefault(); const context=await getUserContext(); if(!context?.empresa_id){setRegistroEstado("No se pudo validar sesión");return;}
- const payload={nombre:document.getElementById("otro_nombre")?.value.trim()||"",cedula:document.getElementById("otro_cedula")?.value.trim()||"",email:document.getElementById("otro_email")?.value.trim()||"",password:document.getElementById("otro_password")?.value||"",rol:document.getElementById("otro_rol")?.value||"",empresa_id:context.empresa_id,tenant_id:context.empresa_id,usuario_id:context.user?.id||context.user?.user_id,registrado_por:context.user?.id||context.user?.user_id,timestamp:new Date().toISOString()};
- const { WEBHOOK_REGISTRO_OTROS_USUARIOS } = await import("./webhooks.js"); const headers=await buildRequestHeaders({ includeTenant: true });
- const res=await fetch(WEBHOOK_REGISTRO_OTROS_USUARIOS,{method:"POST",headers:{"Content-Type":"application/json",...headers},body:JSON.stringify(payload)});
- setRegistroEstado(res.ok?"Usuario registrado correctamente.":"Error registrando usuario."); if(res.ok){formRegistroOtro.reset(); await refreshData();}
-});
-renderAlta();
