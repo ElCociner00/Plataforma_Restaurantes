@@ -466,6 +466,7 @@ const renderInconsistenciasRows = () => {
     const productoSelect = document.createElement("select");
     productoSelect.className = "inconsistencia-producto";
     productoSelect.appendChild(buildProductoOptions(inconsistenciasDraft[i]?.producto_id || ""));
+    if (inconsistenciasDraft[i]?.producto_id) productoSelect.disabled = true;
     productoCell.appendChild(productoSelect);
     tr.appendChild(productoCell);
 
@@ -482,6 +483,7 @@ const renderInconsistenciasRows = () => {
     faltantesInput.className = "inconsistencia-faltantes";
     faltantesInput.placeholder = "0";
     faltantesInput.value = String(inconsistenciasDraft[i]?.unidades_faltantes || "");
+    if (inconsistenciasDraft[i]?.producto_id) faltantesInput.readOnly = true;
     enforceNumericInput([faltantesInput]);
     faltantesCell.appendChild(faltantesInput);
     tr.appendChild(faltantesCell);
@@ -889,7 +891,7 @@ btnVerificar.addEventListener("click", () => {
   productRows.forEach((rowData) => {
     const stockValue = Number(rowData.stockInput.value || 0);
     const gastadoRaw = rowData.gastadoInput.value.trim();
-    const gastadoValue = gastadoRaw === "" ? 0 : Number(gastadoRaw);
+    const gastadoValue = gastadoRaw === "" ? 0 : Number(gastadoRaw.replace(",", "."));
 
     if (Number.isNaN(stockValue) || Number.isNaN(gastadoValue)) {
       hasInvalidValue = true;
