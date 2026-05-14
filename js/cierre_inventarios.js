@@ -46,6 +46,7 @@ const fecha = document.getElementById("fecha");
 const responsable = document.getElementById("responsable");
 const horaInicio = document.getElementById("hora_inicio");
 const horaFin = document.getElementById("hora_fin");
+const momentoInventario = document.getElementById("momento_inventario");
 const inventarioBody = document.getElementById("inventarioBody");
 const inconsistenciasBody = document.getElementById("inconsistenciasBody");
 const status = document.getElementById("status");
@@ -602,7 +603,7 @@ const readRowsForWebhook = ({ includeHiddenAsZero = true } = {}) => {
   const rows = [];
   productRows.forEach((rowData, productId) => {
     const stockGastadoRaw = rowData.gastadoInput.value.trim();
-    const stockGastado = stockGastadoRaw === "" ? 0 : Number(stockGastadoRaw);
+    const stockGastado = stockGastadoRaw === "" ? 0 : Number(stockGastadoRaw.replace(",", "."));
     rows.push({
       producto_id: productId,
       producto_nombre: rowData.nombre,
@@ -631,7 +632,8 @@ const buildBasePayload = async () => {
     responsable_id: responsable.value,
     responsable_turno_id: responsable.value,
     responsable_login_id: contextPayload.usuario_id || "",
-    registrado_por: contextPayload.usuario_id || ""
+    registrado_por: contextPayload.usuario_id || "",
+    momento_inventario: momentoInventario?.value || ""
   };
 };
 
@@ -787,8 +789,8 @@ const renderProducts = async () => {
 
 
 const validateRequiredFields = () => {
-  if (!fecha.value || !responsable.value || !horaInicio.value || !horaFin.value) {
-    setStatus("Atención: Completa fecha, responsable y turno.");
+  if (!fecha.value || !responsable.value || !horaInicio.value || !horaFin.value || !momentoInventario?.value) {
+    setStatus("Atención: Completa fecha, responsable, turno y momento de inventario.");
     return false;
   }
   if (!productRows.size) {
@@ -894,7 +896,7 @@ btnVerificar.addEventListener("click", () => {
       return;
     }
 
-    const restante = stockValue - gastadoValue;
+    const restante = gastadoValue - stockValue;
     rowData.restanteInput.value = String(restante);
   });
 
@@ -908,6 +910,7 @@ btnVerificar.addEventListener("click", () => {
   verified = true;
   setButtonState({ subir: false });
   refreshEstadoSubir();
+  autoGenerarInconsistencias();
   setStatus("Verificación completada. Ya puedes subir datos.");
 });
 
@@ -1218,3 +1221,19 @@ loadResponsables();
 renderProducts();
 cargarNombreEmpresa();
 toggleDetallesAdicionales(false);
+
+
+const autoGenerarInconsistencias = () => {
+  const auto = [];
+  productRows.forEach((rowData, productId) => {
+    const diferencia = Number(rowData.restanteInput.value || 0);
+    if (!Number.isNaN(diferencia) && diferencia !== 0) {
+      auto.push({ producto_id: productId, responsable_id: "", unidades_faltantes: Math.abs(diferencia), producto_nombre: rowData.nombre, responsable_nombre: "" });
+    }
+  });
+  if (detallesAdicionalesSi) detallesAdicionalesSi.checked = auto.length > 0;
+  if (detallesAdicionalesNo) detallesAdicionalesNo.checked = auto.length === 0;
+  inconsistenciasDraft = auto;
+  if (cantidadInconsistencias) cantidadInconsistencias.value = String(auto.length);
+  renderInconsistenciasRows();
+};
