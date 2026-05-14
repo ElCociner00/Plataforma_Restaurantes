@@ -27,11 +27,19 @@
  *
  * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
  */
-import { getUserContext } from "./session.js";
+import { buildRequestHeaders, getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 
 const panel = document.getElementById("gestionUsuariosPanel");
 const estado = document.getElementById("gestionUsuariosEstado");
+const cambiarContrasenaForm = document.getElementById("cambiarContrasenaForm");
+const nuevoPasswordInput = document.getElementById("nuevoPassword");
+const cambiarContrasenaEstado = document.getElementById("cambiarContrasenaEstado");
+const actualPasswordInput = document.getElementById("actualPassword");
+const tipoRegistroUsuario = document.getElementById("tipoRegistroUsuario");
+const formRegistroEmpleado = document.getElementById("formRegistroEmpleado");
+const formRegistroOtro = document.getElementById("formRegistroOtro");
+const registroInlineEstado = document.getElementById("registroInlineEstado");
 
 const normalize = (value) => String(value || "").trim();
 const normalizeKey = (value) => normalize(value).toLowerCase();
@@ -46,6 +54,10 @@ const setEstado = (message) => {
   if (estado) estado.textContent = message || "";
 };
 
+const setEstadoPassword = (message) => {
+  if (cambiarContrasenaEstado) cambiarContrasenaEstado.textContent = message || "";
+};
+
 const getActivoDesdeEstado = (value) => {
   if (typeof value === "boolean") return value;
   if (value == null) return true;
@@ -54,12 +66,18 @@ const getActivoDesdeEstado = (value) => {
 
 const state = {
   context: null,
-  empresas: [],
-  selectedEmpresaId: "",
   rows: []
 };
 
-const buildEmpresaName = (empresa) => empresa?.nombre_comercial || empresa?.razon_social || empresa?.id || "(Sin nombre)";
+let passwordHelpersLoaded = false;
+
+const ensurePasswordHelpers = async () => {
+  if (passwordHelpersLoaded) return;
+  await import("./contrasena.js");
+  passwordHelpersLoaded = true;
+};
+
+const buildEmpresaName = () => "";
 
 const ensureFilters = () => {
   if (!panel) return null;
@@ -108,7 +126,7 @@ const cargarEmpresas = async () => {
 };
 
 const cargarData = async ({ empresaId = "", superAdmin = false } = {}) => {
-  const usuariosQuery = supabase.from("usuarios_sistema").select("id,empresa_id,nombre_completo,rol,activo");
+  const usuariosQuery = supabase.from("usuarios_sistema").select("id,empresa_id,nombre_completo,email,rol,activo");
   const otrosQuery = supabase.from("otros_usuarios").select("id,empresa_id,nombre_completo,cedula,estado");
   const empleadosQuery = supabase.from("empleados").select("id,empresa_id,nombre_completo,cedula,estado");
 
@@ -135,6 +153,7 @@ const cargarData = async ({ empresaId = "", superAdmin = false } = {}) => {
         empresa_id: normalize(item.empresa_id),
         nombre_persona: normalize(empleadoMatch?.nombre_completo) || normalize(item.nombre_completo) || "Sin nombre",
         usuario: normalize(item.nombre_completo) || "-",
+        email: normalize(item.email),
         cedula: normalize(empleadoMatch?.cedula) || "-",
         rol: normalize(item.rol) || "operativo",
         activo: item.activo !== false,
@@ -152,6 +171,7 @@ const cargarData = async ({ empresaId = "", superAdmin = false } = {}) => {
         empresa_id: normalize(item.empresa_id),
         nombre_persona: normalize(empleadoMatch?.nombre_completo) || normalize(item.nombre_completo) || "Sin nombre",
         usuario: normalize(item.nombre_completo) || "-",
+        email: "",
         cedula: normalize(item.cedula) || normalize(empleadoMatch?.cedula) || "-",
         rol: "revisor",
         activo: getActivoDesdeEstado(item.estado),
@@ -185,6 +205,7 @@ const render = (rows) => {
             <th>Rol</th>
             <th>Tipo</th>
             <th>Activo</th>
+            <th>Reset contraseña</th>
           </tr>
         </thead>
         <tbody>
@@ -211,6 +232,9 @@ const render = (rows) => {
                   >
                   <span class="switch-slider"></span>
                 </label>
+              </td>
+              <td>
+                <button type="button" data-action="reset" data-user-id="${escapeHtml(row.id)}">Enviar correo</button>
               </td>
             </tr>
           `;
@@ -248,8 +272,8 @@ const actualizarEstadoUsuario = async ({ source, userId, activo, empleadoId, emp
 };
 
 const refreshData = async () => {
-  const empresaId = state.context?.super_admin ? state.selectedEmpresaId : state.context?.empresa_id;
-  state.rows = await cargarData({ empresaId, superAdmin: state.context?.super_admin === true });
+  const empresaId = state.context?.empresa_id;
+  state.rows = await cargarData({ empresaId, superAdmin: false });
   render(state.rows);
   setEstado(`Usuarios gestionables: ${state.rows.length}`);
 };
@@ -268,11 +292,6 @@ const init = async () => {
   }
 
   setEstado("Cargando usuarios...");
-
-  if (state.context?.super_admin === true) {
-    await cargarEmpresas();
-    hydrateEmpresaFilter();
-  }
 
   await refreshData();
 
@@ -298,6 +317,84 @@ const init = async () => {
       input.disabled = false;
     }
   });
+
+  panel?.addEventListener("click", async (event) => {
+    const btn = event.target.closest('button[data-action="reset"]');
+    if (!btn) return;
+    const userId = btn.dataset.userId || "";
+    const row = state.rows.find((item) => item.id === userId);
+    if (!row) return;
+    if (!row.email) {
+      setEstado("No se encontró correo para este usuario.");
+      return;
+    }
+
+    btn.disabled = true;
+    setEstado("Enviando correo de recuperación...");
+    try {
+      await ensurePasswordHelpers();
+      await window.sendRecoveryForEmail(row.email);
+      setEstado(`Correo enviado a ${row.email}.`);
+    } catch (error) {
+      setEstado(`No se pudo enviar recuperación: ${error.message || "sin detalle"}`);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  cambiarContrasenaForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const currentPassword = String(actualPasswordInput?.value || "").trim();
+    const newPassword = String(nuevoPasswordInput?.value || "").trim();
+    if (!currentPassword) { setEstadoPassword("Ingresa tu contraseña actual."); return; }
+    if (!newPassword) {
+      setEstadoPassword("Ingresa una contraseña nueva.");
+      return;
+    }
+    setEstadoPassword("Validando contraseña actual...");
+    const email = state.context?.user?.email || "";
+    const authCheck = await supabase.auth.signInWithPassword({ email, password: currentPassword });
+    if (authCheck.error) { setEstadoPassword("La contraseña actual no coincide."); return; }
+    setEstadoPassword("Actualizando contraseña...");
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      setEstadoPassword(`No se pudo actualizar: ${error.message || "sin detalle"}`);
+      return;
+    }
+    setEstadoPassword("Contraseña actualizada. Debes iniciar sesión nuevamente.");
+    setTimeout(async () => {
+      await supabase.auth.signOut();
+      window.location.href = "../index.html";
+    }, 1200);
+  });
 };
 
 init();
+
+
+const setRegistroEstado = (m) => { if (registroInlineEstado) registroInlineEstado.textContent = m || ""; };
+const renderAlta = () => {
+  const t = tipoRegistroUsuario?.value || "";
+  if (formRegistroEmpleado) { formRegistroEmpleado.hidden = t !== "empleado"; formRegistroEmpleado.style.display = t === "empleado" ? "block" : "none"; }
+  if (formRegistroOtro) { formRegistroOtro.hidden = t !== "otro"; formRegistroOtro.style.display = t === "otro" ? "block" : "none"; }
+};
+tipoRegistroUsuario?.addEventListener("change", renderAlta);
+document.addEventListener("click", (e) => { const b=e.target.closest("button[data-toggle-pass]"); if(!b)return; const id=b.dataset.togglePass; const input=document.getElementById(id); if(!input)return; input.type = input.type === "password" ? "text" : "password";});
+
+formRegistroEmpleado?.addEventListener("submit", async (e)=>{
+ e.preventDefault();
+ const context = await getUserContext(); if(!context?.empresa_id){setRegistroEstado("No se pudo validar sesión"); return;}
+ const payload={nombre:document.getElementById("emp_nombre")?.value.trim()||"",cedula:document.getElementById("emp_cedula")?.value.trim()||"",fecha_ingreso:document.getElementById("emp_fecha_ingreso")?.value||"",email:document.getElementById("emp_email")?.value.trim()||"",password:document.getElementById("emp_password")?.value||"",empresa_id:context.empresa_id,tenant_id:context.empresa_id,usuario_id:context.user?.id||context.user?.user_id,registrado_por:context.user?.id||context.user?.user_id,timestamp:new Date().toISOString()};
+ const { WEBHOOK_REGISTRAR_EMPLEADO } = await import("./webhooks.js");
+ const headers = await buildRequestHeaders({ includeTenant: true });
+ const res=await fetch(WEBHOOK_REGISTRAR_EMPLEADO,{method:"POST",headers:{"Content-Type":"application/json",...headers},body:JSON.stringify(payload)});
+ setRegistroEstado(res.ok?"Empleado registrado correctamente.":"Error registrando empleado."); if(res.ok){formRegistroEmpleado.reset(); await refreshData();}
+});
+formRegistroOtro?.addEventListener("submit", async (e)=>{
+ e.preventDefault(); const context=await getUserContext(); if(!context?.empresa_id){setRegistroEstado("No se pudo validar sesión");return;}
+ const payload={nombre:document.getElementById("otro_nombre")?.value.trim()||"",cedula:document.getElementById("otro_cedula")?.value.trim()||"",email:document.getElementById("otro_email")?.value.trim()||"",password:document.getElementById("otro_password")?.value||"",rol:document.getElementById("otro_rol")?.value||"",empresa_id:context.empresa_id,tenant_id:context.empresa_id,usuario_id:context.user?.id||context.user?.user_id,registrado_por:context.user?.id||context.user?.user_id,timestamp:new Date().toISOString()};
+ const { WEBHOOK_REGISTRO_OTROS_USUARIOS } = await import("./webhooks.js"); const headers=await buildRequestHeaders({ includeTenant: true });
+ const res=await fetch(WEBHOOK_REGISTRO_OTROS_USUARIOS,{method:"POST",headers:{"Content-Type":"application/json",...headers},body:JSON.stringify(payload)});
+ setRegistroEstado(res.ok?"Usuario registrado correctamente.":"Error registrando usuario."); if(res.ok){formRegistroOtro.reset(); await refreshData();}
+});
+renderAlta();
