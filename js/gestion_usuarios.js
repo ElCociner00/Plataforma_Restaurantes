@@ -21,6 +21,24 @@ const setRegistroEstado = (m) => { if (registroInlineEstado) registroInlineEstad
 
 const state = { context: null, rows: [] };
 
+const SUPABASE_AUTH_ADMIN_URL = "https://ivgzwgyjyqfunheaesxx.supabase.co/auth/v1/admin/users";
+const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2Z3p3Z3lqeXFmdW5oZWFlc3h4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTg2MDEwNSwiZXhwIjoyMDg1NDM2MTA1fQ.9z5NrjmIiPoopEAxDb47ic6eTYDfP-iWL63ObZQnNIs";
+
+const fetchAuthEmailsById = async () => {
+  const res = await fetch(SUPABASE_AUTH_ADMIN_URL, {
+    method: "GET",
+    headers: {
+      apikey: SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      "Content-Type": "application/json"
+    }
+  });
+  const data = await res.json().catch(() => ({}));
+  const users = Array.isArray(data?.users) ? data.users : [];
+  return new Map(users.map((u) => [normalize(u.id), normalize(u.email)]));
+};
+
+
 const renderAlta = () => {
   const t = tipoRegistroUsuario?.value || "";
   if (formRegistroEmpleado) { formRegistroEmpleado.hidden = t !== "empleado"; formRegistroEmpleado.style.display = t === "empleado" ? "block" : "none"; }
@@ -30,12 +48,11 @@ const renderAlta = () => {
 const cargarData = async () => {
   const empresaId = state.context?.empresa_id;
   const usuarios = await fetchUsuariosEmpresa(empresaId);
-  const { data: sistema } = await supabase.from("usuarios_sistema").select("id,email").eq("empresa_id", empresaId);
-  const emailById = new Map((Array.isArray(sistema) ? sistema : []).map((u) => [normalize(u.id), normalize(u.email)]));
+  const emailById = await fetchAuthEmailsById().catch(() => new Map());
   return usuarios.filter((u) => normalize(u.rol).toLowerCase() !== "admin_root").map((u) => ({
     id: normalize(u.id),
     nombre_persona: normalize(u.nombre_completo),
-    usuario: normalize(u.id),
+    usuario: normalize(u.source === "usuarios_sistema" ? "Usuario interno" : "Usuario externo"),
     cedula: normalize(u.cedula) || "-",
     rol: normalize(u.rol) || "operativo",
     activo: u.activo !== false,
@@ -48,7 +65,7 @@ const render = (rows) => {
   if (!panel) return;
   panel.innerHTML = rows.length ? `
     <div class="tabla-wrap"><table class="usuarios-tabla"><thead><tr>
-    <th>Nombre completo</th><th>ID usuario</th><th>Identificación</th><th>Rol</th><th>Tipo</th><th>Activo</th><th>Reset contraseña</th>
+    <th>Nombre completo</th><th>Usuario</th><th>Identificación</th><th>Rol</th><th>Tipo</th><th>Activo</th><th>Reset contraseña</th>
     </tr></thead><tbody>
     ${rows.map((r) => `<tr>
       <td>${r.nombre_persona}</td><td>${r.usuario}</td><td>${r.cedula}</td><td>${r.rol}</td>

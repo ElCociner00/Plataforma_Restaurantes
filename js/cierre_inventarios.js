@@ -484,7 +484,7 @@ const renderInconsistenciasRows = () => {
     faltantesInput.placeholder = "0";
     faltantesInput.value = String(inconsistenciasDraft[i]?.unidades_faltantes || "");
     if (inconsistenciasDraft[i]?.producto_id) faltantesInput.readOnly = true;
-    enforceNumericInput([faltantesInput]);
+
     faltantesCell.appendChild(faltantesInput);
     tr.appendChild(faltantesCell);
 
@@ -737,7 +737,7 @@ const renderProductRows = (productos) => {
     restanteCell.appendChild(restanteInput);
     tr.appendChild(restanteCell);
 
-    enforceNumericInput([gastadoInput]);
+
     gastadoInput.addEventListener("input", resetVerification);
 
     productRows.set(productId, {
