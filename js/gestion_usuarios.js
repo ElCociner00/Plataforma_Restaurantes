@@ -77,7 +77,11 @@ const ensurePasswordHelpers = async () => {
   passwordHelpersLoaded = true;
 };
 
+<<<<<<< codex/update-user-and-inventory-management
 const buildEmpresaName = () => "";
+=======
+const buildEmpresaName = (empresa) => empresa?.nombre_comercial || empresa?.razon_social || empresa?.id || "(Sin nombre)";
+>>>>>>> main
 
 const ensureFilters = () => {
   if (!panel) return null;
@@ -344,17 +348,24 @@ const init = async () => {
 
   cambiarContrasenaForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
+<<<<<<< codex/update-user-and-inventory-management
     const currentPassword = String(actualPasswordInput?.value || "").trim();
     const newPassword = String(nuevoPasswordInput?.value || "").trim();
     if (!currentPassword) { setEstadoPassword("Ingresa tu contraseña actual."); return; }
+=======
+    const newPassword = String(nuevoPasswordInput?.value || "").trim();
+>>>>>>> main
     if (!newPassword) {
       setEstadoPassword("Ingresa una contraseña nueva.");
       return;
     }
+<<<<<<< codex/update-user-and-inventory-management
     setEstadoPassword("Validando contraseña actual...");
     const email = state.context?.user?.email || "";
     const authCheck = await supabase.auth.signInWithPassword({ email, password: currentPassword });
     if (authCheck.error) { setEstadoPassword("La contraseña actual no coincide."); return; }
+=======
+>>>>>>> main
     setEstadoPassword("Actualizando contraseña...");
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) {
