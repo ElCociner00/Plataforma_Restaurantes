@@ -52,7 +52,6 @@ const cargarData = async () => {
   return usuarios.filter((u) => normalize(u.rol).toLowerCase() !== "admin_root").map((u) => ({
     id: normalize(u.id),
     nombre_persona: normalize(u.nombre_completo),
-    usuario: normalize(u.source === "usuarios_sistema" ? "Usuario interno" : "Usuario externo"),
     cedula: normalize(u.cedula) || "-",
     rol: normalize(u.rol) || "operativo",
     activo: u.activo !== false,
@@ -65,10 +64,10 @@ const render = (rows) => {
   if (!panel) return;
   panel.innerHTML = rows.length ? `
     <div class="tabla-wrap"><table class="usuarios-tabla"><thead><tr>
-    <th>Nombre completo</th><th>Usuario</th><th>Identificación</th><th>Rol</th><th>Tipo</th><th>Activo</th><th>Reset contraseña</th>
+    <th>Nombre completo</th><th>Identificación</th><th>Rol</th><th>Tipo</th><th>Activo</th><th>Reset contraseña</th>
     </tr></thead><tbody>
     ${rows.map((r) => `<tr>
-      <td>${r.nombre_persona}</td><td>${r.usuario}</td><td>${r.cedula}</td><td>${r.rol}</td>
+      <td>${r.nombre_persona}</td><td>${r.cedula}</td><td>${r.rol}</td>
       <td>${r.source === "usuarios_sistema" ? "Empleado" : "Otro usuario"}</td>
       <td><label class="switch-cell"><input type="checkbox" data-action="toggle" data-source="${r.source}" data-user-id="${r.id}" ${r.activo ? "checked" : ""}><span class="switch-slider"></span></label></td>
       <td><button type="button" data-action="reset" data-user-id="${r.id}">Enviar correo</button></td>
