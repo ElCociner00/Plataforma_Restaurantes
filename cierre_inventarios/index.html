@@ -86,19 +86,12 @@
 
     <section class="bloque">
       <h2>Detalles adicionales</h2>
-      <div class="detalles-adicionales-toggle">
-        <span>¿Registrar inconsistencias?</span>
-        <label>
-          <input type="radio" name="detallesAdicionales" id="detallesAdicionalesNo" value="no" checked>
-          No
-        </label>
-        <label>
-          <input type="radio" name="detallesAdicionales" id="detallesAdicionalesSi" value="si">
-          Sí
-        </label>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px">
+        <button id="confirmarInconsistencias" type="button">Confirmar inconsistencias</button>
+        <span class="inconsistencias-hint">Las inconsistencias se detectan automáticamente al verificar.</span>
       </div>
 
-      <div id="detallesAdicionalesConfig" class="detalles-adicionales-config is-hidden">
+      <div id="detallesAdicionalesConfig" class="detalles-adicionales-config">
         <label for="cantidadInconsistencias">
           ¿Cuántos productos tienen una inconsistencia?
         </label>

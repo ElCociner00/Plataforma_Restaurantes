@@ -51,14 +51,11 @@ const inventarioBody = document.getElementById("inventarioBody");
 const inconsistenciasBody = document.getElementById("inconsistenciasBody");
 const status = document.getElementById("status");
 const loadingOverlay = document.getElementById("loadingOverlay");
-const detallesAdicionalesNo = document.getElementById("detallesAdicionalesNo");
-const detallesAdicionalesSi = document.getElementById("detallesAdicionalesSi");
 const detallesAdicionalesConfig = document.getElementById("detallesAdicionalesConfig");
 const cantidadInconsistencias = document.getElementById("cantidadInconsistencias");
 const inconsistenciasWrap = document.getElementById("inconsistenciasWrap");
 const inconsistenciasHint = document.getElementById("inconsistenciasHint");
 const btnConfirmarInconsistencias = document.getElementById("confirmarInconsistencias");
-const confirmarInconsistenciasWrap = document.getElementById("confirmarInconsistenciasWrap");
 
 const btnConsultar = document.getElementById("consultar");
 const btnVerificar = document.getElementById("verificar");
@@ -381,7 +378,7 @@ const setButtonState = ({ consultar, verificar, subir }) => {
   if (typeof subir === "boolean") btnSubir.disabled = !subir;
 };
 
-const isDetallesAdicionalesEnabled = () => Boolean(detallesAdicionalesSi?.checked);
+const isDetallesAdicionalesEnabled = () => true;
 
 const getMaxInconsistencias = () => Math.max(0, productRows.size);
 
@@ -513,12 +510,7 @@ const renderInconsistenciasRows = () => {
 };
 
 const toggleDetallesAdicionales = (enabled) => {
-  detallesAdicionalesConfig?.classList.toggle("is-hidden", !enabled);
   inconsistenciasHint?.classList.toggle("is-hidden", !enabled);
-  if (!enabled && cantidadInconsistencias) {
-    cantidadInconsistencias.value = "0";
-    inconsistenciasDraft = [];
-  }
   renderInconsistenciasRows();
   resetVerification();
 };
@@ -593,8 +585,6 @@ const aplicarBloqueoConstancia = (activo) => {
     responsable,
     horaInicio,
     horaFin,
-    detallesAdicionalesNo,
-    detallesAdicionalesSi,
     cantidadInconsistencias
   ].filter(Boolean);
 
@@ -1219,8 +1209,7 @@ btnLimpiar.addEventListener("click", () => {
   });
   resetVerification();
   setButtonState({ verificar: false });
-  if (detallesAdicionalesNo) detallesAdicionalesNo.checked = true;
-  toggleDetallesAdicionales(false);
+  toggleDetallesAdicionales(true);
   setStatus("Datos limpiados.");
 });
 
@@ -1253,13 +1242,6 @@ btnConfirmarInconsistencias?.addEventListener("click", () => {
   setStatus("Inconsistencias confirmadas. Ya puedes subir datos.");
 });
 
-detallesAdicionalesNo?.addEventListener("change", () => {
-  if (detallesAdicionalesNo.checked) toggleDetallesAdicionales(false);
-});
-
-detallesAdicionalesSi?.addEventListener("change", () => {
-  if (detallesAdicionalesSi.checked) toggleDetallesAdicionales(true);
-});
 
 cantidadInconsistencias?.addEventListener("change", () => {
   renderInconsistenciasRows();
@@ -1271,7 +1253,7 @@ cargarPoliticaEmpresa();
 loadResponsables();
 renderProducts();
 cargarNombreEmpresa();
-toggleDetallesAdicionales(false);
+toggleDetallesAdicionales(true);
 
 
 const autoGenerarInconsistencias = () => {
