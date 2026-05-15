@@ -57,6 +57,7 @@ const detallesAdicionalesConfig = document.getElementById("detallesAdicionalesCo
 const cantidadInconsistencias = document.getElementById("cantidadInconsistencias");
 const inconsistenciasWrap = document.getElementById("inconsistenciasWrap");
 const inconsistenciasHint = document.getElementById("inconsistenciasHint");
+const btnConfirmarInconsistencias = document.getElementById("confirmarInconsistencias");
 
 const btnConsultar = document.getElementById("consultar");
 const btnVerificar = document.getElementById("verificar");
@@ -74,6 +75,7 @@ let resumenDescargado = false;
 let bloqueoConstanciaActivo = false;
 let responsablesCache = [];
 let inconsistenciasDraft = [];
+let inconsistenciasConfirmadas = false;
 
 const setStatus = (message) => {
   status.textContent = message;
@@ -497,8 +499,8 @@ const renderInconsistenciasRows = () => {
     tr.appendChild(faltantesCell);
 
     [productoSelect, responsableSelect, faltantesInput].forEach((element) => {
-      element.addEventListener("change", resetVerification);
-      element.addEventListener("input", resetVerification);
+      element.addEventListener("change", () => { inconsistenciasConfirmadas = false; resetVerification(); });
+      element.addEventListener("input", () => { inconsistenciasConfirmadas = false; resetVerification(); });
     });
 
     fragment.appendChild(tr);
@@ -538,6 +540,7 @@ const aplicarPoliticaSoloLectura = () => {
 
 const resetVerification = () => {
   verified = false;
+  inconsistenciasConfirmadas = false;
   resumenDescargado = false;
   setButtonState({ subir: false });
   refreshEstadoSubir();
@@ -922,10 +925,12 @@ btnVerificar.addEventListener("click", () => {
   }
 
   verified = true;
+  autoGenerarInconsistencias();
+  const requiereConfirmacion = isDetallesAdicionalesEnabled() && Number(cantidadInconsistencias?.value || 0) > 0;
+  inconsistenciasConfirmadas = !requiereConfirmacion;
   setButtonState({ subir: false });
   refreshEstadoSubir();
-  autoGenerarInconsistencias();
-  setStatus("Verificación completada. Ya puedes subir datos.");
+  setStatus(requiereConfirmacion ? "Verificación completada. Ahora confirma inconsistencias para habilitar subir." : "Verificación completada. Ya puedes subir datos.");
 });
 
 btnSubir.addEventListener("click", async () => {
@@ -938,6 +943,11 @@ btnSubir.addEventListener("click", async () => {
 
   if (!verified) {
     setStatus("Atención: Primero debes verificar los datos.");
+    return;
+  }
+
+  if (isDetallesAdicionalesEnabled() && Number(cantidadInconsistencias?.value || 0) > 0 && !inconsistenciasConfirmadas) {
+    setStatus("Debes confirmar inconsistencias antes de subir el cierre.");
     return;
   }
 
@@ -1214,6 +1224,31 @@ btnLimpiar.addEventListener("click", () => {
 
 [fecha, responsable, horaInicio, horaFin].forEach((element) => {
   element.addEventListener("change", resetVerification);
+});
+
+
+btnConfirmarInconsistencias?.addEventListener("click", () => {
+  if (!isDetallesAdicionalesEnabled()) {
+    inconsistenciasConfirmadas = true;
+    setStatus("No hay inconsistencias activas para confirmar.");
+    return;
+  }
+  const inconsistencias = collectInconsistencias();
+  if (!inconsistencias.length) {
+    setStatus("No hay inconsistencias para confirmar.");
+    return;
+  }
+  for (const item of inconsistencias) {
+    if (!item.producto_id || !item.responsable_id || item.unidades_faltantes <= 0 || Number.isNaN(item.unidades_faltantes)) {
+      setStatus("Completa responsable y cantidad válida en todas las inconsistencias antes de confirmar.");
+      return;
+    }
+  }
+  inconsistenciasDraft = inconsistencias;
+  inconsistenciasConfirmadas = true;
+  verified = true;
+  refreshEstadoSubir();
+  setStatus("Inconsistencias confirmadas. Ya puedes subir datos.");
 });
 
 detallesAdicionalesNo?.addEventListener("change", () => {
