@@ -155,7 +155,7 @@ function buildMenu({ context, environmentForMenu }) {
         <span class="user-name">${userName}</span>
       </button>
       <div class="nav-dropdown-menu user-dropdown-menu">
-        ${context?.rol === "admin_root" || context?.rol === "admin" ? `<a href="${configLink}">Configuracion</a>` : ""}
+        ${context?.rol === "admin_root" || context?.rol === "admin" ? `<a href="${APP_URLS.gestionUsuarios}">Gestión usuarios</a><a href="${configLink}">Configuracion</a>` : ""}
         <div class="menu-group-title">Cambiar de entorno</div>
         ${environmentOptions}
         <a href="#" id="logoutBtnMenu">Salir</a>
