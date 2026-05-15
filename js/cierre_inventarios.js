@@ -58,6 +58,7 @@ const cantidadInconsistencias = document.getElementById("cantidadInconsistencias
 const inconsistenciasWrap = document.getElementById("inconsistenciasWrap");
 const inconsistenciasHint = document.getElementById("inconsistenciasHint");
 const btnConfirmarInconsistencias = document.getElementById("confirmarInconsistencias");
+const confirmarInconsistenciasWrap = document.getElementById("confirmarInconsistenciasWrap");
 
 const btnConsultar = document.getElementById("consultar");
 const btnVerificar = document.getElementById("verificar");
@@ -460,6 +461,7 @@ const renderInconsistenciasRows = () => {
   const count = isEnabled ? Number(cantidadInconsistencias?.value || 0) : 0;
   inconsistenciasBody.innerHTML = "";
   inconsistenciasHint?.classList.toggle("is-hidden", !isEnabled || count <= 0);
+  confirmarInconsistenciasWrap?.classList.toggle("is-hidden", !isEnabled || count <= 0);
 
   if (!isEnabled || count <= 0) {
     inconsistenciasWrap?.classList.add("is-hidden");
@@ -1273,11 +1275,13 @@ toggleDetallesAdicionales(false);
 
 
 const autoGenerarInconsistencias = () => {
+  const prevByProducto = new Map((inconsistenciasDraft || []).map((i) => [String(i.producto_id || ""), i]));
   const auto = [];
   productRows.forEach((rowData, productId) => {
     const diferencia = Number(rowData.restanteInput.value || 0);
     if (!Number.isNaN(diferencia) && diferencia !== 0) {
-      auto.push({ producto_id: productId, responsable_id: "", unidades_faltantes: Math.abs(diferencia), producto_nombre: rowData.nombre, responsable_nombre: "" });
+      const prev = prevByProducto.get(String(productId));
+      auto.push({ producto_id: productId, responsable_id: prev?.responsable_id || "", unidades_faltantes: Math.abs(diferencia), producto_nombre: rowData.nombre, responsable_nombre: prev?.responsable_nombre || "" });
     }
   });
   if (detallesAdicionalesSi) detallesAdicionalesSi.checked = auto.length > 0;
