@@ -46,6 +46,7 @@ const fecha = document.getElementById("fecha");
 const responsable = document.getElementById("responsable");
 const horaInicio = document.getElementById("hora_inicio");
 const horaFin = document.getElementById("hora_fin");
+const momentoInventario = document.getElementById("momento_inventario");
 const inventarioBody = document.getElementById("inventarioBody");
 const inconsistenciasBody = document.getElementById("inconsistenciasBody");
 const status = document.getElementById("status");
@@ -56,6 +57,8 @@ const detallesAdicionalesConfig = document.getElementById("detallesAdicionalesCo
 const cantidadInconsistencias = document.getElementById("cantidadInconsistencias");
 const inconsistenciasWrap = document.getElementById("inconsistenciasWrap");
 const inconsistenciasHint = document.getElementById("inconsistenciasHint");
+const btnConfirmarInconsistencias = document.getElementById("confirmarInconsistencias");
+const confirmarInconsistenciasWrap = document.getElementById("confirmarInconsistenciasWrap");
 
 const btnConsultar = document.getElementById("consultar");
 const btnVerificar = document.getElementById("verificar");
@@ -73,6 +76,7 @@ let resumenDescargado = false;
 let bloqueoConstanciaActivo = false;
 let responsablesCache = [];
 let inconsistenciasDraft = [];
+let inconsistenciasConfirmadas = false;
 
 const setStatus = (message) => {
   status.textContent = message;
@@ -127,6 +131,13 @@ const fetchWithTimeout = async (url, options = {}, timeoutMs = MAX_LOADING_MS) =
   }
 };
 
+
+const parseDecimalInput = (value) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return 0;
+  if (raw.includes(",")) return Number.NaN;
+  return Number(raw);
+};
 
 const normalizeUnidadMedida = (unidad) => {
   const unidadLimpia = String(unidad ?? "")
@@ -430,11 +441,11 @@ const collectInconsistencias = () => {
   return rows.map((row) => ({
     producto_id: row.querySelector(".inconsistencia-producto")?.value || "",
     responsable_id: row.querySelector(".inconsistencia-responsable")?.value || "",
-    unidades_faltantes: Number(row.querySelector(".inconsistencia-faltantes")?.value || 0),
+    unidades_faltantes: parseDecimalInput(row.querySelector(".inconsistencia-faltantes")?.value || 0),
     producto_nombre:
       row.querySelector(".inconsistencia-producto")?.selectedOptions?.[0]?.textContent || "",
     responsable_nombre:
-      row.querySelector(".inconsistencia-responsable")?.selectedOptions?.[0]?.textContent || ""
+      row.querySelector(".inconsistencia-responsable")?.selectedOptions?.[0]?.textContent || (responsablesCache.find((r) => String(r.id) === (row.querySelector(".inconsistencia-responsable")?.value || ""))?.nombre_completo || "")
   }));
 };
 
@@ -444,12 +455,13 @@ const saveInconsistenciasDraft = () => {
 
 const renderInconsistenciasRows = () => {
   if (!inconsistenciasBody) return;
-  saveInconsistenciasDraft();
+  if (!inconsistenciasDraft.length) saveInconsistenciasDraft();
 
   const isEnabled = isDetallesAdicionalesEnabled();
   const count = isEnabled ? Number(cantidadInconsistencias?.value || 0) : 0;
   inconsistenciasBody.innerHTML = "";
   inconsistenciasHint?.classList.toggle("is-hidden", !isEnabled || count <= 0);
+  confirmarInconsistenciasWrap?.classList.toggle("is-hidden", !isEnabled || count <= 0);
 
   if (!isEnabled || count <= 0) {
     inconsistenciasWrap?.classList.add("is-hidden");
@@ -465,6 +477,7 @@ const renderInconsistenciasRows = () => {
     const productoSelect = document.createElement("select");
     productoSelect.className = "inconsistencia-producto";
     productoSelect.appendChild(buildProductoOptions(inconsistenciasDraft[i]?.producto_id || ""));
+    if (inconsistenciasDraft[i]?.producto_id) productoSelect.disabled = true;
     productoCell.appendChild(productoSelect);
     tr.appendChild(productoCell);
 
@@ -481,13 +494,15 @@ const renderInconsistenciasRows = () => {
     faltantesInput.className = "inconsistencia-faltantes";
     faltantesInput.placeholder = "0";
     faltantesInput.value = String(inconsistenciasDraft[i]?.unidades_faltantes || "");
-    enforceNumericInput([faltantesInput]);
+    if (inconsistenciasDraft[i]?.producto_id) faltantesInput.readOnly = true;
+
+    faltantesInput.addEventListener("input", () => { if (faltantesInput.value.includes(",")) setStatus("Solo se permite punto (.) como separador decimal."); });
     faltantesCell.appendChild(faltantesInput);
     tr.appendChild(faltantesCell);
 
     [productoSelect, responsableSelect, faltantesInput].forEach((element) => {
-      element.addEventListener("change", resetVerification);
-      element.addEventListener("input", resetVerification);
+      element.addEventListener("change", () => { inconsistenciasConfirmadas = false; resetVerification(); });
+      element.addEventListener("input", () => { inconsistenciasConfirmadas = false; resetVerification(); });
     });
 
     fragment.appendChild(tr);
@@ -527,6 +542,7 @@ const aplicarPoliticaSoloLectura = () => {
 
 const resetVerification = () => {
   verified = false;
+  inconsistenciasConfirmadas = false;
   resumenDescargado = false;
   setButtonState({ subir: false });
   refreshEstadoSubir();
@@ -599,16 +615,20 @@ const aplicarBloqueoConstancia = (activo) => {
 };
 
 const readRowsForWebhook = ({ includeHiddenAsZero = true } = {}) => {
+  const inconsistenciasByProducto = new Map(collectInconsistencias().map((i) => [String(i.producto_id || ""), i]));
   const rows = [];
   productRows.forEach((rowData, productId) => {
     const stockGastadoRaw = rowData.gastadoInput.value.trim();
-    const stockGastado = stockGastadoRaw === "" ? 0 : Number(stockGastadoRaw);
+    const stockGastado = stockGastadoRaw === "" ? 0 : parseDecimalInput(stockGastadoRaw);
     rows.push({
       producto_id: productId,
       producto_nombre: rowData.nombre,
       stock: Number(rowData.stockInput.value || 0),
       stock_gastado: Number.isNaN(stockGastado) ? 0 : stockGastado,
       restante: Number(rowData.restanteInput.value || 0),
+      unidad_medida: rowData.unidadInput?.value || "N/A",
+      responsable_inconsistencia_id: inconsistenciasByProducto.get(String(productId))?.responsable_id || "",
+      cantidad_faltante_inconsistencia: inconsistenciasByProducto.get(String(productId))?.unidades_faltantes || 0,
       visible: rowData.visible,
       oculto: !rowData.visible,
       ...(includeHiddenAsZero && !rowData.visible
@@ -631,7 +651,8 @@ const buildBasePayload = async () => {
     responsable_id: responsable.value,
     responsable_turno_id: responsable.value,
     responsable_login_id: contextPayload.usuario_id || "",
-    registrado_por: contextPayload.usuario_id || ""
+    registrado_por: contextPayload.usuario_id || "",
+    momento_inventario: momentoInventario?.value || ""
   };
 };
 
@@ -733,8 +754,8 @@ const renderProductRows = (productos) => {
     restanteCell.appendChild(restanteInput);
     tr.appendChild(restanteCell);
 
-    enforceNumericInput([gastadoInput]);
-    gastadoInput.addEventListener("input", resetVerification);
+
+    gastadoInput.addEventListener("input", () => { if (gastadoInput.value.includes(",")) setStatus("Solo se permite punto (.) como separador decimal."); resetVerification(); });
 
     productRows.set(productId, {
       nombre,
@@ -787,8 +808,8 @@ const renderProducts = async () => {
 
 
 const validateRequiredFields = () => {
-  if (!fecha.value || !responsable.value || !horaInicio.value || !horaFin.value) {
-    setStatus("Atención: Completa fecha, responsable y turno.");
+  if (!fecha.value || !responsable.value || !horaInicio.value || !horaFin.value || !momentoInventario?.value) {
+    setStatus("Atención: Completa fecha, responsable, turno y momento de inventario.");
     return false;
   }
   if (!productRows.size) {
@@ -810,7 +831,7 @@ const validateRequiredFields = () => {
     const productosElegidos = new Set();
 
     for (const item of inconsistencias) {
-      if (!item.producto_id || !item.responsable_id || item.unidades_faltantes <= 0) {
+      if (!item.producto_id || !item.responsable_id || item.unidades_faltantes <= 0 || Number.isNaN(item.unidades_faltantes)) {
         setStatus("Atención: Completa producto, responsable y unidades faltantes (mayor a 0) en inconsistencias.");
         return false;
       }
@@ -887,28 +908,31 @@ btnVerificar.addEventListener("click", () => {
   productRows.forEach((rowData) => {
     const stockValue = Number(rowData.stockInput.value || 0);
     const gastadoRaw = rowData.gastadoInput.value.trim();
-    const gastadoValue = gastadoRaw === "" ? 0 : Number(gastadoRaw);
+    const gastadoValue = gastadoRaw === "" ? 0 : parseDecimalInput(gastadoRaw);
 
     if (Number.isNaN(stockValue) || Number.isNaN(gastadoValue)) {
       hasInvalidValue = true;
       return;
     }
 
-    const restante = stockValue - gastadoValue;
+    const restante = gastadoValue - stockValue;
     rowData.restanteInput.value = String(restante);
   });
 
   if (hasInvalidValue) {
     verified = false;
     setButtonState({ subir: false });
-    setStatus("Atención: Hay valores inválidos en stock o stock gastado.");
+    setStatus("Atención: usa solo punto (.) como separador decimal en stock actual.");
     return;
   }
 
   verified = true;
+  autoGenerarInconsistencias();
+  const requiereConfirmacion = isDetallesAdicionalesEnabled() && Number(cantidadInconsistencias?.value || 0) > 0;
+  inconsistenciasConfirmadas = !requiereConfirmacion;
   setButtonState({ subir: false });
   refreshEstadoSubir();
-  setStatus("Verificación completada. Ya puedes subir datos.");
+  setStatus(requiereConfirmacion ? "Verificación completada. Ahora confirma inconsistencias para habilitar subir." : "Verificación completada. Ya puedes subir datos.");
 });
 
 btnSubir.addEventListener("click", async () => {
@@ -921,6 +945,11 @@ btnSubir.addEventListener("click", async () => {
 
   if (!verified) {
     setStatus("Atención: Primero debes verificar los datos.");
+    return;
+  }
+
+  if (isDetallesAdicionalesEnabled() && Number(cantidadInconsistencias?.value || 0) > 0 && !inconsistenciasConfirmadas) {
+    setStatus("Debes confirmar inconsistencias antes de subir el cierre.");
     return;
   }
 
@@ -1062,7 +1091,7 @@ const descargarImagenInventario = ({ bloquearDespues = false } = {}) => {
     });
   };
 
-  drawRow(y, ["Producto", "Sistema", "Unidad", "Stock actual", "Restante"], true);
+  drawRow(y, ["Producto", "Sistema", "Unidad", "Stock actual", "Diferencia"], true);
   y += rowH;
 
   const rows = Array.from(productRows.values());
@@ -1199,6 +1228,31 @@ btnLimpiar.addEventListener("click", () => {
   element.addEventListener("change", resetVerification);
 });
 
+
+btnConfirmarInconsistencias?.addEventListener("click", () => {
+  if (!isDetallesAdicionalesEnabled()) {
+    inconsistenciasConfirmadas = true;
+    setStatus("No hay inconsistencias activas para confirmar.");
+    return;
+  }
+  const inconsistencias = collectInconsistencias();
+  if (!inconsistencias.length) {
+    setStatus("No hay inconsistencias para confirmar.");
+    return;
+  }
+  for (const item of inconsistencias) {
+    if (!item.producto_id || !item.responsable_id || item.unidades_faltantes <= 0 || Number.isNaN(item.unidades_faltantes)) {
+      setStatus("Completa responsable y cantidad válida en todas las inconsistencias antes de confirmar.");
+      return;
+    }
+  }
+  inconsistenciasDraft = inconsistencias;
+  inconsistenciasConfirmadas = true;
+  verified = true;
+  refreshEstadoSubir();
+  setStatus("Inconsistencias confirmadas. Ya puedes subir datos.");
+});
+
 detallesAdicionalesNo?.addEventListener("change", () => {
   if (detallesAdicionalesNo.checked) toggleDetallesAdicionales(false);
 });
@@ -1218,3 +1272,21 @@ loadResponsables();
 renderProducts();
 cargarNombreEmpresa();
 toggleDetallesAdicionales(false);
+
+
+const autoGenerarInconsistencias = () => {
+  const prevByProducto = new Map((inconsistenciasDraft || []).map((i) => [String(i.producto_id || ""), i]));
+  const auto = [];
+  productRows.forEach((rowData, productId) => {
+    const diferencia = Number(rowData.restanteInput.value || 0);
+    if (!Number.isNaN(diferencia) && diferencia !== 0) {
+      const prev = prevByProducto.get(String(productId));
+      auto.push({ producto_id: productId, responsable_id: prev?.responsable_id || "", unidades_faltantes: Math.abs(diferencia), producto_nombre: rowData.nombre, responsable_nombre: prev?.responsable_nombre || "" });
+    }
+  });
+  if (detallesAdicionalesSi) detallesAdicionalesSi.checked = auto.length > 0;
+  if (detallesAdicionalesNo) detallesAdicionalesNo.checked = auto.length === 0;
+  inconsistenciasDraft = auto;
+  if (cantidadInconsistencias) cantidadInconsistencias.value = String(auto.length);
+  renderInconsistenciasRows();
+};

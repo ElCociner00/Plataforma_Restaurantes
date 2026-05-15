@@ -877,6 +877,15 @@ document.addEventListener("DOMContentLoaded", () => {
     validateApoyoRows,
     marcarComoNoVerificado: () => marcarComoNoVerificado()
   });
+  const apoyoConfirmado = () => Boolean(apoyosPropinaManager?.isConsultaConfirmada?.());
+
+  const exigirConfirmacionApoyo = () => {
+    if ((apoyoHubo?.value || "no") !== "si") return true;
+    if (apoyoConfirmado()) return true;
+    setStatus("Debes usar el botón Confirmar apoyo antes de subir el cierre cuando hubo apoyos.");
+    return false;
+  };
+
   const toggleButtons = ({ consultar, verificar, enviar }) => {
     if (typeof consultar === "boolean") btnConsultar.disabled = !consultar;
     if (typeof verificar === "boolean") btnVerificar.disabled = !verificar;
@@ -1414,6 +1423,7 @@ document.addEventListener("DOMContentLoaded", () => {
         setStatus("Verificación cancelada por el usuario para revisar Bolsa/Caja en cero.");
         return;
       }
+      if (!exigirConfirmacionApoyo()) return;
 
       const contextPayload = await getContextPayload();
       if (!contextPayload) return;

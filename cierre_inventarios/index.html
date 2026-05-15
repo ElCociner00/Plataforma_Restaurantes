@@ -37,6 +37,14 @@
           Hora fin
           <input id="hora_fin" type="time">
         </label>
+        <label>
+          Momento inventario
+          <select id="momento_inventario" required>
+            <option value="">Seleccione momento</option>
+            <option value="Apertura">Apertura</option>
+            <option value="Cierre">Cierre</option>
+          </select>
+        </label>
       </div>
     </section>
 
@@ -68,7 +76,7 @@
               <th>Stock</th>
               <th>Unidad de medida</th>
               <th>Stock actual</th>
-              <th>Restante</th>
+              <th>Diferencia</th>
             </tr>
           </thead>
           <tbody id="inventarioBody"></tbody>
@@ -111,6 +119,9 @@
           </thead>
           <tbody id="inconsistenciasBody"></tbody>
         </table>
+      </div>
+      <div id="confirmarInconsistenciasWrap" class="is-hidden" style="margin-top:10px">
+        <button id="confirmarInconsistencias" type="button">Confirmar inconsistencias</button>
       </div>
     </section>
   </div>

@@ -241,7 +241,7 @@ export function initApoyosPropinaManager({
   });
   observer.observe(apoyoRowsContainer, { childList: true, subtree: true });
 
-  return { reset };
+  return { reset, isConsultaConfirmada: () => repartoActivo };
 }
 
 export const APOYOS_PROPINA_RESPONSE_SAMPLE = [
