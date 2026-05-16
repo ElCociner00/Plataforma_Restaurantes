@@ -809,16 +809,14 @@ const validateRequiredFields = () => {
   if (isDetallesAdicionalesEnabled()) {
     const inconsistencias = collectInconsistencias();
     const configuredCount = Number(cantidadInconsistencias?.value || 0);
-    if (configuredCount <= 0) {
-      setStatus("Atención: si activas detalles adicionales debes registrar al menos 1 inconsistencia.");
-      return false;
-    }
-    if (configuredCount !== inconsistencias.length) {
+    if (configuredCount > 0 && configuredCount !== inconsistencias.length) {
       setStatus("Atención: Actualiza la cantidad de inconsistencias y completa la tabla.");
       return false;
     }
 
     const productosElegidos = new Set();
+
+    if (configuredCount <= 0) return true;
 
     for (const item of inconsistencias) {
       if (!item.producto_id || !item.responsable_id || item.unidades_faltantes <= 0 || Number.isNaN(item.unidades_faltantes)) {

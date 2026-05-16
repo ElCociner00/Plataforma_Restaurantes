@@ -6,6 +6,19 @@ const estado = document.getElementById("estadoReset");
 
 const setEstado = (m) => { if (estado) estado.textContent = m || ""; };
 
+const hasRecoveryTokens = () => {
+  const hash = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+  const query = new URLSearchParams(window.location.search || "");
+  return Boolean(
+    hash.get("access_token") || query.get("access_token") ||
+    hash.get("token_hash") || query.get("token_hash")
+  );
+};
+
+if (!hasRecoveryTokens()) {
+  setEstado("Enlace de recuperación incompleto. Configura la plantilla de Supabase con token_hash/access_token y solicita un nuevo correo.");
+}
+
 const ensureRecoverySession = async () => {
   const hash = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
   const query = new URLSearchParams(window.location.search || "");
