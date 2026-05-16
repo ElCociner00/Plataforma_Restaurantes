@@ -458,6 +458,7 @@ const renderInconsistenciasRows = () => {
   const count = isEnabled ? Number(cantidadInconsistencias?.value || 0) : 0;
   inconsistenciasBody.innerHTML = "";
   inconsistenciasHint?.classList.toggle("is-hidden", !isEnabled || count <= 0);
+  confirmarInconsistenciasWrap?.classList.toggle("is-hidden", !isEnabled || count <= 0);
 
   if (!isEnabled || count <= 0) {
     inconsistenciasWrap?.classList.add("is-hidden");
