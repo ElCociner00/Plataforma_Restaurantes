@@ -616,8 +616,9 @@ const readRowsForWebhook = ({ includeHiddenAsZero = true } = {}) => {
       stock_gastado: Number.isNaN(stockGastado) ? 0 : stockGastado,
       restante: Number(rowData.restanteInput.value || 0),
       unidad_medida: rowData.unidadInput?.value || "N/A",
-      responsable_inconsistencia_id: inconsistenciasByProducto.get(String(productId))?.responsable_id || "",
+      responsable_inconsistencia_id: inconsistenciasByProducto.get(String(productId))?.responsable_id || "N/A",
       cantidad_faltante_inconsistencia: inconsistenciasByProducto.get(String(productId))?.unidades_faltantes || 0,
+      inconsistencia: Boolean(inconsistenciasByProducto.get(String(productId))),
       visible: rowData.visible,
       oculto: !rowData.visible,
       ...(includeHiddenAsZero && !rowData.visible

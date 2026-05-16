@@ -20,6 +20,7 @@ import { APP_ROUTES } from "./config.js";
 import { resolvePostLoginRoute } from "./post_login_route.js";
 import { PUBLIC_PATHS } from "./urls.js";
 import { applyBrandingToDocumentTitle } from "./branding.js";
+import { getUserContext } from "./session.js";
 
 const LOGIN_URL = APP_ROUTES.login;
 const DASHBOARD_URL = APP_ROUTES.dashboard;
@@ -68,6 +69,14 @@ export async function protectCurrentPage({ loginUrl = LOGIN_URL, publicPaths = [
   const { data } = await supabase.auth.getSession();
   if (!data?.session) {
     rememberRequestedPath();
+    window.location.href = loginUrl;
+    return false;
+  }
+
+  const context = await getUserContext().catch(() => null);
+  if (!context) {
+    rememberRequestedPath();
+    await supabase.auth.signOut().catch(() => {});
     window.location.href = loginUrl;
     return false;
   }
