@@ -2,46 +2,66 @@ import { supabase } from "./supabase.js";
 
 const form = document.getElementById("resetPasswordForm");
 const nuevaContrasena = document.getElementById("nuevaContrasena");
+const toggleNuevaContrasena = document.getElementById("toggleNuevaContrasena");
 const estado = document.getElementById("estadoReset");
+const recoveryEmail = document.getElementById("recoveryEmail");
 
 const setEstado = (m) => { if (estado) estado.textContent = m || ""; };
 
-const hasRecoveryTokens = () => {
+const getRecoveryParams = () => {
   const hash = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
   const query = new URLSearchParams(window.location.search || "");
-  return Boolean(
-    hash.get("access_token") || query.get("access_token") ||
-    hash.get("token_hash") || query.get("token_hash")
-  );
+  return {
+    access_token: hash.get("access_token") || query.get("access_token"),
+    refresh_token: hash.get("refresh_token") || query.get("refresh_token"),
+    token_hash: hash.get("token_hash") || query.get("token_hash"),
+    type: hash.get("type") || query.get("type"),
+    code: hash.get("code") || query.get("code")
+  };
 };
 
+const hasRecoveryTokens = () => {
+  const params = getRecoveryParams();
+  return Boolean(params.access_token || params.token_hash || params.code);
+};
+
+if (recoveryEmail) recoveryEmail.value = String(new URLSearchParams(window.location.search || "").get("email") || "").trim();
+
 if (!hasRecoveryTokens()) {
-  setEstado("Enlace de recuperación incompleto. Configura la plantilla de Supabase con token_hash/access_token y solicita un nuevo correo.");
+  setEstado("Enlace inválido o incompleto. Solicita un nuevo correo de recuperación.");
 }
 
 const ensureRecoverySession = async () => {
-  const hash = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
-  const query = new URLSearchParams(window.location.search || "");
+  const { access_token, refresh_token, token_hash, type, code } = getRecoveryParams();
 
-  const access_token = hash.get("access_token") || query.get("access_token");
-  const refresh_token = hash.get("refresh_token") || query.get("refresh_token");
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) throw error;
+    return;
+  }
+
   if (access_token && refresh_token) {
     const { error } = await supabase.auth.setSession({ access_token, refresh_token });
     if (error) throw error;
     return;
   }
 
-  const token_hash = hash.get("token_hash") || query.get("token_hash");
-  const type = hash.get("type") || query.get("type");
   if (token_hash && type === "recovery") {
     const { error } = await supabase.auth.verifyOtp({ token_hash, type: "recovery" });
     if (error) throw error;
     return;
   }
 
-  const { data } = await supabase.auth.getSession();
-  if (!data?.session) throw new Error("Auth session missing!");
+  throw new Error("Missing recovery tokens");
 };
+
+toggleNuevaContrasena?.addEventListener("click", () => {
+  if (!nuevaContrasena) return;
+  const showing = nuevaContrasena.type === "text";
+  nuevaContrasena.type = showing ? "password" : "text";
+  toggleNuevaContrasena.textContent = showing ? "👁️" : "🙈";
+  toggleNuevaContrasena.setAttribute("aria-label", showing ? "Mostrar contraseña" : "Ocultar contraseña");
+});
 
 form?.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -57,7 +77,8 @@ form?.addEventListener("submit", async (event) => {
   const { error } = await supabase.auth.updateUser({ password: nueva });
   if (error) return setEstado(`No se pudo actualizar: ${error.message || "sin detalle"}`);
 
-  setEstado("Contraseña actualizada. Inicia sesión nuevamente.");
-  await supabase.auth.signOut();
-  window.location.href = "../index.html";
+  setEstado("Contraseña actualizada. Inicia sesión con tu nueva contraseña.");
+  setTimeout(() => {
+    window.location.href = "../index.html";
+  }, 1200);
 });
