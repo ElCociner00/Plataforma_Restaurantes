@@ -10,7 +10,10 @@
     <h1>Restablecer contraseña</h1>
     <form id="resetPasswordForm">
       <label for="nuevaContrasena">Nueva contraseña</label>
-      <input id="nuevaContrasena" type="password" required autocomplete="new-password">
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="nuevaContrasena" type="password" required autocomplete="new-password" style="flex:1">
+        <button id="toggleNuevaContrasena" type="button" aria-label="Mostrar contraseña" title="Mostrar/Ocultar contraseña">👁️</button>
+      </div>
       <button type="submit">Actualizar contraseña</button>
     </form>
     <p id="estadoReset"></p>

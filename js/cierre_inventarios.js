@@ -458,7 +458,6 @@ const renderInconsistenciasRows = () => {
   const count = isEnabled ? Number(cantidadInconsistencias?.value || 0) : 0;
   inconsistenciasBody.innerHTML = "";
   inconsistenciasHint?.classList.toggle("is-hidden", !isEnabled || count <= 0);
-  confirmarInconsistenciasWrap?.classList.toggle("is-hidden", !isEnabled || count <= 0);
 
   if (!isEnabled || count <= 0) {
     inconsistenciasWrap?.classList.add("is-hidden");
@@ -1264,8 +1263,6 @@ const autoGenerarInconsistencias = () => {
       auto.push({ producto_id: productId, responsable_id: prev?.responsable_id || "", unidades_faltantes: Math.abs(diferencia), producto_nombre: rowData.nombre, responsable_nombre: prev?.responsable_nombre || "" });
     }
   });
-  if (detallesAdicionalesSi) detallesAdicionalesSi.checked = auto.length > 0;
-  if (detallesAdicionalesNo) detallesAdicionalesNo.checked = auto.length === 0;
   inconsistenciasDraft = auto;
   if (cantidadInconsistencias) cantidadInconsistencias.value = String(auto.length);
   renderInconsistenciasRows();
