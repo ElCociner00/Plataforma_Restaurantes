@@ -26,6 +26,10 @@
       <p id="error-message" style="color: red; margin-top: 10px;"></p>
     </form>
 
+    <div class="login-extra">
+      <a href="#" id="forgotPasswordLink">¿Olvidé mi contraseña?</a>
+    </div>
+
     <p id="status" aria-live="polite"></p>
 
     <div class="login-extra">
@@ -37,11 +41,26 @@
 
   <script type="module">
     import { signInWithPassword } from "./js/auth.js";
+    import { sendRecoveryForEmail } from "./js/contrasena.js";
     import { resolvePostLoginRoute } from "./js/post_login_route.js";
     const form = document.getElementById("loginForm");
     const emailInput = document.getElementById("email");
     const passwordInput = document.getElementById("password");
     const errorEl = document.getElementById("error-message");
+    const forgotPasswordLink = document.getElementById("forgotPasswordLink");
+
+    
+    forgotPasswordLink?.addEventListener("click", async (event) => {
+      event.preventDefault();
+      const email = String(emailInput?.value || "").trim();
+      if (!email) { if (errorEl) errorEl.textContent = "Ingresa tu correo para recuperar contraseña."; return; }
+      try {
+        await sendRecoveryForEmail(email);
+        if (errorEl) errorEl.textContent = "Te enviamos un enlace de recuperación al correo indicado.";
+      } catch (error) {
+        if (errorEl) errorEl.textContent = `No se pudo enviar recuperación: ${error?.message || "sin detalle"}`;
+      }
+    });
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();

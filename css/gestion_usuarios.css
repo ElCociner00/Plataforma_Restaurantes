@@ -95,3 +95,31 @@
 .switch-cell input:checked + .switch-slider::before {
   transform: translateX(22px);
 }
+
+.gestion-usuarios-card {
+  margin: 16px auto;
+  max-width: 760px;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.password-card {
+  max-width: 560px;
+}
+
+#cambiarContrasenaForm > div {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+#cambiarContrasenaForm input {
+  min-width: 260px;
+}
+
+@media (max-width: 640px) {
+  #cambiarContrasenaForm input { min-width: 0; width: 100%; }
+}
