@@ -93,14 +93,46 @@ const init = async () => {
   panel?.addEventListener("change", async (event) => {
     const input = event.target.closest('input[data-action="toggle"]');
     if (!input) return;
-    const userId = input.dataset.userId || "";
-    const source = input.dataset.source || "";
+    const userId = normalize(input.dataset.userId || "");
+    const source = normalize(input.dataset.source || "");
     const activo = input.checked;
-    const table = source === "otros_usuarios" ? "otros_usuarios" : "usuarios_sistema";
-    const field = source === "otros_usuarios" ? "estado" : "activo";
-    const { error } = await supabase.from(table).update({ [field]: activo }).eq("id", userId);
-    if (error) { setEstado(`No se pudo actualizar el usuario: ${error.message || "sin detalle"}`); await refreshData(); return; }
-    setEstado("Estado actualizado correctamente.");
+    const empresaId = state.context?.empresa_id;
+
+    const candidates = source === "otros_usuarios"
+      ? [{ table: "otros_usuarios", field: "estado" }, { table: "usuarios_sistema", field: "activo" }]
+      : [{ table: "usuarios_sistema", field: "activo" }, { table: "otros_usuarios", field: "estado" }];
+
+    let updated = false;
+    let lastError = null;
+
+    for (const candidate of candidates) {
+      const query = supabase
+        .from(candidate.table)
+        .update({ [candidate.field]: activo })
+        .eq("id", userId)
+        .eq("empresa_id", empresaId)
+        .select("id");
+
+      const { data, error } = await query;
+      if (error) {
+        lastError = error;
+        continue;
+      }
+      if (Array.isArray(data) && data.length > 0) {
+        updated = true;
+        break;
+      }
+    }
+
+    if (!updated) {
+      setEstado(`No se pudo actualizar el usuario en Supabase${lastError ? `: ${lastError.message || "sin detalle"}` : ". Verifica políticas RLS y empresa_id."}`);
+      input.checked = !activo;
+      await refreshData();
+      return;
+    }
+
+    setEstado(`Estado actualizado correctamente en Supabase (${activo ? "activo" : "inactivo"}).`);
+    await refreshData();
   });
 
   panel?.addEventListener("click", async (event) => {

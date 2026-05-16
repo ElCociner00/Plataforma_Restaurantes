@@ -35,6 +35,7 @@ function mapContextPayload(data, fallbackUser) {
   const userId = data?.user?.id || fallbackUser?.id || null;
   const email = data?.user?.email || fallbackUser?.email || null;
   const rol = normalizeRole(data?.rol);
+  const usuarioActivo = data?.activo !== false && data?.estado !== false;
 
   return {
     user: {
@@ -48,7 +49,8 @@ function mapContextPayload(data, fallbackUser) {
     plan: String(data?.plan || "free").trim().toLowerCase() || "free",
     activa: data?.activa !== false,
     permisos: sanitizePermisos(data?.permisos),
-    super_admin: rol === "admin_root"
+    super_admin: rol === "admin_root",
+    usuario_activo: usuarioActivo
   };
 }
 
@@ -107,7 +109,8 @@ async function getContextFromTables(user) {
           plan: "enterprise",
           activa: true,
           permisos: {},
-          super_admin: true
+          super_admin: true,
+          usuario_activo: true
         };
       }
     }
@@ -139,7 +142,9 @@ async function getContextFromTables(user) {
     plan: empresa?.plan || empresa?.plan_actual || "free",
     activa: empresa?.activa !== false && empresa?.activo !== false,
     permisos: {},
-    super_admin: String(usuarioSistema.rol || "").trim().toLowerCase() === "admin_root"
+    super_admin: String(usuarioSistema.rol || "").trim().toLowerCase() === "admin_root",
+    activo: usuarioSistema.activo !== false,
+    usuario_activo: usuarioSistema.activo !== false
   };
 }
 
@@ -169,6 +174,11 @@ export async function getUserContext() {
   if (!fallbackPayload) return null;
 
   const context = mapContextPayload(fallbackPayload, user);
+  if (context?.usuario_activo === false) {
+    await supabase.auth.signOut().catch(() => {});
+    cachedContext = null;
+    return null;
+  }
   cachedContext = context;
 
   console.log(`✅ Contexto cargado: ${context.empresa_id || "sin_empresa"} | Plan: ${context.plan} | Rol: ${context.rol}`);
