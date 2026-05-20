@@ -13,6 +13,7 @@ const detalleTitulo = document.getElementById("detalleTitulo");
 const detalleBody = document.getElementById("detalleBody");
 const btnVolver = document.getElementById("volverFacturas");
 const btnEnviar = document.getElementById("enviarCompras");
+const btnNoCorresponde = document.getElementById("noCorrespondeCompras");
 
 let context = null;
 let inventarios = [];
@@ -34,6 +35,17 @@ const isIgnorableProduct = (name) => {
 };
 
 const getFacturaKey = (row) => String(row?.uuid || `${row["Prefijo Factura"] || ""}-${row["Consecutivo Factura"] || ""}`);
+
+const parseFechaFacturaToTime = (value) => {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!match) return 0;
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const time = new Date(year, month - 1, day).getTime();
+  return Number.isFinite(time) ? time : 0;
+};
 
 async function postJson(url, payload) {
   const res = await fetch(url, {
@@ -89,7 +101,7 @@ function groupFacturas(rows) {
       });
     }
   });
-  return Array.from(byFactura.values());
+  return Array.from(byFactura.values()).sort((a, b) => parseFechaFacturaToTime(b.fecha) - parseFechaFacturaToTime(a.fecha));
 }
 
 function renderFacturas() {
@@ -141,6 +153,7 @@ function renderDetalle(factura, detalleRows) {
   if (!detalleRows.length) {
     detalleBody.innerHTML = '<tr><td colspan="5">No hay productos inventariables en esta factura.</td></tr>';
     btnEnviar.disabled = true;
+    btnNoCorresponde.disabled = true;
     return;
   }
 
@@ -152,7 +165,7 @@ function renderDetalle(factura, detalleRows) {
       <td>${row.cantidadLlegada}</td>
       <td><select class="sel-prod">${options}</select></td>
       <td><input class="inp-cantidad" type="number" min="0" step="0.01" value="${row.cantidadLlegada}"></td>
-      <td class="unidad-cell">-</td>
+      <td class="unidad-cell">unidad</td>
     `;
     detalleBody.appendChild(tr);
   });
@@ -161,11 +174,13 @@ function renderDetalle(factura, detalleRows) {
     sel.addEventListener("change", () => {
       const tr = sel.closest("tr");
       const inv = inventarios.find((p) => p.id === sel.value);
-      tr.querySelector(".unidad-cell").textContent = inv?.unidad || "-";
+      const unidadRaw = String(inv?.unidad || "").trim();
+      tr.querySelector(".unidad-cell").textContent = unidadRaw || "unidad";
     });
   });
 
   btnEnviar.disabled = false;
+  btnNoCorresponde.disabled = false;
 }
 
 async function openDetalleFactura(factura) {
@@ -191,6 +206,31 @@ btnVolver.addEventListener("click", () => {
   facturasWrap.closest("section")?.classList.remove("is-hidden");
   facturaActiva = null;
   setStatus("Selecciona una factura para continuar.");
+});
+
+
+
+btnNoCorresponde.addEventListener("click", async () => {
+  if (!facturaActiva) return;
+
+  setStatus("Enviando factura como no corresponde...");
+  btnEnviar.disabled = true;
+  btnNoCorresponde.disabled = true;
+  try {
+    await postJson(WEBHOOK_COMPRAS_SUBIR_MATCH, {
+      empresa_id: context.empresa_id,
+      tenant_id: context.empresa_id,
+      factura_uuid: facturaActiva.uuid,
+      no_corresponde: true,
+      items: []
+    });
+    setStatus("Factura marcada como no corresponde y enviada correctamente.");
+  } catch (error) {
+    setStatus(`No se pudo enviar no corresponde: ${error.message}`);
+  } finally {
+    btnEnviar.disabled = false;
+    btnNoCorresponde.disabled = false;
+  }
 });
 
 btnEnviar.addEventListener("click", async () => {
@@ -223,6 +263,7 @@ btnEnviar.addEventListener("click", async () => {
 
   setStatus("Enviando compras...");
   btnEnviar.disabled = true;
+  btnNoCorresponde.disabled = true;
   try {
     await postJson(WEBHOOK_COMPRAS_SUBIR_MATCH, {
       empresa_id: context.empresa_id,
@@ -235,6 +276,7 @@ btnEnviar.addEventListener("click", async () => {
     setStatus(`No se pudo enviar: ${error.message}`);
   } finally {
     btnEnviar.disabled = false;
+  btnNoCorresponde.disabled = false;
   }
 });
 
