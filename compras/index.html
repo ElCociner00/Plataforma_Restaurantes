@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>AXIOMA | Compras</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/compras.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../js/router.js"></script>
+  <script type="module" src="../js/header.js"></script>
+
+  <div class="main compras-main">
+    <h1>Compras</h1>
+    <p class="compras-help">Revisa los productos facturados, haz match con inventario Loggro y confirma cantidades inventariables.</p>
+
+    <section class="bloque compras-acciones">
+      <button id="consultarCompras" type="button">Consultar compras</button>
+      <button id="enviarCompras" type="button" disabled>Enviar match</button>
+      <div id="comprasStatus"></div>
+    </section>
+
+    <section id="comprasFacturas" class="compras-facturas"></section>
+  </div>
+
+  <script type="module" src="../js/compras.js"></script>
+  <script type="module" src="../js/footer.js"></script>
+</body>
+</html>

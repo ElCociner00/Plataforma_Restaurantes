@@ -1,0 +1,79 @@
+.compras-main {
+  max-width: 1180px;
+}
+
+.compras-help {
+  color: #4b5563;
+  margin-bottom: 18px;
+}
+
+.compras-acciones {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+#comprasStatus {
+  flex-basis: 100%;
+  color: #374151;
+  font-size: 0.92rem;
+}
+
+.compras-facturas {
+  display: grid;
+  gap: 14px;
+}
+
+.factura-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 12px;
+  background: #fff;
+}
+
+.factura-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+}
+
+.factura-table-wrap {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.factura-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.factura-table th,
+.factura-table td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 8px;
+  text-align: left;
+  word-wrap: break-word;
+}
+
+.factura-table th:nth-child(1) { width: 28%; }
+.factura-table th:nth-child(2) { width: 10%; }
+.factura-table th:nth-child(3) { width: 28%; }
+.factura-table th:nth-child(4) { width: 14%; }
+.factura-table th:nth-child(5) { width: 20%; }
+
+.factura-table select,
+.factura-table input {
+  width: 100%;
+}
+
+@media (max-width: 860px) {
+  .factura-table th,
+  .factura-table td {
+    padding: 6px;
+    font-size: 0.82rem;
+  }
+}
