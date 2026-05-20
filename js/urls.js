@@ -50,6 +50,7 @@ export const APP_URLS = {
   historicoCierreTurno: buildAppPath("/cierre_turno/historico_cierre_turno.html"),
   cierreInventarios: buildAppPath("/cierre_inventarios/"),
   historicoCierreInventarios: buildAppPath("/cierre_inventarios/historico_cierre_inventarios.html"),
+  compras: buildAppPath("/compras/"),
   inventarios: buildAppPath("/inventarios/"),
   configuracion: buildAppPath("/configuracion/"),
   loggro: buildAppPath("/configuracion/loggro.html"),

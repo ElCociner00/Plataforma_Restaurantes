@@ -129,6 +129,22 @@ export const WEBHOOK_NOMINA_CONSULTAR =
 export const WEBHOOK_DASHBOARD_DATOS =
   "https://n8n.enkrato.com/webhook/dashboard";
 
+// compras/index.html (auto-carga al entrar: listar facturas de compras pendientes/revisadas)
+export const WEBHOOK_COMPRAS_VERIFICACION_FACTURAS =
+  "https://n8n.enkrato.com/webhook/Verificacion_Compras";
+
+// compras/index.html (detalle factura: lista de productos inventario)
+export const WEBHOOK_COMPRAS_DATOS_FACTURA =
+  "https://n8n.enkrato.com/webhook/Datos_Compras";
+
+// compras/index.html (detalle factura: lista de productos inventario)
+export const WEBHOOK_COMPRAS_CONSULTAR_INVENTARIOS =
+  "https://n8n.enkrato.com/webhook/consultar_inventarios";
+
+// compras/index.html (botón: "Enviar match", subir match factura vs inventario)
+export const WEBHOOK_COMPRAS_SUBIR_MATCH =
+  "https://n8n.enkrato.com/webhook/Subir_Compras";
+
 /**
  * WEBHOOKS CENTRALIZADOS
  * Instrucción: Para modificar URLs, cambiar SOLO aquí
