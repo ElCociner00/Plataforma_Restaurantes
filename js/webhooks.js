@@ -129,6 +129,14 @@ export const WEBHOOK_NOMINA_CONSULTAR =
 export const WEBHOOK_DASHBOARD_DATOS =
   "https://n8n.enkrato.com/webhook/dashboard";
 
+// compras/index.html (botón: "Consultar compras", lista de productos inventario)
+export const WEBHOOK_COMPRAS_CONSULTAR_INVENTARIOS =
+  "https://n8n.enkrato.com/webhook/consultar_inventarios";
+
+// compras/index.html (botón: "Enviar match", subir match factura vs inventario)
+export const WEBHOOK_COMPRAS_SUBIR_MATCH =
+  "https://n8n.enkrato.com/webhook/Subir_Compras";
+
 /**
  * WEBHOOKS CENTRALIZADOS
  * Instrucción: Para modificar URLs, cambiar SOLO aquí
