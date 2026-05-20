@@ -134,6 +134,10 @@ export const WEBHOOK_COMPRAS_VERIFICACION_FACTURAS =
   "https://n8n.enkrato.com/webhook/Verificacion_Compras";
 
 // compras/index.html (detalle factura: lista de productos inventario)
+export const WEBHOOK_COMPRAS_DATOS_FACTURA =
+  "https://n8n.enkrato.com/webhook/Datos_Compras";
+
+// compras/index.html (detalle factura: lista de productos inventario)
 export const WEBHOOK_COMPRAS_CONSULTAR_INVENTARIOS =
   "https://n8n.enkrato.com/webhook/consultar_inventarios";
 

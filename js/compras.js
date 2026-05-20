@@ -1,6 +1,7 @@
 import { getUserContext } from "./session.js";
 import {
   WEBHOOK_COMPRAS_VERIFICACION_FACTURAS,
+  WEBHOOK_COMPRAS_DATOS_FACTURA,
   WEBHOOK_COMPRAS_CONSULTAR_INVENTARIOS,
   WEBHOOK_COMPRAS_SUBIR_MATCH
 } from "./webhooks.js";
@@ -34,23 +35,41 @@ const isIgnorableProduct = (name) => {
 
 const getFacturaKey = (row) => String(row?.uuid || `${row["Prefijo Factura"] || ""}-${row["Consecutivo Factura"] || ""}`);
 
-async function fetchFacturas() {
-  const res = await fetch(WEBHOOK_COMPRAS_VERIFICACION_FACTURAS, {
+async function postJson(url, payload) {
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ empresa_id: context.empresa_id, tenant_id: context.empresa_id })
+    body: JSON.stringify(payload)
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
+  return data;
+}
+
+async function fetchFacturas() {
+  const data = await postJson(WEBHOOK_COMPRAS_VERIFICACION_FACTURAS, {
+    empresa_id: context.empresa_id,
+    tenant_id: context.empresa_id
+  });
   return normalizeList(data).filter((r) => r && getFacturaKey(r));
 }
 
-async function fetchInventarios() {
-  const res = await fetch(WEBHOOK_COMPRAS_CONSULTAR_INVENTARIOS, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ empresa_id: context.empresa_id, tenant_id: context.empresa_id })
+async function fetchDetalleFactura(factura) {
+  const data = await postJson(WEBHOOK_COMPRAS_DATOS_FACTURA, {
+    empresa_id: context.empresa_id,
+    tenant_id: context.empresa_id,
+    uuid: factura.uuid,
+    prefijo_factura: factura.prefijo,
+    consecutivo_factura: factura.consecutivo
   });
-  const data = await res.json();
+  return normalizeList(data);
+}
+
+async function fetchInventarios() {
+  const data = await postJson(WEBHOOK_COMPRAS_CONSULTAR_INVENTARIOS, {
+    empresa_id: context.empresa_id,
+    tenant_id: context.empresa_id
+  });
   return normalizeList(data).filter((p) => p?.id && p?.nombre);
 }
 
@@ -66,11 +85,9 @@ function groupFacturas(rows) {
         consecutivo: row["Consecutivo Factura"] || "",
         proveedor: row.Proveedor || "",
         fecha: row["Fecha Factura"] || "",
-        revisada: String(row.Revisada || "").trim(),
-        rows: []
+        revisada: String(row.Revisada || "").trim()
       });
     }
-    byFactura.get(key).rows.push(row);
   });
   return Array.from(byFactura.values());
 }
@@ -128,13 +145,13 @@ function renderDetalle(factura, detalleRows) {
   }
 
   const options = buildInventarioOptions();
-  detalleRows.forEach((row, index) => {
+  detalleRows.forEach((row) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${row.producto}</td>
       <td>${row.cantidadLlegada}</td>
-      <td><select class="sel-prod" data-index="${index}">${options}</select></td>
-      <td><input class="inp-cantidad" data-index="${index}" type="number" min="0" step="0.01" value="${row.cantidadLlegada}"></td>
+      <td><select class="sel-prod">${options}</select></td>
+      <td><input class="inp-cantidad" type="number" min="0" step="0.01" value="${row.cantidadLlegada}"></td>
       <td class="unidad-cell">-</td>
     `;
     detalleBody.appendChild(tr);
@@ -153,16 +170,20 @@ function renderDetalle(factura, detalleRows) {
 
 async function openDetalleFactura(factura) {
   facturaActiva = factura;
-  setStatus("Cargando detalle de factura e inventario...");
+  setStatus("Consultando detalle de factura...");
 
-  if (!inventarios.length) inventarios = await fetchInventarios();
+  try {
+    if (!inventarios.length) inventarios = await fetchInventarios();
+    const detalleRaw = await fetchDetalleFactura(factura);
+    const detalleRows = normalizeDetalleRows(detalleRaw);
+    renderDetalle(factura, detalleRows);
 
-  const detalleRows = normalizeDetalleRows(factura.rows);
-  renderDetalle(factura, detalleRows);
-
-  facturasWrap.closest("section")?.classList.add("is-hidden");
-  detalleWrap.classList.remove("is-hidden");
-  setStatus(`Factura ${factura.prefijo} ${factura.consecutivo} lista para match.`);
+    facturasWrap.closest("section")?.classList.add("is-hidden");
+    detalleWrap.classList.remove("is-hidden");
+    setStatus(`Factura ${factura.prefijo} ${factura.consecutivo} lista para match.`);
+  } catch (error) {
+    setStatus(`No se pudo cargar el detalle: ${error.message}`);
+  }
 }
 
 btnVolver.addEventListener("click", () => {
@@ -203,12 +224,12 @@ btnEnviar.addEventListener("click", async () => {
   setStatus("Enviando compras...");
   btnEnviar.disabled = true;
   try {
-    const res = await fetch(WEBHOOK_COMPRAS_SUBIR_MATCH, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ empresa_id: context.empresa_id, tenant_id: context.empresa_id, items })
+    await postJson(WEBHOOK_COMPRAS_SUBIR_MATCH, {
+      empresa_id: context.empresa_id,
+      tenant_id: context.empresa_id,
+      factura_uuid: facturaActiva.uuid,
+      items
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     setStatus("Compra enviada correctamente.");
   } catch (error) {
     setStatus(`No se pudo enviar: ${error.message}`);
