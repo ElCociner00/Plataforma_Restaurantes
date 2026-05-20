@@ -129,6 +129,7 @@ function buildMenu({ context, environmentForMenu }) {
         </div>
       </div>
     `;
+    menu += `<a class="nav-link-btn" href="${APP_URLS.compras}">Compras</a>`;
     menu += `<a class="nav-link-btn" href="${APP_URLS.nomina}">Nomina</a>`;
   }
 

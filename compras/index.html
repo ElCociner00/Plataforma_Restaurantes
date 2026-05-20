@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>AXIOMA | Compras</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/compras.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../js/router.js"></script>
+  <script type="module" src="../js/header.js"></script>
+
+  <div class="main compras-main">
+    <h1>Compras</h1>
+    <p id="comprasStatus" class="compras-status"></p>
+
+    <section class="bloque">
+      <div id="comprasFacturas" class="compras-facturas"></div>
+    </section>
+
+    <section id="comprasDetalle" class="bloque compras-detalle is-hidden">
+      <div class="compras-detalle-head">
+        <button id="volverFacturas" type="button">← Volver a facturas</button>
+        <h2 id="detalleTitulo">Detalle de factura</h2>
+      </div>
+      <div class="factura-table-wrap">
+        <table class="factura-table">
+          <thead>
+            <tr>
+              <th>Producto factura</th>
+              <th>Cantidad llegada</th>
+              <th>Producto inventario</th>
+              <th>Cantidad a cargar</th>
+              <th>Unidad</th>
+            </tr>
+          </thead>
+          <tbody id="detalleBody"></tbody>
+        </table>
+      </div>
+      <div class="compras-detalle-actions">
+        <button id="enviarCompras" type="button" disabled>Enviar</button>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="../js/compras.js"></script>
+  <script type="module" src="../js/footer.js"></script>
+</body>
+</html>
