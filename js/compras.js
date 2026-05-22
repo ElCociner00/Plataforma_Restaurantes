@@ -20,6 +20,8 @@ let context = null;
 let inventarios = [];
 let facturasBase = [];
 let facturaActiva = null;
+let detalleSnapshot = [];
+let detailRequestToken = 0;
 
 const setStatus = (msg, type = "info") => {
   statusEl.textContent = msg || "";
@@ -136,27 +138,41 @@ function renderFacturas() {
   });
 }
 
-function normalizeDetalleRows(rows) {
+function normalizeDetalleRows(rows, factura) {
   const mergedByProduct = new Map();
+  const facturaUuid = String(factura?.uuid || "").trim();
+  const prefijo = String(factura?.prefijo || "").trim();
+  const consecutivo = String(factura?.consecutivo || "").trim();
 
   rows
     .filter((r) => String(r?.Producto || "").trim())
     .filter((r) => !isIgnorableProduct(r.Producto))
+    .filter((r) => {
+      const rowUuid = String(r?.uuid || "").trim();
+      const rowPrefijo = String(r?.["Prefijo Factura"] || "").trim();
+      const rowConsecutivo = String(r?.["Consecutivo Factura"] || "").trim();
+      if (facturaUuid && rowUuid) return rowUuid === facturaUuid;
+      return rowPrefijo === prefijo && rowConsecutivo === consecutivo;
+    })
     .forEach((r) => {
       const producto = String(r.Producto || "").trim();
       const key = normalizeTextKey(producto);
       const cantidad = Number(r.Cantidad || 0);
+      const safeCantidad = Number.isFinite(cantidad) ? cantidad : 0;
 
       if (!mergedByProduct.has(key)) {
         mergedByProduct.set(key, {
           producto,
-          cantidadLlegada: Number.isFinite(cantidad) ? cantidad : 0
+          cantidadLlegada: safeCantidad,
+          factura_uuid: String(r?.uuid || factura?.uuid || ""),
+          factura_prefijo: String(r?.["Prefijo Factura"] || factura?.prefijo || ""),
+          factura_consecutivo: Number(r?.["Consecutivo Factura"] || factura?.consecutivo || 0)
         });
         return;
       }
 
       const current = mergedByProduct.get(key);
-      current.cantidadLlegada += Number.isFinite(cantidad) ? cantidad : 0;
+      current.cantidadLlegada += safeCantidad;
     });
 
   return Array.from(mergedByProduct.values());
@@ -181,8 +197,9 @@ function renderDetalle(factura, detalleRows) {
   }
 
   const options = buildInventarioOptions();
-  detalleRows.forEach((row) => {
+  detalleRows.forEach((row, idx) => {
     const tr = document.createElement("tr");
+    tr.dataset.rowIndex = String(idx);
     tr.innerHTML = `
       <td>${row.producto}</td>
       <td>${row.cantidadLlegada}</td>
@@ -208,26 +225,34 @@ function renderDetalle(factura, detalleRows) {
 
 async function openDetalleFactura(factura) {
   facturaActiva = factura;
+  detalleSnapshot = [];
+  const requestToken = ++detailRequestToken;
   setStatus("Consultando detalle de factura...", "info");
 
   try {
     if (!inventarios.length) inventarios = await fetchInventarios();
     const detalleRaw = await fetchDetalleFactura(factura);
-    const detalleRows = normalizeDetalleRows(detalleRaw);
+    if (requestToken !== detailRequestToken) return;
+
+    const detalleRows = normalizeDetalleRows(detalleRaw, factura);
+    detalleSnapshot = detalleRows;
     renderDetalle(factura, detalleRows);
 
     facturasWrap.closest("section")?.classList.add("is-hidden");
     detalleWrap.classList.remove("is-hidden");
     setStatus(`Factura ${factura.prefijo} ${factura.consecutivo} lista para match.`, "info");
   } catch (error) {
+    if (requestToken !== detailRequestToken) return;
     setStatus(`No se pudo cargar el detalle: ${error.message}`, "error");
   }
 }
 
 btnVolver.addEventListener("click", () => {
+  detailRequestToken += 1;
   detalleWrap.classList.add("is-hidden");
   facturasWrap.closest("section")?.classList.remove("is-hidden");
   facturaActiva = null;
+  detalleSnapshot = [];
   setStatus("Selecciona una factura para continuar.", "info");
 });
 
@@ -247,6 +272,8 @@ btnNoCorresponde.addEventListener("click", async () => {
       usuario_id: usuarioId,
       sale_de_caja: saleDeCaja,
       factura_uuid: facturaActiva.uuid,
+      factura_prefijo: facturaActiva.prefijo,
+      factura_consecutivo: facturaActiva.consecutivo,
       no_corresponde: true,
       items: []
     });
@@ -260,23 +287,28 @@ btnNoCorresponde.addEventListener("click", async () => {
 });
 
 btnEnviar.addEventListener("click", async () => {
-  if (!facturaActiva) return;
+  if (!facturaActiva || !detalleSnapshot.length) return;
 
   const usuarioId = context?.user?.id || context?.user?.user_id || "";
   const saleDeCaja = Boolean(saleDeCajaCheckbox?.checked);
 
   const items = [];
   detalleBody.querySelectorAll("tr").forEach((tr) => {
+    const rowIndex = Number(tr.dataset.rowIndex || -1);
+    const snapshotRow = detalleSnapshot[rowIndex];
+    if (!snapshotRow) return;
+
     const sel = tr.querySelector(".sel-prod");
     const inp = tr.querySelector(".inp-cantidad");
     if (!sel || !inp || !sel.value) return;
     const inv = inventarios.find((p) => p.id === sel.value);
+
     items.push({
-      factura_uuid: facturaActiva.uuid,
-      factura_prefijo: facturaActiva.prefijo,
-      factura_consecutivo: facturaActiva.consecutivo,
-      producto_factura: tr.children[0].textContent,
-      cantidad_llegada: Number(tr.children[1].textContent || 0),
+      factura_uuid: snapshotRow.factura_uuid || facturaActiva.uuid,
+      factura_prefijo: snapshotRow.factura_prefijo || facturaActiva.prefijo,
+      factura_consecutivo: snapshotRow.factura_consecutivo || Number(facturaActiva.consecutivo || 0),
+      producto_factura: snapshotRow.producto,
+      cantidad_llegada: snapshotRow.cantidadLlegada,
       producto_loggro_id: sel.value,
       producto_loggro_nombre: inv?.nombre || "",
       locationStockId: inv?.locationStockId || "",
@@ -300,6 +332,8 @@ btnEnviar.addEventListener("click", async () => {
       usuario_id: usuarioId,
       sale_de_caja: saleDeCaja,
       factura_uuid: facturaActiva.uuid,
+      factura_prefijo: facturaActiva.prefijo,
+      factura_consecutivo: facturaActiva.consecutivo,
       items
     });
     setStatus("✅ Compra enviada correctamente.", "success");
