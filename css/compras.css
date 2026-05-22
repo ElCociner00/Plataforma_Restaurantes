@@ -1,0 +1,152 @@
+.compras-main {
+  max-width: 1180px;
+}
+
+.compras-status {
+  color: #374151;
+  margin: 8px 0 16px;
+}
+
+.compras-facturas {
+  display: grid;
+  gap: 14px;
+}
+
+.factura-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 14px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.factura-card:hover {
+  border-color: #c4b5fd;
+  box-shadow: 0 2px 10px rgba(76, 29, 149, 0.08);
+}
+
+.factura-card-head {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.factura-tag {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.factura-tag.pendiente { background: #fef3c7; color: #92400e; }
+.factura-tag.revisada { background: #dcfce7; color: #166534; }
+
+.compras-detalle-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.factura-table-wrap { overflow-x: hidden; }
+
+.factura-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.factura-table th,
+.factura-table td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 8px;
+  text-align: left;
+  word-break: break-word;
+}
+
+.factura-table th:nth-child(1) { width: 28%; }
+.factura-table th:nth-child(2) { width: 12%; }
+.factura-table th:nth-child(3) { width: 28%; }
+.factura-table th:nth-child(4) { width: 14%; }
+.factura-table th:nth-child(5) { width: 18%; }
+
+.factura-table select,
+.factura-table input { width: 100%; }
+
+.compras-detalle-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.is-hidden { display: none !important; }
+
+@media (max-width: 860px) {
+  .factura-table th,
+  .factura-table td {
+    padding: 6px;
+    font-size: 0.82rem;
+  }
+}
+
+
+.status-info {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #3730a3;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.status-success {
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  color: #14532d;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 1.02rem;
+  font-weight: 700;
+}
+
+.status-error {
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #7f1d1d;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.compras-detalle-checklist {
+  margin-top: 12px;
+  margin-bottom: 16px;
+}
+
+.sale-caja-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.compras-detalle-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+}
+
+#noCorrespondeCompras {
+  margin-right: 16px;
+}
+
+#enviarCompras {
+  order: 2;
+}
+
+#noCorrespondeCompras {
+  order: 1;
+}
