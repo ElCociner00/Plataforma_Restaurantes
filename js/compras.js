@@ -14,13 +14,17 @@ const detalleBody = document.getElementById("detalleBody");
 const btnVolver = document.getElementById("volverFacturas");
 const btnEnviar = document.getElementById("enviarCompras");
 const btnNoCorresponde = document.getElementById("noCorrespondeCompras");
+const saleDeCajaCheckbox = document.getElementById("saleDeCajaCompras");
 
 let context = null;
 let inventarios = [];
 let facturasBase = [];
 let facturaActiva = null;
 
-const setStatus = (msg) => { statusEl.textContent = msg || ""; };
+const setStatus = (msg, type = "info") => {
+  statusEl.textContent = msg || "";
+  statusEl.className = `compras-status status-${type}`;
+};
 
 const normalizeList = (raw) => {
   if (Array.isArray(raw?.[0]?.data)) return raw[0].data;
@@ -29,9 +33,11 @@ const normalizeList = (raw) => {
   return [];
 };
 
+const normalizeTextKey = (value) => String(value || "").trim().toUpperCase();
+
 const isIgnorableProduct = (name) => {
-  const upper = String(name || "").toUpperCase();
-  return upper.includes("BANCOLOMBIA") || upper.includes("IMPUESTO");
+  const upper = normalizeTextKey(name);
+  return upper.includes("BANCOLOMBIA") || upper.includes("IMPUESTO") || upper.includes("IVA");
 };
 
 const getFacturaKey = (row) => String(row?.uuid || `${row["Prefijo Factura"] || ""}-${row["Consecutivo Factura"] || ""}`);
@@ -131,13 +137,29 @@ function renderFacturas() {
 }
 
 function normalizeDetalleRows(rows) {
-  return rows
+  const mergedByProduct = new Map();
+
+  rows
     .filter((r) => String(r?.Producto || "").trim())
     .filter((r) => !isIgnorableProduct(r.Producto))
-    .map((r) => ({
-      producto: String(r.Producto || "").trim(),
-      cantidadLlegada: Number(r.Cantidad || 0)
-    }));
+    .forEach((r) => {
+      const producto = String(r.Producto || "").trim();
+      const key = normalizeTextKey(producto);
+      const cantidad = Number(r.Cantidad || 0);
+
+      if (!mergedByProduct.has(key)) {
+        mergedByProduct.set(key, {
+          producto,
+          cantidadLlegada: Number.isFinite(cantidad) ? cantidad : 0
+        });
+        return;
+      }
+
+      const current = mergedByProduct.get(key);
+      current.cantidadLlegada += Number.isFinite(cantidad) ? cantidad : 0;
+    });
+
+  return Array.from(mergedByProduct.values());
 }
 
 function buildInventarioOptions() {
@@ -149,6 +171,7 @@ function buildInventarioOptions() {
 function renderDetalle(factura, detalleRows) {
   detalleTitulo.textContent = `Detalle factura ${factura.prefijo} ${factura.consecutivo}`;
   detalleBody.innerHTML = "";
+  if (saleDeCajaCheckbox) saleDeCajaCheckbox.checked = false;
 
   if (!detalleRows.length) {
     detalleBody.innerHTML = '<tr><td colspan="5">No hay productos inventariables en esta factura.</td></tr>';
@@ -185,7 +208,7 @@ function renderDetalle(factura, detalleRows) {
 
 async function openDetalleFactura(factura) {
   facturaActiva = factura;
-  setStatus("Consultando detalle de factura...");
+  setStatus("Consultando detalle de factura...", "info");
 
   try {
     if (!inventarios.length) inventarios = await fetchInventarios();
@@ -195,9 +218,9 @@ async function openDetalleFactura(factura) {
 
     facturasWrap.closest("section")?.classList.add("is-hidden");
     detalleWrap.classList.remove("is-hidden");
-    setStatus(`Factura ${factura.prefijo} ${factura.consecutivo} lista para match.`);
+    setStatus(`Factura ${factura.prefijo} ${factura.consecutivo} lista para match.`, "info");
   } catch (error) {
-    setStatus(`No se pudo cargar el detalle: ${error.message}`);
+    setStatus(`No se pudo cargar el detalle: ${error.message}`, "error");
   }
 }
 
@@ -205,28 +228,31 @@ btnVolver.addEventListener("click", () => {
   detalleWrap.classList.add("is-hidden");
   facturasWrap.closest("section")?.classList.remove("is-hidden");
   facturaActiva = null;
-  setStatus("Selecciona una factura para continuar.");
+  setStatus("Selecciona una factura para continuar.", "info");
 });
-
-
 
 btnNoCorresponde.addEventListener("click", async () => {
   if (!facturaActiva) return;
 
-  setStatus("Enviando factura como no corresponde...");
+  const usuarioId = context?.user?.id || context?.user?.user_id || "";
+  const saleDeCaja = Boolean(saleDeCajaCheckbox?.checked);
+
+  setStatus("Enviando factura como no corresponde...", "info");
   btnEnviar.disabled = true;
   btnNoCorresponde.disabled = true;
   try {
     await postJson(WEBHOOK_COMPRAS_SUBIR_MATCH, {
       empresa_id: context.empresa_id,
       tenant_id: context.empresa_id,
+      usuario_id: usuarioId,
+      sale_de_caja: saleDeCaja,
       factura_uuid: facturaActiva.uuid,
       no_corresponde: true,
       items: []
     });
-    setStatus("Factura marcada como no corresponde y enviada correctamente.");
+    setStatus("✅ Factura marcada como NO CORRESPONDE y enviada correctamente.", "success");
   } catch (error) {
-    setStatus(`No se pudo enviar no corresponde: ${error.message}`);
+    setStatus(`No se pudo enviar no corresponde: ${error.message}`, "error");
   } finally {
     btnEnviar.disabled = false;
     btnNoCorresponde.disabled = false;
@@ -235,6 +261,9 @@ btnNoCorresponde.addEventListener("click", async () => {
 
 btnEnviar.addEventListener("click", async () => {
   if (!facturaActiva) return;
+
+  const usuarioId = context?.user?.id || context?.user?.user_id || "";
+  const saleDeCaja = Boolean(saleDeCajaCheckbox?.checked);
 
   const items = [];
   detalleBody.querySelectorAll("tr").forEach((tr) => {
@@ -257,43 +286,45 @@ btnEnviar.addEventListener("click", async () => {
   });
 
   if (!items.length) {
-    setStatus("Debes seleccionar al menos un producto para enviar.");
+    setStatus("Debes seleccionar al menos un producto para enviar.", "error");
     return;
   }
 
-  setStatus("Enviando compras...");
+  setStatus("Enviando compras...", "info");
   btnEnviar.disabled = true;
   btnNoCorresponde.disabled = true;
   try {
     await postJson(WEBHOOK_COMPRAS_SUBIR_MATCH, {
       empresa_id: context.empresa_id,
       tenant_id: context.empresa_id,
+      usuario_id: usuarioId,
+      sale_de_caja: saleDeCaja,
       factura_uuid: facturaActiva.uuid,
       items
     });
-    setStatus("Compra enviada correctamente.");
+    setStatus("✅ Compra enviada correctamente.", "success");
   } catch (error) {
-    setStatus(`No se pudo enviar: ${error.message}`);
+    setStatus(`No se pudo enviar: ${error.message}`, "error");
   } finally {
     btnEnviar.disabled = false;
-  btnNoCorresponde.disabled = false;
+    btnNoCorresponde.disabled = false;
   }
 });
 
 async function init() {
-  setStatus("Cargando compras...");
+  setStatus("Cargando compras...", "info");
   context = await getUserContext();
   if (!context?.empresa_id) {
-    setStatus("No hay empresa activa.");
+    setStatus("No hay empresa activa.", "error");
     return;
   }
 
   try {
     facturasBase = await fetchFacturas();
     renderFacturas();
-    setStatus("Selecciona una factura para revisar detalle y enviar.");
+    setStatus("Selecciona una factura para revisar detalle y enviar.", "info");
   } catch (error) {
-    setStatus(`Error cargando compras: ${error.message}`);
+    setStatus(`Error cargando compras: ${error.message}`, "error");
   }
 }
 

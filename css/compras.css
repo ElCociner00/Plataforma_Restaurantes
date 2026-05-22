@@ -90,3 +90,63 @@
     font-size: 0.82rem;
   }
 }
+
+
+.status-info {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #3730a3;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.status-success {
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  color: #14532d;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 1.02rem;
+  font-weight: 700;
+}
+
+.status-error {
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #7f1d1d;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.compras-detalle-checklist {
+  margin-top: 12px;
+  margin-bottom: 16px;
+}
+
+.sale-caja-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.compras-detalle-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+}
+
+#noCorrespondeCompras {
+  margin-right: 16px;
+}
+
+#enviarCompras {
+  order: 2;
+}
+
+#noCorrespondeCompras {
+  order: 1;
+}
