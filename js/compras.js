@@ -313,7 +313,8 @@ btnEnviar.addEventListener("click", async () => {
       producto_loggro_nombre: inv?.nombre || "",
       locationStockId: inv?.locationStockId || "",
       cantidad_match: Number(inp.value || 0),
-      unidad: inv?.unidad || ""
+      unidad: inv?.unidad || "",
+      precio_compra: Number(inv?.precioCompra ?? 0)
     });
   });
 
