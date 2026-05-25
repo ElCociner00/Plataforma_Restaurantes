@@ -118,9 +118,10 @@
         <div class="apoyos-head-grid">
           <label class="apoyos-question">
             <span>¿Hubo apoyos durante el turno?</span>
-            <select id="apoyo_hubo">
-              <option value="no">NO</option>
+            <select id="apoyo_hubo" required>
+              <option value="">Selecciona</option>
               <option value="si">SI</option>
+              <option value="no">NO</option>
             </select>
           </label>
           <label id="apoyoCantidadWrap" class="apoyos-cantidad is-hidden">
@@ -129,7 +130,7 @@
               <option value="">Selecciona</option>
             </select>
           </label>
-          <div class="apoyos-consulta-box" id="apoyosConsultaBox">
+          <div class="apoyos-consulta-box is-hidden" id="apoyosConsultaBox">
             <button id="consultarPropinaApoyos" type="button">Confirmar apoyo</button>
             <small id="apoyosConsultaNota">Antes de consultar, completa los datos de apoyos (responsable + horario) para enviarlos al webhook.</small>
           </div>
