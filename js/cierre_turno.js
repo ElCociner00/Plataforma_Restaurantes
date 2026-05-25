@@ -795,7 +795,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const buildApoyoPayload = (contextPayload) => {
-    const huboApoyos = (apoyoHubo?.value || "no") === "si";
+    const huboApoyos = apoyoHubo?.value === "si";
     const cantidad = Number(apoyoCantidad?.value || 0);
     const rows = Array.from(apoyoRowsContainer?.querySelectorAll(".apoyo-row") || []);
     const registros = rows.map((row) => {
@@ -837,7 +837,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const validateApoyoRows = () => {
-    if ((apoyoHubo?.value || "no") !== "si") return true;
+    if (apoyoHubo?.value !== "si") return true;
     const cantidad = Number(apoyoCantidad?.value || 0);
     if (!cantidad || cantidad < 1) {
       setStatus("Indica cuántas personas participaron como apoyo.");
@@ -878,9 +878,17 @@ document.addEventListener("DOMContentLoaded", () => {
     marcarComoNoVerificado: () => marcarComoNoVerificado()
   });
   const apoyoConfirmado = () => Boolean(apoyosPropinaManager?.isConsultaConfirmada?.());
+  const syncApoyosConsultaVisibility = () => {
+    const enabled = apoyoHubo?.value === "si";
+    const cantidad = Number(apoyoCantidad?.value || 0);
+    const show = enabled && cantidad > 0;
+    const box = document.getElementById("apoyosConsultaBox");
+    box?.classList.toggle("is-hidden", !show);
+  };
+
 
   const exigirConfirmacionApoyo = () => {
-    if ((apoyoHubo?.value || "no") !== "si") return true;
+    if (apoyoHubo?.value !== "si") return true;
     if (apoyoConfirmado()) return true;
     setStatus("Debes usar el botón Confirmar apoyo antes de subir el cierre cuando hubo apoyos.");
     return false;
@@ -927,7 +935,8 @@ document.addEventListener("DOMContentLoaded", () => {
       { label: "Transferencias real", value: inputsFinanzas.transferencias.real?.value },
       { label: "Bono regalo real", value: inputsFinanzas.bono_regalo.real?.value },
       { label: "Propina", value: inputsSoloVista.propina?.value },
-      { label: "Domicilios", value: inputsSoloVista.domicilios?.value }
+      { label: "Domicilios", value: inputsSoloVista.domicilios?.value },
+      { label: "¿Hubo apoyos durante el turno?", value: apoyoHubo?.value }
     ];
     return requiredFields
       .filter((item) => String(item.value ?? "").trim() === "")
@@ -1102,7 +1111,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (horaLlegadaHora) horaLlegadaHora.value = "";
     if (horaLlegadaMinuto) horaLlegadaMinuto.value = "";
     if (horaLlegadaMomento) horaLlegadaMomento.value = "AM";
-    if (apoyoHubo) apoyoHubo.value = "no";
+    if (apoyoHubo) apoyoHubo.value = "";
     if (apoyoCantidad) apoyoCantidad.value = "";
     apoyoCantidadWrap?.classList.add("is-hidden");
     apoyoTablaWrap?.classList.add("is-hidden");
@@ -1133,6 +1142,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   apoyoHubo?.addEventListener("change", () => {
+    if (apoyoHubo.value === "no") {
+      const confirmar = window.confirm("¿Confirmas que NO hubo apoyos durante este turno?");
+      if (!confirmar) {
+        apoyoHubo.value = "";
+      }
+    }
     const enabled = apoyoHubo.value === "si";
     apoyoCantidadWrap?.classList.toggle("is-hidden", !enabled);
     if (!enabled) {
@@ -1142,12 +1157,16 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       renderApoyoRows(Number(apoyoCantidad?.value || 0));
     }
+    syncApoyosConsultaVisibility();
     marcarComoNoVerificado();
   });
   apoyoCantidad?.addEventListener("change", () => {
     renderApoyoRows(Number(apoyoCantidad.value || 0));
+    syncApoyosConsultaVisibility();
     marcarComoNoVerificado();
   });
+
+  syncApoyosConsultaVisibility();
 
   cargarPoliticaEmpresa();
   cargarResponsables();
@@ -1156,6 +1175,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   fecha.addEventListener("change", () => {
     actualizarEstadoHoraFin();
+    syncApoyosConsultaVisibility();
     marcarComoNoVerificado();
   });
   responsable.addEventListener("change", marcarComoNoVerificado);
@@ -1168,16 +1188,19 @@ document.addEventListener("DOMContentLoaded", () => {
   bolsa?.addEventListener("input", () => {
     syncEfectivoRealFromCajaBolsa();
     syncDiferenciaEfectivo();
+    syncApoyosConsultaVisibility();
     marcarComoNoVerificado();
   });
   caja?.addEventListener("input", () => {
     syncEfectivoRealFromCajaBolsa();
     syncDiferenciaEfectivo();
+    syncApoyosConsultaVisibility();
     marcarComoNoVerificado();
   });
   efectivoApertura?.addEventListener("input", () => {
     syncEfectivoSistemaDisplay();
     syncDiferenciaEfectivo();
+    syncApoyosConsultaVisibility();
     marcarComoNoVerificado();
   });
 
