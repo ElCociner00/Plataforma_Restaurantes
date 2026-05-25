@@ -712,7 +712,7 @@ const descargarExcelEmpleado = async () => {
     entorno: getActiveEnvironment() || "global"
   };
 
-  setStatus("Solicitando Excel del empleado...");
+  setStatus("Solicitando histórico del empleado...");
   try {
     const response = await fetch(WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO, {
       method: "POST",
@@ -720,16 +720,67 @@ const descargarExcelEmpleado = async () => {
       body: JSON.stringify(payload)
     });
 
-    const contentType = response.headers.get("content-type") || "";
-    const maybeJson = contentType.includes("application/json") ? await response.json().catch(() => ({})) : null;
+    const text = await response.text();
+    let parsed = null;
+    try {
+      parsed = text ? JSON.parse(text) : null;
+    } catch (_e) {
+      parsed = text;
+    }
+
     if (!response.ok) {
-      const errorMsg = maybeJson?.message || `HTTP ${response.status}`;
+      const errorMsg = (parsed && typeof parsed === "object" && parsed.message) ? parsed.message : `HTTP ${response.status}`;
       throw new Error(errorMsg);
     }
 
-    setStatus("Solicitud enviada. Si el flujo de n8n ya genera archivo, se iniciará la descarga desde el webhook.");
+    const extractRows = (node, depth = 0) => {
+      if (depth > 6 || node === null || node === undefined) return [];
+      if (Array.isArray(node)) return node;
+      if (typeof node === "string") {
+        try { return extractRows(JSON.parse(node), depth + 1); } catch (_e) { return []; }
+      }
+      if (typeof node === "object") {
+        for (const value of Object.values(node)) {
+          const rows = extractRows(value, depth + 1);
+          if (rows.length) return rows;
+        }
+      }
+      return [];
+    };
+
+    const rows = extractRows(parsed).filter((row) => row && typeof row === "object");
+    if (!rows.length) {
+      setStatus("El webhook respondió sin filas exportables aún. Se enviaron los parámetros correctamente.");
+      return;
+    }
+
+    const headers = [
+      "fecha_turno", "hora_inicio", "hora_fin", "Momento", "comentarios", "domicilios",
+      "efectivo_inicial", "propinas", "ventas_brutas", "bolsas", "caja_final", "diferencia_caja"
+    ];
+
+    const esc = (value) => {
+      const str = String(value ?? "");
+      return /[",
+;]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+    };
+
+    const csv = [headers.join(";")]
+      .concat(rows.map((row) => headers.map((h) => esc(row[h])).join(";")))
+      .join("
+");
+
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `historico_empleado_${empleadoId}_${fechaInicioInput.value || "inicio"}_${fechaFinInput.value || "fin"}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    setStatus(`Excel (CSV) generado con ${rows.length} filas.`);
   } catch (error) {
-    setStatus(`No fue posible generar el Excel en este momento (${error.message}). Datos enviados correctamente, valida la estructura del flujo en n8n.`);
+    setStatus(`No fue posible generar el Excel en este momento (${error.message}).`);
   }
 };
 

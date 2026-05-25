@@ -878,6 +878,14 @@ document.addEventListener("DOMContentLoaded", () => {
     marcarComoNoVerificado: () => marcarComoNoVerificado()
   });
   const apoyoConfirmado = () => Boolean(apoyosPropinaManager?.isConsultaConfirmada?.());
+  const syncApoyosConsultaVisibility = () => {
+    const enabled = apoyoHubo?.value === "si";
+    const cantidad = Number(apoyoCantidad?.value || 0);
+    const show = enabled && cantidad > 0;
+    const box = document.getElementById("apoyosConsultaBox");
+    box?.classList.toggle("is-hidden", !show);
+  };
+
 
   const exigirConfirmacionApoyo = () => {
     if (apoyoHubo?.value !== "si") return true;
@@ -1149,12 +1157,16 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       renderApoyoRows(Number(apoyoCantidad?.value || 0));
     }
+    syncApoyosConsultaVisibility();
     marcarComoNoVerificado();
   });
   apoyoCantidad?.addEventListener("change", () => {
     renderApoyoRows(Number(apoyoCantidad.value || 0));
+    syncApoyosConsultaVisibility();
     marcarComoNoVerificado();
   });
+
+  syncApoyosConsultaVisibility();
 
   cargarPoliticaEmpresa();
   cargarResponsables();
@@ -1163,6 +1175,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   fecha.addEventListener("change", () => {
     actualizarEstadoHoraFin();
+    syncApoyosConsultaVisibility();
     marcarComoNoVerificado();
   });
   responsable.addEventListener("change", marcarComoNoVerificado);
@@ -1175,16 +1188,19 @@ document.addEventListener("DOMContentLoaded", () => {
   bolsa?.addEventListener("input", () => {
     syncEfectivoRealFromCajaBolsa();
     syncDiferenciaEfectivo();
+    syncApoyosConsultaVisibility();
     marcarComoNoVerificado();
   });
   caja?.addEventListener("input", () => {
     syncEfectivoRealFromCajaBolsa();
     syncDiferenciaEfectivo();
+    syncApoyosConsultaVisibility();
     marcarComoNoVerificado();
   });
   efectivoApertura?.addEventListener("input", () => {
     syncEfectivoSistemaDisplay();
     syncDiferenciaEfectivo();
+    syncApoyosConsultaVisibility();
     marcarComoNoVerificado();
   });
 

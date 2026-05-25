@@ -10,6 +10,7 @@ const statusEl = document.getElementById("comprasStatus");
 const facturasWrap = document.getElementById("comprasFacturas");
 const tabPrincipal = document.getElementById("tabComprasPrincipal");
 const tabNoCorresponde = document.getElementById("tabComprasNoCorresponde");
+const tabRevisadas = document.getElementById("tabComprasRevisadas");
 const detalleWrap = document.getElementById("comprasDetalle");
 const detalleTitulo = document.getElementById("detalleTitulo");
 const detalleBody = document.getElementById("detalleBody");
@@ -124,11 +125,20 @@ function groupFacturas(rows) {
 
 function renderFacturas(view = "principal") {
   const groups = groupFacturas(facturasBase)
-    .filter((f) => (view === "no_corresponde" ? f.revisionEstado === 2 : f.revisionEstado !== 2));
+    .filter((f) => {
+      if (view === "no_corresponde") return f.revisionEstado === 2;
+      if (view === "revisadas") return f.revisionEstado === 1;
+      return f.revisionEstado === 0;
+    });
   facturasWrap.innerHTML = "";
 
   if (!groups.length) {
-    facturasWrap.innerHTML = `<p>${view === "no_corresponde" ? "No hay facturas marcadas como no corresponde." : "No hay facturas para esta empresa."}</p>`;
+    const emptyMessage = view === "no_corresponde"
+      ? "No hay facturas marcadas como no corresponde."
+      : view === "revisadas"
+        ? "No hay facturas revisadas."
+        : "No hay facturas pendientes para esta empresa.";
+    facturasWrap.innerHTML = `<p>${emptyMessage}</p>`;
     return;
   }
 
@@ -384,17 +394,16 @@ async function init() {
 
   try {
     facturasBase = await fetchFacturas();
-    renderFacturas("principal");
-    tabPrincipal?.addEventListener("click", () => {
-      tabPrincipal.classList.add("is-active");
-      tabNoCorresponde?.classList.remove("is-active");
-      renderFacturas("principal");
-    });
-    tabNoCorresponde?.addEventListener("click", () => {
-      tabNoCorresponde.classList.add("is-active");
-      tabPrincipal?.classList.remove("is-active");
-      renderFacturas("no_corresponde");
-    });
+    const activateTab = (view) => {
+      tabPrincipal?.classList.toggle("is-active", view === "principal");
+      tabNoCorresponde?.classList.toggle("is-active", view === "no_corresponde");
+      tabRevisadas?.classList.toggle("is-active", view === "revisadas");
+      renderFacturas(view);
+    };
+    activateTab("principal");
+    tabPrincipal?.addEventListener("click", () => activateTab("principal"));
+    tabNoCorresponde?.addEventListener("click", () => activateTab("no_corresponde"));
+    tabRevisadas?.addEventListener("click", () => activateTab("revisadas"));
     setStatus("Selecciona una factura para revisar detalle y enviar.", "info");
   } catch (error) {
     setStatus(`Error cargando compras: ${error.message}`, "error");
