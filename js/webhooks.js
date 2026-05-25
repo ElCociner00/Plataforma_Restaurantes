@@ -125,6 +125,10 @@ export const WEBHOOK_SIIGO_PROVEEDORES_REGISTRAR =
 export const WEBHOOK_NOMINA_CONSULTAR =
   "https://n8n.enkrato.com/webhook/consultar_nomina";
 
+// nomina/index.html (botón: "Descargar Excel empleado")
+export const WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO =
+  "https://n8n.enkrato.com/webhook/consultar_histórico_empleado";
+
 // dashboard/index.html (auto-carga inicial de métricas)
 export const WEBHOOK_DASHBOARD_DATOS =
   "https://n8n.enkrato.com/webhook/dashboard";

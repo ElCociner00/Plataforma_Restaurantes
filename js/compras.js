@@ -8,6 +8,8 @@ import {
 
 const statusEl = document.getElementById("comprasStatus");
 const facturasWrap = document.getElementById("comprasFacturas");
+const tabPrincipal = document.getElementById("tabComprasPrincipal");
+const tabNoCorresponde = document.getElementById("tabComprasNoCorresponde");
 const detalleWrap = document.getElementById("comprasDetalle");
 const detalleTitulo = document.getElementById("detalleTitulo");
 const detalleBody = document.getElementById("detalleBody");
@@ -93,6 +95,14 @@ async function fetchInventarios() {
   return normalizeList(data).filter((p) => p?.id && p?.nombre);
 }
 
+const normalizeRevisionStatus = (value) => {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw || raw === "0" || raw === "false" || raw === "null" || raw === "undefined" || raw === "empty") return 0;
+  if (raw === "2" || raw.includes("no corresponde")) return 2;
+  if (raw === "1" || raw === "true" || raw.includes("revis")) return 1;
+  return 0;
+};
+
 function groupFacturas(rows) {
   const byFactura = new Map();
   rows.forEach((row) => {
@@ -105,34 +115,40 @@ function groupFacturas(rows) {
         consecutivo: row["Consecutivo Factura"] || "",
         proveedor: row.Proveedor || "",
         fecha: row["Fecha Factura"] || "",
-        revisada: String(row.Revisada || "").trim()
+        revisionEstado: normalizeRevisionStatus(row.Revisada)
       });
     }
   });
   return Array.from(byFactura.values()).sort((a, b) => parseFechaFacturaToTime(b.fecha) - parseFechaFacturaToTime(a.fecha));
 }
 
-function renderFacturas() {
-  const groups = groupFacturas(facturasBase);
+function renderFacturas(view = "principal") {
+  const groups = groupFacturas(facturasBase)
+    .filter((f) => (view === "no_corresponde" ? f.revisionEstado === 2 : f.revisionEstado !== 2));
   facturasWrap.innerHTML = "";
 
   if (!groups.length) {
-    facturasWrap.innerHTML = "<p>No hay facturas para esta empresa.</p>";
+    facturasWrap.innerHTML = `<p>${view === "no_corresponde" ? "No hay facturas marcadas como no corresponde." : "No hay facturas para esta empresa."}</p>`;
     return;
   }
 
   groups.forEach((f) => {
-    const pendiente = !f.revisada;
+    const pendiente = f.revisionEstado === 0;
+    const revisada = f.revisionEstado === 1;
+    const noCorresponde = f.revisionEstado === 2;
     const card = document.createElement("article");
-    card.className = "factura-card";
+    card.className = `factura-card ${revisada ? "is-locked" : ""}`;
     card.innerHTML = `
       <div class="factura-card-head">
         <div><strong>Factura:</strong> ${f.prefijo} ${f.consecutivo}</div>
         <div><strong>Proveedor:</strong> ${f.proveedor}</div>
         <div><strong>Fecha:</strong> ${f.fecha}</div>
-        <div><span class="factura-tag ${pendiente ? "pendiente" : "revisada"}">${pendiente ? "Pendiente" : "Revisada"}</span></div>
+        <div><span class="factura-tag ${pendiente ? "pendiente" : revisada ? "revisada" : "no-corresponde"}">${pendiente ? "Pendiente" : revisada ? "Revisada" : "No corresponde"}</span></div>
       </div>
     `;
+    if (revisada) {
+      card.title = "Factura revisada: bloqueada para evitar doble subida.";
+    }
     card.addEventListener("click", () => openDetalleFactura(f));
     facturasWrap.appendChild(card);
   });
@@ -224,6 +240,10 @@ function renderDetalle(factura, detalleRows) {
 }
 
 async function openDetalleFactura(factura) {
+  if (factura?.revisionEstado === 1) {
+    setStatus(`La factura ${factura.prefijo} ${factura.consecutivo} ya está revisada y no puede abrirse de nuevo.`, "error");
+    return;
+  }
   facturaActiva = factura;
   detalleSnapshot = [];
   const requestToken = ++detailRequestToken;
@@ -278,6 +298,10 @@ btnNoCorresponde.addEventListener("click", async () => {
       items: []
     });
     setStatus("✅ Factura marcada como NO CORRESPONDE y enviada correctamente.", "success");
+    facturasBase = await fetchFacturas();
+    detalleWrap.classList.add("is-hidden");
+    facturasWrap.closest("section")?.classList.remove("is-hidden");
+    renderFacturas("principal");
   } catch (error) {
     setStatus(`No se pudo enviar no corresponde: ${error.message}`, "error");
   } finally {
@@ -338,6 +362,10 @@ btnEnviar.addEventListener("click", async () => {
       items
     });
     setStatus("✅ Compra enviada correctamente.", "success");
+    facturasBase = await fetchFacturas();
+    detalleWrap.classList.add("is-hidden");
+    facturasWrap.closest("section")?.classList.remove("is-hidden");
+    renderFacturas("principal");
   } catch (error) {
     setStatus(`No se pudo enviar: ${error.message}`, "error");
   } finally {
@@ -356,7 +384,17 @@ async function init() {
 
   try {
     facturasBase = await fetchFacturas();
-    renderFacturas();
+    renderFacturas("principal");
+    tabPrincipal?.addEventListener("click", () => {
+      tabPrincipal.classList.add("is-active");
+      tabNoCorresponde?.classList.remove("is-active");
+      renderFacturas("principal");
+    });
+    tabNoCorresponde?.addEventListener("click", () => {
+      tabNoCorresponde.classList.add("is-active");
+      tabPrincipal?.classList.remove("is-active");
+      renderFacturas("no_corresponde");
+    });
     setStatus("Selecciona una factura para revisar detalle y enviar.", "info");
   } catch (error) {
     setStatus(`Error cargando compras: ${error.message}`, "error");
