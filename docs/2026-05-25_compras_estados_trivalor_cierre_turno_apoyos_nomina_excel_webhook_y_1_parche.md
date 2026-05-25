@@ -112,3 +112,46 @@ Corregir visibilidad de tabs en Compras, agregar pestaña de Revisadas, ocultar 
 - cierre turno: ✅ confirmar apoyo oculto cuando no aplica.
 - nómina: ✅ descarga CSV compatible Excel con columnas pedidas.
 - pendiente backend: ⚠️ si webhook no devuelve filas, el frontend informa estado sin romper flujo.
+
+
+---
+
+## Parche posterior #2 (2026-05-25)
+### Objetivo
+Corregir regresión del módulo Nómina causada por error de sintaxis en `js/nomina.js` (rompía la carga completa del módulo), y reemplazar salida CSV por archivo Excel descargable con columnas/celdas según estructura acordada.
+
+### Archivos implicados en este parche
+- `js/nomina.js` (modificación correctiva y funcional):
+  - Se reescribe `descargarExcelEmpleado` para eliminar el fragmento que generó error de expresión regular/salto de línea.
+  - Se mantiene consulta al webhook histórico.
+  - Se extraen filas del payload de forma tolerante.
+  - Se genera archivo `.xls` (HTML tabular + MIME Excel) con columnas:
+    `fecha_turno,hora_inicio,hora_fin,Momento,comentarios,domicilios,efectivo_inicial,propinas,ventas_brutas,bolsas,caja_final,diferencia_caja`.
+
+### Causa raíz de la falla y aislamiento
+- Causa raíz: en el parche anterior se introdujo código mal serializado en `js/nomina.js` (saltos de línea dentro de literales para regex/join), produciendo error de parseo y abortando la ejecución del módulo completo.
+- Efecto: al no cargar el script, dejaron de correr inicialización de fechas rápidas (`updateDatesByCut`) y carga de empleados (`fetchResponsablesActivos`).
+- Aislamiento aplicado:
+  1. Validación sintáctica obligatoria post-cambio con `node --check js/nomina.js`.
+  2. Reescritura limpia de la función problemática sin concatenaciones ambiguas.
+  3. Mantener cambios encapsulados en `descargarExcelEmpleado` sin tocar flujo base de inicialización de nómina.
+
+### Reversión de emergencia (parche #2)
+1. En `js/nomina.js`, ubicar función `descargarExcelEmpleado` y reemplazarla por la versión previa de solo solicitud sin generación de archivo.
+2. Verificar que listeners de `init`, `corteSelect`, fechas y empleado permanecen intactos.
+3. Ejecutar `node --check js/nomina.js` antes de desplegar.
+
+### Exportar a otro repositorio (parche #2)
+1. Copiar únicamente cambios de `js/nomina.js` si el resto del parche ya existe.
+2. Verificar centralización de URL en archivo equivalente a `js/webhooks.js`.
+3. Validar en navegador:
+   - Cambio de corte actualiza fechas.
+   - Lista de empleados carga.
+   - Botón Excel descarga `.xls` con columnas definidas.
+4. Confirmar que no exista minificador/procesador que modifique literales JS de forma insegura.
+
+### Check funcional (log)
+- nómina: ✅ inicialización vuelve a ejecutarse, ✅ cortes rápidos funcionan, ✅ empleados cargan, ✅ exporta archivo Excel `.xls`.
+- compras: ✅ sin cambios en este parche.
+- cierre turno: ✅ sin cambios en este parche.
+- pendiente backend: ⚠️ si webhook retorna vacío/no estructurado, se informa en status sin romper el módulo.
