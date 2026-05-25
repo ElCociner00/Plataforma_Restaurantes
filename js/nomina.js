@@ -27,7 +27,7 @@ import { getUserContext } from "./session.js";
 import { fetchResponsablesActivos } from "./responsables.js";
 import { getActiveEnvironment } from "./environment.js";
 import { supabase } from "./supabase.js";
-import { WEBHOOK_NOMINA_CONSULTAR } from "./webhooks.js";
+import { WEBHOOK_NOMINA_CONSULTAR, WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO } from "./webhooks.js";
 import { drawPngBrandWatermark } from "./png_branding.js";
 import { nominaLog, nominaWarn } from "./nomina.debug.js";
 
@@ -37,6 +37,7 @@ const corteSelect = document.getElementById("nominaCorte");
 const empleadoSelect = document.getElementById("nominaEmpleado");
 const consultarBtn = document.getElementById("consultarNomina");
 const descargarBtn = document.getElementById("descargarComprobanteNomina");
+const descargarExcelEmpleadoBtn = document.getElementById("descargarExcelEmpleadoNomina");
 
 const totalDevengadoEl = document.getElementById("nominaTotalDevengado");
 const totalDeduccionesEl = document.getElementById("nominaTotalDeducciones");
@@ -695,6 +696,43 @@ const descargarComprobante = () => {
   setStatus("Comprobante descargado correctamente.");
 };
 
+
+const descargarExcelEmpleado = async () => {
+  const empleadoId = empleadoSelect.value;
+  if (!empleadoId) {
+    setStatus("Selecciona un empleado antes de solicitar el Excel.");
+    return;
+  }
+  const payload = {
+    empresa_id: state.context?.empresa_id || "",
+    responsable_id: empleadoId,
+    corte: corteSelect.value || "quincenal",
+    fecha_inicio: fechaInicioInput.value || "",
+    fecha_fin: fechaFinInput.value || "",
+    entorno: getActiveEnvironment() || "global"
+  };
+
+  setStatus("Solicitando Excel del empleado...");
+  try {
+    const response = await fetch(WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const contentType = response.headers.get("content-type") || "";
+    const maybeJson = contentType.includes("application/json") ? await response.json().catch(() => ({})) : null;
+    if (!response.ok) {
+      const errorMsg = maybeJson?.message || `HTTP ${response.status}`;
+      throw new Error(errorMsg);
+    }
+
+    setStatus("Solicitud enviada. Si el flujo de n8n ya genera archivo, se iniciará la descarga desde el webhook.");
+  } catch (error) {
+    setStatus(`No fue posible generar el Excel en este momento (${error.message}). Datos enviados correctamente, valida la estructura del flujo en n8n.`);
+  }
+};
+
 const init = async () => {
   setDefaultDates();
   state.context = await getUserContext().catch(() => null);
@@ -720,6 +758,7 @@ const init = async () => {
 
 consultarBtn?.addEventListener("click", consultarNomina);
 descargarBtn?.addEventListener("click", descargarComprobante);
+descargarExcelEmpleadoBtn?.addEventListener("click", descargarExcelEmpleado);
 corteSelect?.addEventListener("change", updateDatesByCut);
 fechaInicioInput?.addEventListener("change", clampDatesToToday);
 fechaFinInput?.addEventListener("change", clampDatesToToday);

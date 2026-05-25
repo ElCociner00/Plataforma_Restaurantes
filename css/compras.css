@@ -150,3 +150,9 @@
 #noCorrespondeCompras {
   order: 1;
 }
+
+.compras-tabs{display:flex;gap:8px;margin-bottom:12px}
+.compras-tab{border:1px solid #d1d5db;background:#fff;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+.compras-tab.is-active{background:#111827;color:#fff;border-color:#111827}
+.factura-tag.no-corresponde{background:#ffedd5;color:#9a3412}
+.factura-card.is-locked{opacity:.8;border-style:dashed}
