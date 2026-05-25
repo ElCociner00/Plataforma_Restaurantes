@@ -27,7 +27,7 @@ import { getUserContext } from "./session.js";
 import { fetchResponsablesActivos } from "./responsables.js";
 import { getActiveEnvironment } from "./environment.js";
 import { supabase } from "./supabase.js";
-import { WEBHOOK_NOMINA_CONSULTAR } from "./webhooks.js";
+import { WEBHOOK_NOMINA_CONSULTAR, WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO } from "./webhooks.js";
 import { drawPngBrandWatermark } from "./png_branding.js";
 import { nominaLog, nominaWarn } from "./nomina.debug.js";
 
@@ -37,6 +37,7 @@ const corteSelect = document.getElementById("nominaCorte");
 const empleadoSelect = document.getElementById("nominaEmpleado");
 const consultarBtn = document.getElementById("consultarNomina");
 const descargarBtn = document.getElementById("descargarComprobanteNomina");
+const descargarExcelEmpleadoBtn = document.getElementById("descargarExcelEmpleadoNomina");
 
 const totalDevengadoEl = document.getElementById("nominaTotalDevengado");
 const totalDeduccionesEl = document.getElementById("nominaTotalDeducciones");
@@ -695,6 +696,99 @@ const descargarComprobante = () => {
   setStatus("Comprobante descargado correctamente.");
 };
 
+
+const descargarExcelEmpleado = async () => {
+  const empleadoId = empleadoSelect.value;
+  if (!empleadoId) {
+    setStatus("Selecciona un empleado antes de solicitar el Excel.");
+    return;
+  }
+
+  const payload = {
+    empresa_id: state.context?.empresa_id || "",
+    responsable_id: empleadoId,
+    corte: corteSelect.value || "quincenal",
+    fecha_inicio: fechaInicioInput.value || "",
+    fecha_fin: fechaFinInput.value || "",
+    entorno: getActiveEnvironment() || "global"
+  };
+
+  setStatus("Solicitando histórico del empleado...");
+  try {
+    const response = await fetch(WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const text = await response.text();
+    let parsed = null;
+    try {
+      parsed = text ? JSON.parse(text) : null;
+    } catch (_e) {
+      parsed = text;
+    }
+
+    if (!response.ok) {
+      const errorMsg = (parsed && typeof parsed === "object" && parsed.message) ? parsed.message : `HTTP ${response.status}`;
+      throw new Error(errorMsg);
+    }
+
+    const extractRows = (node, depth = 0) => {
+      if (depth > 8 || node === null || node === undefined) return [];
+      if (Array.isArray(node)) return node;
+      if (typeof node === "string") {
+        try { return extractRows(JSON.parse(node), depth + 1); } catch (_e) { return []; }
+      }
+      if (typeof node === "object") {
+        for (const value of Object.values(node)) {
+          const rows = extractRows(value, depth + 1);
+          if (rows.length) return rows;
+        }
+      }
+      return [];
+    };
+
+    const rows = extractRows(parsed).filter((row) => row && typeof row === "object");
+    if (!rows.length) {
+      setStatus("El webhook respondió sin filas exportables aún. Se enviaron los parámetros correctamente.");
+      return;
+    }
+
+    const headers = [
+      "fecha_turno", "hora_inicio", "hora_fin", "Momento", "comentarios", "domicilios",
+      "efectivo_inicial", "propinas", "ventas_brutas", "bolsas", "caja_final", "diferencia_caja"
+    ];
+
+    const escHtml = (value) => String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+
+    const thead = `<tr>${headers.map((h) => `<th>${escHtml(h)}</th>`).join("")}</tr>`;
+    const tbody = rows.map((row) => `<tr>${headers.map((h) => `<td>${escHtml(row[h])}</td>`).join("")}</tr>`).join("");
+
+    const excelHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8" /><style>
+      table{border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;}
+      th,td{border:1px solid #cbd5e1;padding:6px 8px;text-align:left;}
+      th{background:#f1f5f9;font-weight:700;}
+    </style></head><body><table><thead>${thead}</thead><tbody>${tbody}</tbody></table></body></html>`;
+
+    const blob = new Blob(["﻿" + excelHtml], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `historico_empleado_${empleadoId}_${fechaInicioInput.value || "inicio"}_${fechaFinInput.value || "fin"}.xls`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    setStatus(`Excel generado con ${rows.length} filas.`);
+  } catch (error) {
+    setStatus(`No fue posible generar el Excel en este momento (${error.message}).`);
+  }
+};
+
 const init = async () => {
   setDefaultDates();
   state.context = await getUserContext().catch(() => null);
@@ -720,6 +814,7 @@ const init = async () => {
 
 consultarBtn?.addEventListener("click", consultarNomina);
 descargarBtn?.addEventListener("click", descargarComprobante);
+descargarExcelEmpleadoBtn?.addEventListener("click", descargarExcelEmpleado);
 corteSelect?.addEventListener("change", updateDatesByCut);
 fechaInicioInput?.addEventListener("change", clampDatesToToday);
 fechaFinInput?.addEventListener("change", clampDatesToToday);

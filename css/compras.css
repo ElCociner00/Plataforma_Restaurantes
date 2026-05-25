@@ -150,3 +150,37 @@
 #noCorrespondeCompras {
   order: 1;
 }
+
+
+.compras-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.compras-tab {
+  appearance: none;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: all .15s ease;
+}
+
+.compras-tab:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+}
+
+.compras-tab.is-active {
+  background: #111827;
+  color: #ffffff;
+  border-color: #111827;
+  box-shadow: 0 1px 2px rgba(0,0,0,.18);
+}
+.factura-tag.no-corresponde{background:#ffedd5;color:#9a3412}
+.factura-card.is-locked{opacity:.8;border-style:dashed}
