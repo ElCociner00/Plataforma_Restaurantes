@@ -713,6 +713,60 @@ const descargarExcelEmpleado = async () => {
     entorno: getActiveEnvironment() || "global"
   };
 
+  const headers = [
+    "fecha_turno", "hora_inicio", "hora_fin", "Momento", "comentarios", "domicilios",
+    "efectivo_inicial", "propinas", "ventas_brutas", "bolsas", "caja_final", "diferencia_caja"
+  ];
+
+  const extractRows = (node, depth = 0) => {
+    if (depth > 10 || node === null || node === undefined) return [];
+    if (Array.isArray(node)) return node.filter((row) => row && typeof row === "object");
+    if (typeof node === "string") {
+      const t = node.trim();
+      if (!t) return [];
+      try { return extractRows(JSON.parse(t), depth + 1); } catch (_e) { return []; }
+    }
+    if (typeof node === "object") {
+      for (const value of Object.values(node)) {
+        const rows = extractRows(value, depth + 1);
+        if (rows.length) return rows;
+      }
+    }
+    return [];
+  };
+
+  const escHtml = (value) => String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
+  const buildExcelHtml = (rows) => {
+    const thead = `<tr>${headers.map((h) => `<th>${escHtml(h)}</th>`).join("")}</tr>`;
+    const tbody = rows
+      .map((row) => `<tr>${headers.map((h) => `<td>${escHtml(row[h])}</td>`).join("")}</tr>`)
+      .join("");
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8" /><style>
+      table{border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;}
+      th,td{border:1px solid #cbd5e1;padding:6px 8px;text-align:left;}
+      th{background:#f1f5f9;font-weight:700;}
+    </style></head><body><table><thead>${thead}</thead><tbody>${tbody}</tbody></table></body></html>`;
+  };
+
+  const triggerExcelDownload = (excelHtml, rowCount) => {
+    const blob = new Blob(["﻿" + excelHtml], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `historico_empleado_${empleadoId}_${fechaInicioInput.value || "inicio"}_${fechaFinInput.value || "fin"}.xls`;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    setStatus(`Excel generado con ${rowCount} filas.`);
+  };
+
   setStatus("Solicitando histórico del empleado...");
   try {
     const response = await fetch(WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO, {
@@ -721,71 +775,46 @@ const descargarExcelEmpleado = async () => {
       body: JSON.stringify(payload)
     });
 
-    const text = await response.text();
-    let parsed = null;
-    try {
-      parsed = text ? JSON.parse(text) : null;
-    } catch (_e) {
-      parsed = text;
-    }
-
     if (!response.ok) {
-      const errorMsg = (parsed && typeof parsed === "object" && parsed.message) ? parsed.message : `HTTP ${response.status}`;
-      throw new Error(errorMsg);
+      const errText = await response.text().catch(() => "");
+      throw new Error(`HTTP ${response.status}${errText ? ` - ${errText.slice(0, 200)}` : ""}`);
     }
 
-    const extractRows = (node, depth = 0) => {
-      if (depth > 8 || node === null || node === undefined) return [];
-      if (Array.isArray(node)) return node;
-      if (typeof node === "string") {
-        try { return extractRows(JSON.parse(node), depth + 1); } catch (_e) { return []; }
-      }
-      if (typeof node === "object") {
-        for (const value of Object.values(node)) {
-          const rows = extractRows(value, depth + 1);
-          if (rows.length) return rows;
-        }
-      }
-      return [];
-    };
+    const contentType = (response.headers.get("content-type") || "").toLowerCase();
 
-    const rows = extractRows(parsed).filter((row) => row && typeof row === "object");
-    if (!rows.length) {
-      setStatus("El webhook respondió sin filas exportables aún. Se enviaron los parámetros correctamente.");
+    if (contentType.includes("application/vnd.ms-excel") || contentType.includes("application/octet-stream")) {
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `historico_empleado_${empleadoId}_${fechaInicioInput.value || "inicio"}_${fechaFinInput.value || "fin"}.xls`;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+      setStatus("Excel descargado correctamente.");
       return;
     }
 
-    const headers = [
-      "fecha_turno", "hora_inicio", "hora_fin", "Momento", "comentarios", "domicilios",
-      "efectivo_inicial", "propinas", "ventas_brutas", "bolsas", "caja_final", "diferencia_caja"
-    ];
+    const rawText = await response.text();
+    let parsed = null;
+    try {
+      parsed = rawText ? JSON.parse(rawText) : null;
+    } catch (_e) {
+      parsed = rawText;
+    }
 
-    const escHtml = (value) => String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+    const rows = extractRows(parsed);
+    if (!rows.length) {
+      throw new Error(`El webhook respondió sin filas exportables. Vista previa: ${(rawText || "").slice(0, 180)}`);
+    }
 
-    const thead = `<tr>${headers.map((h) => `<th>${escHtml(h)}</th>`).join("")}</tr>`;
-    const tbody = rows.map((row) => `<tr>${headers.map((h) => `<td>${escHtml(row[h])}</td>`).join("")}</tr>`).join("");
-
-    const excelHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8" /><style>
-      table{border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;}
-      th,td{border:1px solid #cbd5e1;padding:6px 8px;text-align:left;}
-      th{background:#f1f5f9;font-weight:700;}
-    </style></head><body><table><thead>${thead}</thead><tbody>${tbody}</tbody></table></body></html>`;
-
-    const blob = new Blob(["﻿" + excelHtml], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `historico_empleado_${empleadoId}_${fechaInicioInput.value || "inicio"}_${fechaFinInput.value || "fin"}.xls`;
-    link.click();
-    URL.revokeObjectURL(url);
-
-    setStatus(`Excel generado con ${rows.length} filas.`);
+    const excelHtml = buildExcelHtml(rows);
+    triggerExcelDownload(excelHtml, rows.length);
   } catch (error) {
     setStatus(`No fue posible generar el Excel en este momento (${error.message}).`);
+    nominaWarn("excel_empleado.error", error?.message || error);
   }
 };
 
