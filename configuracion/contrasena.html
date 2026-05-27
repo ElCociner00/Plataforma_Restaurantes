@@ -8,6 +8,16 @@
 <body>
   <div class="main" style="max-width:460px">
     <h1>Restablecer contraseña</h1>
+
+    <div id="identityBlock" style="margin-bottom:16px">
+      <label for="cedulaRecovery">Cédula o NIT</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="cedulaRecovery" type="text" placeholder="Ingresa tu cédula o NIT" style="flex:1">
+        <button id="verificarCedulaBtn" type="button">Verificar</button>
+      </div>
+      <small id="identityHint" style="display:block;margin-top:8px;color:#6b7280"></small>
+    </div>
+
     <form id="resetPasswordForm">
       <input id="recoveryEmail" type="text" autocomplete="username" name="email" hidden aria-hidden="true">
       <label for="nuevaContrasena">Nueva contraseña</label>
