@@ -718,15 +718,18 @@ const descargarExcelEmpleado = async () => {
     "efectivo_inicial", "propinas", "ventas_brutas", "bolsas", "caja_final", "diferencia_caja"
   ];
 
+  const isExportableRow = (row) => row && typeof row === "object" && headers.some((key) => Object.prototype.hasOwnProperty.call(row, key));
+
   const extractRows = (node, depth = 0) => {
     if (depth > 10 || node === null || node === undefined) return [];
-    if (Array.isArray(node)) return node.filter((row) => row && typeof row === "object");
+    if (Array.isArray(node)) return node.filter((row) => isExportableRow(row));
     if (typeof node === "string") {
       const t = node.trim();
       if (!t) return [];
       try { return extractRows(JSON.parse(t), depth + 1); } catch (_e) { return []; }
     }
     if (typeof node === "object") {
+      if (isExportableRow(node)) return [node];
       for (const value of Object.values(node)) {
         const rows = extractRows(value, depth + 1);
         if (rows.length) return rows;
@@ -766,6 +769,11 @@ const descargarExcelEmpleado = async () => {
     setTimeout(() => URL.revokeObjectURL(url), 1500);
     setStatus(`Excel generado con ${rowCount} filas.`);
   };
+
+  if (!fechaInicioInput.value || !fechaFinInput.value) {
+    setStatus("Selecciona un rango de fechas válido para exportar el Excel.");
+    return;
+  }
 
   setStatus("Solicitando histórico del empleado...");
   try {
