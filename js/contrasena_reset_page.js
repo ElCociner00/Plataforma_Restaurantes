@@ -37,31 +37,85 @@ const maskEmail = (email) => {
   return `${name.slice(0, 2)}***@${domain}`;
 };
 
-const resolveEmailByCedula = async (cedula) => {
-  const { data: otros, error: errOtros } = await supabase
-    .from("otros_usuarios")
-    .select("correo")
-    .eq("cedula", cedula)
-    .maybeSingle();
-  if (errOtros) throw errOtros;
-  if (otros?.correo) return { email: otros.correo, source: "otros_usuarios" };
+const normalizeLookupText = (value) => String(value || "").trim();
 
-  const { data: empleado, error: errEmp } = await supabase
-    .from("empleados")
-    .select("nombre_completo")
+const firstRowByCedula = async (tableName, cedula) => {
+  const { data, error } = await supabase
+    .from(tableName)
+    .select("id,nombre_completo,cedula")
     .eq("cedula", cedula)
-    .maybeSingle();
-  if (errEmp) throw errEmp;
-  if (!empleado?.nombre_completo) return null;
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] || null : null;
+};
 
-  const { data: usuarioSistema, error: errUsr } = await supabase
+const firstUsuarioSistemaBy = async ({ id, nombreCompleto }) => {
+  const cleanId = normalizeLookupText(id);
+  const cleanNombre = normalizeLookupText(nombreCompleto);
+
+  if (cleanId) {
+    const { data, error } = await supabase
+      .from("usuarios_sistema")
+      .select("id,nombre_completo,correo")
+      .eq("id", cleanId)
+      .limit(1);
+    if (!error) {
+      const row = Array.isArray(data) ? data[0] || null : null;
+      if (row?.correo) return row;
+    }
+  }
+
+  if (!cleanNombre) return null;
+  const { data, error } = await supabase
     .from("usuarios_sistema")
-    .select("correo")
-    .eq("nombre_completo", empleado.nombre_completo)
-    .maybeSingle();
-  if (errUsr) throw errUsr;
-  if (!usuarioSistema?.correo) return null;
-  return { email: usuarioSistema.correo, source: "empleados->usuarios_sistema" };
+    .select("id,nombre_completo,correo")
+    .eq("nombre_completo", cleanNombre)
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] || null : null;
+};
+
+const resolveEmailByCedula = async (cedula) => {
+  const pasos = [];
+
+  pasos.push("Buscando coincidencia en otros_usuarios.cedula...");
+  const otroUsuario = await firstRowByCedula("otros_usuarios", cedula);
+  if (otroUsuario) {
+    pasos.push("Coincidencia encontrada en otros_usuarios; resolviendo correo en usuarios_sistema...");
+    const usuarioSistema = await firstUsuarioSistemaBy({
+      id: otroUsuario.id,
+      nombreCompleto: otroUsuario.nombre_completo
+    });
+    if (usuarioSistema?.correo) {
+      return {
+        email: usuarioSistema.correo,
+        source: "otros_usuarios->usuarios_sistema",
+        userId: usuarioSistema.id,
+        pasos
+      };
+    }
+    pasos.push("otros_usuarios no tenía usuario_sistema con correo; continuando fallback a empleados...");
+  } else {
+    pasos.push("Sin coincidencia en otros_usuarios; continuando fallback a empleados...");
+  }
+
+  const empleado = await firstRowByCedula("empleados", cedula);
+  if (!empleado?.nombre_completo) {
+    return { email: null, source: null, pasos: [...pasos, "Sin coincidencia en empleados.cedula."] };
+  }
+
+  pasos.push("Coincidencia encontrada en empleados; buscando usuarios_sistema por nombre_completo...");
+  const usuarioSistema = await firstUsuarioSistemaBy({ nombreCompleto: empleado.nombre_completo });
+  if (!usuarioSistema?.correo) {
+    return { email: null, source: "empleados", pasos: [...pasos, "No se encontró correo en usuarios_sistema para ese empleado."] };
+  }
+
+  return {
+    email: usuarioSistema.correo,
+    source: "empleados->usuarios_sistema",
+    userId: usuarioSistema.id,
+    pasos
+  };
 };
 
 if (recoveryEmail) recoveryEmail.value = String(new URLSearchParams(window.location.search || "").get("email") || "").trim();
@@ -78,14 +132,15 @@ verificarCedulaBtn?.addEventListener("click", async () => {
   try {
     const resolved = await resolveEmailByCedula(cedula);
     if (!resolved?.email) {
-      setHint("");
-      setEstado("No encontramos un usuario con esa cédula/NIT. Verifica el dato e intenta de nuevo.");
+      setHint((resolved?.pasos || []).join(" → "));
+      setEstado("No encontramos un usuario con esa cédula/NIT o no tiene correo asociado en usuarios_sistema. Verifica el dato e intenta de nuevo.");
       return;
     }
+    setHint((resolved.pasos || []).join(" → "));
     await sendRecoveryForEmail(resolved.email);
     if (recoveryEmail) recoveryEmail.value = resolved.email;
-    setHint(`Usuario validado desde ${resolved.source}.`);
-    setEstado(`Identidad verificada. Enviamos un nuevo enlace de recuperación a ${maskEmail(resolved.email)}.`);
+    setHint(`Usuario validado desde ${resolved.source}. Abre el nuevo enlace para cargar el token de recuperación.`);
+    setEstado(`Identidad verificada. Enviamos un nuevo enlace de recuperación a ${maskEmail(resolved.email)} para que puedas cambiar la contraseña con un token válido.`);
   } catch (error) {
     setHint("");
     setEstado(`No fue posible verificar la identidad (${error.message || "sin detalle"}).`);
