@@ -54,6 +54,7 @@ export const APP_URLS = {
   inventarios: buildAppPath("/inventarios/"),
   configuracion: buildAppPath("/configuracion/"),
   loggro: buildAppPath("/configuracion/loggro.html"),
+  credibanco: buildAppPath("/configuracion/credibanco.html"),
   visualizacionCierreTurno: buildAppPath("/configuracion/visualizacion_cierre_turno.html"),
   visualizacionCierreTurnoHistorico: buildAppPath("/configuracion/visualizacion_cierre_turno_historico.html"),
   visualizacionCierreInventarios: buildAppPath("/configuracion/visualizacion_cierre_inventarios.html"),

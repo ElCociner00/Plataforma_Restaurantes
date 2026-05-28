@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>AXIOMA | Loggro</title>
+  <title>AXIOMA | Credibanco</title>
 
   <link rel="stylesheet" href="../css/main.css">
   <link rel="stylesheet" href="../css/loggro.css">
@@ -18,24 +18,24 @@
   <script type="module" src="../js/header.js"></script>
 
   <div class="main">
-    <h1>Loggro</h1>
+    <h1>Credibanco</h1>
     <p class="descripcion">
-      Configura las credenciales de Loggro para habilitar las integraciones.
+      Configura las credenciales de Credibanco para habilitar las integraciones de pagos.
     </p>
 
-    <form id="loggroForm" class="formulario">
+    <form id="credibancoForm" class="formulario">
       <div class="campo">
-        <label for="loggroEmail">Correo de Loggro</label>
-        <p class="ayuda">Ingresa el correo con el que inicias sesión en Loggro.</p>
-        <input id="loggroEmail" type="email" required autocomplete="email">
+        <label for="credibancoClientId">Client ID</label>
+        <p class="ayuda">Ingresa el Client ID entregado por Credibanco.</p>
+        <input id="credibancoClientId" type="text" required autocomplete="off">
       </div>
 
       <div class="campo">
-        <label for="loggroPassword">Contraseña de Loggro</label>
-        <p class="ayuda">Ingresa la contraseña con la que inicias sesión en Loggro.</p>
+        <label for="credibancoClientSecret">Client Secret</label>
+        <p class="ayuda">Ingresa el Client Secret entregado por Credibanco.</p>
         <div class="password-wrap">
-          <input id="loggroPassword" type="password" required autocomplete="current-password">
-          <button type="button" id="toggleLoggroPassword" class="btn-ojito" aria-label="Mostrar contraseña">👁</button>
+          <input id="credibancoClientSecret" type="password" required autocomplete="off">
+          <button type="button" id="toggleCredibancoSecret" class="btn-ojito" aria-label="Mostrar client secret">👁</button>
         </div>
       </div>
 
@@ -44,7 +44,7 @@
     </form>
   </div>
 
-  <script type="module" src="../js/loggro.js"></script>
+  <script type="module" src="../js/credibanco.js"></script>
   <script type="module" src="../js/footer.js"></script>
   <!-- Parche de autenticación para módulos (aislado) -->
   <script type="module" src="../js/module_fix/init.js"></script>

@@ -60,6 +60,10 @@ export const WEBHOOK_LISTAR_RESPONSABLES =
 export const WEBHOOK_REGISTRO_CREDENCIALES =
   "https://n8n.enkrato.com/webhook/registro_credenciales";
 
+// configuracion/credibanco.html (guardar credenciales Credibanco)
+export const WEBHOOK_REGISTRAR_CREDIBANCO =
+  "https://n8n.enkrato.com/webhook/registrar_credibanco";
+
 // cierre_inventarios/index.html (auto-carga al abrir pestaña: traer productos)
 export const WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS =
   "https://n8n.enkrato.com/webhook/consultar_inventarios_ingredientes";

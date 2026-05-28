@@ -7,21 +7,15 @@
  * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
  * 3) Lógica principal del módulo (flujo funcional).
  * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
- *
- * Índice de funciones/bloques para ubicarte rápido:
- * - `getTimestamp` (línea aprox. 9): Obtiene un valor o recurso.
- * - `setStatus` (línea aprox. 11): Asigna/actualiza estado.
- * - `readResponseBody` (línea aprox. 15): Bloque funcional del módulo.
- *
- * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
  */
 import { getUserContext } from "./session.js";
 import { buildRequestHeaders } from "./session.js";
 import { WEBHOOK_REGISTRO_CREDENCIALES } from "./webhooks.js";
 
 const form = document.getElementById("loggroForm");
-const tokenInput = document.getElementById("loggroToken");
-const urlInput = document.getElementById("loggroUrl");
+const emailInput = document.getElementById("loggroEmail");
+const passwordInput = document.getElementById("loggroPassword");
+const togglePasswordBtn = document.getElementById("toggleLoggroPassword");
 const status = document.getElementById("status");
 const getTimestamp = () => new Date().toISOString();
 
@@ -39,6 +33,12 @@ const readResponseBody = async (res) => {
   }
 };
 
+togglePasswordBtn?.addEventListener("click", () => {
+  const shouldShow = passwordInput.type === "password";
+  passwordInput.type = shouldShow ? "text" : "password";
+  togglePasswordBtn.textContent = shouldShow ? "🙈" : "👁";
+});
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   setStatus("Guardando credenciales...");
@@ -55,8 +55,10 @@ form.addEventListener("submit", async (event) => {
     usuario_id: context.user?.id || context.user?.user_id,
     registrado_por: context.user?.id || context.user?.user_id,
     timestamp: getTimestamp(),
-    token: tokenInput.value.trim(),
-    url: urlInput.value.trim()
+    plataforma: "loggro",
+    url: "loggro.com",
+    correo: emailInput.value.trim(),
+    password: passwordInput.value
   };
 
   try {
