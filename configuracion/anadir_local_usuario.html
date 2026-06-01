@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Enkrato | Usuarios del nuevo local</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/usuario.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../js/router.js"></script>
+  <script type="module" src="../js/header.js"></script>
+
+  <div class="main">
+    <h1>Usuarios del nuevo local</h1>
+    <p class="helper-text">
+      Crea o confirma el usuario administrador inicial del local. Este paso queda preparado para que el flujo de BD duplique los usuarios de la empresa matriz hacia el nuevo tenant.
+    </p>
+
+    <form id="registroUsuarioLocal">
+      <input type="text" id="nombre_visible" placeholder="Nombre completo" required>
+      <input type="email" id="email" placeholder="Correo electrónico" required>
+      <p class="helper-text" id="correoSugerido"></p>
+      <input type="password" id="password" placeholder="Contraseña temporal o inicial" required>
+      <button type="submit">Crear usuario / preparar duplicación</button>
+    </form>
+
+    <div id="status"></div>
+  </div>
+
+  <script type="module" src="../js/anadir_local_usuario.js"></script>
+  <script type="module" src="../js/footer.js"></script>
+</body>
+</html>
