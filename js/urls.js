@@ -42,7 +42,7 @@ export const buildAppUrl = (path) => `${APP_ORIGIN}${buildAppPath(path)}`;
 
 export const APP_URLS = {
   root: buildAppPath("/"),
-  login: buildAppPath("/index.html"),
+  login: buildAppPath("/inicio/"),
   dashboard: buildAppPath("/dashboard/"),
   registroEmpresa: buildAppPath("/registro/index.html"),
   registroUsuario: buildAppPath("/registro/usuario.html"),
