@@ -1,0 +1,379 @@
+:root {
+  --bg-color: #160923;
+  --primary-purple: #8a2be2;
+  --secondary-magenta: #c71585;
+  --accent-gold: #f8d47a;
+  --text-primary: #ffffff;
+  --text-secondary: #e8ddf2;
+  --muted-purple: #241038;
+  --card-bg: rgba(255, 255, 255, 0.08);
+  --border-color: rgba(255, 255, 255, 0.16);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg-color);
+  color: var(--text-primary);
+  overflow-x: hidden;
+}
+
+.landing-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(138, 43, 226, 0.3), transparent 32rem),
+    linear-gradient(180deg, #160923 0%, #1d0d30 48%, #12071f 100%);
+}
+
+.hero-section {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  background-image:
+    linear-gradient(90deg, rgba(13, 5, 25, 0.78) 0%, rgba(26, 11, 46, 0.56) 52%, rgba(26, 11, 46, 0.24) 100%),
+    url("https://images.unsplash.com/photo-1600112356915-089abb8fc71a?q=80&w=1294&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
+  background-size: cover;
+  background-position: center;
+  cursor: crosshair;
+}
+
+#automaton-canvas,
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+#automaton-canvas {
+  z-index: 1;
+}
+
+.hero-overlay {
+  z-index: 2;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 42%, rgba(199, 21, 133, 0.22), transparent 24rem),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.68));
+  box-shadow: inset 0 0 160px rgba(0, 0, 0, 0.72);
+}
+
+.landing-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.2rem clamp(1.25rem, 5vw, 5rem);
+}
+
+.brand-pill,
+.login-link,
+.primary-cta,
+.secondary-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: var(--text-primary);
+}
+
+.brand-pill {
+  gap: 0.7rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: rgba(16, 7, 31, 0.46);
+  backdrop-filter: blur(16px);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.brand-logo {
+  width: 2rem;
+  height: 2rem;
+  object-fit: contain;
+  border-radius: 0.65rem;
+  background: white;
+  padding: 0.18rem;
+}
+
+.login-link {
+  min-height: 2.75rem;
+  padding: 0.7rem 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(14px);
+  font-weight: 700;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.login-link:hover,
+.secondary-cta:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.hero-content {
+  position: relative;
+  z-index: 3;
+  width: min(90%, 1120px);
+  margin: 0 auto;
+  padding: 7rem 0 4rem;
+  text-align: left;
+}
+
+.eyebrow,
+.section-kicker {
+  margin: 0 0 1rem;
+  color: var(--accent-gold);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-size: clamp(0.78rem, 1.4vw, 0.96rem);
+}
+
+.hero-title {
+  max-width: 11ch;
+  margin: 0 0 1.2rem;
+  font-size: clamp(4.4rem, 13vw, 10rem);
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: -0.08em;
+  background: linear-gradient(135deg, #ffffff 0%, #f5d6ff 36%, var(--primary-purple) 68%, var(--secondary-magenta) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 20px 70px rgba(138, 43, 226, 0.28);
+}
+
+.hero-subtitle {
+  max-width: 720px;
+  margin: 0 0 2rem;
+  color: var(--text-secondary);
+  font-size: clamp(1.05rem, 2.1vw, 1.45rem);
+  line-height: 1.65;
+  font-weight: 300;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.primary-cta,
+.secondary-cta {
+  min-height: 3.35rem;
+  padding: 0.95rem 1.35rem;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.primary-cta {
+  background: linear-gradient(135deg, var(--primary-purple), var(--secondary-magenta));
+  box-shadow: 0 18px 42px rgba(199, 21, 133, 0.32);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.primary-cta:hover {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: 0 24px 54px rgba(199, 21, 133, 0.42);
+}
+
+.secondary-cta {
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.scroll-indicator {
+  position: absolute;
+  bottom: 1.6rem;
+  left: 50%;
+  z-index: 4;
+  color: var(--text-secondary);
+  font-size: 3rem;
+  line-height: 1;
+  text-decoration: none;
+  animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% { transform: translateX(-50%) translateY(0); }
+  40% { transform: translateX(-50%) translateY(-18px); }
+  60% { transform: translateX(-50%) translateY(-9px); }
+}
+
+.section-shell {
+  width: min(90%, 1120px);
+  margin: 0 auto;
+}
+
+.problem-solution,
+.benefits-section {
+  position: relative;
+  z-index: 5;
+  padding: clamp(4.5rem, 9vw, 7rem) 0;
+}
+
+.problem-solution {
+  background: linear-gradient(180deg, #12071f 0%, #1a0b2e 100%);
+}
+
+.two-column {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: clamp(2rem, 6vw, 5rem);
+  align-items: start;
+}
+
+h2 {
+  margin: 0;
+  font-size: clamp(2.2rem, 5vw, 4.2rem);
+  line-height: 1.05;
+  letter-spacing: -0.05em;
+}
+
+.story-card,
+.benefit-card {
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(18px);
+}
+
+.story-card {
+  padding: clamp(1.5rem, 4vw, 2.4rem);
+  border-radius: 1.6rem;
+}
+
+.story-card p,
+.benefit-card p {
+  color: var(--text-secondary);
+  line-height: 1.75;
+}
+
+.story-card p {
+  margin: 0;
+  font-size: 1.03rem;
+}
+
+.story-card p + p {
+  margin-top: 1.2rem;
+}
+
+.benefits-section {
+  background:
+    radial-gradient(circle at 78% 20%, rgba(138, 43, 226, 0.24), transparent 25rem),
+    #160923;
+}
+
+.benefits-section h2 {
+  max-width: 760px;
+  margin-bottom: 2rem;
+}
+
+.benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.benefit-card {
+  min-height: 100%;
+  padding: 1.35rem;
+  border-radius: 1.35rem;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.benefit-card:hover {
+  transform: translateY(-5px);
+  border-color: rgba(248, 212, 122, 0.42);
+}
+
+.benefit-icon {
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  margin-bottom: 1rem;
+  border-radius: 0.9rem;
+  background: linear-gradient(135deg, rgba(138, 43, 226, 0.38), rgba(199, 21, 133, 0.34));
+  color: var(--accent-gold);
+  font-weight: 800;
+  font-size: 1.2rem;
+}
+
+.benefit-card h3 {
+  margin: 0 0 0.7rem;
+  font-size: 1.08rem;
+}
+
+.benefit-card p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .scroll-indicator,
+  .primary-cta,
+  .benefit-card,
+  .login-link,
+  .secondary-cta {
+    animation: none;
+    transition: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .two-column,
+  .benefits-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .benefits-grid {
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .landing-header {
+    padding: 1rem;
+  }
+
+  .brand-pill span {
+    display: none;
+  }
+
+  .hero-content {
+    width: min(92%, 1120px);
+    padding-top: 6.8rem;
+  }
+
+  .hero-title {
+    font-size: clamp(3.6rem, 20vw, 6rem);
+  }
+
+  .hero-actions {
+    display: grid;
+  }
+}

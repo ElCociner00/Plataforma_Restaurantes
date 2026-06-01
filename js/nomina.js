@@ -713,29 +713,64 @@ const descargarExcelEmpleado = async () => {
     entorno: getActiveEnvironment() || "global"
   };
 
+  const empleadoSeleccionado = state.responsables.find((item) => item.id === empleadoId);
+  const periodoInicio = fechaInicioInput.value || "inicio";
+  const periodoFin = fechaFinInput.value || "fin";
+
   const headers = [
-    "fecha_turno", "hora_inicio", "hora_fin", "Momento", "comentarios", "domicilios",
-    "efectivo_inicial", "propinas", "ventas_brutas", "bolsas", "caja_final", "diferencia_caja"
+    "fecha_turno", "hora_inicio", "hora_fin", "Momento", "domicilios",
+    "efectivo_inicial", "propinas", "ventas_brutas", "bolsas", "caja_final", "diferencia_caja", "comentarios"
   ];
 
-  const isExportableRow = (row) => row && typeof row === "object" && headers.some((key) => Object.prototype.hasOwnProperty.call(row, key));
+  const aliasesByHeader = {
+    comentarios: ["comentarios", "comentario", "observaciones", "observacion"]
+  };
+
+  const readCellValue = (row, header) => {
+    const aliases = aliasesByHeader[header] || [header];
+    const key = aliases.find((candidate) => Object.prototype.hasOwnProperty.call(row, candidate));
+    return key ? row[key] : "";
+  };
+
+  const isExportableRow = (row) => row && typeof row === "object" && !Array.isArray(row)
+    && headers.some((key) => Object.prototype.hasOwnProperty.call(row, key) || (aliasesByHeader[key] || []).some((alias) => Object.prototype.hasOwnProperty.call(row, alias)));
 
   const extractRows = (node, depth = 0) => {
     if (depth > 10 || node === null || node === undefined) return [];
-    if (Array.isArray(node)) return node.filter((row) => isExportableRow(row));
     if (typeof node === "string") {
       const t = node.trim();
       if (!t) return [];
       try { return extractRows(JSON.parse(t), depth + 1); } catch (_e) { return []; }
     }
+    if (Array.isArray(node)) {
+      return node.flatMap((item) => extractRows(item, depth + 1));
+    }
     if (typeof node === "object") {
-      if (isExportableRow(node)) return [node];
-      for (const value of Object.values(node)) {
-        const rows = extractRows(value, depth + 1);
-        if (rows.length) return rows;
-      }
+      const currentRows = isExportableRow(node) ? [node] : [];
+      const nestedRows = Object.values(node).flatMap((value) => extractRows(value, depth + 1));
+      return [...currentRows, ...nestedRows];
     }
     return [];
+  };
+
+  const removeEmailDomainNoise = (value) => String(value || "")
+    .replace(/@/g, "_")
+    .replace(/(?:\.com|\.co|\.net|\.org|\.edu|\.es)+$/i, "");
+
+  const normalizeFilePart = (value, fallback, { stripDomain = false } = {}) => {
+    const baseValue = stripDomain ? removeEmailDomainNoise(value) : value;
+    const text = String(baseValue || fallback || "archivo")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\./g, "_")
+      .replace(/[^a-zA-Z0-9_-]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    return text || fallback || "archivo";
+  };
+
+  const buildExcelFilename = () => {
+    const empleadoNombre = empleadoSeleccionado?.nombre_completo || state.empleadoDetalle?.nombre || empleadoId || "empleado";
+    return `${normalizeFilePart(empleadoNombre, "empleado", { stripDomain: true })}_${normalizeFilePart(periodoInicio, "inicio")}_a_${normalizeFilePart(periodoFin, "fin")}.xls`;
   };
 
   const escHtml = (value) => String(value ?? "")
@@ -747,7 +782,7 @@ const descargarExcelEmpleado = async () => {
   const buildExcelHtml = (rows) => {
     const thead = `<tr>${headers.map((h) => `<th>${escHtml(h)}</th>`).join("")}</tr>`;
     const tbody = rows
-      .map((row) => `<tr>${headers.map((h) => `<td>${escHtml(row[h])}</td>`).join("")}</tr>`)
+      .map((row) => `<tr>${headers.map((h) => `<td>${escHtml(readCellValue(row, h))}</td>`).join("")}</tr>`)
       .join("");
     return `<!DOCTYPE html><html><head><meta charset="UTF-8" /><style>
       table{border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;}
@@ -761,7 +796,7 @@ const descargarExcelEmpleado = async () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `historico_empleado_${empleadoId}_${fechaInicioInput.value || "inicio"}_${fechaFinInput.value || "fin"}.xls`;
+    link.download = buildExcelFilename();
     link.style.display = "none";
     document.body.appendChild(link);
     link.click();
@@ -795,7 +830,7 @@ const descargarExcelEmpleado = async () => {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `historico_empleado_${empleadoId}_${fechaInicioInput.value || "inicio"}_${fechaFinInput.value || "fin"}.xls`;
+      link.download = buildExcelFilename();
       link.style.display = "none";
       document.body.appendChild(link);
       link.click();

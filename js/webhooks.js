@@ -32,6 +32,21 @@ export const WEBHOOK_REGISTRO_EMPRESA =
 export const WEBHOOK_REGISTRO_USUARIO =
   "https://n8n.enkrato.com/webhook/registro_usuario";
 
+
+
+// configuracion/contrasena.html (botón: "Verificar" cédula o NIT para recuperación no logueada)
+export const WEBHOOK_VERIFICAR_NIT_CEDULA =
+  "https://n8n.enkrato.com/webhook/verificar_nit_cedula";
+
+
+// configuracion/anadir_local.html (botón: "Registrar local y continuar")
+export const WEBHOOK_REGISTRO_LOCAL_DEPENDIENTE =
+  "https://n8n.enkrato.com/webhook/locales/registrar_local_dependiente";
+
+// configuracion/anadir_local_usuario.html (botón: "Crear usuario / preparar duplicación")
+export const WEBHOOK_DUPLICAR_USUARIOS_LOCAL =
+  "https://n8n.enkrato.com/webhook/locales/duplicar_usuarios";
+
 // configuracion/registro_empleados.html (botón: "Registrar empleado")
 export const WEBHOOK_REGISTRAR_EMPLEADO =
   "https://n8n.enkrato.com/webhook/registro_empleados";

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Enkrato | Añadir local</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/registro.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../js/router.js"></script>
+  <script type="module" src="../js/header.js"></script>
+
+  <div class="main">
+    <h1>Añadir local</h1>
+    <p>
+      Registra una sede o local ligado a tu empresa principal. Este flujo queda separado del registro público
+      para que luego puedas conectarlo a la creación de tenant y duplicación de usuarios por sede.
+    </p>
+
+    <form id="registroLocal">
+      <input type="text" id="nombre_comercial" placeholder="Nombre comercial del local" required>
+      <input type="text" id="razon_social" placeholder="Razón social o nombre legal de la sede" required>
+      <input type="text" id="nit" placeholder="NIT de la empresa principal" inputmode="numeric" pattern="[0-9]*" required readonly>
+      <small style="display:block;color:#6b7280;margin-top:-8px">Los locales comparten el mismo NIT tributario de la empresa principal.</small>
+      <input type="email" id="correo_empresa" placeholder="Correo administrativo del local" required>
+
+      <label class="consentimiento-legal">
+        <input type="checkbox" id="acepta_politicas" required>
+        Confirmo que tengo autorización para registrar este local como sede dependiente de la empresa activa y acepto las políticas de Enkrato:
+        <a href="../legal/terminos.html" target="_blank" rel="noopener noreferrer">Términos y Condiciones</a>,
+        <a href="../legal/privacidad.html" target="_blank" rel="noopener noreferrer">Política de Privacidad</a>,
+        <a href="../legal/datos.html" target="_blank" rel="noopener noreferrer">Tratamiento de Datos</a> y
+        <a href="../legal/seguridad.html" target="_blank" rel="noopener noreferrer">Política de Seguridad</a>.
+      </label>
+
+      <button type="submit">Enviar código de verificación</button>
+    </form>
+
+    <div id="verificacion" style="display:none; margin-top:16px;">
+      <input type="text" id="codigo" placeholder="Código recibido por correo" inputmode="numeric" pattern="[0-9]*">
+      <button id="verificarCodigo" type="button">Verificar código</button>
+    </div>
+
+    <button id="continuar" type="button" style="display:none; margin-top:16px;">
+      Registrar local y continuar
+    </button>
+
+    <div id="status"></div>
+  </div>
+
+  <script type="module" src="../js/anadir_local.js"></script>
+  <script type="module" src="../js/footer.js"></script>
+</body>
+</html>

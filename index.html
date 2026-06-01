@@ -3,88 +3,97 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AXIOMA | Iniciar sesión</title>
-  <link rel="stylesheet" href="css/main.css">
-  <link rel="stylesheet" href="css/login.css">
+  <title>Enkrato | Software para restaurantes y negocios operativos</title>
+  <meta name="description" content="Enkrato ayuda a restaurantes, tiendas y distribuidoras a medir, controlar, analizar y mejorar su operación con menos tareas manuales y más decisiones confiables.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/landing.css">
 </head>
 <body>
-  <div class="main login-container">
-    <h2>Accede a tu cuenta</h2>
+  <main class="landing-page">
+    <section class="hero-section" id="heroSection" aria-labelledby="heroTitle">
+      <canvas id="automaton-canvas" aria-hidden="true"></canvas>
+      <div class="hero-overlay" aria-hidden="true"></div>
 
-    <form id="loginForm">
-      <div class="form-group">
-        <label for="email">Correo electrónico</label>
-        <input type="email" id="email" name="email" required autocomplete="email">
+      <header class="landing-header" aria-label="Navegación principal">
+        <a class="brand-pill" href="./" aria-label="Enkrato inicio">
+          <img src="images/Logo.webp" alt="Logo Enkrato" class="brand-logo" onerror="this.style.display='none'">
+          <span>Enkrato</span>
+        </a>
+        <a class="login-link" href="./inicio/">Iniciar sesión</a>
+      </header>
+
+      <div class="hero-content" id="hero-content">
+        <p class="eyebrow">Medir, Controlar, Analizar y Mejorar</p>
+        <h1 class="hero-title" id="heroTitle">Enkrato</h1>
+        <p class="hero-subtitle">
+          Convierte la operación diaria de restaurantes, tiendas y distribuidoras en decisiones claras:
+          módulos prácticos creados con negocios del sector para ordenar tu gestión administrativa,
+          validar tu información y liberar tiempo para crecer.
+        </p>
+        <div class="hero-actions">
+          <a class="primary-cta" href="./registro/index.html">Empodérate de tu negocio</a>
+          <a class="secondary-cta" href="./inicio/">Ya tengo cuenta</a>
+        </div>
       </div>
 
-      <div class="form-group">
-        <label for="password">Contraseña</label>
-        <input type="password" id="password" name="password" required autocomplete="current-password">
-      </div>
-
-      <button type="submit">Iniciar sesión</button>
-      <p id="error-message" style="color: red; margin-top: 10px;"></p>
-    </form>
-
-    <div class="login-extra">
-      <a href="#" id="forgotPasswordLink">¿Olvidé mi contraseña?</a>
-    </div>
-
-    <p id="status" aria-live="polite"></p>
-
-    <div class="login-extra">
-      <a href="./registro/index.html" class="registro-link">
-        ¿No tienes cuenta? Regístrate aquí
+      <a class="scroll-indicator" href="#por-que-nosotros" aria-label="Ver por qué elegir Enkrato">
+        <span aria-hidden="true">⌄</span>
       </a>
-    </div>
-  </div>
+    </section>
 
-  <script type="module">
-    import { signInWithPassword } from "./js/auth.js";
-    import { sendRecoveryForEmail } from "./js/contrasena.js";
-    import { resolvePostLoginRoute } from "./js/post_login_route.js";
-    const form = document.getElementById("loginForm");
-    const emailInput = document.getElementById("email");
-    const passwordInput = document.getElementById("password");
-    const errorEl = document.getElementById("error-message");
-    const forgotPasswordLink = document.getElementById("forgotPasswordLink");
+    <section class="problem-solution" id="por-que-nosotros" aria-labelledby="whyTitle">
+      <div class="section-shell two-column">
+        <div>
+          <p class="section-kicker">Problema → solución</p>
+          <h2 id="whyTitle">¿Por qué elegir Enkrato?</h2>
+        </div>
+        <div class="story-card">
+          <p>
+            Muchos sistemas registran turnos, ventas o inventarios consumidos; el verdadero reto aparece
+            cuando necesitas comparar lo que el sistema dice con lo que tu equipo reporta en la operación real.
+          </p>
+          <p>
+            En demasiados negocios esa verificación todavía depende de formatos manuales, revisión fila por fila
+            y cierres que consumen energía. Enkrato automatiza esa conciliación y, para usuarios que operan con
+            Loggro, conecta ambas plataformas para ahorrar tiempo, aumentar eficiencia y detectar diferencias con
+            mayor confianza.
+          </p>
+        </div>
+      </div>
+    </section>
 
-    
-    forgotPasswordLink?.addEventListener("click", async (event) => {
-      event.preventDefault();
-      const email = String(emailInput?.value || "").trim();
-      if (!email) { if (errorEl) errorEl.textContent = "Ingresa tu correo para recuperar contraseña."; return; }
-      try {
-        await sendRecoveryForEmail(email);
-        if (errorEl) errorEl.textContent = "Te enviamos un enlace de recuperación al correo indicado.";
-      } catch (error) {
-        if (errorEl) errorEl.textContent = `No se pudo enviar recuperación: ${error?.message || "sin detalle"}`;
-      }
-    });
+    <section class="benefits-section" aria-labelledby="benefitsTitle">
+      <div class="section-shell">
+        <p class="section-kicker">Beneficios para tu operación</p>
+        <h2 id="benefitsTitle">Menos fricción diaria. Más control para escalar.</h2>
+        <div class="benefits-grid">
+          <article class="benefit-card">
+            <span class="benefit-icon" aria-hidden="true">⏱</span>
+            <h3>Ahorro de tiempo</h3>
+            <p>Centraliza verificaciones y reduce horas invertidas en revisar cierres, turnos e inventario de forma manual.</p>
+          </article>
+          <article class="benefit-card">
+            <span class="benefit-icon" aria-hidden="true">✓</span>
+            <h3>Menos errores operativos</h3>
+            <p>Disminuye reprocesos causados por digitación, formatos físicos o diferencias no detectadas a tiempo.</p>
+          </article>
+          <article class="benefit-card">
+            <span class="benefit-icon" aria-hidden="true">↗</span>
+            <h3>Decisiones con evidencia</h3>
+            <p>Compara información registrada contra datos reales para entender qué pasó y actuar con mayor seguridad.</p>
+          </article>
+          <article class="benefit-card">
+            <span class="benefit-icon" aria-hidden="true">☕</span>
+            <h3>Menos estrés para el equipo</h3>
+            <p>Simplifica cierres y controles repetitivos para que tus colaboradores se enfoquen en atender y producir mejor.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
 
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      if (errorEl) errorEl.textContent = "";
-
-      const email = String(emailInput?.value || "").trim();
-      const password = String(passwordInput?.value || "");
-
-      try {
-        await signInWithPassword(email, password);
-        const targetRoute = await resolvePostLoginRoute().catch(() => "./dashboard/");
-        window.location.href = targetRoute;
-      } catch (error) {
-        console.error("Error de inicio de sesión:", error);
-        const message = String(error?.message || "");
-        if (message.includes("Invalid login credentials")) {
-          if (errorEl) errorEl.textContent = "Correo o contraseña incorrectos.";
-        } else {
-          if (errorEl) errorEl.textContent = "Error de conexión. Inténtalo de nuevo.";
-        }
-      }
-    });
-  </script>
-  <script type="module" src="js/public_chrome.js"></script>
-  <script type="module" src="js/footer.js"></script>
+  <script type="module" src="js/landing.js"></script>
 </body>
 </html>
