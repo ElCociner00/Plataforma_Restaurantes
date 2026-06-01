@@ -32,6 +32,23 @@ export const WEBHOOK_REGISTRO_EMPRESA =
 export const WEBHOOK_REGISTRO_USUARIO =
   "https://n8n.enkrato.com/webhook/registro_usuario";
 
+
+// configuracion/anadir_local.html (botón: "Enviar código de verificación" para nueva sede/local)
+export const WEBHOOK_CREAR_CODIGO_VERIFICACION_LOCAL =
+  "https://n8n.enkrato.com/webhook/locales/crear_codigo_verificacion";
+
+// configuracion/anadir_local.html (botón: "Verificar código" para nueva sede/local)
+export const WEBHOOK_VERIFICAR_CODIGO_LOCAL =
+  "https://n8n.enkrato.com/webhook/locales/verificar_codigo";
+
+// configuracion/anadir_local.html (botón: "Registrar local y continuar")
+export const WEBHOOK_REGISTRO_LOCAL_DEPENDIENTE =
+  "https://n8n.enkrato.com/webhook/locales/registrar_local_dependiente";
+
+// configuracion/anadir_local_usuario.html (botón: "Crear usuario / preparar duplicación")
+export const WEBHOOK_DUPLICAR_USUARIOS_LOCAL =
+  "https://n8n.enkrato.com/webhook/locales/duplicar_usuarios";
+
 // configuracion/registro_empleados.html (botón: "Registrar empleado")
 export const WEBHOOK_REGISTRAR_EMPLEADO =
   "https://n8n.enkrato.com/webhook/registro_empleados";
