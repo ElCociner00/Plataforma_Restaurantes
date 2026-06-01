@@ -753,18 +753,24 @@ const descargarExcelEmpleado = async () => {
     return [];
   };
 
-  const normalizeFilePart = (value, fallback) => {
-    const text = String(value || fallback || "archivo")
+  const removeEmailDomainNoise = (value) => String(value || "")
+    .replace(/@/g, "_")
+    .replace(/(?:\.com|\.co|\.net|\.org|\.edu|\.es)+$/i, "");
+
+  const normalizeFilePart = (value, fallback, { stripDomain = false } = {}) => {
+    const baseValue = stripDomain ? removeEmailDomainNoise(value) : value;
+    const text = String(baseValue || fallback || "archivo")
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-zA-Z0-9._-]+/g, "_")
+      .replace(/\./g, "_")
+      .replace(/[^a-zA-Z0-9_-]+/g, "_")
       .replace(/^_+|_+$/g, "");
     return text || fallback || "archivo";
   };
 
   const buildExcelFilename = () => {
     const empleadoNombre = empleadoSeleccionado?.nombre_completo || state.empleadoDetalle?.nombre || empleadoId || "empleado";
-    return `${normalizeFilePart(empleadoNombre, "empleado")}_${normalizeFilePart(periodoInicio, "inicio")}_a_${normalizeFilePart(periodoFin, "fin")}.xls`;
+    return `${normalizeFilePart(empleadoNombre, "empleado", { stripDomain: true })}_${normalizeFilePart(periodoInicio, "inicio")}_a_${normalizeFilePart(periodoFin, "fin")}.xls`;
   };
 
   const escHtml = (value) => String(value ?? "")

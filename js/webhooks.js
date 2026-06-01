@@ -33,13 +33,11 @@ export const WEBHOOK_REGISTRO_USUARIO =
   "https://n8n.enkrato.com/webhook/registro_usuario";
 
 
-// configuracion/anadir_local.html (botón: "Enviar código de verificación" para nueva sede/local)
-export const WEBHOOK_CREAR_CODIGO_VERIFICACION_LOCAL =
-  "https://n8n.enkrato.com/webhook/locales/crear_codigo_verificacion";
 
-// configuracion/anadir_local.html (botón: "Verificar código" para nueva sede/local)
-export const WEBHOOK_VERIFICAR_CODIGO_LOCAL =
-  "https://n8n.enkrato.com/webhook/locales/verificar_codigo";
+// configuracion/contrasena.html (botón: "Verificar" cédula o NIT para recuperación no logueada)
+export const WEBHOOK_VERIFICAR_NIT_CEDULA =
+  "https://n8n.enkrato.com/webhook/verificar_nit_cedula";
+
 
 // configuracion/anadir_local.html (botón: "Registrar local y continuar")
 export const WEBHOOK_REGISTRO_LOCAL_DEPENDIENTE =

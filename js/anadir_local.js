@@ -1,8 +1,9 @@
 import { enforceNumericInput } from "./input_utils.js";
 import { getUserContext } from "./session.js";
+import { supabase } from "./supabase.js";
 import {
-  WEBHOOK_CREAR_CODIGO_VERIFICACION_LOCAL,
-  WEBHOOK_VERIFICAR_CODIGO_LOCAL,
+  WEBHOOK_CREAR_CODIGO_VERIFICACION,
+  WEBHOOK_VERIFICAR_CODIGO,
   WEBHOOK_REGISTRO_LOCAL_DEPENDIENTE
 } from "./webhooks.js";
 import { APP_URLS } from "./urls.js";
@@ -35,6 +36,7 @@ enforceNumericInput([nitInput, codigoInput]);
 let context = null;
 let datosLocal = null;
 let codigoValidado = false;
+let empresaMatriz = null;
 
 const init = async () => {
   context = await getUserContext().catch(() => null);
@@ -47,7 +49,26 @@ const init = async () => {
   if (!canManageLocals(context)) {
     setStatus("No tienes permisos para añadir locales. Solicita acceso a un administrador.");
     form?.querySelectorAll("input, button")?.forEach((element) => { element.disabled = true; });
+    return;
   }
+
+  const { data, error } = await supabase
+    .from("empresas")
+    .select("id,nit,nombre_comercial,razon_social,correo_empresa")
+    .eq("id", context.empresa_id)
+    .maybeSingle();
+
+  if (error || !data?.nit) {
+    setStatus("No se pudo cargar el NIT de la empresa principal. Es necesario para registrar locales con el mismo NIT.");
+    form?.querySelectorAll("input, button")?.forEach((element) => { element.disabled = true; });
+    return;
+  }
+
+  empresaMatriz = data;
+  nitInput.value = String(data.nit || "").trim();
+  nitInput.readOnly = true;
+  nitInput.title = "Los locales usan el mismo NIT de la empresa principal.";
+  setStatus("El local se registrará con el mismo NIT de la empresa principal.");
 };
 
 form?.addEventListener("submit", async (event) => {
@@ -71,7 +92,7 @@ form?.addEventListener("submit", async (event) => {
   datosLocal = {
     nombre_comercial: nombreComercialInput.value.trim(),
     razon_social: razonSocialInput.value.trim(),
-    nit: nitInput.value.trim(),
+    nit: String(empresaMatriz?.nit || nitInput.value || "").trim(),
     correo_empresa: correoEmpresaInput.value.trim(),
     empresa_matriz_id: context.empresa_id,
     usuario_solicitante_id: context.user?.id || context.user?.user_id || null,
@@ -83,7 +104,7 @@ form?.addEventListener("submit", async (event) => {
   setStatus("Enviando código de verificación del local...");
 
   try {
-    const res = await fetch(WEBHOOK_CREAR_CODIGO_VERIFICACION_LOCAL, {
+    const res = await fetch(WEBHOOK_CREAR_CODIGO_VERIFICACION, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(datosLocal)
@@ -112,7 +133,7 @@ document.getElementById("verificarCodigo")?.addEventListener("click", async () =
   setStatus("Verificando código del local...");
 
   try {
-    const res = await fetch(WEBHOOK_VERIFICAR_CODIGO_LOCAL, {
+    const res = await fetch(WEBHOOK_VERIFICAR_CODIGO, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
