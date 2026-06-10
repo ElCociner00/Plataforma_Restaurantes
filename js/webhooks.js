@@ -148,6 +148,10 @@ export const WEBHOOK_NOMINA_CONSULTAR =
 export const WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO =
   "https://n8n.enkrato.com/webhook/consultar_histórico_empleado";
 
+// configuracion/parametros_nomina.html (botón: "Guardar parámetro")
+export const WEBHOOK_NOMINA_PARAMETROS_REGISTRAR =
+  "https://n8n.enkrato.com/webhook/nomina_parametros_registrar";
+
 // dashboard/index.html (auto-carga inicial de métricas)
 export const WEBHOOK_DASHBOARD_DATOS =
   "https://n8n.enkrato.com/webhook/dashboard";
@@ -225,6 +229,13 @@ WEBHOOKS.NOMINA_CONSULTAR = {
   archivos_que_usan: ["js/nomina.js"],
   metodo: "POST",
   descripcion: "Consulta movimientos de nómina por empresa, empleado y rango de fechas"
+};
+
+WEBHOOKS.NOMINA_PARAMETROS_REGISTRAR = {
+  url: WEBHOOK_NOMINA_PARAMETROS_REGISTRAR,
+  archivos_que_usan: ["js/parametros_nomina.js"],
+  metodo: "POST",
+  descripcion: "Registra el valor de una combinación de tiempo y concepto para parámetros de nómina por tenant"
 };
 
 

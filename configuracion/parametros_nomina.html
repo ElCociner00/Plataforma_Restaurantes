@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>AXIOMA | Parámetros de nómina</title>
+
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/parametros_nomina.css">
+</head>
+<body style="display:none">
+
+  <script type="module" src="../js/router.js"></script>
+  <script type="module" src="../js/header.js"></script>
+
+  <div class="main parametros-nomina-main">
+    <h1>Parámetros de nómina</h1>
+    <p class="intro">Configura el valor que se aplicará a cada combinación de tiempo y concepto para la empresa activa.</p>
+
+    <section class="bloque parametros-nomina-card">
+      <h2>Nuevo parámetro</h2>
+      <p class="ayuda">Selecciona un tiempo, un concepto y escribe el valor numérico que tendrá esa combinación.</p>
+
+      <form id="parametrosNominaForm" class="parametros-nomina-form">
+        <label for="parametroTiempo">Tiempo</label>
+        <select id="parametroTiempo" required>
+          <option value="">Cargando tiempos...</option>
+        </select>
+
+        <label for="parametroConcepto">Concepto</label>
+        <select id="parametroConcepto" required>
+          <option value="">Cargando conceptos...</option>
+        </select>
+
+        <label for="parametroValor">Valor</label>
+        <input id="parametroValor" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ej: 12500" required>
+
+        <button id="btnGuardarParametroNomina" type="submit">Guardar parámetro</button>
+      </form>
+
+      <div id="parametrosNominaStatus" class="status" role="status" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <script type="module" src="../js/parametros_nomina.js"></script>
+  <script type="module" src="../js/footer.js"></script>
+  <!-- Parche de autenticación para módulos (aislado) -->
+  <script type="module" src="../js/module_fix/init.js"></script>
+</body>
+</html>
