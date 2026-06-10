@@ -9,15 +9,18 @@
  * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
  *
  * Índice de funciones/bloques para ubicarte rápido:
- * - `loadCatalog` (línea aprox. 80): Carga catálogos de tiempos/conceptos desde Supabase.
- * - `buildPayload` (línea aprox. 164): Construye el JSON enviado al webhook.
- * - `submitParametro` (línea aprox. 193): Envía el parámetro de nómina al webhook.
+ * - `loadCatalog` (línea aprox. 114): Carga catálogos de tiempos/conceptos desde webhooks n8n.
+ * - `buildPayload` (línea aprox. 156): Construye el JSON enviado al webhook.
+ * - `submitParametro` (línea aprox. 188): Envía el parámetro de nómina al webhook.
  *
  * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
  */
-import { supabase } from "./supabase.js";
 import { buildRequestHeaders, getUserContext } from "./session.js";
-import { WEBHOOK_NOMINA_PARAMETROS_REGISTRAR } from "./webhooks.js";
+import {
+  WEBHOOK_NOMINA_CONCEPTOS_CONSULTAR,
+  WEBHOOK_NOMINA_PARAMETROS_REGISTRAR,
+  WEBHOOK_NOMINA_TIEMPOS_CONSULTAR
+} from "./webhooks.js";
 
 const form = document.getElementById("parametrosNominaForm");
 const tiempoSelect = document.getElementById("parametroTiempo");
@@ -26,32 +29,18 @@ const valorInput = document.getElementById("parametroValor");
 const btnGuardar = document.getElementById("btnGuardarParametroNomina");
 const statusDiv = document.getElementById("parametrosNominaStatus");
 
-const FALLBACK_TIEMPOS = [
-  { id: "hora_diurna", nombre: "Hora diurna" },
-  { id: "hora_nocturna", nombre: "Hora nocturna" },
-  { id: "dominical_diurna", nombre: "Dominical diurna" },
-  { id: "dominical_nocturna", nombre: "Dominical nocturna" }
-];
-
-const FALLBACK_CONCEPTOS = [
-  { id: "devengo", nombre: "Devengo" },
-  { id: "deduccion", nombre: "Deducción" },
-  { id: "bono", nombre: "Bono" },
-  { id: "descuento", nombre: "Descuento" }
-];
-
 const CATALOGS = {
   tiempos: {
     select: tiempoSelect,
     placeholder: "Selecciona un tiempo",
-    fallback: FALLBACK_TIEMPOS,
-    tables: ["nomina_tiempos", "nomina_tipos_tiempo", "nomina_catalogo_tiempos", "nomina_tiempo"]
+    loadingLabel: "Cargando tiempos...",
+    url: WEBHOOK_NOMINA_TIEMPOS_CONSULTAR
   },
   conceptos: {
     select: conceptoSelect,
     placeholder: "Selecciona un concepto",
-    fallback: FALLBACK_CONCEPTOS,
-    tables: ["nomina_conceptos", "nomina_catalogo_conceptos", "nomina_concepto"]
+    loadingLabel: "Cargando conceptos...",
+    url: WEBHOOK_NOMINA_CONCEPTOS_CONSULTAR
   }
 };
 
@@ -73,24 +62,16 @@ const setSubmitting = (isSubmitting) => {
 
 const normalizeCatalogRow = (row) => {
   if (!row || typeof row !== "object") return null;
-  const rawId = row.id || row.uuid || row.codigo || row.code || row.slug || row.nombre || row.name || row.descripcion;
-  const rawName = row.nombre || row.name || row.descripcion || row.label || row.codigo || row.code || row.slug || row.id;
-  const id = String(rawId || "").trim();
-  const nombre = String(rawName || "").trim();
+  const id = String(row.id || "").trim();
+  const nombre = String(row.nombre || "").trim();
   if (!id || !nombre) return null;
 
   return {
     id,
     nombre,
+    factor_conversion: row.factor_conversion ?? null,
     raw: row
   };
-};
-
-const isRowVisibleForTenant = (row, tenantId) => {
-  if (!row || typeof row !== "object") return false;
-  if (row.activo === false || row.estado === false) return false;
-  const rowTenant = row.tenant_id || row.empresa_id;
-  return !rowTenant || !tenantId || String(rowTenant) === String(tenantId);
 };
 
 const fillSelect = (select, options, placeholder) => {
@@ -107,66 +88,11 @@ const fillSelect = (select, options, placeholder) => {
     el.value = option.id;
     el.textContent = option.nombre;
     el.dataset.nombre = option.nombre;
+    if (option.factor_conversion !== null && option.factor_conversion !== undefined) {
+      el.dataset.factorConversion = String(option.factor_conversion);
+    }
     select.appendChild(el);
   });
-};
-
-const mapCatalogRows = (data, tenantId) => (
-  (Array.isArray(data) ? data : [])
-    .filter((row) => isRowVisibleForTenant(row, tenantId))
-    .map(normalizeCatalogRow)
-    .filter(Boolean)
-);
-
-const readCatalogFromTable = async (tableName, tenantId) => {
-  const tenantFilters = tenantId ? [
-    `tenant_id.is.null,tenant_id.eq.${tenantId}`,
-    `empresa_id.is.null,empresa_id.eq.${tenantId}`
-  ] : [];
-
-  for (const filter of tenantFilters) {
-    const { data, error } = await supabase
-      .from(tableName)
-      .select("*")
-      .or(filter)
-      .limit(250);
-
-    if (!error) return mapCatalogRows(data, tenantId);
-    console.warn(`[parametros_nomina] Filtro ${filter} no aplicó en ${tableName}:`, error?.message || error);
-  }
-
-  const { data, error } = await supabase
-    .from(tableName)
-    .select("*")
-    .limit(250);
-
-  if (error) throw error;
-
-  return mapCatalogRows(data, tenantId);
-};
-
-const loadCatalog = async (catalogName) => {
-  const config = CATALOGS[catalogName];
-  const tenantId = currentContext?.empresa_id;
-
-  fillSelect(config.select, [], `Cargando ${catalogName}...`);
-
-  for (const tableName of config.tables) {
-    try {
-      const rows = await readCatalogFromTable(tableName, tenantId);
-      if (rows.length) {
-        catalogState[catalogName] = rows;
-        fillSelect(config.select, rows, config.placeholder);
-        return { tableName, usedFallback: false };
-      }
-    } catch (error) {
-      console.warn(`[parametros_nomina] No se pudo cargar ${catalogName} desde ${tableName}:`, error?.message || error);
-    }
-  }
-
-  catalogState[catalogName] = config.fallback;
-  fillSelect(config.select, config.fallback, config.placeholder);
-  return { tableName: null, usedFallback: true };
 };
 
 const readResponseBody = async (response) => {
@@ -177,6 +103,66 @@ const readResponseBody = async (response) => {
   } catch {
     return { message: raw };
   }
+};
+
+const extractDataRows = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    if (value.every((item) => item && typeof item === "object" && !Array.isArray(item) && "id" in item && "nombre" in item)) {
+      return value;
+    }
+
+    return value.flatMap((item) => extractDataRows(item));
+  }
+
+  if (typeof value === "object") {
+    if (Array.isArray(value.data)) return extractDataRows(value.data);
+    if (Array.isArray(value.body)) return extractDataRows(value.body);
+    if (Array.isArray(value.result)) return extractDataRows(value.result);
+  }
+
+  return [];
+};
+
+const buildCatalogRequestPayload = () => ({
+  tenant_id: currentContext?.empresa_id,
+  empresa_id: currentContext?.empresa_id,
+  usuario_id: currentContext?.user?.id || currentContext?.user?.user_id || null,
+  origen: "configuracion_parametros_nomina",
+  timestamp: new Date().toISOString()
+});
+
+const fetchCatalogRows = async (url) => {
+  const authHeaders = await buildRequestHeaders({ includeTenant: true });
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders
+    },
+    body: JSON.stringify(buildCatalogRequestPayload())
+  });
+
+  const data = await readResponseBody(response);
+  if (!response.ok) throw new Error(data?.message || `HTTP ${response.status}`);
+
+  return extractDataRows(data)
+    .map(normalizeCatalogRow)
+    .filter(Boolean);
+};
+
+const loadCatalog = async (catalogName) => {
+  const config = CATALOGS[catalogName];
+  fillSelect(config.select, [], config.loadingLabel);
+
+  const rows = await fetchCatalogRows(config.url);
+  if (!rows.length) {
+    throw new Error(`El webhook de ${catalogName} respondió sin datos compatibles.`);
+  }
+
+  catalogState[catalogName] = rows;
+  fillSelect(config.select, rows, config.placeholder);
+  return rows;
 };
 
 const findSelectedCatalogItem = (catalogName, selectedId) => (
@@ -194,8 +180,11 @@ const buildPayload = () => {
     empresa_id: currentContext?.empresa_id,
     tiempo_id: tiempo?.id || tiempoSelect?.value,
     tiempo: tiempo?.nombre || tiempoSelect?.selectedOptions?.[0]?.textContent || "",
+    tiempo_nombre: tiempo?.nombre || tiempoSelect?.selectedOptions?.[0]?.textContent || "",
+    tiempo_factor_conversion: tiempo?.factor_conversion ?? null,
     concepto_id: concepto?.id || conceptoSelect?.value,
     concepto: concepto?.nombre || conceptoSelect?.selectedOptions?.[0]?.textContent || "",
+    concepto_nombre: concepto?.nombre || conceptoSelect?.selectedOptions?.[0]?.textContent || "",
     valor,
     usuario_id: userId,
     registrado_por: userId,
@@ -258,23 +247,16 @@ const init = async () => {
     return;
   }
 
-  const [tiemposResult, conceptosResult] = await Promise.all([
+  await Promise.all([
     loadCatalog("tiempos"),
     loadCatalog("conceptos")
   ]);
 
-  const fallbackCatalogs = [
-    tiemposResult.usedFallback ? "tiempos" : "",
-    conceptosResult.usedFallback ? "conceptos" : ""
-  ].filter(Boolean);
-
-  setStatus(fallbackCatalogs.length
-    ? `Listas cargadas con valores base para: ${fallbackCatalogs.join(" y ")}. Verifica las tablas de Supabase si esperabas datos personalizados.`
-    : "Listas de tiempos y conceptos cargadas desde Supabase.");
+  setStatus("Listas de tiempos y conceptos cargadas desde los webhooks de nómina.");
 };
 
 form?.addEventListener("submit", submitParametro);
 init().catch((error) => {
   console.error("[parametros_nomina] Error inicializando módulo:", error);
-  setStatus("No se pudo cargar el módulo de parámetros de nómina.");
+  setStatus(`No se pudo cargar el módulo de parámetros de nómina: ${error?.message || "error de conexión"}.`);
 });
