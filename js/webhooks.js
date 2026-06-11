@@ -160,18 +160,6 @@ export const WEBHOOK_NOMINA_TIEMPOS_CONSULTAR =
 export const WEBHOOK_NOMINA_PARAMETROS_REGISTRAR =
   "https://n8n.enkrato.com/webhook/nuevo_parametro_nómina";
 
-// configuracion/parametros_nomina.html (selector: "Concepto")
-export const WEBHOOK_NOMINA_CONCEPTOS_CONSULTAR =
-  "https://n8n.enkrato.com/webhook/consultar_concepto_nómina";
-
-// configuracion/parametros_nomina.html (selector: "Tiempo")
-export const WEBHOOK_NOMINA_TIEMPOS_CONSULTAR =
-  "https://n8n.enkrato.com/webhook/consultar_tiempo_nómina";
-
-// configuracion/parametros_nomina.html (botón: "Guardar parámetro")
-export const WEBHOOK_NOMINA_PARAMETROS_REGISTRAR =
-  "https://n8n.enkrato.com/webhook/nuevo_parametro_nómina";
-
 // dashboard/index.html (auto-carga inicial de métricas)
 export const WEBHOOK_DASHBOARD_DATOS =
   "https://n8n.enkrato.com/webhook/dashboard";
