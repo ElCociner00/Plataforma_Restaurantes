@@ -146,7 +146,19 @@ export const WEBHOOK_NOMINA_CONSULTAR =
 
 // nomina/index.html (botón: "Descargar Excel empleado")
 export const WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO =
-  "https://n8n.enkrato.com/webhook/consultar_histórico_empleado";
+  "https://n8n.enkrato.com/webhook/consultar_nomina_nuevo";
+
+// configuracion/parametros_nomina.html (selector: "Concepto")
+export const WEBHOOK_NOMINA_CONCEPTOS_CONSULTAR =
+  "https://n8n.enkrato.com/webhook/consultar_concepto_nómina";
+
+// configuracion/parametros_nomina.html (selector: "Tiempo")
+export const WEBHOOK_NOMINA_TIEMPOS_CONSULTAR =
+  "https://n8n.enkrato.com/webhook/consultar_tiempo_nómina";
+
+// configuracion/parametros_nomina.html (botón: "Guardar parámetro")
+export const WEBHOOK_NOMINA_PARAMETROS_REGISTRAR =
+  "https://n8n.enkrato.com/webhook/nuevo_parametro_nómina";
 
 // configuracion/parametros_nomina.html (selector: "Concepto")
 export const WEBHOOK_NOMINA_CONCEPTOS_CONSULTAR =

@@ -23,7 +23,7 @@
  *
  * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
  */
-import { getUserContext } from "./session.js";
+import { buildRequestHeaders, getUserContext } from "./session.js";
 import { fetchResponsablesActivos } from "./responsables.js";
 import { getActiveEnvironment } from "./environment.js";
 import { supabase } from "./supabase.js";
@@ -704,9 +704,16 @@ const descargarExcelEmpleado = async () => {
     return;
   }
 
+  if (!fechaInicioInput.value || !fechaFinInput.value) {
+    setStatus("Selecciona un rango de fechas válido para exportar el Excel.");
+    return;
+  }
+
   const payload = {
     empresa_id: state.context?.empresa_id || "",
+    tenant_id: state.context?.empresa_id || "",
     responsable_id: empleadoId,
+    empleado_id: empleadoId,
     corte: corteSelect.value || "quincenal",
     fecha_inicio: fechaInicioInput.value || "",
     fecha_fin: fechaFinInput.value || "",
@@ -716,42 +723,6 @@ const descargarExcelEmpleado = async () => {
   const empleadoSeleccionado = state.responsables.find((item) => item.id === empleadoId);
   const periodoInicio = fechaInicioInput.value || "inicio";
   const periodoFin = fechaFinInput.value || "fin";
-
-  const headers = [
-    "fecha_turno", "hora_inicio", "hora_fin", "Momento", "domicilios",
-    "efectivo_inicial", "propinas", "ventas_brutas", "bolsas", "caja_final", "diferencia_caja", "comentarios"
-  ];
-
-  const aliasesByHeader = {
-    comentarios: ["comentarios", "comentario", "observaciones", "observacion"]
-  };
-
-  const readCellValue = (row, header) => {
-    const aliases = aliasesByHeader[header] || [header];
-    const key = aliases.find((candidate) => Object.prototype.hasOwnProperty.call(row, candidate));
-    return key ? row[key] : "";
-  };
-
-  const isExportableRow = (row) => row && typeof row === "object" && !Array.isArray(row)
-    && headers.some((key) => Object.prototype.hasOwnProperty.call(row, key) || (aliasesByHeader[key] || []).some((alias) => Object.prototype.hasOwnProperty.call(row, alias)));
-
-  const extractRows = (node, depth = 0) => {
-    if (depth > 10 || node === null || node === undefined) return [];
-    if (typeof node === "string") {
-      const t = node.trim();
-      if (!t) return [];
-      try { return extractRows(JSON.parse(t), depth + 1); } catch (_e) { return []; }
-    }
-    if (Array.isArray(node)) {
-      return node.flatMap((item) => extractRows(item, depth + 1));
-    }
-    if (typeof node === "object") {
-      const currentRows = isExportableRow(node) ? [node] : [];
-      const nestedRows = Object.values(node).flatMap((value) => extractRows(value, depth + 1));
-      return [...currentRows, ...nestedRows];
-    }
-    return [];
-  };
 
   const removeEmailDomainNoise = (value) => String(value || "")
     .replace(/@/g, "_")
@@ -770,7 +741,7 @@ const descargarExcelEmpleado = async () => {
 
   const buildExcelFilename = () => {
     const empleadoNombre = empleadoSeleccionado?.nombre_completo || state.empleadoDetalle?.nombre || empleadoId || "empleado";
-    return `${normalizeFilePart(empleadoNombre, "empleado", { stripDomain: true })}_${normalizeFilePart(periodoInicio, "inicio")}_a_${normalizeFilePart(periodoFin, "fin")}.xls`;
+    return `nomina_${normalizeFilePart(empleadoNombre, "empleado", { stripDomain: true })}_${normalizeFilePart(periodoInicio, "inicio")}_a_${normalizeFilePart(periodoFin, "fin")}.xls`;
   };
 
   const escHtml = (value) => String(value ?? "")
@@ -779,20 +750,150 @@ const descargarExcelEmpleado = async () => {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
-  const buildExcelHtml = (rows) => {
-    const thead = `<tr>${headers.map((h) => `<th>${escHtml(h)}</th>`).join("")}</tr>`;
-    const tbody = rows
-      .map((row) => `<tr>${headers.map((h) => `<td>${escHtml(readCellValue(row, h))}</td>`).join("")}</tr>`)
-      .join("");
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8" /><style>
-      table{border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;}
-      th,td{border:1px solid #cbd5e1;padding:6px 8px;text-align:left;}
-      th{background:#f1f5f9;font-weight:700;}
-    </style></head><body><table><thead>${thead}</thead><tbody>${tbody}</tbody></table></body></html>`;
+  const parseWebhookPayload = (value, depth = 0) => {
+    if (depth > 8 || value === null || value === undefined) return null;
+    if (typeof value === "string") {
+      const text = value.trim();
+      if (!text) return null;
+      try { return parseWebhookPayload(JSON.parse(text), depth + 1); } catch (_e) { return null; }
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const parsed = parseWebhookPayload(item, depth + 1);
+        if (parsed) return parsed;
+      }
+      return null;
+    }
+    if (typeof value === "object") {
+      if (Array.isArray(value.parametros) || Array.isArray(value.detalle) || value.resumen || value.totales) return value;
+      for (const child of Object.values(value)) {
+        const parsed = parseWebhookPayload(child, depth + 1);
+        if (parsed) return parsed;
+      }
+    }
+    return null;
   };
 
-  const triggerExcelDownload = (excelHtml, rowCount) => {
-    const blob = new Blob(["﻿" + excelHtml], { type: "application/vnd.ms-excel;charset=utf-8;" });
+  const toMoneyNumber = (value) => {
+    const number = toNumeric(value);
+    return Number.isFinite(number) ? number : 0;
+  };
+
+  const tableRows = (rows) => rows.join("\n");
+
+  const renderHeaderRow = (headers) => `<tr>${headers.map((header) => `<th>${escHtml(header)}</th>`).join("")}</tr>`;
+
+  const moneyCell = (value, className = "money calculated") => `<td class="${className}">${toMoneyNumber(value)}</td>`;
+  const textCell = (value, className = "") => `<td${className ? ` class="${className}"` : ""}>${escHtml(value)}</td>`;
+
+  const worksheetXml = (names) => names.map((name) => `
+    <x:ExcelWorksheet>
+      <x:Name>${escHtml(name)}</x:Name>
+      <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+    </x:ExcelWorksheet>`).join("");
+
+  const renderSheet = (name, title, tableHtml) => `
+    <div class="sheet">
+      <!--[if gte mso 9]><xml><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></xml><![endif]-->
+      <h1>${escHtml(title)}</h1>
+      ${tableHtml}
+    </div>`;
+
+  const buildExcelHtml = (data) => {
+    const parametros = Array.isArray(data.parametros) ? data.parametros : [];
+    const detalle = Array.isArray(data.detalle) ? data.detalle : [];
+    const resumen = data.resumen && typeof data.resumen === "object" ? data.resumen : {};
+    const totales = data.totales && typeof data.totales === "object" ? data.totales : {};
+    const metadata = data.metadata && typeof data.metadata === "object" ? data.metadata : {};
+
+    const parametrosTable = `<table>
+      <thead>${renderHeaderRow(["Concepto", "Valor por unidad", "Unidad", "Valor formateado"])}</thead>
+      <tbody>${tableRows(parametros.map((param) => `<tr>${textCell(param.concepto)}${moneyCell(param.valor, "money")}${textCell("COP")}${textCell(param.valorFormateado)}</tr>`))}</tbody>
+    </table>`;
+
+    const detalleHeaders = [
+      "Responsable", "Día", "Fecha", "Hora Inicio", "Hora Fin", "Horas Totales", "Horas Diurnas", "Horas Nocturnas",
+      "Valor Diurnas", "Valor Nocturnas", "Valor Dom. Diurnas", "Valor Dom. Nocturnas", "Total Fila"
+    ];
+    const detalleRows = detalle.map((row) => {
+      const totalFila = toMoneyNumber(row.valor_diurnas) + toMoneyNumber(row.valor_nocturnas) + toMoneyNumber(row.valor_dominical_diurnas) + toMoneyNumber(row.valor_dominical_nocturnas);
+      return `<tr>
+        ${textCell(row.responsable)}${textCell(row.dia)}${textCell(row.fecha, "date-text")}${textCell(row.hora_inicio)}${textCell(row.hora_fin)}
+        ${textCell(row.horas_totales)}${textCell(row.horas_diurnas)}${textCell(row.horas_nocturnas)}
+        ${moneyCell(row.valor_diurnas)}${moneyCell(row.valor_nocturnas)}${moneyCell(row.valor_dominical_diurnas)}${moneyCell(row.valor_dominical_nocturnas)}${moneyCell(totalFila)}
+      </tr>`;
+    });
+    const detalleTable = `<table>
+      <thead>${renderHeaderRow(detalleHeaders)}</thead>
+      <tbody>${tableRows(detalleRows)}</tbody>
+    </table>`;
+
+    const subtotalHoras = toMoneyNumber(resumen.total_diurnas) + toMoneyNumber(resumen.total_nocturnas) + toMoneyNumber(resumen.total_dominical_diurnas) + toMoneyNumber(resumen.total_dominical_nocturnas);
+    const resumenItems = [
+      ["Total Horas Diurnas", resumen.total_diurnas, resumen.total_diurnas_formato],
+      ["Total Horas Nocturnas", resumen.total_nocturnas, resumen.total_nocturnas_formato],
+      ["Total Dominicales Diurnas", resumen.total_dominical_diurnas, resumen.total_dominical_diurnas_formato],
+      ["Total Dominicales Nocturnas", resumen.total_dominical_nocturnas, resumen.total_dominical_nocturnas_formato],
+      ["SUBTOTAL HORAS", subtotalHoras, fmtMoney(subtotalHoras), "subtotal"]
+    ];
+    const resumenTable = `<table>
+      <thead>${renderHeaderRow(["Concepto", "Valor calculado", "Valor formateado"])}</thead>
+      <tbody>${tableRows(resumenItems.map(([label, value, formatted, extraClass]) => `<tr class="${extraClass || ""}">${textCell(label)}${moneyCell(value, "money")}${textCell(formatted)}</tr>`))}</tbody>
+    </table>`;
+
+    const totalesItems = [
+      ["Días trabajados", totales.dias_trabajados, ""],
+      ["Horas trabajadas", totales.horas_trabajadas_formato || totales.horas_trabajadas, ""],
+      ["Valor total horas", totales.valor_horas, totales.valor_horas_formato, "money"],
+      ["Auxilio de transporte", totales.transporte, totales.transporte_formato, "money"],
+      ["TOTAL A PAGAR", totales.total_general, totales.total_general_formato, "money total"]
+    ];
+    const metadataRows = [
+      ["Filas procesadas", metadata.total_filas_procesadas ?? detalle.length],
+      ["Fecha proceso", metadata.fecha_proceso || ""]
+    ];
+    const totalesTable = `<table>
+      <thead>${renderHeaderRow(["Concepto", "Valor", "Valor formateado"])} </thead>
+      <tbody>${tableRows(totalesItems.map(([label, value, formatted, type]) => `<tr class="${String(type || "").includes("total") ? "total-row" : ""}">${textCell(label)}${type ? moneyCell(value, type) : textCell(value)}${textCell(formatted)}</tr>`))}</tbody>
+    </table>
+    <h2>Metadata</h2>
+    <table>
+      <thead>${renderHeaderRow(["Campo", "Valor"])}</thead>
+      <tbody>${tableRows(metadataRows.map(([label, value]) => `<tr>${textCell(label)}${textCell(value)}</tr>`))}</tbody>
+    </table>`;
+
+    const sheetNames = ["Parámetros", "Detalle Nómina", "Resumen", "Totales Generales"];
+    return `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="UTF-8" />
+  <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>${worksheetXml(sheetNames)}</x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+  <style>
+    body{font-family:Arial,sans-serif;font-size:12px;color:#111827;}
+    .sheet{page-break-after:always;}
+    h1{font-size:18px;text-align:center;margin:12px 0 16px;}
+    h2{font-size:14px;margin:18px 0 8px;}
+    table{border-collapse:collapse;margin-bottom:16px;}
+    th,td{border:1px solid #cbd5e1;padding:6px 8px;text-align:left;vertical-align:middle;}
+    th{background:#4472C4;color:#fff;font-weight:700;text-align:center;}
+    .money{mso-number-format:'$\\#\\,\\#\\#0.00';text-align:right;}
+    .calculated{background:#E2EFDA;}
+    .subtotal td{background:#D9E1F2;font-weight:700;}
+    .total-row td{background:#FFC000;font-weight:700;font-size:13px;}
+    .date-text{mso-number-format:'@';}
+  </style>
+</head>
+<body>
+  ${renderSheet("Parámetros", "PARÁMETROS DE NÓMINA", parametrosTable)}
+  ${renderSheet("Detalle Nómina", "DETALLE DE NÓMINA", detalleTable)}
+  ${renderSheet("Resumen", "RESUMEN DE NÓMINA", resumenTable)}
+  ${renderSheet("Totales Generales", "TOTALES GENERALES", totalesTable)}
+</body>
+</html>`;
+  };
+
+  const triggerExcelDownload = (excelHtml, detalleCount) => {
+    const blob = new Blob(["\ufeff" + excelHtml], { type: "application/vnd.ms-excel;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -802,45 +903,26 @@ const descargarExcelEmpleado = async () => {
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1500);
-    setStatus(`Excel generado con ${rowCount} filas.`);
+    setStatus(`Excel de nómina generado con ${detalleCount} filas de detalle y 4 tablas.`);
   };
 
-  if (!fechaInicioInput.value || !fechaFinInput.value) {
-    setStatus("Selecciona un rango de fechas válido para exportar el Excel.");
-    return;
-  }
-
-  setStatus("Solicitando histórico del empleado...");
+  setStatus("Solicitando nómina calculada del empleado...");
   try {
+    const authHeaders = await buildRequestHeaders({ includeTenant: true });
     const response = await fetch(WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders
+      },
       body: JSON.stringify(payload)
     });
 
-    if (!response.ok) {
-      const errText = await response.text().catch(() => "");
-      throw new Error(`HTTP ${response.status}${errText ? ` - ${errText.slice(0, 200)}` : ""}`);
-    }
-
-    const contentType = (response.headers.get("content-type") || "").toLowerCase();
-
-    if (contentType.includes("application/vnd.ms-excel") || contentType.includes("application/octet-stream")) {
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = buildExcelFilename();
-      link.style.display = "none";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1500);
-      setStatus("Excel descargado correctamente.");
-      return;
-    }
-
     const rawText = await response.text();
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}${rawText ? ` - ${rawText.slice(0, 200)}` : ""}`);
+    }
+
     let parsed = null;
     try {
       parsed = rawText ? JSON.parse(rawText) : null;
@@ -848,13 +930,14 @@ const descargarExcelEmpleado = async () => {
       parsed = rawText;
     }
 
-    const rows = extractRows(parsed);
-    if (!rows.length) {
-      throw new Error(`El webhook respondió sin filas exportables. Vista previa: ${(rawText || "").slice(0, 180)}`);
+    const data = parseWebhookPayload(parsed);
+    if (!data) {
+      throw new Error(`El webhook respondió sin estructura de nómina exportable. Vista previa: ${(rawText || "").slice(0, 180)}`);
     }
 
-    const excelHtml = buildExcelHtml(rows);
-    triggerExcelDownload(excelHtml, rows.length);
+    const detalleCount = Array.isArray(data.detalle) ? data.detalle.length : 0;
+    const excelHtml = buildExcelHtml(data);
+    triggerExcelDownload(excelHtml, detalleCount);
   } catch (error) {
     setStatus(`No fue posible generar el Excel en este momento (${error.message}).`);
     nominaWarn("excel_empleado.error", error?.message || error);
