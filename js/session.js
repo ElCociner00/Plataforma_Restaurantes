@@ -232,17 +232,24 @@ async function applyLocalContextOverride(baseContext, authUser) {
       return baseContext;
     }
 
-    const { data: usuarioLocal, error: usuarioLocalError } = await supabase
-      .from("usuarios_locales")
-      .select("id, usuario_principal_id, empresa_id, nombre_completo, rol, activo")
-      .eq("usuario_principal_id", authUser.id)
-      .eq("empresa_id", selection.empresa_id)
-      .maybeSingle();
+    const isAdminRoot = baseContext.rol === "admin_root" || baseContext.super_admin === true;
+    let usuarioLocal = null;
 
-    if (usuarioLocalError || !usuarioLocal || usuarioLocal.activo === false) {
-      console.warn("[session] No existe usuario local activo para el local seleccionado. Se vuelve al contexto principal.", usuarioLocalError);
-      clearActiveLocalContext();
-      return baseContext;
+    if (!isAdminRoot) {
+      const { data, error: usuarioLocalError } = await supabase
+        .from("usuarios_locales")
+        .select("id, usuario_principal_id, empresa_id, nombre_completo, rol, activo")
+        .eq("usuario_principal_id", authUser.id)
+        .eq("empresa_id", selection.empresa_id)
+        .maybeSingle();
+
+      if (usuarioLocalError || !data || data.activo === false) {
+        console.warn("[session] No existe usuario local activo para el local seleccionado. Se vuelve al contexto principal.", usuarioLocalError);
+        clearActiveLocalContext();
+        return baseContext;
+      }
+
+      usuarioLocal = data;
     }
 
     const empresa = await loadEmpresaForContext(selection.empresa_id);
@@ -251,28 +258,29 @@ async function applyLocalContextOverride(baseContext, authUser) {
       return baseContext;
     }
 
-    const rol = normalizeRole(usuarioLocal.rol || baseContext.rol);
+    const contextualUserId = isAdminRoot ? authUser.id : usuarioLocal.id;
+    const rol = normalizeRole(isAdminRoot ? baseContext.rol : (usuarioLocal.rol || baseContext.rol));
 
     return {
       ...baseContext,
       user: {
         ...baseContext.user,
-        id: usuarioLocal.id,
-        user_id: usuarioLocal.id,
+        id: contextualUserId,
+        user_id: contextualUserId,
         auth_user_id: authUser.id
       },
       auth_user_id: authUser.id,
-      usuario_principal_id: usuarioLocal.usuario_principal_id || authUser.id,
-      usuario_local_id: usuarioLocal.id,
+      usuario_principal_id: usuarioLocal?.usuario_principal_id || authUser.id,
+      usuario_local_id: usuarioLocal?.id || null,
       empresa_principal_id: principalEmpresaId,
       empresa_id: selection.empresa_id,
-      nombre: usuarioLocal.nombre_completo || baseContext.nombre,
+      nombre: usuarioLocal?.nombre_completo || baseContext.nombre,
       rol,
       plan: String(empresa.plan || empresa.plan_actual || grupo.plan_grupo || baseContext.plan || "free").trim().toLowerCase() || "free",
       activa: empresa.activa !== false && empresa.activo !== false,
       permisos: {},
       super_admin: rol === "admin_root",
-      usuario_activo: usuarioLocal.activo !== false,
+      usuario_activo: isAdminRoot || usuarioLocal?.activo !== false,
       local_context: true,
       nombre_grupo: grupo.nombre_grupo || ""
     };
@@ -289,6 +297,7 @@ export async function listAvailableLocalContexts() {
 
   const principalEmpresaId = context.empresa_principal_id || context.empresa_id;
   const principalUserId = context.usuario_principal_id || context.auth_user_id || context.user?.auth_user_id || context.user?.id;
+  const isAdminRoot = context.rol === "admin_root" || context.super_admin === true;
   if (!principalEmpresaId || !principalUserId) return [];
 
   const { data: grupos, error: gruposError } = await supabase
@@ -305,7 +314,7 @@ export async function listAvailableLocalContexts() {
   const localEmpresaIds = [...new Set((grupos || []).map((row) => row?.empresa_id).filter(Boolean))];
   let usuariosLocales = [];
 
-  if (localEmpresaIds.length) {
+  if (!isAdminRoot && localEmpresaIds.length) {
     const { data, error } = await supabase
       .from("usuarios_locales")
       .select("id, usuario_principal_id, empresa_id, nombre_completo, rol, activo")
@@ -320,7 +329,10 @@ export async function listAvailableLocalContexts() {
     }
   }
 
-  const visibleEmpresaIds = [principalEmpresaId, ...usuariosLocales.map((row) => row.empresa_id).filter(Boolean)];
+  const visibleEmpresaIds = [
+    principalEmpresaId,
+    ...(isAdminRoot ? localEmpresaIds : usuariosLocales.map((row) => row.empresa_id).filter(Boolean))
+  ];
   let empresas = [];
   if (visibleEmpresaIds.length) {
     const { data, error } = await supabase
@@ -345,15 +357,27 @@ export async function listAvailableLocalContexts() {
     activo: context.empresa_id === principalEmpresaId && !context.local_context
   }];
 
-  usuariosLocales.forEach((usuarioLocal) => {
-    const grupo = grupoByEmpresaId.get(usuarioLocal.empresa_id);
+  const localRowsForMenu = isAdminRoot
+    ? (grupos || []).map((grupo) => ({
+        empresa_id: grupo.empresa_id,
+        id: principalUserId,
+        rol: context.rol,
+        grupo
+      }))
+    : usuariosLocales.map((usuarioLocal) => ({
+        ...usuarioLocal,
+        grupo: grupoByEmpresaId.get(usuarioLocal.empresa_id)
+      }));
+
+  localRowsForMenu.forEach((localRow) => {
+    const grupo = localRow.grupo || grupoByEmpresaId.get(localRow.empresa_id);
     locales.push({
-      empresa_id: usuarioLocal.empresa_id,
-      usuario_id: usuarioLocal.id,
-      nombre: labelForEmpresa(usuarioLocal.empresa_id, grupo?.nombre_grupo || "Local"),
+      empresa_id: localRow.empresa_id,
+      usuario_id: localRow.id,
+      nombre: labelForEmpresa(localRow.empresa_id, grupo?.nombre_grupo || "Local"),
       tipo: "local",
-      rol: usuarioLocal.rol || "",
-      activo: context.empresa_id === usuarioLocal.empresa_id,
+      rol: localRow.rol || "",
+      activo: context.empresa_id === localRow.empresa_id,
       grupo_id: principalEmpresaId
     });
   });
@@ -375,6 +399,7 @@ export async function switchLocalContext(empresaId) {
   }
 
   const principalUserId = context.usuario_principal_id || context.auth_user_id || context.user?.auth_user_id || context.user?.id;
+  const isAdminRoot = context.rol === "admin_root" || context.super_admin === true;
   const { data: grupo, error: grupoError } = await supabase
     .from("grupos_empresariales")
     .select("empresa_id, grupo_id, activo")
@@ -385,19 +410,24 @@ export async function switchLocalContext(empresaId) {
 
   if (grupoError || !grupo) throw new Error("El local seleccionado no está activo o no pertenece a esta empresa principal.");
 
-  const { data: usuarioLocal, error: usuarioLocalError } = await supabase
-    .from("usuarios_locales")
-    .select("id, empresa_id, activo")
-    .eq("usuario_principal_id", principalUserId)
-    .eq("empresa_id", targetEmpresaId)
-    .eq("activo", true)
-    .maybeSingle();
+  let usuarioLocal = null;
 
-  if (usuarioLocalError || !usuarioLocal) throw new Error("Tu usuario no tiene duplicado activo para ese local.");
+  if (!isAdminRoot) {
+    const { data, error: usuarioLocalError } = await supabase
+      .from("usuarios_locales")
+      .select("id, empresa_id, activo")
+      .eq("usuario_principal_id", principalUserId)
+      .eq("empresa_id", targetEmpresaId)
+      .eq("activo", true)
+      .maybeSingle();
+
+    if (usuarioLocalError || !data) throw new Error("Tu usuario no tiene duplicado activo para ese local.");
+    usuarioLocal = data;
+  }
 
   writeActiveLocalSelection({ empresa_id: targetEmpresaId, grupo_id: principalEmpresaId });
   cachedContext = null;
-  return { empresa_id: targetEmpresaId, usuario_id: usuarioLocal.id, tipo: "local" };
+  return { empresa_id: targetEmpresaId, usuario_id: usuarioLocal?.id || principalUserId, tipo: "local" };
 }
 
 async function resolveAccessToken() {
