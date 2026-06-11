@@ -61,10 +61,14 @@ const escapeHtml = (value) => String(value ?? "")
   .replace(/"/g, "&quot;")
   .replace(/'/g, "&#39;");
 
-const buildLocalSwitcherItems = (localContexts = []) => {
-  if (!Array.isArray(localContexts) || localContexts.length <= 1) return "";
+const buildLocalSwitcherItems = ({ context, localContexts = [] } = {}) => {
+  const canManageLocals = ["admin_root", "admin"].includes(String(context?.rol || "").toLowerCase());
+  const hasSwitchableLocals = Array.isArray(localContexts) && localContexts.length > 1;
 
-  const items = localContexts.map((local) => {
+  if (!canManageLocals && !hasSwitchableLocals) return "";
+
+  const safeLocalContexts = Array.isArray(localContexts) ? localContexts : [];
+  const items = safeLocalContexts.map((local) => {
     const label = escapeHtml(local.nombre || (local.tipo === "principal" ? "Empresa principal" : "Local"));
     const badge = local.tipo === "principal" ? "Principal" : "Local";
     const activeClass = local.activo ? " active" : "";
@@ -72,9 +76,14 @@ const buildLocalSwitcherItems = (localContexts = []) => {
     return `<a href="#" class="local-switch-option${activeClass}" data-switch-local="${escapeHtml(local.empresa_id)}"><span><strong>${label}</strong><small>${badge}</small></span>${activeSuffix}</a>`;
   }).join("");
 
+  const emptyHint = hasSwitchableLocals
+    ? ""
+    : `<div class="local-switch-empty" role="note">No hay locales disponibles para este usuario. Si acabas de crear uno, verifica que exista en grupos_empresariales y recarga.</div>`;
+
   return `
         <div class="menu-group-title">Cambiar de local</div>
-        ${items}`;
+        ${items}
+        ${emptyHint}`;
 };
 
 const ensureViewportMeta = () => {
@@ -180,7 +189,7 @@ function buildMenu({ context, environmentForMenu, localContexts = [] }) {
       </button>
       <div class="nav-dropdown-menu user-dropdown-menu">
         ${context?.rol === "admin_root" || context?.rol === "admin" ? `<a href="${APP_URLS.gestionUsuarios}">Gestión usuarios</a><a href="${APP_URLS.anadirLocal}">Añadir local</a><a href="${configLink}">Configuracion</a>` : ""}
-        ${buildLocalSwitcherItems(localContexts)}
+        ${buildLocalSwitcherItems({ context, localContexts })}
         <div class="menu-group-title">Cambiar de entorno</div>
         ${environmentOptions}
         <a href="#" id="logoutBtnMenu">Salir</a>

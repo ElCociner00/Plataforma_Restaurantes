@@ -444,3 +444,12 @@ body.has-legal-footer {
   color: #bbf7d0;
   font-weight: 700;
 }
+
+.app-header .local-switch-empty {
+  padding: 8px;
+  border-radius: 6px;
+  color: #d1d5db;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
