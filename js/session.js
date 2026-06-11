@@ -22,6 +22,45 @@ import { getCurrentUser } from "./auth.js";
 let cachedContext = null;
 let authListenerInitialized = false;
 
+const ACTIVE_LOCAL_CONTEXT_KEY = "plataforma_active_local_context_v1";
+
+function readActiveLocalSelection() {
+  if (typeof localStorage === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(ACTIVE_LOCAL_CONTEXT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const empresaId = String(parsed?.empresa_id || "").trim();
+    const grupoId = String(parsed?.grupo_id || "").trim();
+    if (!empresaId || !grupoId) return null;
+    return { empresa_id: empresaId, grupo_id: grupoId };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function writeActiveLocalSelection(selection) {
+  if (typeof localStorage === "undefined") return;
+  try {
+    if (!selection?.empresa_id || !selection?.grupo_id) {
+      localStorage.removeItem(ACTIVE_LOCAL_CONTEXT_KEY);
+      return;
+    }
+    localStorage.setItem(ACTIVE_LOCAL_CONTEXT_KEY, JSON.stringify({
+      empresa_id: selection.empresa_id,
+      grupo_id: selection.grupo_id,
+      updated_at: new Date().toISOString()
+    }));
+  } catch (_error) {
+    // noop: si storage falla, se conserva el contexto base sin romper la app.
+  }
+}
+
+export function clearActiveLocalContext() {
+  writeActiveLocalSelection(null);
+  cachedContext = null;
+}
+
 function normalizeRole(value) {
   return String(value || "operativo").trim().toLowerCase() || "operativo";
 }
@@ -41,8 +80,12 @@ function mapContextPayload(data, fallbackUser) {
     user: {
       id: userId,
       email,
-      user_id: userId
+      user_id: userId,
+      auth_user_id: fallbackUser?.id || userId
     },
+    auth_user_id: fallbackUser?.id || userId,
+    usuario_principal_id: data?.usuario_principal_id || fallbackUser?.id || userId,
+    empresa_principal_id: data?.empresa_principal_id || data?.grupo_id || data?.empresa_id || null,
     empresa_id: data?.empresa_id || null,
     rol,
     nombre: data?.nombre || email || "Usuario",
@@ -60,7 +103,7 @@ function ensureAuthCacheInvalidation() {
 
   supabase.auth.onAuthStateChange((event) => {
     if (event === "SIGNED_OUT" || event === "USER_UPDATED") {
-      cachedContext = null;
+      clearActiveLocalContext();
     }
   });
 }
@@ -148,6 +191,215 @@ async function getContextFromTables(user) {
   };
 }
 
+async function loadEmpresaForContext(empresaId) {
+  if (!empresaId) return null;
+
+  const { data, error } = await supabase
+    .from("empresas")
+    .select("id, plan, plan_actual, activa, activo, nombre_comercial, razon_social")
+    .eq("id", empresaId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("No se pudo resolver empresa para contexto:", error);
+    return null;
+  }
+
+  return data || null;
+}
+
+async function applyLocalContextOverride(baseContext, authUser) {
+  const selection = readActiveLocalSelection();
+  if (!selection || !baseContext?.empresa_id || !authUser?.id) return baseContext;
+
+  const principalEmpresaId = baseContext.empresa_principal_id || baseContext.empresa_id;
+  if (selection.empresa_id === principalEmpresaId) {
+    clearActiveLocalContext();
+    return baseContext;
+  }
+
+  try {
+    const { data: grupo, error: grupoError } = await supabase
+      .from("grupos_empresariales")
+      .select("empresa_id, grupo_id, nombre_grupo, razon_social_grupo, plan_grupo, activo")
+      .eq("empresa_id", selection.empresa_id)
+      .eq("grupo_id", principalEmpresaId)
+      .maybeSingle();
+
+    if (grupoError || !grupo || grupo.activo === false) {
+      console.warn("[session] Local seleccionado no pertenece al grupo activo o está inactivo. Se vuelve al contexto principal.", grupoError);
+      clearActiveLocalContext();
+      return baseContext;
+    }
+
+    const { data: usuarioLocal, error: usuarioLocalError } = await supabase
+      .from("usuarios_locales")
+      .select("id, usuario_principal_id, empresa_id, nombre_completo, rol, activo")
+      .eq("usuario_principal_id", authUser.id)
+      .eq("empresa_id", selection.empresa_id)
+      .maybeSingle();
+
+    if (usuarioLocalError || !usuarioLocal || usuarioLocal.activo === false) {
+      console.warn("[session] No existe usuario local activo para el local seleccionado. Se vuelve al contexto principal.", usuarioLocalError);
+      clearActiveLocalContext();
+      return baseContext;
+    }
+
+    const empresa = await loadEmpresaForContext(selection.empresa_id);
+    if (!empresa) {
+      clearActiveLocalContext();
+      return baseContext;
+    }
+
+    const rol = normalizeRole(usuarioLocal.rol || baseContext.rol);
+
+    return {
+      ...baseContext,
+      user: {
+        ...baseContext.user,
+        id: usuarioLocal.id,
+        user_id: usuarioLocal.id,
+        auth_user_id: authUser.id
+      },
+      auth_user_id: authUser.id,
+      usuario_principal_id: usuarioLocal.usuario_principal_id || authUser.id,
+      usuario_local_id: usuarioLocal.id,
+      empresa_principal_id: principalEmpresaId,
+      empresa_id: selection.empresa_id,
+      nombre: usuarioLocal.nombre_completo || baseContext.nombre,
+      rol,
+      plan: String(empresa.plan || empresa.plan_actual || grupo.plan_grupo || baseContext.plan || "free").trim().toLowerCase() || "free",
+      activa: empresa.activa !== false && empresa.activo !== false,
+      permisos: {},
+      super_admin: rol === "admin_root",
+      usuario_activo: usuarioLocal.activo !== false,
+      local_context: true,
+      nombre_grupo: grupo.nombre_grupo || ""
+    };
+  } catch (error) {
+    console.error("[session] Error aplicando contexto de local. Se vuelve al contexto principal:", error);
+    clearActiveLocalContext();
+    return baseContext;
+  }
+}
+
+export async function listAvailableLocalContexts() {
+  const context = await getUserContext();
+  if (!context?.empresa_id) return [];
+
+  const principalEmpresaId = context.empresa_principal_id || context.empresa_id;
+  const principalUserId = context.usuario_principal_id || context.auth_user_id || context.user?.auth_user_id || context.user?.id;
+  if (!principalEmpresaId || !principalUserId) return [];
+
+  const { data: grupos, error: gruposError } = await supabase
+    .from("grupos_empresariales")
+    .select("empresa_id, grupo_id, nombre_grupo, razon_social_grupo, plan_grupo, activo")
+    .eq("grupo_id", principalEmpresaId)
+    .eq("activo", true);
+
+  if (gruposError) {
+    console.warn("[session] No se pudieron consultar locales del grupo:", gruposError);
+    return [];
+  }
+
+  const localEmpresaIds = [...new Set((grupos || []).map((row) => row?.empresa_id).filter(Boolean))];
+  let usuariosLocales = [];
+
+  if (localEmpresaIds.length) {
+    const { data, error } = await supabase
+      .from("usuarios_locales")
+      .select("id, usuario_principal_id, empresa_id, nombre_completo, rol, activo")
+      .eq("usuario_principal_id", principalUserId)
+      .in("empresa_id", localEmpresaIds)
+      .eq("activo", true);
+
+    if (error) {
+      console.warn("[session] No se pudieron consultar usuarios locales disponibles:", error);
+    } else {
+      usuariosLocales = data || [];
+    }
+  }
+
+  const visibleEmpresaIds = [principalEmpresaId, ...usuariosLocales.map((row) => row.empresa_id).filter(Boolean)];
+  let empresas = [];
+  if (visibleEmpresaIds.length) {
+    const { data, error } = await supabase
+      .from("empresas")
+      .select("id, nombre_comercial, razon_social")
+      .in("id", [...new Set(visibleEmpresaIds)]);
+    if (!error) empresas = data || [];
+  }
+
+  const empresaById = new Map(empresas.map((empresa) => [empresa.id, empresa]));
+  const grupoByEmpresaId = new Map((grupos || []).map((grupo) => [grupo.empresa_id, grupo]));
+  const labelForEmpresa = (empresaId, fallback = "") => {
+    const empresa = empresaById.get(empresaId);
+    return String(empresa?.nombre_comercial || empresa?.razon_social || fallback || empresaId).trim();
+  };
+
+  const locales = [{
+    empresa_id: principalEmpresaId,
+    usuario_id: principalUserId,
+    nombre: labelForEmpresa(principalEmpresaId, "Empresa principal"),
+    tipo: "principal",
+    activo: context.empresa_id === principalEmpresaId && !context.local_context
+  }];
+
+  usuariosLocales.forEach((usuarioLocal) => {
+    const grupo = grupoByEmpresaId.get(usuarioLocal.empresa_id);
+    locales.push({
+      empresa_id: usuarioLocal.empresa_id,
+      usuario_id: usuarioLocal.id,
+      nombre: labelForEmpresa(usuarioLocal.empresa_id, grupo?.nombre_grupo || "Local"),
+      tipo: "local",
+      rol: usuarioLocal.rol || "",
+      activo: context.empresa_id === usuarioLocal.empresa_id,
+      grupo_id: principalEmpresaId
+    });
+  });
+
+  return locales;
+}
+
+export async function switchLocalContext(empresaId) {
+  const context = await getUserContext();
+  if (!context?.empresa_id) throw new Error("No se pudo resolver el contexto actual.");
+
+  const principalEmpresaId = context.empresa_principal_id || context.empresa_id;
+  const targetEmpresaId = String(empresaId || "").trim();
+  if (!targetEmpresaId) throw new Error("Local inválido.");
+
+  if (targetEmpresaId === principalEmpresaId) {
+    clearActiveLocalContext();
+    return { empresa_id: principalEmpresaId, tipo: "principal" };
+  }
+
+  const principalUserId = context.usuario_principal_id || context.auth_user_id || context.user?.auth_user_id || context.user?.id;
+  const { data: grupo, error: grupoError } = await supabase
+    .from("grupos_empresariales")
+    .select("empresa_id, grupo_id, activo")
+    .eq("empresa_id", targetEmpresaId)
+    .eq("grupo_id", principalEmpresaId)
+    .eq("activo", true)
+    .maybeSingle();
+
+  if (grupoError || !grupo) throw new Error("El local seleccionado no está activo o no pertenece a esta empresa principal.");
+
+  const { data: usuarioLocal, error: usuarioLocalError } = await supabase
+    .from("usuarios_locales")
+    .select("id, empresa_id, activo")
+    .eq("usuario_principal_id", principalUserId)
+    .eq("empresa_id", targetEmpresaId)
+    .eq("activo", true)
+    .maybeSingle();
+
+  if (usuarioLocalError || !usuarioLocal) throw new Error("Tu usuario no tiene duplicado activo para ese local.");
+
+  writeActiveLocalSelection({ empresa_id: targetEmpresaId, grupo_id: principalEmpresaId });
+  cachedContext = null;
+  return { empresa_id: targetEmpresaId, usuario_id: usuarioLocal.id, tipo: "local" };
+}
+
 async function resolveAccessToken() {
   const { data } = await supabase.auth.getSession();
   const sessionToken = data?.session?.access_token;
@@ -173,7 +425,8 @@ export async function getUserContext() {
   const fallbackPayload = payload || await getContextFromTables(user);
   if (!fallbackPayload) return null;
 
-  const context = mapContextPayload(fallbackPayload, user);
+  const baseContext = mapContextPayload(fallbackPayload, user);
+  const context = await applyLocalContextOverride(baseContext, user);
   if (context?.usuario_activo === false) {
     await supabase.auth.signOut().catch(() => {});
     cachedContext = null;
