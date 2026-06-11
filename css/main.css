@@ -409,3 +409,47 @@ body.has-legal-footer {
     gap: 10px;
   }
 }
+
+.app-header .local-switch-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.app-header .local-switch-option span:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.app-header .local-switch-option strong {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.app-header .local-switch-option small,
+.app-header .local-switch-active-label {
+  color: #c4b5fd;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.app-header .local-switch-option.active {
+  background: rgba(196, 181, 253, 0.18);
+  cursor: default;
+}
+
+.app-header .local-switch-active-label {
+  color: #bbf7d0;
+  font-weight: 700;
+}
+
+.app-header .local-switch-empty {
+  padding: 8px;
+  border-radius: 6px;
+  color: #d1d5db;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
