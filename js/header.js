@@ -23,7 +23,7 @@
  */
 import "./mobile_shell.js";
 import { supabase } from "./supabase.js";
-import { clearUserContextCache, getUserContext } from "./session.js";
+import { clearActiveLocalContext, clearUserContextCache, getUserContext, listAvailableLocalContexts, switchLocalContext } from "./session.js";
 import { ENV_LOGGRO, ENV_SIIGO, getActiveEnvironment, setActiveEnvironment } from "./environment.js";
 import { resolveFirstAllowedRoute } from "./access_control.local.js";
 import { getPermisosEfectivos } from "./permisos.core.js";
@@ -53,6 +53,29 @@ async function safeVerificarYMostrarAnuncio() {
   const mod = await loadAnuncioModuleSafe();
   await mod?.verificarYMostrarAnuncio?.();
 }
+
+const escapeHtml = (value) => String(value ?? "")
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#39;");
+
+const buildLocalSwitcherItems = (localContexts = []) => {
+  if (!Array.isArray(localContexts) || localContexts.length <= 1) return "";
+
+  const items = localContexts.map((local) => {
+    const label = escapeHtml(local.nombre || (local.tipo === "principal" ? "Empresa principal" : "Local"));
+    const badge = local.tipo === "principal" ? "Principal" : "Local";
+    const activeClass = local.activo ? " active" : "";
+    const activeSuffix = local.activo ? `<span class="local-switch-active-label">Actual</span>` : "";
+    return `<a href="#" class="local-switch-option${activeClass}" data-switch-local="${escapeHtml(local.empresa_id)}"><span><strong>${label}</strong><small>${badge}</small></span>${activeSuffix}</a>`;
+  }).join("");
+
+  return `
+        <div class="menu-group-title">Cambiar de local</div>
+        ${items}`;
+};
 
 const ensureViewportMeta = () => {
   if (document.querySelector('meta[name="viewport"]')) return;
@@ -103,7 +126,7 @@ function getOrCreateHeader() {
   return header;
 }
 
-function buildMenu({ context, environmentForMenu }) {
+function buildMenu({ context, environmentForMenu, localContexts = [] }) {
   const userName = context?.user?.email?.split("@")[0] || "Usuario";
   const avatarLabel = userName.charAt(0).toUpperCase() || "U";
   let menu = "";
@@ -157,6 +180,7 @@ function buildMenu({ context, environmentForMenu }) {
       </button>
       <div class="nav-dropdown-menu user-dropdown-menu">
         ${context?.rol === "admin_root" || context?.rol === "admin" ? `<a href="${APP_URLS.gestionUsuarios}">Gestión usuarios</a><a href="${APP_URLS.anadirLocal}">Añadir local</a><a href="${configLink}">Configuracion</a>` : ""}
+        ${buildLocalSwitcherItems(localContexts)}
         <div class="menu-group-title">Cambiar de entorno</div>
         ${environmentOptions}
         <a href="#" id="logoutBtnMenu">Salir</a>
@@ -186,6 +210,28 @@ function wireHeaderEvents(header, context) {
     };
   });
 
+  header.querySelectorAll("[data-switch-local]").forEach((link) => {
+    link.onclick = async (event) => {
+      event.preventDefault();
+      const targetEmpresaId = link.getAttribute("data-switch-local");
+      if (!targetEmpresaId || link.classList.contains("active")) return;
+
+      link.setAttribute("aria-busy", "true");
+      link.textContent = "Cambiando local...";
+
+      try {
+        await switchLocalContext(targetEmpresaId);
+        await safeClearBannerDisplayCache();
+        clearUserContextCache();
+        window.location.reload();
+      } catch (error) {
+        console.error("[header] No se pudo cambiar de local:", error);
+        window.alert(error?.message || "No se pudo cambiar de local. Intenta nuevamente.");
+        window.location.reload();
+      }
+    };
+  });
+
   document.addEventListener("click", () => {
     header.querySelectorAll(".nav-dropdown.open").forEach((dropdown) => dropdown.classList.remove("open"));
   });
@@ -196,6 +242,7 @@ function wireHeaderEvents(header, context) {
       event.preventDefault();
       setActiveEnvironment("");
       await safeClearBannerDisplayCache();
+      clearActiveLocalContext();
       clearUserContextCache();
       await supabase.auth.signOut();
       window.location.href = APP_URLS.login;
@@ -241,7 +288,11 @@ async function renderAuthenticatedHeader() {
 
   const environmentForMenu = getActiveEnvironment() || (isGlobalNoTenantPage ? ENV_LOGGRO : inferEnvironmentFromPath());
   const nombreEmpresa = await obtenerNombreEmpresa(context.empresa_id);
-  const menu = buildMenu({ context, environmentForMenu });
+  const localContexts = await listAvailableLocalContexts().catch((error) => {
+    console.warn("[header] No se pudo cargar el selector de locales:", error);
+    return [];
+  });
+  const menu = buildMenu({ context, environmentForMenu, localContexts });
 
   header.innerHTML = `
     <div class="logo"><span class="logo-mark-wrap"><img src="${getLogoSrc()}" alt="${BRAND.logoAlt}" class="logo-mark" onerror="this.style.display='none'"/></span><span>${BRAND.platformName}</span></div>
