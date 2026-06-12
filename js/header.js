@@ -1,31 +1,10 @@
 /**
  * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
  * Archivo: js/header.js
- *
- * Partes del archivo:
- * 1) Imports/constantes de configuración (dependencias y estado base).
- * 2) Utilidades puras y normalizadores (cálculos/formato/validaciones).
- * 3) Lógica principal del módulo (flujo funcional).
- * 4) Eventos/integraciones externas (DOM, API, webhooks, storage).
- *
- * Índice de funciones/bloques para ubicarte rápido:
- * - `ensureViewportMeta` (línea aprox. 33): Bloque funcional del módulo.
- * - `getLogoSrc` (línea aprox. 41): Obtiene un valor o recurso.
- * - `resolveRouteForEnv` (línea aprox. 43): Bloque funcional del módulo.
- * - `obtenerNombreEmpresa` (línea aprox. 50): Trabaja con contexto o datos de empresa.
- * - `getOrCreateHeader` (línea aprox. 66): Obtiene un valor o recurso.
- * - `buildMenu` (línea aprox. 82): Construye estructuras de datos.
- * - `wireHeaderEvents` (línea aprox. 144): Bloque funcional del módulo.
- * - `renderFallbackHeader` (línea aprox. 180): Renderiza/actualiza UI.
- * - `inferEnvironmentFromPath` (línea aprox. 207): Bloque funcional del módulo.
- *
- * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
  */
 import "./mobile_shell.js";
 import { supabase } from "./supabase.js";
 import { clearActiveLocalContext, clearUserContextCache, getUserContext } from "./session.js";
-// IMPORTANTE: Eliminada la dependencia directa de local_context_switcher.js
-// Las funciones de locales se cargarán de forma dinámica y opcional
 import { ENV_LOGGRO, ENV_SIIGO, getActiveEnvironment, setActiveEnvironment } from "./environment.js";
 import { resolveFirstAllowedRoute } from "./access_control.local.js";
 import { getPermisosEfectivos } from "./permisos.core.js";
@@ -43,7 +22,6 @@ let localContextModulePromise = null;
 let localContextModuleError = false;
 
 async function getLocalContextModule() {
-  // Si ya sabemos que el módulo falló, no reintentar
   if (localContextModuleError) return null;
   
   if (localContextModulePromise === undefined) {
@@ -53,7 +31,7 @@ async function getLocalContextModule() {
         return module;
       })
       .catch(error => {
-        console.warn("[header] ⚠️ Módulo de locales no disponible, funciones de cambio de local desactivadas:", error.message);
+        console.warn("[header] ⚠️ Módulo de locales no disponible:", error.message);
         localContextModuleError = true;
         return null;
       });
@@ -89,7 +67,7 @@ async function safePrepareLocalContextSwitch(empresaId) {
 async function loadAnuncioModuleSafe() {
   if (!anuncioModulePromise) {
     anuncioModulePromise = import("./anuncio_impago.js").catch((error) => {
-      console.warn("[header] anuncio_impago no disponible, se omite sin romper header:", error);
+      console.warn("[header] anuncio_impago no disponible:", error);
       return null;
     });
   }
@@ -112,7 +90,6 @@ const escapeHtml = (value) => String(value ?? "")
   .replace(/>/g, "&gt;")
   .replace(/"/g, "&quot;")
   .replace(/'/g, "&#39;");
-
 
 function showLocalContextLoading(message = "Cambiando local...") {
   const overlay = document.createElement("div");
@@ -367,13 +344,11 @@ async function renderAuthenticatedHeader() {
   const environmentForMenu = getActiveEnvironment() || (isGlobalNoTenantPage ? ENV_LOGGRO : inferEnvironmentFromPath());
   const nombreEmpresa = await obtenerNombreEmpresa(context.empresa_id);
   
-  // Carga de locales de forma NO BLOQUEANTE (si falla, sigue funcionando)
   let localContexts = [];
   try {
     localContexts = await safeListLocalContexts();
   } catch (error) {
     console.warn("[header] No se pudo cargar el selector de locales:", error);
-    // localContexts ya es [], el header sigue funcionando
   }
   
   const menu = buildMenu({ context, environmentForMenu, localContexts });
@@ -401,14 +376,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
-// Inicialización silenciosa del módulo de locales y refresco automático
-setTimeout(async () => {
+// ==============================================
+// NUEVO: Escuchar evento del módulo de locales para refrescar
+// ==============================================
+window.addEventListener('localContextReady', async () => {
+  console.log("[header] 📢 Evento localContextReady recibido, refrescando header...");
   try {
-    const module = await import('/js/local_context_switcher.js');
-    await module.initializeLocalContext?.();
     await renderAuthenticatedHeader();
     console.log("[header] ✅ Header refrescado con selector de locales");
   } catch (error) {
-    // Silencioso - no rompe nada
+    console.warn("[header] No se pudo refrescar header:", error);
   }
+});
+
+// ==============================================
+// NUEVO: Inicialización silenciosa (NO refresca aquí, solo carga)
+// ==============================================
+setTimeout(() => {
+  import('/js/local_context_switcher.js').then(m => m.initializeLocalContext?.()).catch(() => {});
 }, 2000);
