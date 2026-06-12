@@ -633,9 +633,9 @@ export async function initializeLocalContext() {
           
           initialized = true;
           
-          // NUEVO: Disparar evento para que header refresque
+          // Disparar evento para refrescar header
           if (typeof window !== 'undefined') {
-            console.log("[local_context_switcher] 📢 Disparando evento localContextReady para refrescar header");
+            console.log("[local_context_switcher] 📢 Disparando evento localContextReady");
             window.dispatchEvent(new CustomEvent('localContextReady'));
           }
           
@@ -649,9 +649,9 @@ export async function initializeLocalContext() {
       initialized = true;
       console.log("[local_context_switcher] ✅ Inicialización completada");
       
-      // NUEVO: Disparar evento para que header refresque
+      // Disparar evento para refrescar header
       if (typeof window !== 'undefined') {
-        console.log("[local_context_switcher] 📢 Disparando evento localContextReady para refrescar header");
+        console.log("[local_context_switcher] 📢 Disparando evento localContextReady");
         window.dispatchEvent(new CustomEvent('localContextReady'));
       }
       
