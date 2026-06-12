@@ -106,9 +106,14 @@ function showLocalContextLoading(message = "Cambiando local...") {
   document.body.appendChild(overlay);
 }
 
+// ==============================================
+// FUNCIÓN CORREGIDA: buildLocalSwitcherItems
+// Ahora muestra el selector aunque haya solo 1 local
+// ==============================================
 const buildLocalSwitcherItems = ({ context, localContexts = [] } = {}) => {
   const canManageLocals = ["admin_root", "admin"].includes(String(context?.rol || "").toLowerCase());
-  const hasSwitchableLocals = Array.isArray(localContexts) && localContexts.length > 1;
+  // CORREGIDO: Ahora muestra si hay AL MENOS 1 local (>= 1 en lugar de > 1)
+  const hasSwitchableLocals = Array.isArray(localContexts) && localContexts.length >= 1;
 
   if (!canManageLocals && !hasSwitchableLocals) return "";
 
@@ -121,9 +126,10 @@ const buildLocalSwitcherItems = ({ context, localContexts = [] } = {}) => {
     return `<a href="#" class="local-switch-option${activeClass}" data-switch-local="${escapeHtml(local.empresa_id)}"><span><strong>${label}</strong><small>${badge}</small></span>${activeSuffix}</a>`;
   }).join("");
 
-  const emptyHint = hasSwitchableLocals
-    ? ""
-    : `<div class="local-switch-empty" role="note">No hay locales disponibles para este usuario. Si acabas de crear uno, verifica que exista en grupos_empresariales y recarga.</div>`;
+  // Solo mostrar mensaje vacío si no hay items
+  const emptyHint = (!items || items === "")
+    ? `<div class="local-switch-empty" role="note">No hay locales disponibles para este usuario.</div>`
+    : "";
 
   return `
         <div class="menu-group-title">Cambiar de local</div>
@@ -377,7 +383,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 // ==============================================
-// NUEVO: Escuchar evento del módulo de locales para refrescar
+// Escuchar evento del módulo de locales para refrescar
 // ==============================================
 window.addEventListener('localContextReady', async () => {
   console.log("[header] 📢 Evento localContextReady recibido, refrescando header...");
@@ -390,7 +396,7 @@ window.addEventListener('localContextReady', async () => {
 });
 
 // ==============================================
-// NUEVO: Inicialización silenciosa (NO refresca aquí, solo carga)
+// Inicialización silenciosa (solo carga, no refresca aquí)
 // ==============================================
 setTimeout(() => {
   import('/js/local_context_switcher.js').then(m => m.initializeLocalContext?.()).catch(() => {});
