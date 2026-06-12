@@ -191,6 +191,75 @@ async function getContextFromTables(user) {
   };
 }
 
+
+function uniqueNonEmpty(values) {
+  return [...new Set((values || []).map((value) => String(value || "").trim()).filter(Boolean))];
+}
+
+async function resolveGrupoEmpresarialContext(currentEmpresaId, hintedPrincipalEmpresaId) {
+  const currentId = String(currentEmpresaId || "").trim();
+  const hintedPrincipalId = String(hintedPrincipalEmpresaId || "").trim();
+  if (!currentId) return { principalEmpresaId: hintedPrincipalId || null, grupos: [] };
+
+  const candidatePrincipalIds = uniqueNonEmpty([hintedPrincipalId, currentId]);
+
+  for (const candidatePrincipalId of candidatePrincipalIds) {
+    const { data, error } = await supabase
+      .from("grupos_empresariales")
+      .select("empresa_id, grupo_id, nombre_grupo, razon_social_grupo, plan_grupo, activo")
+      .eq("grupo_id", candidatePrincipalId)
+      .eq("activo", true);
+
+    if (error) {
+      console.warn("[session] No se pudieron consultar locales por grupo_id:", error);
+      continue;
+    }
+
+    if (Array.isArray(data) && data.length) {
+      return { principalEmpresaId: candidatePrincipalId, grupos: data };
+    }
+  }
+
+  const { data: localMembership, error: membershipError } = await supabase
+    .from("grupos_empresariales")
+    .select("empresa_id, grupo_id, nombre_grupo, razon_social_grupo, plan_grupo, activo")
+    .eq("empresa_id", currentId)
+    .eq("activo", true)
+    .limit(1);
+
+  if (membershipError) {
+    console.warn("[session] No se pudo resolver si la empresa actual pertenece a un grupo:", membershipError);
+  }
+
+  const discoveredPrincipalId = Array.isArray(localMembership) && localMembership[0]?.grupo_id
+    ? String(localMembership[0].grupo_id).trim()
+    : "";
+
+  if (discoveredPrincipalId && !candidatePrincipalIds.includes(discoveredPrincipalId)) {
+    const { data, error } = await supabase
+      .from("grupos_empresariales")
+      .select("empresa_id, grupo_id, nombre_grupo, razon_social_grupo, plan_grupo, activo")
+      .eq("grupo_id", discoveredPrincipalId)
+      .eq("activo", true);
+
+    if (error) {
+      console.warn("[session] No se pudieron consultar locales del grupo descubierto:", error);
+    } else if (Array.isArray(data) && data.length) {
+      return { principalEmpresaId: discoveredPrincipalId, grupos: data };
+    }
+  }
+
+  return { principalEmpresaId: hintedPrincipalId || currentId, grupos: [] };
+}
+
+function resolvePrincipalUserId(context) {
+  return context?.auth_user_id
+    || context?.user?.auth_user_id
+    || context?.usuario_principal_id
+    || context?.user?.id
+    || null;
+}
+
 async function loadEmpresaForContext(empresaId) {
   if (!empresaId) return null;
 
@@ -212,7 +281,7 @@ async function applyLocalContextOverride(baseContext, authUser) {
   const selection = readActiveLocalSelection();
   if (!selection || !baseContext?.empresa_id || !authUser?.id) return baseContext;
 
-  const principalEmpresaId = baseContext.empresa_principal_id || baseContext.empresa_id;
+  const principalEmpresaId = selection.grupo_id || baseContext.empresa_principal_id || baseContext.empresa_id;
   if (selection.empresa_id === principalEmpresaId) {
     clearActiveLocalContext();
     return baseContext;
@@ -295,23 +364,12 @@ export async function listAvailableLocalContexts() {
   const context = await getUserContext();
   if (!context?.empresa_id) return [];
 
-  const principalEmpresaId = context.empresa_principal_id || context.empresa_id;
-  const principalUserId = context.usuario_principal_id || context.auth_user_id || context.user?.auth_user_id || context.user?.id;
+  const { principalEmpresaId, grupos } = await resolveGrupoEmpresarialContext(context.empresa_id, context.empresa_principal_id);
+  const principalUserId = resolvePrincipalUserId(context);
   const isAdminRoot = context.rol === "admin_root" || context.super_admin === true;
   if (!principalEmpresaId || !principalUserId) return [];
 
-  const { data: grupos, error: gruposError } = await supabase
-    .from("grupos_empresariales")
-    .select("empresa_id, grupo_id, nombre_grupo, razon_social_grupo, plan_grupo, activo")
-    .eq("grupo_id", principalEmpresaId)
-    .eq("activo", true);
-
-  if (gruposError) {
-    console.warn("[session] No se pudieron consultar locales del grupo:", gruposError);
-    return [];
-  }
-
-  const localEmpresaIds = [...new Set((grupos || []).map((row) => row?.empresa_id).filter(Boolean))];
+  const localEmpresaIds = uniqueNonEmpty((grupos || []).map((row) => row?.empresa_id));
   let usuariosLocales = [];
 
   if (!isAdminRoot && localEmpresaIds.length) {
@@ -389,7 +447,7 @@ export async function switchLocalContext(empresaId) {
   const context = await getUserContext();
   if (!context?.empresa_id) throw new Error("No se pudo resolver el contexto actual.");
 
-  const principalEmpresaId = context.empresa_principal_id || context.empresa_id;
+  const { principalEmpresaId, grupos } = await resolveGrupoEmpresarialContext(context.empresa_id, context.empresa_principal_id);
   const targetEmpresaId = String(empresaId || "").trim();
   if (!targetEmpresaId) throw new Error("Local inválido.");
 
@@ -398,17 +456,11 @@ export async function switchLocalContext(empresaId) {
     return { empresa_id: principalEmpresaId, tipo: "principal" };
   }
 
-  const principalUserId = context.usuario_principal_id || context.auth_user_id || context.user?.auth_user_id || context.user?.id;
+  const principalUserId = resolvePrincipalUserId(context);
   const isAdminRoot = context.rol === "admin_root" || context.super_admin === true;
-  const { data: grupo, error: grupoError } = await supabase
-    .from("grupos_empresariales")
-    .select("empresa_id, grupo_id, activo")
-    .eq("empresa_id", targetEmpresaId)
-    .eq("grupo_id", principalEmpresaId)
-    .eq("activo", true)
-    .maybeSingle();
+  const grupo = (grupos || []).find((row) => row?.empresa_id === targetEmpresaId && row?.grupo_id === principalEmpresaId && row?.activo !== false);
 
-  if (grupoError || !grupo) throw new Error("El local seleccionado no está activo o no pertenece a esta empresa principal.");
+  if (!grupo) throw new Error("El local seleccionado no está activo o no pertenece a esta empresa principal.");
 
   let usuarioLocal = null;
 
