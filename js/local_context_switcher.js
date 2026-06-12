@@ -56,8 +56,13 @@ function resolvePrincipalUserId(context) {
     || normalizeId(context?.user?.id);
 }
 
+// ==============================================
+// FUNCIÓN MEJORADA: Obtener locales de una empresa principal
+// ==============================================
 async function fetchGroupLocales(principalEmpresaId) {
   if (!principalEmpresaId) return [];
+
+  console.log("[local_context_switcher] Buscando locales para grupo_id:", principalEmpresaId);
 
   const { data, error } = await supabase
     .from("grupos_empresariales")
@@ -66,10 +71,11 @@ async function fetchGroupLocales(principalEmpresaId) {
     .eq("activo", true);
 
   if (error) {
-    console.warn("[local_context_switcher] No se pudieron cargar locales del grupo:", error);
+    console.warn("[local_context_switcher] Error al cargar locales:", error);
     return [];
   }
 
+  console.log(`[local_context_switcher] Se encontraron ${data?.length || 0} locales para el grupo ${principalEmpresaId}`);
   return Array.isArray(data) ? data : [];
 }
 
@@ -107,6 +113,223 @@ async function fetchUsuariosLocales({ principalUserId, localEmpresaIds }) {
 
   return Array.isArray(data) ? data : [];
 }
+
+// ==============================================
+// NUEVA FUNCIÓN: Verificar si una empresa TIENE locales
+// ==============================================
+export async function hasLocales(empresaId = null) {
+  try {
+    let targetEmpresaId = empresaId;
+    
+    if (!targetEmpresaId) {
+      const context = await getUserContext();
+      if (!context?.empresa_id) {
+        console.warn("[local_context_switcher] No hay contexto para verificar locales");
+        return false;
+      }
+      targetEmpresaId = resolvePrincipalEmpresaId(context);
+    }
+    
+    const locales = await fetchGroupLocales(targetEmpresaId);
+    const hasLocalesFlag = locales.length > 0;
+    
+    console.log(`[local_context_switcher] La empresa ${targetEmpresaId} ${hasLocalesFlag ? 'TIENE' : 'NO TIENE'} locales (${locales.length})`);
+    return hasLocalesFlag;
+    
+  } catch (error) {
+    console.error("[local_context_switcher] Error al verificar locales:", error);
+    return false;
+  }
+}
+
+// ==============================================
+// NUEVA FUNCIÓN: Obtener lista de locales disponibles
+// ==============================================
+export async function getLocalesList(empresaId = null) {
+  try {
+    let targetEmpresaId = empresaId;
+    
+    if (!targetEmpresaId) {
+      const context = await getUserContext();
+      if (!context?.empresa_id) {
+        console.warn("[local_context_switcher] No hay contexto para obtener locales");
+        return [];
+      }
+      targetEmpresaId = resolvePrincipalEmpresaId(context);
+    }
+    
+    const locales = await fetchGroupLocales(targetEmpresaId);
+    
+    // Obtener nombres comerciales de los locales
+    const empresaIds = locales.map(l => l.empresa_id);
+    const empresas = await fetchEmpresasByIds(empresaIds);
+    const empresaMap = new Map(empresas.map(e => [e.id, e]));
+    
+    // Formatear lista de locales para UI
+    const formattedLocales = locales.map(local => ({
+      id: local.empresa_id,           // ID del local (tenant)
+      grupo_id: local.grupo_id,       // ID del grupo principal
+      nombre: empresaMap.get(local.empresa_id)?.nombre_comercial || local.nombre_grupo || "Local sin nombre",
+      razon_social: local.razon_social_grupo,
+      plan: local.plan_grupo,
+      activo: local.activo
+    }));
+    
+    console.log(`[local_context_switcher] Lista de locales obtenida:`, formattedLocales);
+    return formattedLocales;
+    
+  } catch (error) {
+    console.error("[local_context_switcher] Error al obtener lista de locales:", error);
+    return [];
+  }
+}
+
+// ==============================================
+// NUEVA FUNCIÓN: Cambiar a un local específico
+// ==============================================
+export async function switchToLocal(localEmpresaId) {
+  try {
+    console.log(`[local_context_switcher] Intentando cambiar al local: ${localEmpresaId}`);
+    
+    const context = await getUserContext();
+    if (!context?.empresa_id) {
+      throw new Error("No hay contexto de usuario");
+    }
+    
+    const principalEmpresaId = resolvePrincipalEmpresaId(context);
+    
+    // Verificar que el local pertenezca al grupo principal
+    const locales = await fetchGroupLocales(principalEmpresaId);
+    const targetLocal = locales.find(l => normalizeId(l.empresa_id) === normalizeId(localEmpresaId));
+    
+    if (!targetLocal) {
+      throw new Error(`El local ${localEmpresaId} no pertenece al grupo ${principalEmpresaId} o no está activo`);
+    }
+    
+    // Guardar selección en localStorage
+    writeStoredLocalSelection({ 
+      empresa_id: localEmpresaId, 
+      grupo_id: principalEmpresaId 
+    });
+    
+    console.log(`[local_context_switcher] ✅ Cambio exitoso al local:`, {
+      local_id: localEmpresaId,
+      local_nombre: targetLocal.nombre_grupo,
+      grupo_id: principalEmpresaId
+    });
+    
+    // Disparar evento para que otros componentes se enteren
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('localChanged', { 
+        detail: { 
+          local_id: localEmpresaId, 
+          grupo_id: principalEmpresaId,
+          previous_local_id: context.empresa_id
+        } 
+      }));
+    }
+    
+    return {
+      success: true,
+      local_id: localEmpresaId,
+      grupo_id: principalEmpresaId,
+      local_nombre: targetLocal.nombre_grupo
+    };
+    
+  } catch (error) {
+    console.error("[local_context_switcher] ❌ Error al cambiar de local:", error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+// ==============================================
+// NUEVA FUNCIÓN: Volver a la empresa principal
+// ==============================================
+export async function switchToPrincipal() {
+  try {
+    console.log(`[local_context_switcher] Cambiando a la empresa principal...`);
+    
+    const context = await getUserContext();
+    if (!context?.empresa_id) {
+      throw new Error("No hay contexto de usuario");
+    }
+    
+    const principalEmpresaId = resolvePrincipalEmpresaId(context);
+    
+    // Limpiar selección guardada
+    writeStoredLocalSelection(null);
+    
+    console.log(`[local_context_switcher] ✅ Cambio exitoso a empresa principal: ${principalEmpresaId}`);
+    
+    // Disparar evento
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('localChanged', { 
+        detail: { 
+          local_id: principalEmpresaId, 
+          grupo_id: null,
+          is_principal: true
+        } 
+      }));
+    }
+    
+    return {
+      success: true,
+      local_id: principalEmpresaId,
+      is_principal: true
+    };
+    
+  } catch (error) {
+    console.error("[local_context_switcher] ❌ Error al cambiar a principal:", error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+// ==============================================
+// NUEVA FUNCIÓN: Obtener el local actualmente activo
+// ==============================================
+export async function getCurrentLocal() {
+  const context = await getUserContext();
+  if (!context?.empresa_id) return null;
+  
+  const storedSelection = readStoredLocalSelection();
+  const principalEmpresaId = resolvePrincipalEmpresaId(context);
+  const currentEmpresaId = context.empresa_id;
+  
+  // Si el ID actual es diferente al principal, estamos en un local
+  const isLocal = normalizeId(currentEmpresaId) !== normalizeId(principalEmpresaId);
+  
+  if (isLocal && storedSelection) {
+    // Intentar obtener nombre del local
+    const locales = await fetchGroupLocales(principalEmpresaId);
+    const currentLocal = locales.find(l => normalizeId(l.empresa_id) === normalizeId(currentEmpresaId));
+    
+    return {
+      id: currentEmpresaId,
+      grupo_id: principalEmpresaId,
+      nombre: currentLocal?.nombre_grupo || "Local",
+      tipo: "local",
+      is_principal: false
+    };
+  }
+  
+  return {
+    id: principalEmpresaId,
+    grupo_id: null,
+    nombre: "Empresa Principal",
+    tipo: "principal",
+    is_principal: true
+  };
+}
+
+// ==============================================
+// FUNCIONES EXISTENTES (listLocalContextsForSwitcher, prepareLocalContextSwitch)
+// ==============================================
 
 export async function listLocalContextsForSwitcher() {
   const context = await getUserContext();
@@ -203,24 +426,18 @@ export async function prepareLocalContextSwitch(empresaId) {
 }
 
 // ==============================================
-// NUEVO CÓDIGO DE INICIALIZACIÓN TARDÍA
+// INICIALIZACIÓN TARDÍA (ya existente)
 // ==============================================
 
 let initialized = false;
 let initPromise = null;
 
-/**
- * Inicializa el selector de locales de forma manual o automática
- * Esta función se puede llamar desde fuera si es necesario
- */
 export async function initializeLocalContext() {
-  // Si ya se inicializó, retornar el resultado guardado
   if (initialized) {
     console.log("[local_context_switcher] Ya estaba inicializado");
     return;
   }
 
-  // Evitar múltiples inicializaciones simultáneas
   if (initPromise) {
     console.log("[local_context_switcher] Esperando inicialización en curso...");
     return initPromise;
@@ -234,7 +451,6 @@ export async function initializeLocalContext() {
       
       if (!context || !context.empresa_id) {
         console.log("[local_context_switcher] Usuario no logueado aún, reintentando en 2 segundos...");
-        // Reintentar después de 2 segundos si no hay sesión
         setTimeout(() => {
           initPromise = null;
           initializeLocalContext();
@@ -247,6 +463,15 @@ export async function initializeLocalContext() {
         rol: context.rol
       });
       
+      // Verificar si tiene locales
+      const tieneLocales = await hasLocales();
+      console.log(`[local_context_switcher] ¿La empresa tiene locales? ${tieneLocales ? 'SÍ' : 'NO'}`);
+      
+      if (tieneLocales) {
+        const localesList = await getLocalesList();
+        console.log(`[local_context_switcher] Locales disponibles:`, localesList);
+      }
+      
       const storedSelection = readStoredLocalSelection();
       
       if (storedSelection) {
@@ -255,7 +480,6 @@ export async function initializeLocalContext() {
           const result = await prepareLocalContextSwitch(storedSelection.empresa_id);
           console.log("[local_context_switcher] ✅ Contexto de local restaurado exitosamente:", result);
           
-          // Disparar evento personalizado para notificar que el contexto está listo
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('localContextReady', { detail: result }));
           }
@@ -265,13 +489,11 @@ export async function initializeLocalContext() {
         } catch (error) {
           console.warn("[local_context_switcher] ⚠️ No se pudo restaurar selección guardada:", error.message);
           writeStoredLocalSelection(null);
-          // Continuar con el contexto principal
         }
       } else {
         console.log("[local_context_switcher] No hay selección guardada, usando contexto principal");
       }
       
-      // Disparar evento incluso sin selección guardada
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('localContextReady', { 
           detail: { empresa_id: context.empresa_id, tipo: "principal" }
@@ -284,7 +506,6 @@ export async function initializeLocalContext() {
     } catch (error) {
       console.error("[local_context_switcher] ❌ Error en inicialización:", error);
       initPromise = null;
-      // Reintentar después de 5 segundos si hay error grave
       setTimeout(() => {
         if (!initialized) {
           console.log("[local_context_switcher] Reintentando inicialización...");
@@ -299,28 +520,21 @@ export async function initializeLocalContext() {
   return initPromise;
 }
 
-// INICIALIZACIÓN AUTOMÁTICA TARDÍA
-// Espera a que el DOM esté listo y luego inicia con un retraso
 if (typeof window !== 'undefined') {
-  // Función para iniciar después de que todo esté cargado
   const startDelayedInitialization = () => {
     console.log("[local_context_switcher] Programando inicialización tardía (3 segundos después de carga completa)...");
     setTimeout(() => {
       console.log("[local_context_switcher] Ejecutando inicialización tardía...");
       initializeLocalContext();
-    }, 3000); // 3 segundos de retraso para asegurar que todo esté listo
+    }, 3000);
   };
   
-  // Si el documento ya está cargado, iniciar directamente
   if (document.readyState === 'complete') {
     startDelayedInitialization();
   } else {
-    // Esperar a que todo el contenido esté cargado
     window.addEventListener('load', startDelayedInitialization);
   }
   
-  // También escuchar cambios en la sesión por si el usuario loguea después
-  // Esto es útil si el módulo se carga antes del login
   const checkSessionInterval = setInterval(async () => {
     if (!initialized) {
       const context = await getUserContext();
@@ -332,15 +546,13 @@ if (typeof window !== 'undefined') {
     } else {
       clearInterval(checkSessionInterval);
     }
-  }, 1000); // Revisar cada segundo si hay sesión
+  }, 1000);
   
-  // Limpiar el intervalo después de 30 segundos para no dejar procesos infinitos
   setTimeout(() => {
     clearInterval(checkSessionInterval);
   }, 30000);
 }
 
-// Exportar también la función de verificación de estado
 export function isLocalContextInitialized() {
   return initialized;
 }
