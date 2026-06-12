@@ -53,8 +53,7 @@ function resolvePrincipalUserId(context) {
 }
 
 // ==============================================
-// NUEVA FUNCIÓN: Validación de seguridad
-// Verifica que un local pertenezca legítimamente al grupo del usuario
+// FUNCIÓN: Validación de seguridad
 // ==============================================
 async function validateLocalBelongsToUserGroup(localEmpresaId, userPrincipalEmpresaId = null) {
   try {
@@ -71,14 +70,13 @@ async function validateLocalBelongsToUserGroup(localEmpresaId, userPrincipalEmpr
     
     console.log(`[local_context_switcher] 🔒 Validando seguridad: ¿El local ${localEmpresaId} pertenece al grupo ${principalEmpresaId}?`);
     
-    // Consulta de VALIDACIÓN - esto respeta las RLS existentes
     const { data, error } = await supabase
       .from("grupos_empresariales")
       .select("empresa_id, grupo_id, activo")
       .eq("empresa_id", localEmpresaId)
       .eq("grupo_id", principalEmpresaId)
       .eq("activo", true)
-      .maybeSingle();  // .maybeSingle() no da error si no encuentra
+      .maybeSingle();
     
     if (error) {
       console.error("[local_context_switcher] ❌ Error en validación:", error);
@@ -102,21 +100,18 @@ async function validateLocalBelongsToUserGroup(localEmpresaId, userPrincipalEmpr
 }
 
 // ==============================================
-// NUEVA FUNCIÓN: Obtener datos de un local de forma SEGURA
-// Primero valida, luego consulta empresas
+// FUNCIÓN: Obtener datos de un local de forma SEGURA
 // ==============================================
 export async function getLocalData(localEmpresaId) {
   try {
     console.log(`[local_context_switcher] 📋 Solicitando datos del local: ${localEmpresaId}`);
     
-    // PASO 1: Validar que el usuario tiene acceso a este local
     const isValid = await validateLocalBelongsToUserGroup(localEmpresaId);
     
     if (!isValid) {
       throw new Error(`Acceso denegado: No tienes permiso para consultar el local ${localEmpresaId}`);
     }
     
-    // PASO 2: Si es válido, consultar la tabla empresas
     console.log(`[local_context_switcher] 🔍 Consultando datos en tabla empresas para ID: ${localEmpresaId}`);
     
     const { data: empresaData, error: empresaError } = await supabase
@@ -135,7 +130,6 @@ export async function getLocalData(localEmpresaId) {
       throw new Error(`El local ${localEmpresaId} no existe o no está activo`);
     }
     
-    // PASO 3: También obtener datos del grupo (para contexto)
     const context = await getUserContext();
     const principalEmpresaId = resolvePrincipalEmpresaId(context);
     
@@ -181,7 +175,7 @@ export async function getLocalData(localEmpresaId) {
 }
 
 // ==============================================
-// FUNCIÓN MEJORADA: fetchGroupLocales (tipificación corregida)
+// FUNCIÓN: fetchGroupLocales
 // ==============================================
 async function fetchGroupLocales(principalEmpresaId) {
   if (!principalEmpresaId) {
@@ -192,19 +186,13 @@ async function fetchGroupLocales(principalEmpresaId) {
   console.log("[local_context_switcher] 🔍 Buscando locales en Supabase...");
   console.log("[local_context_switcher] 📊 Tabla: grupos_empresariales");
   console.log("[local_context_switcher] 🎯 Condición: grupo_id =", principalEmpresaId);
-  console.log("[local_context_switcher] 🎯 Condición: activo = true");
 
   try {
-    // Obtener la relación de locales del grupo
-    const { data: groupRelations, error, status, statusText } = await supabase
+    const { data: groupRelations, error } = await supabase
       .from("grupos_empresariales")
       .select("empresa_id, grupo_id, nombre_grupo, razon_social_grupo, plan_grupo, activo")
       .eq("grupo_id", principalEmpresaId)
       .eq("activo", true);
-
-    console.log("[local_context_switcher] 📡 Respuesta de Supabase:");
-    console.log("  - Status:", status);
-    console.log("  - Cantidad de relaciones encontradas:", groupRelations?.length || 0);
 
     if (error) {
       console.error("[local_context_switcher] ❌ Error detallado:", error);
@@ -216,12 +204,9 @@ async function fetchGroupLocales(principalEmpresaId) {
       return [];
     }
 
-    // Obtener los IDs de los locales (empresa_id)
     const localIds = groupRelations.map(rel => rel.empresa_id);
     console.log(`[local_context_switcher] IDs de locales a consultar:`, localIds);
 
-    // PASO CRÍTICO: Consultar la tabla empresas para cada local
-    // Usamos .in() para consultar múltiples IDs a la vez
     const { data: empresasData, error: empresasError } = await supabase
       .from("empresas")
       .select("id, nombre_comercial, razon_social, activo")
@@ -230,51 +215,33 @@ async function fetchGroupLocales(principalEmpresaId) {
 
     if (empresasError) {
       console.error("[local_context_switcher] ❌ Error al consultar empresas:", empresasError);
-      // Si falla consultar empresas, devolvemos solo las relaciones
       return groupRelations;
     }
 
     console.log(`[local_context_switcher] ✅ Empresas encontradas:`, empresasData?.length || 0);
 
-    // Crear un mapa de empresas por ID para fácil acceso
     const empresasMap = new Map();
     empresasData?.forEach(empresa => {
       empresasMap.set(empresa.id, empresa);
     });
 
-    // ENRIQUECER los datos del local con información de la tabla empresas
     const enrichedLocales = groupRelations.map(rel => {
       const empresaInfo = empresasMap.get(rel.empresa_id);
       
       return {
-        // Datos de la relación (grupo)
         empresa_id: rel.empresa_id,
         grupo_id: rel.grupo_id,
         nombre_grupo: rel.nombre_grupo,
         razon_social_grupo: rel.razon_social_grupo,
         plan_grupo: rel.plan_grupo,
         activo: rel.activo,
-        
-        // Datos ENRIQUECIDOS de la tabla empresas (NUEVO)
         local_nombre_comercial: empresaInfo?.nombre_comercial || null,
         local_razon_social: empresaInfo?.razon_social || null,
         local_activo: empresaInfo?.activo || false,
-        
-        // Flag para saber si el local existe en empresas
         local_exists_in_empresas: !!empresaInfo
       };
     });
 
-    console.log(`[local_context_switcher] ✅ Se encontraron ${enrichedLocales.length} locales enriquecidos:`);
-    enrichedLocales.forEach((local, index) => {
-      console.log(`  Local ${index + 1}:`, {
-        id: local.empresa_id,
-        nombre: local.local_nombre_comercial || local.nombre_grupo,
-        grupo: local.grupo_id
-      });
-    });
-    
-    // Filtrar solo locales que existen en empresas (seguridad adicional)
     const validLocales = enrichedLocales.filter(local => local.local_exists_in_empresas);
     
     if (validLocales.length !== enrichedLocales.length) {
@@ -290,7 +257,7 @@ async function fetchGroupLocales(principalEmpresaId) {
 }
 
 // ==============================================
-// FUNCIÓN MEJORADA: getLocalesList (usa datos enriquecidos)
+// FUNCIÓN: getLocalesList
 // ==============================================
 export async function getLocalesList(empresaId = null) {
   try {
@@ -311,16 +278,13 @@ export async function getLocalesList(empresaId = null) {
       return [];
     }
     
-    // Ahora locales ya tiene datos enriquecidos de empresas
     const formattedLocales = locales.map(local => ({
       id: local.empresa_id,
       grupo_id: local.grupo_id,
-      // PRIORIZAR el nombre de la tabla empresas sobre el del grupo
       nombre: local.local_nombre_comercial || local.nombre_grupo || "Local sin nombre",
       razon_social: local.local_razon_social || local.razon_social_grupo,
       plan: local.plan_grupo,
       activo: local.activo && local.local_activo,
-      // Datos adicionales útiles para UI
       nombre_grupo: local.nombre_grupo,
       esta_en_empresas: local.local_exists_in_empresas
     }));
@@ -335,7 +299,7 @@ export async function getLocalesList(empresaId = null) {
 }
 
 // ==============================================
-// FUNCIÓN MEJORADA: switchToLocal (con validación)
+// FUNCIÓN: switchToLocal
 // ==============================================
 export async function switchToLocal(localEmpresaId) {
   try {
@@ -348,21 +312,18 @@ export async function switchToLocal(localEmpresaId) {
     
     const principalEmpresaId = resolvePrincipalEmpresaId(context);
     
-    // Validación de seguridad ANTES de hacer el cambio
     const isValid = await validateLocalBelongsToUserGroup(localEmpresaId, principalEmpresaId);
     
     if (!isValid) {
       throw new Error(`Acceso denegado: No puedes cambiar al local ${localEmpresaId}`);
     }
     
-    // Obtener datos del local para mostrar confirmación
     const localData = await getLocalData(localEmpresaId);
     
     if (!localData.success) {
       throw new Error(localData.error || "No se pudo obtener datos del local");
     }
     
-    // Guardar selección en localStorage
     writeStoredLocalSelection({ 
       empresa_id: localEmpresaId, 
       grupo_id: principalEmpresaId 
@@ -374,7 +335,6 @@ export async function switchToLocal(localEmpresaId) {
       grupo: principalEmpresaId
     });
     
-    // Disparar evento
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('localChanged', { 
         detail: { 
@@ -402,7 +362,49 @@ export async function switchToLocal(localEmpresaId) {
 }
 
 // ==============================================
-// FUNCIÓN MEJORADA: getCurrentLocal (con datos reales)
+// FUNCIÓN: switchToPrincipal
+// ==============================================
+export async function switchToPrincipal() {
+  try {
+    console.log(`[local_context_switcher] Cambiando a la empresa principal...`);
+    
+    const context = await getUserContext();
+    if (!context?.empresa_id) {
+      throw new Error("No hay contexto de usuario");
+    }
+    
+    const principalEmpresaId = resolvePrincipalEmpresaId(context);
+    writeStoredLocalSelection(null);
+    
+    console.log(`[local_context_switcher] ✅ Cambio a principal: ${principalEmpresaId}`);
+    
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('localChanged', { 
+        detail: { 
+          local_id: principalEmpresaId, 
+          grupo_id: null,
+          is_principal: true
+        } 
+      }));
+    }
+    
+    return {
+      success: true,
+      local_id: principalEmpresaId,
+      is_principal: true
+    };
+    
+  } catch (error) {
+    console.error("[local_context_switcher] ❌ Error al cambiar a principal:", error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+// ==============================================
+// FUNCIÓN: getCurrentLocal
 // ==============================================
 export async function getCurrentLocal() {
   const context = await getUserContext();
@@ -414,7 +416,6 @@ export async function getCurrentLocal() {
   const isLocal = normalizeId(currentEmpresaId) !== normalizeId(principalEmpresaId);
   
   if (isLocal && storedSelection) {
-    // Obtener datos REALES del local actual
     const localData = await getLocalData(currentEmpresaId);
     
     if (localData.success) {
@@ -430,7 +431,6 @@ export async function getCurrentLocal() {
     }
   }
   
-  // Si estamos en principal o no se pudo obtener el local
   return {
     id: principalEmpresaId,
     grupo_id: null,
@@ -441,17 +441,285 @@ export async function getCurrentLocal() {
 }
 
 // ==============================================
-// FUNCIONES EXISTENTES (diagnoseDatabaseStructure, etc.)
-// Mantenerlas igual pero con los logs que ya tienen
+// FUNCIÓN: hasLocales
 // ==============================================
+export async function hasLocales(empresaId = null) {
+  try {
+    let targetEmpresaId = empresaId;
+    
+    if (!targetEmpresaId) {
+      const context = await getUserContext();
+      if (!context?.empresa_id) {
+        console.warn("[local_context_switcher] No hay contexto para verificar locales");
+        return false;
+      }
+      targetEmpresaId = resolvePrincipalEmpresaId(context);
+    }
+    
+    console.log(`[local_context_switcher] Verificando si ${targetEmpresaId} tiene locales...`);
+    const locales = await fetchGroupLocales(targetEmpresaId);
+    const hasLocalesFlag = locales.length > 0;
+    
+    console.log(`[local_context_switcher] Resultado: ${hasLocalesFlag ? '✅ TIENE locales' : '❌ NO TIENE locales'}`);
+    return hasLocalesFlag;
+    
+  } catch (error) {
+    console.error("[local_context_switcher] Error al verificar locales:", error);
+    return false;
+  }
+}
 
-// ... (el resto de funciones existentes se mantienen igual)
-// - diagnoseDatabaseStructure()
-// - hasLocales()
-// - listLocalContextsForSwitcher()
-// - prepareLocalContextSwitch()
-// - initializeLocalContext()
-// - etc.
+// ==============================================
+// FUNCIÓN: listLocalContextsForSwitcher (¡EXPORTADA!)
+// ==============================================
+export async function listLocalContextsForSwitcher() {
+  const context = await getUserContext();
+  if (!context?.empresa_id) return [];
 
-// Exportar las nuevas funciones
+  const principalEmpresaId = resolvePrincipalEmpresaId(context);
+  const principalUserId = resolvePrincipalUserId(context);
+  if (!principalEmpresaId || !principalUserId) return [];
+
+  const grupos = await fetchGroupLocales(principalEmpresaId);
+  const localEmpresaIds = uniqueIds(grupos.map((grupo) => grupo?.empresa_id));
+  const adminRoot = isAdminRootContext(context);
+  const usuariosLocales = adminRoot
+    ? []
+    : await fetchUsuariosLocales({ principalUserId, localEmpresaIds });
+
+  const visibleLocalIds = adminRoot
+    ? localEmpresaIds
+    : uniqueIds(usuariosLocales.map((usuarioLocal) => usuarioLocal?.empresa_id));
+  const empresas = await fetchEmpresasByIds([principalEmpresaId, ...visibleLocalIds]);
+  const empresaById = new Map(empresas.map((empresa) => [empresa.id, empresa]));
+  const grupoByEmpresaId = new Map(grupos.map((grupo) => [grupo.empresa_id, grupo]));
+
+  const labelForEmpresa = (empresaId, fallback) => {
+    const empresa = empresaById.get(empresaId);
+    return String(empresa?.nombre_comercial || empresa?.razon_social || fallback || empresaId).trim();
+  };
+
+  const locales = [{
+    empresa_id: principalEmpresaId,
+    usuario_id: principalUserId,
+    nombre: labelForEmpresa(principalEmpresaId, "Empresa principal"),
+    tipo: "principal",
+    activo: normalizeId(context.empresa_id) === principalEmpresaId && context.local_context !== true
+  }];
+
+  const rowsForMenu = adminRoot
+    ? grupos.map((grupo) => ({
+        empresa_id: grupo.empresa_id,
+        id: principalUserId,
+        rol: context.rol,
+        grupo
+      }))
+    : usuariosLocales.map((usuarioLocal) => ({
+        ...usuarioLocal,
+        grupo: grupoByEmpresaId.get(usuarioLocal.empresa_id)
+      }));
+
+  rowsForMenu.forEach((row) => {
+    const grupo = row.grupo || grupoByEmpresaId.get(row.empresa_id);
+    locales.push({
+      empresa_id: row.empresa_id,
+      usuario_id: row.id,
+      nombre: labelForEmpresa(row.empresa_id, grupo?.nombre_grupo || "Local"),
+      tipo: "local",
+      rol: row.rol || "",
+      activo: normalizeId(context.empresa_id) === normalizeId(row.empresa_id),
+      grupo_id: principalEmpresaId
+    });
+  });
+
+  return locales;
+}
+
+// ==============================================
+// FUNCIÓN: fetchUsuariosLocales
+// ==============================================
+async function fetchUsuariosLocales({ principalUserId, localEmpresaIds }) {
+  if (!principalUserId || !localEmpresaIds.length) return [];
+
+  console.log("[local_context_switcher] 🔍 Buscando usuarios locales para usuario principal:", principalUserId);
+
+  const { data, error } = await supabase
+    .from("usuarios_locales")
+    .select("id, usuario_principal_id, empresa_id, nombre_completo, rol, activo")
+    .eq("usuario_principal_id", principalUserId)
+    .in("empresa_id", localEmpresaIds)
+    .eq("activo", true);
+
+  if (error) {
+    console.warn("[local_context_switcher] No se pudieron cargar usuarios locales:", error);
+    return [];
+  }
+
+  console.log("[local_context_switcher] ✅ Usuarios locales encontrados:", data?.length || 0);
+  return Array.isArray(data) ? data : [];
+}
+
+// ==============================================
+// FUNCIÓN: fetchEmpresasByIds
+// ==============================================
+async function fetchEmpresasByIds(empresaIds) {
+  const ids = uniqueIds(empresaIds);
+  if (!ids.length) return [];
+
+  const { data, error } = await supabase
+    .from("empresas")
+    .select("id, nombre_comercial, razon_social")
+    .in("id", ids);
+
+  if (error) {
+    console.warn("[local_context_switcher] No se pudieron cargar nombres de empresas/locales:", error);
+    return [];
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
+// ==============================================
+// FUNCIÓN: prepareLocalContextSwitch
+// ==============================================
+export async function prepareLocalContextSwitch(empresaId) {
+  const context = await getUserContext();
+  if (!context?.empresa_id) throw new Error("No se pudo resolver el contexto actual.");
+
+  const targetEmpresaId = normalizeId(empresaId);
+  const principalEmpresaId = resolvePrincipalEmpresaId(context);
+  const principalUserId = resolvePrincipalUserId(context);
+  if (!targetEmpresaId) throw new Error("Local inválido.");
+  if (!principalEmpresaId || !principalUserId) throw new Error("No se pudo resolver la empresa o usuario principal.");
+
+  if (targetEmpresaId === principalEmpresaId) {
+    writeStoredLocalSelection(null);
+    return { empresa_id: principalEmpresaId, usuario_id: principalUserId, tipo: "principal" };
+  }
+
+  const grupos = await fetchGroupLocales(principalEmpresaId);
+  const grupo = grupos.find((row) => normalizeId(row?.empresa_id) === targetEmpresaId);
+  if (!grupo) throw new Error("El local seleccionado no está activo o no pertenece a esta empresa principal.");
+
+  let usuarioId = principalUserId;
+  if (!isAdminRootContext(context)) {
+    const usuariosLocales = await fetchUsuariosLocales({ principalUserId, localEmpresaIds: [targetEmpresaId] });
+    const usuarioLocal = usuariosLocales.find((row) => normalizeId(row?.empresa_id) === targetEmpresaId);
+    if (!usuarioLocal) throw new Error("Tu usuario no tiene duplicado activo para ese local.");
+    usuarioId = usuarioLocal.id;
+  }
+
+  writeStoredLocalSelection({ empresa_id: targetEmpresaId, grupo_id: principalEmpresaId });
+  return { empresa_id: targetEmpresaId, usuario_id: usuarioId, tipo: "local" };
+}
+
+// ==============================================
+// FUNCIÓN: initializeLocalContext
+// ==============================================
+let initialized = false;
+let initPromise = null;
+
+export async function initializeLocalContext() {
+  if (initialized) {
+    console.log("[local_context_switcher] Ya estaba inicializado");
+    return;
+  }
+
+  if (initPromise) {
+    console.log("[local_context_switcher] Esperando inicialización en curso...");
+    return initPromise;
+  }
+
+  initPromise = (async () => {
+    try {
+      console.log("[local_context_switcher] 🚀 Iniciando inicialización tardía...");
+      
+      const context = await getUserContext();
+      
+      if (!context || !context.empresa_id) {
+        console.log("[local_context_switcher] Usuario no logueado aún, reintentando...");
+        setTimeout(() => {
+          initPromise = null;
+          initializeLocalContext();
+        }, 2000);
+        return;
+      }
+      
+      console.log("[local_context_switcher] Contexto encontrado:", {
+        empresa_id: context.empresa_id,
+        rol: context.rol
+      });
+      
+      const tieneLocales = await hasLocales();
+      console.log(`[local_context_switcher] ¿La empresa tiene locales? ${tieneLocales ? 'SÍ' : 'NO'}`);
+      
+      if (tieneLocales) {
+        const localesList = await getLocalesList();
+        console.log(`[local_context_switcher] Locales disponibles:`, localesList);
+      }
+      
+      const storedSelection = readStoredLocalSelection();
+      
+      if (storedSelection) {
+        console.log("[local_context_switcher] Selección guardada:", storedSelection);
+        try {
+          const result = await prepareLocalContextSwitch(storedSelection.empresa_id);
+          console.log("[local_context_switcher] ✅ Contexto restaurado:", result);
+          
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('localContextReady', { detail: result }));
+          }
+          
+          initialized = true;
+          return result;
+        } catch (error) {
+          console.warn("[local_context_switcher] ⚠️ No se pudo restaurar:", error.message);
+          writeStoredLocalSelection(null);
+        }
+      }
+      
+      initialized = true;
+      console.log("[local_context_switcher] ✅ Inicialización completada");
+      
+    } catch (error) {
+      console.error("[local_context_switcher] ❌ Error:", error);
+      initPromise = null;
+      setTimeout(() => {
+        if (!initialized) {
+          initializeLocalContext();
+        }
+      }, 5000);
+    } finally {
+      initPromise = null;
+    }
+  })();
+
+  return initPromise;
+}
+
+// ==============================================
+// EXPORTACIÓN DE FUNCIONES ADICIONALES
+// ==============================================
 export { validateLocalBelongsToUserGroup };
+export function isLocalContextInitialized() {
+  return initialized;
+}
+
+// ==============================================
+// INICIALIZACIÓN AUTOMÁTICA (solo si existe window)
+// ==============================================
+if (typeof window !== 'undefined') {
+  const startDelayedInitialization = () => {
+    console.log("[local_context_switcher] ⏰ Programando inicialización en 3 segundos...");
+    setTimeout(() => {
+      console.log("[local_context_switcher] ▶️ Ejecutando inicialización...");
+      initializeLocalContext();
+    }, 3000);
+  };
+  
+  if (document.readyState === 'complete') {
+    startDelayedInitialization();
+  } else {
+    window.addEventListener('load', startDelayedInitialization);
+  }
+}
