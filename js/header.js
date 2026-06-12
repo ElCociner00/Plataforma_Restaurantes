@@ -400,3 +400,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderFallbackHeader("Menu temporal disponible");
   }
 });
+
+// Inicialización silenciosa del módulo de locales (no bloqueante, no dependiente)
+setTimeout(() => import('/js/local_context_switcher.js').then(m => m.initializeLocalContext?.()).catch(() => {}), 2000);
