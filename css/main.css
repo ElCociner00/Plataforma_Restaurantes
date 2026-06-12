@@ -453,3 +453,48 @@ body.has-legal-footer {
   font-size: 0.78rem;
   line-height: 1.35;
 }
+
+.local-context-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.local-context-loading-card {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  max-width: 340px;
+  padding: 22px;
+  border-radius: 16px;
+  color: #f8fafc;
+  text-align: center;
+  background: #312e81;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.35);
+}
+
+.local-context-loading-card span {
+  color: #ddd6fe;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.local-context-loading-spinner {
+  width: 34px;
+  height: 34px;
+  border: 4px solid rgba(255, 255, 255, 0.28);
+  border-top-color: #ffffff;
+  border-radius: 999px;
+  animation: local-context-spin 0.8s linear infinite;
+}
+
+@keyframes local-context-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
