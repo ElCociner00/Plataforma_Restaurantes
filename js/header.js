@@ -23,7 +23,8 @@
  */
 import "./mobile_shell.js";
 import { supabase } from "./supabase.js";
-import { clearActiveLocalContext, clearUserContextCache, getUserContext, listAvailableLocalContexts, switchLocalContext } from "./session.js";
+import { clearActiveLocalContext, clearUserContextCache, getUserContext } from "./session.js";
+import { listLocalContextsForSwitcher, prepareLocalContextSwitch } from "./local_context_switcher.js";
 import { ENV_LOGGRO, ENV_SIIGO, getActiveEnvironment, setActiveEnvironment } from "./environment.js";
 import { resolveFirstAllowedRoute } from "./access_control.local.js";
 import { getPermisosEfectivos } from "./permisos.core.js";
@@ -60,6 +61,22 @@ const escapeHtml = (value) => String(value ?? "")
   .replace(/>/g, "&gt;")
   .replace(/"/g, "&quot;")
   .replace(/'/g, "&#39;");
+
+
+function showLocalContextLoading(message = "Cambiando local...") {
+  const overlay = document.createElement("div");
+  overlay.className = "local-context-loading-overlay";
+  overlay.setAttribute("role", "status");
+  overlay.setAttribute("aria-live", "polite");
+  overlay.innerHTML = `
+    <div class="local-context-loading-card">
+      <div class="local-context-loading-spinner" aria-hidden="true"></div>
+      <strong>${escapeHtml(message)}</strong>
+      <span>Preparando tenant y usuario del local. No cierres esta ventana.</span>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
 
 const buildLocalSwitcherItems = ({ context, localContexts = [] } = {}) => {
   const canManageLocals = ["admin_root", "admin"].includes(String(context?.rol || "").toLowerCase());
@@ -229,7 +246,8 @@ function wireHeaderEvents(header, context) {
       link.textContent = "Cambiando local...";
 
       try {
-        await switchLocalContext(targetEmpresaId);
+        showLocalContextLoading("Cambiando local...");
+        await prepareLocalContextSwitch(targetEmpresaId);
         await safeClearBannerDisplayCache();
         clearUserContextCache();
         window.location.reload();
@@ -297,7 +315,7 @@ async function renderAuthenticatedHeader() {
 
   const environmentForMenu = getActiveEnvironment() || (isGlobalNoTenantPage ? ENV_LOGGRO : inferEnvironmentFromPath());
   const nombreEmpresa = await obtenerNombreEmpresa(context.empresa_id);
-  const localContexts = await listAvailableLocalContexts().catch((error) => {
+  const localContexts = await listLocalContextsForSwitcher().catch((error) => {
     console.warn("[header] No se pudo cargar el selector de locales:", error);
     return [];
   });
