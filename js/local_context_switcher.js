@@ -1,9 +1,5 @@
 /**
  * Selector aislado de locales.
- *
- * Este módulo no modifica login ni el núcleo de sesión. Solo prepara/valida la
- * selección de local que el sistema de sesión existente ya sabe aplicar desde
- * localStorage durante la recarga.
  */
 import { supabase } from "./supabase.js";
 import { getUserContext } from "./session.js";
@@ -57,31 +53,84 @@ function resolvePrincipalUserId(context) {
 }
 
 // ==============================================
-// FUNCIÓN MEJORADA: Obtener locales de una empresa principal
+// FUNCIÓN MEJORADA CON LOGS PARA DIAGNÓSTICO
 // ==============================================
 async function fetchGroupLocales(principalEmpresaId) {
-  if (!principalEmpresaId) return [];
-
-  console.log("[local_context_switcher] Buscando locales para grupo_id:", principalEmpresaId);
-
-  const { data, error } = await supabase
-    .from("grupos_empresariales")
-    .select("empresa_id, grupo_id, nombre_grupo, razon_social_grupo, plan_grupo, activo")
-    .eq("grupo_id", principalEmpresaId)
-    .eq("activo", true);
-
-  if (error) {
-    console.warn("[local_context_switcher] Error al cargar locales:", error);
+  if (!principalEmpresaId) {
+    console.warn("[local_context_switcher] ❌ No hay principalEmpresaId para buscar locales");
     return [];
   }
 
-  console.log(`[local_context_switcher] Se encontraron ${data?.length || 0} locales para el grupo ${principalEmpresaId}`);
-  return Array.isArray(data) ? data : [];
+  console.log("[local_context_switcher] 🔍 Buscando locales en Supabase...");
+  console.log("[local_context_switcher] 📊 Tabla: grupos_empresariales");
+  console.log("[local_context_switcher] 🎯 Condición: grupo_id =", principalEmpresaId);
+  console.log("[local_context_switcher] 🎯 Condición: activo = true");
+  console.log("[local_context_switcher] 🔑 Usando cliente Supabase:", supabase ? "✅ Cliente existe" : "❌ Cliente NO existe");
+
+  try {
+    const { data, error, status, statusText } = await supabase
+      .from("grupos_empresariales")
+      .select("*")  // Seleccionar todo para ver qué columnas existen realmente
+      .eq("grupo_id", principalEmpresaId)
+      .eq("activo", true);
+
+    console.log("[local_context_switcher] 📡 Respuesta de Supabase:");
+    console.log("  - Status:", status);
+    console.log("  - StatusText:", statusText);
+    console.log("  - Error:", error);
+    console.log("  - Data:", data);
+    console.log("  - ¿Data es array?", Array.isArray(data));
+    console.log("  - Cantidad de registros:", data?.length || 0);
+
+    if (error) {
+      console.error("[local_context_switcher] ❌ Error detallado al cargar locales:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
+      return [];
+    }
+
+    if (!data || data.length === 0) {
+      console.warn(`[local_context_switcher] ⚠️ No se encontraron locales para grupo_id: ${principalEmpresaId}`);
+      
+      // Intentar ver si la tabla tiene datos en general
+      console.log("[local_context_switcher] 🔍 Verificando si la tabla tiene algún registro...");
+      const { count, error: countError } = await supabase
+        .from("grupos_empresariales")
+        .select("*", { count: 'exact', head: true });
+      
+      console.log("[local_context_switcher] 📊 Total de registros en grupos_empresariales:", count);
+      if (countError) {
+        console.error("[local_context_switcher] Error al contar registros:", countError);
+      }
+      
+      return [];
+    }
+
+    console.log(`[local_context_switcher] ✅ Se encontraron ${data.length} locales:`);
+    data.forEach((local, index) => {
+      console.log(`  Local ${index + 1}:`, {
+        empresa_id: local.empresa_id,
+        grupo_id: local.grupo_id,
+        nombre_grupo: local.nombre_grupo
+      });
+    });
+    
+    return data;
+    
+  } catch (error) {
+    console.error("[local_context_switcher] 💥 Excepción catastrófica en fetchGroupLocales:", error);
+    return [];
+  }
 }
 
 async function fetchEmpresasByIds(empresaIds) {
   const ids = uniqueIds(empresaIds);
   if (!ids.length) return [];
+
+  console.log("[local_context_switcher] 🔍 Buscando nombres de empresas para IDs:", ids);
 
   const { data, error } = await supabase
     .from("empresas")
@@ -93,11 +142,15 @@ async function fetchEmpresasByIds(empresaIds) {
     return [];
   }
 
+  console.log("[local_context_switcher] ✅ Empresas encontradas:", data?.length || 0);
   return Array.isArray(data) ? data : [];
 }
 
 async function fetchUsuariosLocales({ principalUserId, localEmpresaIds }) {
   if (!principalUserId || !localEmpresaIds.length) return [];
+
+  console.log("[local_context_switcher] 🔍 Buscando usuarios locales para usuario principal:", principalUserId);
+  console.log("[local_context_switcher] 📍 En empresas:", localEmpresaIds);
 
   const { data, error } = await supabase
     .from("usuarios_locales")
@@ -111,11 +164,90 @@ async function fetchUsuariosLocales({ principalUserId, localEmpresaIds }) {
     return [];
   }
 
+  console.log("[local_context_switcher] ✅ Usuarios locales encontrados:", data?.length || 0);
   return Array.isArray(data) ? data : [];
 }
 
 // ==============================================
-// NUEVA FUNCIÓN: Verificar si una empresa TIENE locales
+// FUNCIÓN DIAGNÓSTICA: Ver estructura de la tabla
+// ==============================================
+export async function diagnoseDatabaseStructure() {
+  console.log("[local_context_switcher] 🩺 INICIANDO DIAGNÓSTICO DE BASE DE DATOS");
+  console.log("==================================================");
+  
+  // 1. Verificar conexión a Supabase
+  console.log("1️⃣ Verificando conexión a Supabase...");
+  try {
+    const { data: healthCheck, error: healthError } = await supabase.from('grupos_empresariales').select('count', { count: 'exact', head: true });
+    if (healthError) {
+      console.error("❌ Error de conexión:", healthError);
+    } else {
+      console.log("✅ Conexión a Supabase exitosa");
+    }
+  } catch (e) {
+    console.error("❌ No se pudo conectar a Supabase:", e);
+  }
+  
+  // 2. Obtener contexto actual
+  console.log("\n2️⃣ Obteniendo contexto de usuario...");
+  const context = await getUserContext();
+  console.log("Contexto completo:", context);
+  console.log("empresa_id del contexto:", context?.empresa_id);
+  console.log("rol:", context?.rol);
+  
+  // 3. Obtener todas las columnas de grupos_empresariales
+  console.log("\n3️⃣ Consultando estructura de grupos_empresariales...");
+  const { data: sampleData, error: sampleError } = await supabase
+    .from("grupos_empresariales")
+    .select("*")
+    .limit(1);
+  
+  if (sampleError) {
+    console.error("❌ Error al obtener muestra:", sampleError);
+  } else if (sampleData && sampleData.length > 0) {
+    console.log("✅ Columnas disponibles en grupos_empresariales:");
+    const columns = Object.keys(sampleData[0]);
+    columns.forEach(col => console.log(`   - ${col}`));
+  } else {
+    console.log("⚠️ La tabla grupos_empresariales está vacía o no existe");
+  }
+  
+  // 4. Contar registros totales
+  console.log("\n4️⃣ Contando registros...");
+  const { count: totalCount, error: countError } = await supabase
+    .from("grupos_empresariales")
+    .select("*", { count: 'exact', head: true });
+  
+  if (countError) {
+    console.error("❌ Error al contar:", countError);
+  } else {
+    console.log(`📊 Total de registros en grupos_empresariales: ${totalCount}`);
+  }
+  
+  // 5. Buscar por grupo_id específico
+  if (context?.empresa_id) {
+    console.log(`\n5️⃣ Buscando registros con grupo_id = ${context.empresa_id}...`);
+    const { data: matchingGroups, error: matchError } = await supabase
+      .from("grupos_empresariales")
+      .select("*")
+      .eq("grupo_id", context.empresa_id);
+    
+    if (matchError) {
+      console.error("❌ Error en búsqueda:", matchError);
+    } else {
+      console.log(`✅ Encontrados ${matchingGroups?.length || 0} registros con ese grupo_id`);
+      if (matchingGroups && matchingGroups.length > 0) {
+        console.log("Registros:", matchingGroups);
+      }
+    }
+  }
+  
+  console.log("\n==================================================");
+  console.log("🩺 DIAGNÓSTICO COMPLETADO");
+}
+
+// ==============================================
+// FUNCIÓN MEJORADA hasLocales
 // ==============================================
 export async function hasLocales(empresaId = null) {
   try {
@@ -130,10 +262,11 @@ export async function hasLocales(empresaId = null) {
       targetEmpresaId = resolvePrincipalEmpresaId(context);
     }
     
+    console.log(`[local_context_switcher] Verificando si ${targetEmpresaId} tiene locales...`);
     const locales = await fetchGroupLocales(targetEmpresaId);
     const hasLocalesFlag = locales.length > 0;
     
-    console.log(`[local_context_switcher] La empresa ${targetEmpresaId} ${hasLocalesFlag ? 'TIENE' : 'NO TIENE'} locales (${locales.length})`);
+    console.log(`[local_context_switcher] Resultado: ${hasLocalesFlag ? '✅ TIENE locales' : '❌ NO TIENE locales'}`);
     return hasLocalesFlag;
     
   } catch (error) {
@@ -142,9 +275,6 @@ export async function hasLocales(empresaId = null) {
   }
 }
 
-// ==============================================
-// NUEVA FUNCIÓN: Obtener lista de locales disponibles
-// ==============================================
 export async function getLocalesList(empresaId = null) {
   try {
     let targetEmpresaId = empresaId;
@@ -160,22 +290,24 @@ export async function getLocalesList(empresaId = null) {
     
     const locales = await fetchGroupLocales(targetEmpresaId);
     
-    // Obtener nombres comerciales de los locales
+    if (locales.length === 0) {
+      return [];
+    }
+    
     const empresaIds = locales.map(l => l.empresa_id);
     const empresas = await fetchEmpresasByIds(empresaIds);
     const empresaMap = new Map(empresas.map(e => [e.id, e]));
     
-    // Formatear lista de locales para UI
     const formattedLocales = locales.map(local => ({
-      id: local.empresa_id,           // ID del local (tenant)
-      grupo_id: local.grupo_id,       // ID del grupo principal
+      id: local.empresa_id,
+      grupo_id: local.grupo_id,
       nombre: empresaMap.get(local.empresa_id)?.nombre_comercial || local.nombre_grupo || "Local sin nombre",
       razon_social: local.razon_social_grupo,
       plan: local.plan_grupo,
       activo: local.activo
     }));
     
-    console.log(`[local_context_switcher] Lista de locales obtenida:`, formattedLocales);
+    console.log(`[local_context_switcher] Lista de locales:`, formattedLocales);
     return formattedLocales;
     
   } catch (error) {
@@ -184,9 +316,6 @@ export async function getLocalesList(empresaId = null) {
   }
 }
 
-// ==============================================
-// NUEVA FUNCIÓN: Cambiar a un local específico
-// ==============================================
 export async function switchToLocal(localEmpresaId) {
   try {
     console.log(`[local_context_switcher] Intentando cambiar al local: ${localEmpresaId}`);
@@ -197,8 +326,6 @@ export async function switchToLocal(localEmpresaId) {
     }
     
     const principalEmpresaId = resolvePrincipalEmpresaId(context);
-    
-    // Verificar que el local pertenezca al grupo principal
     const locales = await fetchGroupLocales(principalEmpresaId);
     const targetLocal = locales.find(l => normalizeId(l.empresa_id) === normalizeId(localEmpresaId));
     
@@ -206,19 +333,13 @@ export async function switchToLocal(localEmpresaId) {
       throw new Error(`El local ${localEmpresaId} no pertenece al grupo ${principalEmpresaId} o no está activo`);
     }
     
-    // Guardar selección en localStorage
     writeStoredLocalSelection({ 
       empresa_id: localEmpresaId, 
       grupo_id: principalEmpresaId 
     });
     
-    console.log(`[local_context_switcher] ✅ Cambio exitoso al local:`, {
-      local_id: localEmpresaId,
-      local_nombre: targetLocal.nombre_grupo,
-      grupo_id: principalEmpresaId
-    });
+    console.log(`[local_context_switcher] ✅ Cambio exitoso al local: ${targetLocal.nombre_grupo}`);
     
-    // Disparar evento para que otros componentes se enteren
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('localChanged', { 
         detail: { 
@@ -245,9 +366,6 @@ export async function switchToLocal(localEmpresaId) {
   }
 }
 
-// ==============================================
-// NUEVA FUNCIÓN: Volver a la empresa principal
-// ==============================================
 export async function switchToPrincipal() {
   try {
     console.log(`[local_context_switcher] Cambiando a la empresa principal...`);
@@ -258,13 +376,10 @@ export async function switchToPrincipal() {
     }
     
     const principalEmpresaId = resolvePrincipalEmpresaId(context);
-    
-    // Limpiar selección guardada
     writeStoredLocalSelection(null);
     
-    console.log(`[local_context_switcher] ✅ Cambio exitoso a empresa principal: ${principalEmpresaId}`);
+    console.log(`[local_context_switcher] ✅ Cambio a principal: ${principalEmpresaId}`);
     
-    // Disparar evento
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('localChanged', { 
         detail: { 
@@ -290,9 +405,6 @@ export async function switchToPrincipal() {
   }
 }
 
-// ==============================================
-// NUEVA FUNCIÓN: Obtener el local actualmente activo
-// ==============================================
 export async function getCurrentLocal() {
   const context = await getUserContext();
   if (!context?.empresa_id) return null;
@@ -300,12 +412,9 @@ export async function getCurrentLocal() {
   const storedSelection = readStoredLocalSelection();
   const principalEmpresaId = resolvePrincipalEmpresaId(context);
   const currentEmpresaId = context.empresa_id;
-  
-  // Si el ID actual es diferente al principal, estamos en un local
   const isLocal = normalizeId(currentEmpresaId) !== normalizeId(principalEmpresaId);
   
   if (isLocal && storedSelection) {
-    // Intentar obtener nombre del local
     const locales = await fetchGroupLocales(principalEmpresaId);
     const currentLocal = locales.find(l => normalizeId(l.empresa_id) === normalizeId(currentEmpresaId));
     
@@ -326,10 +435,6 @@ export async function getCurrentLocal() {
     is_principal: true
   };
 }
-
-// ==============================================
-// FUNCIONES EXISTENTES (listLocalContextsForSwitcher, prepareLocalContextSwitch)
-// ==============================================
 
 export async function listLocalContextsForSwitcher() {
   const context = await getUserContext();
@@ -426,7 +531,7 @@ export async function prepareLocalContextSwitch(empresaId) {
 }
 
 // ==============================================
-// INICIALIZACIÓN TARDÍA (ya existente)
+// INICIALIZACIÓN
 // ==============================================
 
 let initialized = false;
@@ -445,12 +550,15 @@ export async function initializeLocalContext() {
 
   initPromise = (async () => {
     try {
-      console.log("[local_context_switcher] Iniciando inicialización tardía...");
+      console.log("[local_context_switcher] 🚀 Iniciando inicialización tardía...");
+      
+      // Ejecutar diagnóstico automático
+      await diagnoseDatabaseStructure();
       
       const context = await getUserContext();
       
       if (!context || !context.empresa_id) {
-        console.log("[local_context_switcher] Usuario no logueado aún, reintentando en 2 segundos...");
+        console.log("[local_context_switcher] Usuario no logueado aún, reintentando...");
         setTimeout(() => {
           initPromise = null;
           initializeLocalContext();
@@ -463,7 +571,6 @@ export async function initializeLocalContext() {
         rol: context.rol
       });
       
-      // Verificar si tiene locales
       const tieneLocales = await hasLocales();
       console.log(`[local_context_switcher] ¿La empresa tiene locales? ${tieneLocales ? 'SÍ' : 'NO'}`);
       
@@ -475,10 +582,10 @@ export async function initializeLocalContext() {
       const storedSelection = readStoredLocalSelection();
       
       if (storedSelection) {
-        console.log("[local_context_switcher] Selección guardada encontrada:", storedSelection);
+        console.log("[local_context_switcher] Selección guardada:", storedSelection);
         try {
           const result = await prepareLocalContextSwitch(storedSelection.empresa_id);
-          console.log("[local_context_switcher] ✅ Contexto de local restaurado exitosamente:", result);
+          console.log("[local_context_switcher] ✅ Contexto restaurado:", result);
           
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('localContextReady', { detail: result }));
@@ -487,28 +594,19 @@ export async function initializeLocalContext() {
           initialized = true;
           return result;
         } catch (error) {
-          console.warn("[local_context_switcher] ⚠️ No se pudo restaurar selección guardada:", error.message);
+          console.warn("[local_context_switcher] ⚠️ No se pudo restaurar:", error.message);
           writeStoredLocalSelection(null);
         }
-      } else {
-        console.log("[local_context_switcher] No hay selección guardada, usando contexto principal");
-      }
-      
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('localContextReady', { 
-          detail: { empresa_id: context.empresa_id, tipo: "principal" }
-        }));
       }
       
       initialized = true;
-      console.log("[local_context_switcher] ✅ Inicialización completada (contexto principal)");
+      console.log("[local_context_switcher] ✅ Inicialización completada");
       
     } catch (error) {
-      console.error("[local_context_switcher] ❌ Error en inicialización:", error);
+      console.error("[local_context_switcher] ❌ Error:", error);
       initPromise = null;
       setTimeout(() => {
         if (!initialized) {
-          console.log("[local_context_switcher] Reintentando inicialización...");
           initializeLocalContext();
         }
       }, 5000);
@@ -522,9 +620,9 @@ export async function initializeLocalContext() {
 
 if (typeof window !== 'undefined') {
   const startDelayedInitialization = () => {
-    console.log("[local_context_switcher] Programando inicialización tardía (3 segundos después de carga completa)...");
+    console.log("[local_context_switcher] ⏰ Programando inicialización en 3 segundos...");
     setTimeout(() => {
-      console.log("[local_context_switcher] Ejecutando inicialización tardía...");
+      console.log("[local_context_switcher] ▶️ Ejecutando inicialización...");
       initializeLocalContext();
     }, 3000);
   };
@@ -534,23 +632,6 @@ if (typeof window !== 'undefined') {
   } else {
     window.addEventListener('load', startDelayedInitialization);
   }
-  
-  const checkSessionInterval = setInterval(async () => {
-    if (!initialized) {
-      const context = await getUserContext();
-      if (context?.empresa_id) {
-        console.log("[local_context_switcher] Sesión detectada, iniciando inicialización...");
-        clearInterval(checkSessionInterval);
-        initializeLocalContext();
-      }
-    } else {
-      clearInterval(checkSessionInterval);
-    }
-  }, 1000);
-  
-  setTimeout(() => {
-    clearInterval(checkSessionInterval);
-  }, 30000);
 }
 
 export function isLocalContextInitialized() {
