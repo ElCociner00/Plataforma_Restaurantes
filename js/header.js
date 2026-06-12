@@ -108,25 +108,24 @@ function showLocalContextLoading(message = "Cambiando local...") {
 
 // ==============================================
 // FUNCIÓN CORREGIDA: buildLocalSwitcherItems
-// Ahora muestra el selector aunque haya solo 1 local
 // ==============================================
 const buildLocalSwitcherItems = ({ context, localContexts = [] } = {}) => {
+  console.log("[header] buildLocalSwitcherItems - localContexts:", localContexts);
+  
   const canManageLocals = ["admin_root", "admin"].includes(String(context?.rol || "").toLowerCase());
-  // CORREGIDO: Ahora muestra si hay AL MENOS 1 local (>= 1 en lugar de > 1)
   const hasSwitchableLocals = Array.isArray(localContexts) && localContexts.length >= 1;
 
   if (!canManageLocals && !hasSwitchableLocals) return "";
 
   const safeLocalContexts = Array.isArray(localContexts) ? localContexts : [];
   const items = safeLocalContexts.map((local) => {
-    const label = escapeHtml(local.nombre || (local.tipo === "principal" ? "Empresa principal" : "Local"));
+    const label = escapeHtml(local.nombre || (local.tipo === "principal" ? "Empresa principal" : "Local sin nombre"));
     const badge = local.tipo === "principal" ? "Principal" : "Local";
     const activeClass = local.activo ? " active" : "";
     const activeSuffix = local.activo ? `<span class="local-switch-active-label">Actual</span>` : "";
     return `<a href="#" class="local-switch-option${activeClass}" data-switch-local="${escapeHtml(local.empresa_id)}"><span><strong>${label}</strong><small>${badge}</small></span>${activeSuffix}</a>`;
   }).join("");
 
-  // Solo mostrar mensaje vacío si no hay items
   const emptyHint = (!items || items === "")
     ? `<div class="local-switch-empty" role="note">No hay locales disponibles para este usuario.</div>`
     : "";
