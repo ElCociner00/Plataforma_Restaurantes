@@ -201,3 +201,146 @@ export async function prepareLocalContextSwitch(empresaId) {
   writeStoredLocalSelection({ empresa_id: targetEmpresaId, grupo_id: principalEmpresaId });
   return { empresa_id: targetEmpresaId, usuario_id: usuarioId, tipo: "local" };
 }
+
+// ==============================================
+// NUEVO CÓDIGO DE INICIALIZACIÓN TARDÍA
+// ==============================================
+
+let initialized = false;
+let initPromise = null;
+
+/**
+ * Inicializa el selector de locales de forma manual o automática
+ * Esta función se puede llamar desde fuera si es necesario
+ */
+export async function initializeLocalContext() {
+  // Si ya se inicializó, retornar el resultado guardado
+  if (initialized) {
+    console.log("[local_context_switcher] Ya estaba inicializado");
+    return;
+  }
+
+  // Evitar múltiples inicializaciones simultáneas
+  if (initPromise) {
+    console.log("[local_context_switcher] Esperando inicialización en curso...");
+    return initPromise;
+  }
+
+  initPromise = (async () => {
+    try {
+      console.log("[local_context_switcher] Iniciando inicialización tardía...");
+      
+      const context = await getUserContext();
+      
+      if (!context || !context.empresa_id) {
+        console.log("[local_context_switcher] Usuario no logueado aún, reintentando en 2 segundos...");
+        // Reintentar después de 2 segundos si no hay sesión
+        setTimeout(() => {
+          initPromise = null;
+          initializeLocalContext();
+        }, 2000);
+        return;
+      }
+      
+      console.log("[local_context_switcher] Contexto encontrado:", {
+        empresa_id: context.empresa_id,
+        rol: context.rol
+      });
+      
+      const storedSelection = readStoredLocalSelection();
+      
+      if (storedSelection) {
+        console.log("[local_context_switcher] Selección guardada encontrada:", storedSelection);
+        try {
+          const result = await prepareLocalContextSwitch(storedSelection.empresa_id);
+          console.log("[local_context_switcher] ✅ Contexto de local restaurado exitosamente:", result);
+          
+          // Disparar evento personalizado para notificar que el contexto está listo
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('localContextReady', { detail: result }));
+          }
+          
+          initialized = true;
+          return result;
+        } catch (error) {
+          console.warn("[local_context_switcher] ⚠️ No se pudo restaurar selección guardada:", error.message);
+          writeStoredLocalSelection(null);
+          // Continuar con el contexto principal
+        }
+      } else {
+        console.log("[local_context_switcher] No hay selección guardada, usando contexto principal");
+      }
+      
+      // Disparar evento incluso sin selección guardada
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('localContextReady', { 
+          detail: { empresa_id: context.empresa_id, tipo: "principal" }
+        }));
+      }
+      
+      initialized = true;
+      console.log("[local_context_switcher] ✅ Inicialización completada (contexto principal)");
+      
+    } catch (error) {
+      console.error("[local_context_switcher] ❌ Error en inicialización:", error);
+      initPromise = null;
+      // Reintentar después de 5 segundos si hay error grave
+      setTimeout(() => {
+        if (!initialized) {
+          console.log("[local_context_switcher] Reintentando inicialización...");
+          initializeLocalContext();
+        }
+      }, 5000);
+    } finally {
+      initPromise = null;
+    }
+  })();
+
+  return initPromise;
+}
+
+// INICIALIZACIÓN AUTOMÁTICA TARDÍA
+// Espera a que el DOM esté listo y luego inicia con un retraso
+if (typeof window !== 'undefined') {
+  // Función para iniciar después de que todo esté cargado
+  const startDelayedInitialization = () => {
+    console.log("[local_context_switcher] Programando inicialización tardía (3 segundos después de carga completa)...");
+    setTimeout(() => {
+      console.log("[local_context_switcher] Ejecutando inicialización tardía...");
+      initializeLocalContext();
+    }, 3000); // 3 segundos de retraso para asegurar que todo esté listo
+  };
+  
+  // Si el documento ya está cargado, iniciar directamente
+  if (document.readyState === 'complete') {
+    startDelayedInitialization();
+  } else {
+    // Esperar a que todo el contenido esté cargado
+    window.addEventListener('load', startDelayedInitialization);
+  }
+  
+  // También escuchar cambios en la sesión por si el usuario loguea después
+  // Esto es útil si el módulo se carga antes del login
+  const checkSessionInterval = setInterval(async () => {
+    if (!initialized) {
+      const context = await getUserContext();
+      if (context?.empresa_id) {
+        console.log("[local_context_switcher] Sesión detectada, iniciando inicialización...");
+        clearInterval(checkSessionInterval);
+        initializeLocalContext();
+      }
+    } else {
+      clearInterval(checkSessionInterval);
+    }
+  }, 1000); // Revisar cada segundo si hay sesión
+  
+  // Limpiar el intervalo después de 30 segundos para no dejar procesos infinitos
+  setTimeout(() => {
+    clearInterval(checkSessionInterval);
+  }, 30000);
+}
+
+// Exportar también la función de verificación de estado
+export function isLocalContextInitialized() {
+  return initialized;
+}
