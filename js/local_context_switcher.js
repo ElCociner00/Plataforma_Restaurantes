@@ -52,9 +52,6 @@ function resolvePrincipalUserId(context) {
     || normalizeId(context?.user?.id);
 }
 
-// ==============================================
-// FUNCIÓN: Validación de seguridad
-// ==============================================
 async function validateLocalBelongsToUserGroup(localEmpresaId, userPrincipalEmpresaId = null) {
   try {
     let principalEmpresaId = userPrincipalEmpresaId;
@@ -99,9 +96,6 @@ async function validateLocalBelongsToUserGroup(localEmpresaId, userPrincipalEmpr
   }
 }
 
-// ==============================================
-// FUNCIÓN: Obtener datos de un local de forma SEGURA
-// ==============================================
 export async function getLocalData(localEmpresaId) {
   try {
     console.log(`[local_context_switcher] 📋 Solicitando datos del local: ${localEmpresaId}`);
@@ -174,9 +168,6 @@ export async function getLocalData(localEmpresaId) {
   }
 }
 
-// ==============================================
-// FUNCIÓN: fetchGroupLocales
-// ==============================================
 async function fetchGroupLocales(principalEmpresaId) {
   if (!principalEmpresaId) {
     console.warn("[local_context_switcher] ❌ No hay principalEmpresaId para buscar locales");
@@ -256,9 +247,6 @@ async function fetchGroupLocales(principalEmpresaId) {
   }
 }
 
-// ==============================================
-// FUNCIÓN: getLocalesList
-// ==============================================
 export async function getLocalesList(empresaId = null) {
   try {
     let targetEmpresaId = empresaId;
@@ -298,9 +286,6 @@ export async function getLocalesList(empresaId = null) {
   }
 }
 
-// ==============================================
-// FUNCIÓN: switchToLocal
-// ==============================================
 export async function switchToLocal(localEmpresaId) {
   try {
     console.log(`[local_context_switcher] 🔄 Intentando cambiar al local: ${localEmpresaId}`);
@@ -361,9 +346,6 @@ export async function switchToLocal(localEmpresaId) {
   }
 }
 
-// ==============================================
-// FUNCIÓN: switchToPrincipal
-// ==============================================
 export async function switchToPrincipal() {
   try {
     console.log(`[local_context_switcher] Cambiando a la empresa principal...`);
@@ -403,9 +385,6 @@ export async function switchToPrincipal() {
   }
 }
 
-// ==============================================
-// FUNCIÓN: getCurrentLocal
-// ==============================================
 export async function getCurrentLocal() {
   const context = await getUserContext();
   if (!context?.empresa_id) return null;
@@ -440,9 +419,6 @@ export async function getCurrentLocal() {
   };
 }
 
-// ==============================================
-// FUNCIÓN: hasLocales
-// ==============================================
 export async function hasLocales(empresaId = null) {
   try {
     let targetEmpresaId = empresaId;
@@ -469,9 +445,6 @@ export async function hasLocales(empresaId = null) {
   }
 }
 
-// ==============================================
-// FUNCIÓN: listLocalContextsForSwitcher
-// ==============================================
 export async function listLocalContextsForSwitcher() {
   const context = await getUserContext();
   if (!context?.empresa_id) return [];
@@ -504,233 +477,4 @@ export async function listLocalContextsForSwitcher() {
     usuario_id: principalUserId,
     nombre: labelForEmpresa(principalEmpresaId, "Empresa principal"),
     tipo: "principal",
-    activo: normalizeId(context.empresa_id) === principalEmpresaId && context.local_context !== true
-  }];
-
-  const rowsForMenu = adminRoot
-    ? grupos.map((grupo) => ({
-        empresa_id: grupo.empresa_id,
-        id: principalUserId,
-        rol: context.rol,
-        grupo
-      }))
-    : usuariosLocales.map((usuarioLocal) => ({
-        ...usuarioLocal,
-        grupo: grupoByEmpresaId.get(usuarioLocal.empresa_id)
-      }));
-
-  rowsForMenu.forEach((row) => {
-    const grupo = row.grupo || grupoByEmpresaId.get(row.empresa_id);
-    locales.push({
-      empresa_id: row.empresa_id,
-      usuario_id: row.id,
-      nombre: labelForEmpresa(row.empresa_id, grupo?.nombre_grupo || "Local"),
-      tipo: "local",
-      rol: row.rol || "",
-      activo: normalizeId(context.empresa_id) === normalizeId(row.empresa_id),
-      grupo_id: principalEmpresaId
-    });
-  });
-
-  return locales;
-}
-
-// ==============================================
-// FUNCIÓN: fetchUsuariosLocales
-// ==============================================
-async function fetchUsuariosLocales({ principalUserId, localEmpresaIds }) {
-  if (!principalUserId || !localEmpresaIds.length) return [];
-
-  console.log("[local_context_switcher] 🔍 Buscando usuarios locales para usuario principal:", principalUserId);
-
-  const { data, error } = await supabase
-    .from("usuarios_locales")
-    .select("id, usuario_principal_id, empresa_id, nombre_completo, rol, activo")
-    .eq("usuario_principal_id", principalUserId)
-    .in("empresa_id", localEmpresaIds)
-    .eq("activo", true);
-
-  if (error) {
-    console.warn("[local_context_switcher] No se pudieron cargar usuarios locales:", error);
-    return [];
-  }
-
-  console.log("[local_context_switcher] ✅ Usuarios locales encontrados:", data?.length || 0);
-  return Array.isArray(data) ? data : [];
-}
-
-// ==============================================
-// FUNCIÓN: fetchEmpresasByIds
-// ==============================================
-async function fetchEmpresasByIds(empresaIds) {
-  const ids = uniqueIds(empresaIds);
-  if (!ids.length) return [];
-
-  const { data, error } = await supabase
-    .from("empresas")
-    .select("id, nombre_comercial, razon_social")
-    .in("id", ids);
-
-  if (error) {
-    console.warn("[local_context_switcher] No se pudieron cargar nombres de empresas/locales:", error);
-    return [];
-  }
-
-  return Array.isArray(data) ? data : [];
-}
-
-// ==============================================
-// FUNCIÓN: prepareLocalContextSwitch
-// ==============================================
-export async function prepareLocalContextSwitch(empresaId) {
-  const context = await getUserContext();
-  if (!context?.empresa_id) throw new Error("No se pudo resolver el contexto actual.");
-
-  const targetEmpresaId = normalizeId(empresaId);
-  const principalEmpresaId = resolvePrincipalEmpresaId(context);
-  const principalUserId = resolvePrincipalUserId(context);
-  if (!targetEmpresaId) throw new Error("Local inválido.");
-  if (!principalEmpresaId || !principalUserId) throw new Error("No se pudo resolver la empresa o usuario principal.");
-
-  if (targetEmpresaId === principalEmpresaId) {
-    writeStoredLocalSelection(null);
-    return { empresa_id: principalEmpresaId, usuario_id: principalUserId, tipo: "principal" };
-  }
-
-  const grupos = await fetchGroupLocales(principalEmpresaId);
-  const grupo = grupos.find((row) => normalizeId(row?.empresa_id) === targetEmpresaId);
-  if (!grupo) throw new Error("El local seleccionado no está activo o no pertenece a esta empresa principal.");
-
-  let usuarioId = principalUserId;
-  if (!isAdminRootContext(context)) {
-    const usuariosLocales = await fetchUsuariosLocales({ principalUserId, localEmpresaIds: [targetEmpresaId] });
-    const usuarioLocal = usuariosLocales.find((row) => normalizeId(row?.empresa_id) === targetEmpresaId);
-    if (!usuarioLocal) throw new Error("Tu usuario no tiene duplicado activo para ese local.");
-    usuarioId = usuarioLocal.id;
-  }
-
-  writeStoredLocalSelection({ empresa_id: targetEmpresaId, grupo_id: principalEmpresaId });
-  return { empresa_id: targetEmpresaId, usuario_id: usuarioId, tipo: "local" };
-}
-
-// ==============================================
-// FUNCIÓN: initializeLocalContext
-// ==============================================
-let initialized = false;
-let initPromise = null;
-
-export async function initializeLocalContext() {
-  if (initialized) {
-    console.log("[local_context_switcher] Ya estaba inicializado");
-    return;
-  }
-
-  if (initPromise) {
-    console.log("[local_context_switcher] Esperando inicialización en curso...");
-    return initPromise;
-  }
-
-  initPromise = (async () => {
-    try {
-      console.log("[local_context_switcher] 🚀 Iniciando inicialización...");
-      
-      const context = await getUserContext();
-      
-      if (!context || !context.empresa_id) {
-        console.log("[local_context_switcher] Usuario no logueado aún, reintentando en 2 segundos...");
-        setTimeout(() => {
-          initPromise = null;
-          initializeLocalContext();
-        }, 2000);
-        return;
-      }
-      
-      console.log("[local_context_switcher] Contexto encontrado:", {
-        empresa_id: context.empresa_id,
-        rol: context.rol
-      });
-      
-      const tieneLocales = await hasLocales();
-      console.log(`[local_context_switcher] ¿La empresa tiene locales? ${tieneLocales ? 'SÍ' : 'NO'}`);
-      
-      if (tieneLocales) {
-        const localesList = await getLocalesList();
-        console.log(`[local_context_switcher] Locales disponibles:`, localesList);
-      }
-      
-      const storedSelection = readStoredLocalSelection();
-      
-      if (storedSelection) {
-        console.log("[local_context_switcher] Selección guardada:", storedSelection);
-        try {
-          const result = await prepareLocalContextSwitch(storedSelection.empresa_id);
-          console.log("[local_context_switcher] ✅ Contexto restaurado:", result);
-          
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('localContextReady', { detail: result }));
-          }
-          
-          initialized = true;
-          return result;
-        } catch (error) {
-          console.warn("[local_context_switcher] ⚠️ No se pudo restaurar:", error.message);
-          writeStoredLocalSelection(null);
-        }
-      }
-      
-      initialized = true;
-      console.log("[local_context_switcher] ✅ Inicialización completada");
-      
-    } catch (error) {
-      console.error("[local_context_switcher] ❌ Error:", error);
-      initPromise = null;
-      setTimeout(() => {
-        if (!initialized) {
-          initializeLocalContext();
-        }
-      }, 5000);
-    } finally {
-      initPromise = null;
-    }
-  })();
-
-  return initPromise;
-}
-
-// ==============================================
-// EXPORTACIÓN DE FUNCIONES ADICIONALES
-// ==============================================
-export { validateLocalBelongsToUserGroup };
-export function isLocalContextInitialized() {
-  return initialized;
-}
-
-// ==============================================
-// AUTO-INICIALIZACIÓN ROBUSTA (Funciona con importación dinámica)
-// ==============================================
-if (typeof window !== 'undefined') {
-  // Función que intenta inicializar múltiples veces hasta que tenga éxito
-  let initAttempts = 0;
-  const MAX_ATTEMPTS = 10;
-  const INIT_DELAY_MS = 3000;
-  
-  const attemptInitialization = () => {
-    initAttempts++;
-    console.log(`[local_context_switcher] 🔄 Intento de inicialización #${initAttempts}...`);
-    
-    initializeLocalContext().then(() => {
-      console.log("[local_context_switcher] ✅ Auto-inicialización exitosa");
-    }).catch((err) => {
-      console.warn(`[local_context_switcher] ⚠️ Intento #${initAttempts} falló:`, err?.message || err);
-      
-      if (initAttempts < MAX_ATTEMPTS) {
-        setTimeout(attemptInitialization, INIT_DELAY_MS);
-      } else {
-        console.error("[local_context_switcher] ❌ No se pudo inicializar después de", MAX_ATTEMPTS, "intentos");
-      }
-    });
-  };
-  
-  // Iniciar el primer intento
-  attemptInitialization();
-}
+    activo: normalizeId(context.empresa_id) === principal
