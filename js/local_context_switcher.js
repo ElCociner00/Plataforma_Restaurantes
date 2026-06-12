@@ -470,7 +470,7 @@ export async function hasLocales(empresaId = null) {
 }
 
 // ==============================================
-// FUNCIÓN: listLocalContextsForSwitcher (¡EXPORTADA!)
+// FUNCIÓN: listLocalContextsForSwitcher
 // ==============================================
 export async function listLocalContextsForSwitcher() {
   const context = await getUserContext();
@@ -632,12 +632,12 @@ export async function initializeLocalContext() {
 
   initPromise = (async () => {
     try {
-      console.log("[local_context_switcher] 🚀 Iniciando inicialización tardía...");
+      console.log("[local_context_switcher] 🚀 Iniciando inicialización...");
       
       const context = await getUserContext();
       
       if (!context || !context.empresa_id) {
-        console.log("[local_context_switcher] Usuario no logueado aún, reintentando...");
+        console.log("[local_context_switcher] Usuario no logueado aún, reintentando en 2 segundos...");
         setTimeout(() => {
           initPromise = null;
           initializeLocalContext();
@@ -706,20 +706,31 @@ export function isLocalContextInitialized() {
 }
 
 // ==============================================
-// INICIALIZACIÓN AUTOMÁTICA (solo si existe window)
+// AUTO-INICIALIZACIÓN ROBUSTA (Funciona con importación dinámica)
 // ==============================================
 if (typeof window !== 'undefined') {
-  const startDelayedInitialization = () => {
-    console.log("[local_context_switcher] ⏰ Programando inicialización en 3 segundos...");
-    setTimeout(() => {
-      console.log("[local_context_switcher] ▶️ Ejecutando inicialización...");
-      initializeLocalContext();
-    }, 3000);
+  // Función que intenta inicializar múltiples veces hasta que tenga éxito
+  let initAttempts = 0;
+  const MAX_ATTEMPTS = 10;
+  const INIT_DELAY_MS = 3000;
+  
+  const attemptInitialization = () => {
+    initAttempts++;
+    console.log(`[local_context_switcher] 🔄 Intento de inicialización #${initAttempts}...`);
+    
+    initializeLocalContext().then(() => {
+      console.log("[local_context_switcher] ✅ Auto-inicialización exitosa");
+    }).catch((err) => {
+      console.warn(`[local_context_switcher] ⚠️ Intento #${initAttempts} falló:`, err?.message || err);
+      
+      if (initAttempts < MAX_ATTEMPTS) {
+        setTimeout(attemptInitialization, INIT_DELAY_MS);
+      } else {
+        console.error("[local_context_switcher] ❌ No se pudo inicializar después de", MAX_ATTEMPTS, "intentos");
+      }
+    });
   };
   
-  if (document.readyState === 'complete') {
-    startDelayedInitialization();
-  } else {
-    window.addEventListener('load', startDelayedInitialization);
-  }
+  // Iniciar el primer intento
+  attemptInitialization();
 }
