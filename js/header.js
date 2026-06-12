@@ -24,7 +24,8 @@
 import "./mobile_shell.js";
 import { supabase } from "./supabase.js";
 import { clearActiveLocalContext, clearUserContextCache, getUserContext } from "./session.js";
-import { listLocalContextsForSwitcher, prepareLocalContextSwitch } from "./local_context_switcher.js";
+// IMPORTANTE: Eliminada la dependencia directa de local_context_switcher.js
+// Las funciones de locales se cargarán de forma dinámica y opcional
 import { ENV_LOGGRO, ENV_SIIGO, getActiveEnvironment, setActiveEnvironment } from "./environment.js";
 import { resolveFirstAllowedRoute } from "./access_control.local.js";
 import { getPermisosEfectivos } from "./permisos.core.js";
@@ -34,6 +35,56 @@ import { BRAND, applyBrandingToDocumentTitle } from "./branding.js";
 const HEADER_ID = "globalAppHeader";
 
 let anuncioModulePromise = null;
+
+// ==============================================
+// MÓDULO DE LOCALES OPCIONAL (NO BLOQUEANTE)
+// ==============================================
+let localContextModulePromise = null;
+let localContextModuleError = false;
+
+async function getLocalContextModule() {
+  // Si ya sabemos que el módulo falló, no reintentar
+  if (localContextModuleError) return null;
+  
+  if (localContextModulePromise === undefined) {
+    localContextModulePromise = import("./local_context_switcher.js")
+      .then(module => {
+        console.log("[header] ✅ Módulo de locales cargado correctamente");
+        return module;
+      })
+      .catch(error => {
+        console.warn("[header] ⚠️ Módulo de locales no disponible, funciones de cambio de local desactivadas:", error.message);
+        localContextModuleError = true;
+        return null;
+      });
+  }
+  return localContextModulePromise;
+}
+
+async function safeListLocalContexts() {
+  try {
+    const module = await getLocalContextModule();
+    if (module?.listLocalContextsForSwitcher) {
+      return await module.listLocalContextsForSwitcher();
+    }
+  } catch (error) {
+    console.warn("[header] No se pudo obtener lista de locales:", error);
+  }
+  return [];
+}
+
+async function safePrepareLocalContextSwitch(empresaId) {
+  try {
+    const module = await getLocalContextModule();
+    if (module?.prepareLocalContextSwitch) {
+      return await module.prepareLocalContextSwitch(empresaId);
+    }
+    throw new Error("Módulo de locales no disponible");
+  } catch (error) {
+    console.warn("[header] No se pudo cambiar de local:", error);
+    throw error;
+  }
+}
 
 async function loadAnuncioModuleSafe() {
   if (!anuncioModulePromise) {
@@ -247,7 +298,7 @@ function wireHeaderEvents(header, context) {
 
       try {
         showLocalContextLoading("Cambiando local...");
-        await prepareLocalContextSwitch(targetEmpresaId);
+        await safePrepareLocalContextSwitch(targetEmpresaId);
         await safeClearBannerDisplayCache();
         clearUserContextCache();
         window.location.reload();
@@ -315,10 +366,16 @@ async function renderAuthenticatedHeader() {
 
   const environmentForMenu = getActiveEnvironment() || (isGlobalNoTenantPage ? ENV_LOGGRO : inferEnvironmentFromPath());
   const nombreEmpresa = await obtenerNombreEmpresa(context.empresa_id);
-  const localContexts = await listLocalContextsForSwitcher().catch((error) => {
+  
+  // Carga de locales de forma NO BLOQUEANTE (si falla, sigue funcionando)
+  let localContexts = [];
+  try {
+    localContexts = await safeListLocalContexts();
+  } catch (error) {
     console.warn("[header] No se pudo cargar el selector de locales:", error);
-    return [];
-  });
+    // localContexts ya es [], el header sigue funcionando
+  }
+  
   const menu = buildMenu({ context, environmentForMenu, localContexts });
 
   header.innerHTML = `
