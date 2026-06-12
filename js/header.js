@@ -401,5 +401,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
-// Inicialización silenciosa del módulo de locales (no bloqueante, no dependiente)
-setTimeout(() => import('/js/local_context_switcher.js').then(m => m.initializeLocalContext?.()).catch(() => {}), 2000);
+// Inicialización silenciosa del módulo de locales y refresco automático
+setTimeout(async () => {
+  try {
+    const module = await import('/js/local_context_switcher.js');
+    await module.initializeLocalContext?.();
+    await renderAuthenticatedHeader();
+    console.log("[header] ✅ Header refrescado con selector de locales");
+  } catch (error) {
+    // Silencioso - no rompe nada
+  }
+}, 2000);
