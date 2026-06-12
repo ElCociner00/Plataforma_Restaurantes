@@ -445,6 +445,10 @@ export async function hasLocales(empresaId = null) {
   }
 }
 
+// ==============================================
+// FUNCIÓN CORREGIDA: listLocalContextsForSwitcher
+// Ahora incluye la empresa principal en el array
+// ==============================================
 export async function listLocalContextsForSwitcher() {
   const context = await getUserContext();
   if (!context?.empresa_id) return [];
@@ -453,6 +457,25 @@ export async function listLocalContextsForSwitcher() {
   const principalUserId = resolvePrincipalUserId(context);
   if (!principalEmpresaId || !principalUserId) return [];
 
+  // Obtener el nombre de la empresa principal desde la tabla empresas
+  const { data: principalEmpresa, error: principalError } = await supabase
+    .from("empresas")
+    .select("id, nombre_comercial, razon_social")
+    .eq("id", principalEmpresaId)
+    .maybeSingle();
+
+  const nombrePrincipal = principalEmpresa?.nombre_comercial || principalEmpresa?.razon_social || "Empresa principal";
+
+  // Array de resultados: empezar con la empresa principal
+  const locales = [{
+    empresa_id: principalEmpresaId,
+    usuario_id: principalUserId,
+    nombre: nombrePrincipal,
+    tipo: "principal",
+    activo: normalizeId(context.empresa_id) === principalEmpresaId && context.local_context !== true
+  }];
+
+  // Obtener los locales del grupo
   const grupos = await fetchGroupLocales(principalEmpresaId);
   const localEmpresaIds = uniqueIds(grupos.map((grupo) => grupo?.empresa_id));
   const adminRoot = isAdminRootContext(context);
@@ -463,7 +486,9 @@ export async function listLocalContextsForSwitcher() {
   const visibleLocalIds = adminRoot
     ? localEmpresaIds
     : uniqueIds(usuariosLocales.map((usuarioLocal) => usuarioLocal?.empresa_id));
-  const empresas = await fetchEmpresasByIds([principalEmpresaId, ...visibleLocalIds]);
+  
+  // Consultar empresas para obtener nombres reales de los locales
+  const empresas = await fetchEmpresasByIds([...visibleLocalIds]);
   const empresaById = new Map(empresas.map((empresa) => [empresa.id, empresa]));
   const grupoByEmpresaId = new Map(grupos.map((grupo) => [grupo.empresa_id, grupo]));
 
@@ -471,14 +496,6 @@ export async function listLocalContextsForSwitcher() {
     const empresa = empresaById.get(empresaId);
     return String(empresa?.nombre_comercial || empresa?.razon_social || fallback || empresaId).trim();
   };
-
-  const locales = [{
-    empresa_id: principalEmpresaId,
-    usuario_id: principalUserId,
-    nombre: labelForEmpresa(principalEmpresaId, "Empresa principal"),
-    tipo: "principal",
-    activo: normalizeId(context.empresa_id) === principalEmpresaId && context.local_context !== true
-  }];
 
   const rowsForMenu = adminRoot
     ? grupos.map((grupo) => ({
@@ -505,6 +522,7 @@ export async function listLocalContextsForSwitcher() {
     });
   });
 
+  console.log("[local_context_switcher] listLocalContextsForSwitcher resultado:", locales);
   return locales;
 }
 
@@ -633,7 +651,6 @@ export async function initializeLocalContext() {
           
           initialized = true;
           
-          // Disparar evento para refrescar header
           if (typeof window !== 'undefined') {
             console.log("[local_context_switcher] 📢 Disparando evento localContextReady");
             window.dispatchEvent(new CustomEvent('localContextReady'));
@@ -649,7 +666,6 @@ export async function initializeLocalContext() {
       initialized = true;
       console.log("[local_context_switcher] ✅ Inicialización completada");
       
-      // Disparar evento para refrescar header
       if (typeof window !== 'undefined') {
         console.log("[local_context_switcher] 📢 Disparando evento localContextReady");
         window.dispatchEvent(new CustomEvent('localContextReady'));
