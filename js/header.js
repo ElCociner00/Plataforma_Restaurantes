@@ -25,7 +25,8 @@ async function getLocalContextModule() {
   if (localContextModuleError) return null;
   
   if (localContextModulePromise === undefined) {
-    localContextModulePromise = import("./local_context_switcher.js")
+    // CAMBIADO: Ruta absoluta para evitar problemas de contexto
+    localContextModulePromise = import('/js/local_context_switcher.js')
       .then(module => {
         console.log("[header] ✅ Módulo de locales cargado correctamente");
         return module;
@@ -397,16 +398,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 window.addEventListener('localContextReady', async () => {
   console.log("[header] 📢 Evento localContextReady recibido, refrescando header...");
   
-  // Esperar a que el módulo esté completamente inicializado
   await new Promise(r => setTimeout(r, 500));
   
   try {
-    const module = await getLocalContextModule();
+    // CAMBIADO: Importar directamente con ruta absoluta
+    const module = await import('/js/local_context_switcher.js');
     if (module?.listLocalContextsForSwitcher && module.isLocalContextInitialized?.()) {
       const localContexts = await module.listLocalContextsForSwitcher();
       console.log("[header] Contextos obtenidos:", localContexts.length, "items:", localContexts);
       
-      // Actualizar header directamente
       const header = document.getElementById(HEADER_ID);
       const context = await getUserContext();
       const currentPath = String(window.location.pathname || "");
