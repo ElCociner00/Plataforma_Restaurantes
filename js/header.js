@@ -43,13 +43,20 @@ async function safeListLocalContexts() {
   try {
     const module = await getLocalContextModule();
     if (module?.listLocalContextsForSwitcher) {
-      // Esperar a que el módulo esté inicializado (máximo 3 segundos)
+      // Esperar activamente a que el módulo esté inicializado (hasta 5 segundos)
       let attempts = 0;
-      while (!module.isLocalContextInitialized?.() && attempts < 30) {
+      while (!module.isLocalContextInitialized?.() && attempts < 50) {
         await new Promise(r => setTimeout(r, 100));
         attempts++;
       }
-      return await module.listLocalContextsForSwitcher();
+      
+      if (module.isLocalContextInitialized?.()) {
+        const result = await module.listLocalContextsForSwitcher();
+        console.log("[header] safeListLocalContexts obtuvo:", result.length, "contextos");
+        return result;
+      } else {
+        console.warn("[header] Módulo de locales no se inicializó a tiempo");
+      }
     }
   } catch (error) {
     console.warn("[header] No se pudo obtener lista de locales:", error);
@@ -113,6 +120,8 @@ function showLocalContextLoading(message = "Cambiando local...") {
 }
 
 const buildLocalSwitcherItems = ({ context, localContexts = [] } = {}) => {
+  console.log("[header] buildLocalSwitcherItems - localContexts.length:", localContexts.length);
+  
   const canManageLocals = ["admin_root", "admin"].includes(String(context?.rol || "").toLowerCase());
   const hasSwitchableLocals = Array.isArray(localContexts) && localContexts.length >= 1;
 
@@ -389,15 +398,15 @@ window.addEventListener('localContextReady', async () => {
   console.log("[header] 📢 Evento localContextReady recibido, refrescando header...");
   
   // Esperar a que el módulo esté completamente inicializado
-  await new Promise(r => setTimeout(r, 300));
+  await new Promise(r => setTimeout(r, 500));
   
   try {
     const module = await getLocalContextModule();
     if (module?.listLocalContextsForSwitcher && module.isLocalContextInitialized?.()) {
       const localContexts = await module.listLocalContextsForSwitcher();
-      console.log("[header] Contextos obtenidos:", localContexts);
+      console.log("[header] Contextos obtenidos:", localContexts.length, "items:", localContexts);
       
-      // Actualizar header directamente sin recargar toda la función
+      // Actualizar header directamente
       const header = document.getElementById(HEADER_ID);
       const context = await getUserContext();
       const currentPath = String(window.location.pathname || "");
@@ -415,6 +424,8 @@ window.addEventListener('localContextReady', async () => {
       
       wireHeaderEvents(header, context);
       console.log("[header] ✅ Header refrescado correctamente con selector de locales");
+    } else {
+      console.warn("[header] Módulo no disponible o no inicializado");
     }
   } catch (error) {
     console.warn("[header] Error refrescando header:", error);
