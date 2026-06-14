@@ -25,7 +25,6 @@ async function getLocalContextModule() {
   if (localContextModuleError) return null;
   
   if (localContextModulePromise === undefined) {
-    // CAMBIADO: Ruta absoluta para evitar problemas de contexto
     localContextModulePromise = import('/js/local_context_switcher.js')
       .then(module => {
         console.log("[header] ✅ Módulo de locales cargado correctamente");
@@ -44,7 +43,6 @@ async function safeListLocalContexts() {
   try {
     const module = await getLocalContextModule();
     if (module?.listLocalContextsForSwitcher) {
-      // Esperar activamente a que el módulo esté inicializado (hasta 5 segundos)
       let attempts = 0;
       while (!module.isLocalContextInitialized?.() && attempts < 50) {
         await new Promise(r => setTimeout(r, 100));
@@ -65,15 +63,23 @@ async function safeListLocalContexts() {
   return [];
 }
 
+// ==============================================
+// CORREGIDA: Usa import directo con ruta absoluta
+// ==============================================
 async function safePrepareLocalContextSwitch(empresaId) {
+  console.log("[header] safePrepareLocalContextSwitch llamado para local:", empresaId);
   try {
-    const module = await getLocalContextModule();
+    const module = await import('/js/local_context_switcher.js');
+    console.log("[header] Módulo importado correctamente");
+    
     if (module?.prepareLocalContextSwitch) {
-      return await module.prepareLocalContextSwitch(empresaId);
+      const result = await module.prepareLocalContextSwitch(empresaId);
+      console.log("[header] prepareLocalContextSwitch resultado:", result);
+      return result;
     }
-    throw new Error("Módulo de locales no disponible");
+    throw new Error("prepareLocalContextSwitch no está disponible en el módulo");
   } catch (error) {
-    console.warn("[header] No se pudo cambiar de local:", error);
+    console.error("[header] Error en safePrepareLocalContextSwitch:", error);
     throw error;
   }
 }
@@ -393,7 +399,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 // ==============================================
-// SOLUCIÓN ÚNICA: Refrescar el header cuando el módulo esté listo
+// Refrescar el header cuando el módulo esté listo
 // ==============================================
 window.addEventListener('localContextReady', async () => {
   console.log("[header] 📢 Evento localContextReady recibido, refrescando header...");
@@ -401,7 +407,6 @@ window.addEventListener('localContextReady', async () => {
   await new Promise(r => setTimeout(r, 500));
   
   try {
-    // CAMBIADO: Importar directamente con ruta absoluta
     const module = await import('/js/local_context_switcher.js');
     if (module?.listLocalContextsForSwitcher && module.isLocalContextInitialized?.()) {
       const localContexts = await module.listLocalContextsForSwitcher();
