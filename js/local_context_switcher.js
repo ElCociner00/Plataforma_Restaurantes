@@ -286,6 +286,43 @@ export async function getLocalesList(empresaId = null) {
   }
 }
 
+// ==============================================
+// NUEVA FUNCIÓN: Obtener el usuario local para un tenant específico
+// ==============================================
+export async function getLocalUserForTenant(principalUserId, targetEmpresaId) {
+  try {
+    console.log(`[local_context_switcher] 🔍 Buscando usuario local para usuario principal: ${principalUserId} en empresa: ${targetEmpresaId}`);
+    
+    const { data, error } = await supabase
+      .from("usuarios_locales")
+      .select("id, usuario_principal_id, empresa_id, nombre_completo, rol, activo")
+      .eq("usuario_principal_id", principalUserId)
+      .eq("empresa_id", targetEmpresaId)
+      .eq("activo", true)
+      .maybeSingle();
+    
+    if (error) {
+      console.error("[local_context_switcher] ❌ Error al buscar usuario local:", error);
+      return null;
+    }
+    
+    if (data) {
+      console.log("[local_context_switcher] ✅ Usuario local encontrado:", {
+        id: data.id,
+        empresa_id: data.empresa_id,
+        rol: data.rol
+      });
+      return data;
+    } else {
+      console.log("[local_context_switcher] ℹ️ No hay usuario local para este tenant (posiblemente admin sin duplicado)");
+      return null;
+    }
+  } catch (error) {
+    console.error("[local_context_switcher] 💥 Excepción en getLocalUserForTenant:", error);
+    return null;
+  }
+}
+
 export async function switchToLocal(localEmpresaId) {
   try {
     console.log(`[local_context_switcher] 🔄 Intentando cambiar al local: ${localEmpresaId}`);
@@ -309,15 +346,30 @@ export async function switchToLocal(localEmpresaId) {
       throw new Error(localData.error || "No se pudo obtener datos del local");
     }
     
+    // Determinar el usuario_id según el rol
+    const principalUserId = resolvePrincipalUserId(context);
+    let usuarioId = principalUserId;
+    const esAdmin = isAdminRootContext(context);
+    
+    if (!esAdmin) {
+      const usuarioLocal = await getLocalUserForTenant(principalUserId, localEmpresaId);
+      if (usuarioLocal) {
+        usuarioId = usuarioLocal.id;
+      }
+    }
+    
     writeStoredLocalSelection({ 
       empresa_id: localEmpresaId, 
-      grupo_id: principalEmpresaId 
+      grupo_id: principalEmpresaId,
+      usuario_id: usuarioId
     });
     
     console.log(`[local_context_switcher] ✅ Cambio exitoso al local:`, {
       id: localEmpresaId,
       nombre: localData.local.nombre_comercial,
-      grupo: principalEmpresaId
+      grupo: principalEmpresaId,
+      usuario_id: usuarioId,
+      es_admin: esAdmin
     });
     
     if (typeof window !== 'undefined') {
@@ -325,7 +377,8 @@ export async function switchToLocal(localEmpresaId) {
         detail: { 
           local: localData.local,
           grupo_id: principalEmpresaId,
-          previous_local_id: context.empresa_id
+          previous_local_id: context.empresa_id,
+          usuario_id: usuarioId
         } 
       }));
     }
@@ -334,7 +387,9 @@ export async function switchToLocal(localEmpresaId) {
       success: true,
       local: localData.local,
       grupo: localData.grupo,
-      grupo_id: principalEmpresaId
+      grupo_id: principalEmpresaId,
+      usuario_id: usuarioId,
+      es_admin: esAdmin
     };
     
   } catch (error) {
@@ -356,16 +411,19 @@ export async function switchToPrincipal() {
     }
     
     const principalEmpresaId = resolvePrincipalEmpresaId(context);
+    const principalUserId = resolvePrincipalUserId(context);
+    
     writeStoredLocalSelection(null);
     
-    console.log(`[local_context_switcher] ✅ Cambio a principal: ${principalEmpresaId}`);
+    console.log(`[local_context_switcher] ✅ Cambio a principal: ${principalEmpresaId}, usuario: ${principalUserId}`);
     
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('localChanged', { 
         detail: { 
           local_id: principalEmpresaId, 
           grupo_id: null,
-          is_principal: true
+          is_principal: true,
+          usuario_id: principalUserId
         } 
       }));
     }
@@ -373,7 +431,8 @@ export async function switchToPrincipal() {
     return {
       success: true,
       local_id: principalEmpresaId,
-      is_principal: true
+      is_principal: true,
+      usuario_id: principalUserId
     };
     
   } catch (error) {
@@ -445,10 +504,6 @@ export async function hasLocales(empresaId = null) {
   }
 }
 
-// ==============================================
-// FUNCIÓN CORREGIDA: listLocalContextsForSwitcher
-// Ahora incluye la empresa principal en el array
-// ==============================================
 export async function listLocalContextsForSwitcher() {
   const context = await getUserContext();
   if (!context?.empresa_id) return [];
@@ -457,7 +512,6 @@ export async function listLocalContextsForSwitcher() {
   const principalUserId = resolvePrincipalUserId(context);
   if (!principalEmpresaId || !principalUserId) return [];
 
-  // Obtener el nombre de la empresa principal desde la tabla empresas
   const { data: principalEmpresa, error: principalError } = await supabase
     .from("empresas")
     .select("id, nombre_comercial, razon_social")
@@ -466,7 +520,6 @@ export async function listLocalContextsForSwitcher() {
 
   const nombrePrincipal = principalEmpresa?.nombre_comercial || principalEmpresa?.razon_social || "Empresa principal";
 
-  // Array de resultados: empezar con la empresa principal
   const locales = [{
     empresa_id: principalEmpresaId,
     usuario_id: principalUserId,
@@ -475,7 +528,6 @@ export async function listLocalContextsForSwitcher() {
     activo: normalizeId(context.empresa_id) === principalEmpresaId && context.local_context !== true
   }];
 
-  // Obtener los locales del grupo
   const grupos = await fetchGroupLocales(principalEmpresaId);
   const localEmpresaIds = uniqueIds(grupos.map((grupo) => grupo?.empresa_id));
   const adminRoot = isAdminRootContext(context);
@@ -487,7 +539,6 @@ export async function listLocalContextsForSwitcher() {
     ? localEmpresaIds
     : uniqueIds(usuariosLocales.map((usuarioLocal) => usuarioLocal?.empresa_id));
   
-  // Consultar empresas para obtener nombres reales de los locales
   const empresas = await fetchEmpresasByIds([...visibleLocalIds]);
   const empresaById = new Map(empresas.map((empresa) => [empresa.id, empresa]));
   const grupoByEmpresaId = new Map(grupos.map((grupo) => [grupo.empresa_id, grupo]));
@@ -576,7 +627,12 @@ export async function prepareLocalContextSwitch(empresaId) {
 
   if (targetEmpresaId === principalEmpresaId) {
     writeStoredLocalSelection(null);
-    return { empresa_id: principalEmpresaId, usuario_id: principalUserId, tipo: "principal" };
+    return { 
+      empresa_id: principalEmpresaId, 
+      usuario_id: principalUserId, 
+      tipo: "principal",
+      necesitaRecarga: true
+    };
   }
 
   const grupos = await fetchGroupLocales(principalEmpresaId);
@@ -584,15 +640,24 @@ export async function prepareLocalContextSwitch(empresaId) {
   if (!grupo) throw new Error("El local seleccionado no está activo o no pertenece a esta empresa principal.");
 
   let usuarioId = principalUserId;
-  if (!isAdminRootContext(context)) {
-    const usuariosLocales = await fetchUsuariosLocales({ principalUserId, localEmpresaIds: [targetEmpresaId] });
-    const usuarioLocal = usuariosLocales.find((row) => normalizeId(row?.empresa_id) === targetEmpresaId);
-    if (!usuarioLocal) throw new Error("Tu usuario no tiene duplicado activo para ese local.");
-    usuarioId = usuarioLocal.id;
+  const esAdmin = isAdminRootContext(context);
+  
+  if (!esAdmin) {
+    const usuarioLocal = await getLocalUserForTenant(principalUserId, targetEmpresaId);
+    if (usuarioLocal) {
+      usuarioId = usuarioLocal.id;
+    }
   }
 
   writeStoredLocalSelection({ empresa_id: targetEmpresaId, grupo_id: principalEmpresaId });
-  return { empresa_id: targetEmpresaId, usuario_id: usuarioId, tipo: "local" };
+
+  return { 
+    empresa_id: targetEmpresaId, 
+    usuario_id: usuarioId, 
+    tipo: "local",
+    es_admin: esAdmin,
+    necesitaRecarga: true
+  };
 }
 
 let initialized = false;
