@@ -43,6 +43,12 @@ async function safeListLocalContexts() {
   try {
     const module = await getLocalContextModule();
     if (module?.listLocalContextsForSwitcher) {
+      // Esperar a que el módulo esté inicializado (máximo 3 segundos)
+      let attempts = 0;
+      while (!module.isLocalContextInitialized?.() && attempts < 30) {
+        await new Promise(r => setTimeout(r, 100));
+        attempts++;
+      }
       return await module.listLocalContextsForSwitcher();
     }
   } catch (error) {
@@ -106,12 +112,7 @@ function showLocalContextLoading(message = "Cambiando local...") {
   document.body.appendChild(overlay);
 }
 
-// ==============================================
-// FUNCIÓN CORREGIDA: buildLocalSwitcherItems
-// ==============================================
 const buildLocalSwitcherItems = ({ context, localContexts = [] } = {}) => {
-  console.log("[header] buildLocalSwitcherItems - localContexts:", localContexts);
-  
   const canManageLocals = ["admin_root", "admin"].includes(String(context?.rol || "").toLowerCase());
   const hasSwitchableLocals = Array.isArray(localContexts) && localContexts.length >= 1;
 
@@ -382,20 +383,46 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 // ==============================================
-// Escuchar evento del módulo de locales para refrescar
+// SOLUCIÓN ÚNICA: Refrescar el header cuando el módulo esté listo
 // ==============================================
 window.addEventListener('localContextReady', async () => {
   console.log("[header] 📢 Evento localContextReady recibido, refrescando header...");
+  
+  // Esperar a que el módulo esté completamente inicializado
+  await new Promise(r => setTimeout(r, 300));
+  
   try {
-    await renderAuthenticatedHeader();
-    console.log("[header] ✅ Header refrescado con selector de locales");
+    const module = await getLocalContextModule();
+    if (module?.listLocalContextsForSwitcher && module.isLocalContextInitialized?.()) {
+      const localContexts = await module.listLocalContextsForSwitcher();
+      console.log("[header] Contextos obtenidos:", localContexts);
+      
+      // Actualizar header directamente sin recargar toda la función
+      const header = document.getElementById(HEADER_ID);
+      const context = await getUserContext();
+      const currentPath = String(window.location.pathname || "");
+      const isGlobalNoTenantPage = currentPath.includes("/gestion_empresas/") || currentPath.includes("/facturacion/");
+      const inferEnvironmentFromPath = () => currentPath.includes("/siigo/") ? ENV_SIIGO : ENV_LOGGRO;
+      const environmentForMenu = getActiveEnvironment() || (isGlobalNoTenantPage ? ENV_LOGGRO : inferEnvironmentFromPath());
+      const nombreEmpresa = await obtenerNombreEmpresa(context?.empresa_id);
+      const menu = buildMenu({ context, environmentForMenu, localContexts });
+      
+      header.innerHTML = `
+        <div class="logo"><span class="logo-mark-wrap"><img src="${getLogoSrc()}" alt="${BRAND.logoAlt}" class="logo-mark" onerror="this.style.display='none'"/></span><span>${BRAND.platformName}</span></div>
+        <div class="empresa-header-nombre">${nombreEmpresa || ""}</div>
+        <nav>${menu}</nav>
+      `;
+      
+      wireHeaderEvents(header, context);
+      console.log("[header] ✅ Header refrescado correctamente con selector de locales");
+    }
   } catch (error) {
-    console.warn("[header] No se pudo refrescar header:", error);
+    console.warn("[header] Error refrescando header:", error);
   }
 });
 
 // ==============================================
-// Inicialización silenciosa (solo carga, no refresca aquí)
+// Inicialización silenciosa
 // ==============================================
 setTimeout(() => {
   import('/js/local_context_switcher.js').then(m => m.initializeLocalContext?.()).catch(() => {});
