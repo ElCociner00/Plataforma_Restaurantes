@@ -16,6 +16,7 @@
  */
 import { getCurrentEmpresaId } from "./session.js";
 import { supabase } from "./supabase.js";
+import { fetchUsuariosEmpresaLocalCompat } from "./local_compat_responsables.js";
 
 const normalizeText = (value) => String(value || "").trim();
 
@@ -43,6 +44,9 @@ const toResponsableRecord = (row, source) => {
 export async function fetchUsuariosEmpresa(empresaId) {
   const safeEmpresaId = normalizeText(empresaId);
   if (!safeEmpresaId) return [];
+
+  const localCompatUsuarios = await fetchUsuariosEmpresaLocalCompat(safeEmpresaId);
+  if (Array.isArray(localCompatUsuarios)) return localCompatUsuarios;
 
   const [usuariosSistemaRes, otrosUsuariosRes, empleadosRes] = await Promise.all([
     supabase
