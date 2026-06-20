@@ -27,7 +27,7 @@ import { buildRequestHeaders, getUserContext } from "./session.js";
 import { fetchResponsablesActivos } from "./responsables.js";
 import { getActiveEnvironment } from "./environment.js";
 import { supabase } from "./supabase.js";
-import { WEBHOOK_NOMINA_CONSULTAR, WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO } from "./webhooks.js";
+import { WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO } from "./webhooks.js";
 import { drawPngBrandWatermark } from "./png_branding.js";
 import { nominaLog, nominaWarn } from "./nomina.debug.js";
 
@@ -54,6 +54,8 @@ const deduccionesBody = document.getElementById("nominaDeduccionesBody");
 const totalIngresosTablaEl = document.getElementById("nominaTotalIngresosTabla");
 const totalDeduccionesTablaEl = document.getElementById("nominaTotalDeduccionesTabla");
 const netoPagarEl = document.getElementById("nominaNetoPagarComprobante");
+const parametrosBody = document.getElementById("nominaParametrosBody");
+const detalleCalculoBody = document.getElementById("nominaDetalleCalculoBody");
 
 const state = {
   context: null,
@@ -62,7 +64,9 @@ const state = {
   movimientos: [],
   empleadoDetalle: null,
   periodoDetalle: null,
-  horasDetalle: null
+  horasDetalle: null,
+  parametrosDetalle: [],
+  detalleCalculo: []
 };
 
 
@@ -308,6 +312,7 @@ const renderMovimientos = () => {
     ingresosBody.innerHTML = "<tr><td>Sin ingresos</td><td>0</td><td>$0</td></tr>";
     deduccionesBody.innerHTML = "<tr><td>Sin deducciones</td><td>0</td><td>$0</td></tr>";
     renderResumen();
+    renderParametrosYDetalle();
     return;
   }
 
@@ -320,6 +325,93 @@ const renderMovimientos = () => {
     .map((item) => `<tr><td>${item.tipo || "-"}</td><td>1</td><td>${fmtMoney(item.valor || 0)}</td></tr>`).join("");
 
   renderResumen();
+  renderParametrosYDetalle();
+};
+
+
+const parseExcelWebhookPayload = (value, depth = 0) => {
+  if (depth > 10 || value === null || value === undefined) return null;
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (!text) return null;
+    try { return parseExcelWebhookPayload(JSON.parse(text), depth + 1); } catch (_e) { return null; }
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const parsed = parseExcelWebhookPayload(item, depth + 1);
+      if (parsed) return parsed;
+    }
+    return null;
+  }
+  if (typeof value === "object") {
+    if (Array.isArray(value.parametros) || Array.isArray(value.detalle) || value.resumen || value.totales) return value;
+    for (const child of Object.values(value)) {
+      const parsed = parseExcelWebhookPayload(child, depth + 1);
+      if (parsed) return parsed;
+    }
+  }
+  return null;
+};
+
+const buildExcelWebhookPayload = (empleadoId) => ({
+  empresa_id: state.context?.empresa_id || "",
+  tenant_id: state.context?.empresa_id || "",
+  responsable_id: empleadoId,
+  empleado_id: empleadoId,
+  usuario_id: empleadoId,
+  corte: corteSelect.value || "quincenal",
+  fecha_inicio: fechaInicioInput.value || "",
+  fecha_fin: fechaFinInput.value || "",
+  entorno: getActiveEnvironment() || "global"
+});
+
+const normalizeExcelPayrollForUi = (data, empleadoSeleccionado = null) => {
+  const parametros = Array.isArray(data?.parametros) ? data.parametros : [];
+  const detalle = Array.isArray(data?.detalle) ? data.detalle : [];
+  const resumen = data?.resumen && typeof data.resumen === "object" ? data.resumen : {};
+  const totales = data?.totales && typeof data.totales === "object" ? data.totales : {};
+
+  state.parametrosDetalle = parametros;
+  state.detalleCalculo = detalle;
+  state.horasDetalle = {
+    diurnas: toNumeric(resumen.horas_diurnas ?? resumen.total_horas_diurnas ?? resumen.horas_diurnas_trabajadas),
+    nocturnas: toNumeric(resumen.horas_nocturnas ?? resumen.total_horas_nocturnas ?? resumen.horas_nocturnas_trabajadas),
+    dominicales_diurnas: toNumeric(resumen.horas_dominicales_diurnas ?? resumen.total_horas_dominicales_diurnas),
+    dominicales_nocturnas: toNumeric(resumen.horas_dominicales_nocturnas ?? resumen.total_horas_dominicales_nocturnas)
+  };
+  state.horasDetalle.total = toNumeric(totales.horas_trabajadas ?? resumen.horas_trabajadas) ||
+    (state.horasDetalle.diurnas + state.horasDetalle.nocturnas + state.horasDetalle.dominicales_diurnas + state.horasDetalle.dominicales_nocturnas);
+
+  const rows = [
+    { tipo: "Horas diurnas", naturaleza: "Devengo", valor: toNumeric(resumen.total_diurnas), cantidad: state.horasDetalle.diurnas, fuente: "webhook_excel" },
+    { tipo: "Horas nocturnas", naturaleza: "Devengo", valor: toNumeric(resumen.total_nocturnas), cantidad: state.horasDetalle.nocturnas, fuente: "webhook_excel" },
+    { tipo: "Dominicales diurnas", naturaleza: "Devengo", valor: toNumeric(resumen.total_dominical_diurnas), cantidad: state.horasDetalle.dominicales_diurnas, fuente: "webhook_excel" },
+    { tipo: "Dominicales nocturnas", naturaleza: "Devengo", valor: toNumeric(resumen.total_dominical_nocturnas), cantidad: state.horasDetalle.dominicales_nocturnas, fuente: "webhook_excel" },
+    { tipo: "Auxilio de transporte", naturaleza: "Devengo", valor: toNumeric(totales.transporte), cantidad: 1, fuente: "webhook_excel" }
+  ].filter((row) => row.valor > 0 || row.cantidad > 0);
+
+  const valorHoras = toNumeric(totales.valor_horas);
+  const totalResumenHoras = rows.reduce((acc, row) => acc + (row.tipo.startsWith("Horas") || row.tipo.startsWith("Dominicales") ? toNumeric(row.valor) : 0), 0);
+  if (valorHoras > totalResumenHoras) rows.push({ tipo: "Ajuste total horas", naturaleza: "Devengo", valor: valorHoras - totalResumenHoras, cantidad: 1, fuente: "webhook_excel" });
+
+  state.empleadoDetalle = { nombre: empleadoSeleccionado?.nombre_completo || data?.empleado?.nombre || "-", cargo: empleadoSeleccionado?.rol || data?.empleado?.cargo || "-" };
+  state.periodoDetalle = { inicio: data?.periodo?.inicio || fechaInicioInput.value, fin: data?.periodo?.fin || fechaFinInput.value };
+  return rows;
+};
+
+const renderParametrosYDetalle = () => {
+  if (parametrosBody) {
+    parametrosBody.innerHTML = (state.parametrosDetalle.length ? state.parametrosDetalle : [{ concepto: "Sin parámetros", valor: 0, unidad: "-" }])
+      .map((param) => `<tr><td>${param.concepto || param.nombre || "-"}</td><td>${param.valorFormateado || fmtMoney(toNumeric(param.valor))}</td><td>${param.unidad || "COP"}</td></tr>`).join("");
+  }
+  if (detalleCalculoBody) {
+    detalleCalculoBody.innerHTML = (state.detalleCalculo.length ? state.detalleCalculo : [{ fecha: "-", hora_inicio: "-", hora_fin: "-", horas_totales: 0, total: 0 }])
+      .map((row) => {
+        const totalFila = toNumeric(row.total_fila ?? row.total ?? row.valor_total) || toNumeric(row.valor_diurnas) + toNumeric(row.valor_nocturnas) + toNumeric(row.valor_dominical_diurnas) + toNumeric(row.valor_dominical_nocturnas);
+        const horas = toNumeric(row.horas_totales) || (toNumeric(row.horas_diurnas) + toNumeric(row.horas_nocturnas));
+        return `<tr><td>${row.fecha || "-"}</td><td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}</td><td>${fmtHours(horas)}</td><td>${fmtMoney(totalFila)}</td></tr>`;
+      }).join("");
+  }
 };
 
 const renderComprobanteHeader = (empleado) => {
@@ -518,27 +610,22 @@ const consultarNomina = async () => {
   state.empleadoDetalle = { nombre: empleadoSeleccionado?.nombre_completo || "-", cargo: empleadoSeleccionado?.rol || "-" };
   setStatus("Consultando movimientos de nómina...");
   const loadingStart = Date.now();
-  const payload = {
-    empresa_id: state.context.empresa_id,
-    usuario_id: empleadoId,
-    fecha_inicio: fechaInicioInput.value,
-    fecha_fin: fechaFinInput.value,
-    corte: corteSelect.value || "quincenal",
-    entorno: getActiveEnvironment() || "global"
-  };
+  const payload = buildExcelWebhookPayload(empleadoId);
 
   let rows = [];
 
   try {
-    const response = await fetch(WEBHOOK_NOMINA_CONSULTAR, {
+    const authHeaders = await buildRequestHeaders({ includeTenant: true });
+    const response = await fetch(WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders },
       body: JSON.stringify(payload)
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const webhookData = await parseWebhookResponseSafe(response);
-    setStatus("Datos recibidos. Procesando nómina...");
-    rows = await normalizeWithRetries(webhookData, empleadoSeleccionado, 4);
+    const excelData = parseExcelWebhookPayload(webhookData);
+    setStatus("Datos recibidos del webhook del Excel. Procesando nómina para interfaz...");
+    rows = excelData ? normalizeExcelPayrollForUi(excelData, empleadoSeleccionado) : await normalizeWithRetries(webhookData, empleadoSeleccionado, 4);
     nominaLog("consultar.rows.afterRetries", rows.length);
     if (!hasMeaningfulRows(rows) && webhookData) startMappingRecoveryLoop(webhookData, empleadoSeleccionado);
     if (!rows.length) {
@@ -568,6 +655,8 @@ const consultarNomina = async () => {
     state.empleadoDetalle = null;
     state.periodoDetalle = null;
     state.horasDetalle = null;
+    state.parametrosDetalle = [];
+    state.detalleCalculo = [];
   }
 
   const elapsed = Date.now() - loadingStart;
@@ -709,16 +798,7 @@ const descargarExcelEmpleado = async () => {
     return;
   }
 
-  const payload = {
-    empresa_id: state.context?.empresa_id || "",
-    tenant_id: state.context?.empresa_id || "",
-    responsable_id: empleadoId,
-    empleado_id: empleadoId,
-    corte: corteSelect.value || "quincenal",
-    fecha_inicio: fechaInicioInput.value || "",
-    fecha_fin: fechaFinInput.value || "",
-    entorno: getActiveEnvironment() || "global"
-  };
+  const payload = buildExcelWebhookPayload(empleadoId);
 
   const empleadoSeleccionado = state.responsables.find((item) => item.id === empleadoId);
   const periodoInicio = fechaInicioInput.value || "inicio";

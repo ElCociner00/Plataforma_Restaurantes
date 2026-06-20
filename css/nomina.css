@@ -156,3 +156,15 @@
 
 .comprobante-table.comparativo { grid-template-columns: 1fr 1fr; }
 .comprobante-table.detalles-horas { grid-template-columns: 1fr; margin-top: 12px; }
+
+.nomina-web-panel {
+  margin-top: 18px;
+}
+
+.nomina-web-panel table {
+  font-size: 0.9rem;
+}
+
+.nomina-web-panel tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
