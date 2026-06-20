@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enkrato | Seleccionar local</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/local_preselector.css">
+</head>
+<body>
+  <main class="local-preselector" aria-live="polite">
+    <section class="local-preselector-card">
+      <div class="local-preselector-brand">ENKRATO</div>
+      <h1>¿A qué empresa o local quieres ingresar?</h1>
+      <p class="local-preselector-intro">Estamos cargando los locales disponibles para que no tengas que entrar primero a la empresa principal.</p>
+      <div id="localPreselectorStatus" class="local-preselector-status">Preparando contexto de usuario...</div>
+      <div id="localPreselectorList" class="local-preselector-list"></div>
+      <div class="local-preselector-actions">
+        <button type="button" id="localPreselectorContinue" class="secondary">Continuar con empresa principal</button>
+        <button type="button" id="localPreselectorRetry" class="ghost">Reintentar carga</button>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="../js/local_preselector.js"></script>
+</body>
+</html>
