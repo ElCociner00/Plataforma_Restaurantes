@@ -56,6 +56,7 @@ const totalDeduccionesTablaEl = document.getElementById("nominaTotalDeduccionesT
 const netoPagarEl = document.getElementById("nominaNetoPagarComprobante");
 const parametrosBody = document.getElementById("nominaParametrosBody");
 const detalleCalculoBody = document.getElementById("nominaDetalleCalculoBody");
+const apoyosBody = document.getElementById("nominaApoyosBody");
 
 const state = {
   context: null,
@@ -67,6 +68,7 @@ const state = {
   horasDetalle: null,
   parametrosDetalle: [],
   detalleCalculo: [],
+  apoyosDetalle: [],
   excelTotales: null
 };
 
@@ -115,6 +117,20 @@ const parseHoursToDecimal = (value) => {
   return toNumeric(text);
 };
 
+const minutesToHourText = (minutes) => {
+  const safeMinutes = Math.max(0, Math.round(toNumeric(minutes)));
+  const hours = Math.floor(safeMinutes / 60);
+  const rest = safeMinutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(rest).padStart(2, "0")}`;
+};
+
+const hoursToMinutes = (value) => {
+  const text = String(value ?? "").trim();
+  const match = text.match(/^(\d+):(\d{1,2})$/);
+  if (match) return (Number(match[1]) * 60) + Number(match[2]);
+  return Math.round(toNumeric(value) * 60);
+};
+
 const normalizeConcept = (value) => String(value || "")
   .normalize("NFD")
   .replace(/[\u0300-\u036f]/g, "")
@@ -125,6 +141,13 @@ const normalizeConcept = (value) => String(value || "")
 const findParamValue = (parametros, matcher) => {
   const found = (parametros || []).find((param) => matcher(normalizeConcept(param?.concepto || param?.nombre)));
   return toNumeric(found?.valor);
+};
+
+const resolveResponsableName = (id, fallback = "-") => {
+  const safeId = String(id || "").trim();
+  if (!safeId) return fallback;
+  const found = state.responsables.find((item) => String(item.id || "") === safeId);
+  return found?.nombre_completo || fallback || safeId;
 };
 
 const setStatus = (message) => {
@@ -339,6 +362,7 @@ const renderMovimientos = () => {
     deduccionesBody.innerHTML = "<tr><td>Sin deducciones</td><td>0</td><td>$0</td></tr>";
     renderResumen();
     renderParametrosYDetalle();
+    renderApoyos();
     return;
   }
 
@@ -352,6 +376,7 @@ const renderMovimientos = () => {
 
   renderResumen();
   renderParametrosYDetalle();
+  renderApoyos();
 };
 
 
@@ -370,7 +395,7 @@ const parseExcelWebhookPayload = (value, depth = 0) => {
     return null;
   }
   if (typeof value === "object") {
-    if (Array.isArray(value.parametros) || Array.isArray(value.detalle) || value.resumen || value.totales) return value;
+    if (Array.isArray(value.parametros) || Array.isArray(value.detalle) || Array.isArray(value.apoyos) || value.resumen || value.totales) return value;
     for (const child of Object.values(value)) {
       const parsed = parseExcelWebhookPayload(child, depth + 1);
       if (parsed) return parsed;
@@ -421,6 +446,12 @@ const buildPayrollRowsFromEditableDetail = () => {
 
   const auxilioDia = findParamValue(parametros, (concepto) => concepto.includes("auxilio") && concepto.includes("transporte"));
   const transporteCalculado = auxilioDia > 0 ? auxilioDia * diasTrabajados : toNumeric(state.excelTotales?.transporte);
+  const apoyosIncluidos = (state.apoyosDetalle || []).filter((row) => row.incluido !== false);
+  const totalApoyoHoras = apoyosIncluidos.reduce((acc, row) => acc + (toNumeric(row.tiempo_minutos) / 60), 0);
+  const totalApoyoPropinas = apoyosIncluidos.reduce((acc, row) => acc + toNumeric(row.propina), 0);
+  const tarifaApoyo = findParamValue(parametros, (concepto) => concepto.includes("extra") && concepto.includes("hora")) ||
+    findParamValue(parametros, (concepto) => concepto.includes("hora diurna") && !concepto.includes("dominical"));
+  const valorApoyos = totalApoyoHoras * tarifaApoyo;
 
   state.horasDetalle = {
     diurnas: totals.horas_diurnas,
@@ -435,6 +466,8 @@ const buildPayrollRowsFromEditableDetail = () => {
     { tipo: "Horas nocturnas", naturaleza: "Devengo", valor: totals.valor_nocturnas, cantidad: totals.horas_nocturnas, unidad: "h", fuente: "webhook_excel" },
     { tipo: "Dominicales diurnas", naturaleza: "Devengo", valor: totals.valor_dominical_diurnas, cantidad: totals.horas_dominicales_diurnas, unidad: "h", fuente: "webhook_excel" },
     { tipo: "Dominicales nocturnas", naturaleza: "Devengo", valor: totals.valor_dominical_nocturnas, cantidad: totals.horas_dominicales_nocturnas, unidad: "h", fuente: "webhook_excel" },
+    { tipo: "Horas de apoyo", naturaleza: "Devengo", valor: valorApoyos, cantidad: totalApoyoHoras, unidad: "h", fuente: "webhook_excel" },
+    { tipo: "Propinas de apoyo", naturaleza: "Devengo", valor: totalApoyoPropinas, cantidad: apoyosIncluidos.length, unidad: "apoyo(s)", fuente: "webhook_excel" },
     { tipo: "Auxilio de transporte", naturaleza: "Devengo", valor: transporteCalculado, cantidad: diasTrabajados, unidad: "día(s)", fuente: "webhook_excel" }
   ];
 };
@@ -452,9 +485,17 @@ const normalizeExcelPayrollForUi = (data, empleadoSeleccionado = null) => {
   const parametros = Array.isArray(data?.parametros) ? data.parametros : [];
   const detalle = Array.isArray(data?.detalle) ? data.detalle : [];
   const totales = data?.totales && typeof data.totales === "object" ? data.totales : {};
+  const apoyos = Array.isArray(data?.apoyos) ? data.apoyos : [];
 
   state.parametrosDetalle = parametros;
   state.excelTotales = totales;
+  state.apoyosDetalle = apoyos.map((row, index) => ({
+    ...row,
+    row_id: row.row_id || `${row.fecha_turno || "apoyo"}-${row.hora_inicio || "inicio"}-${row.hora_fin || "fin"}-${index}`,
+    incluido: row.incluido !== false,
+    tiempo_minutos: toNumeric(row.tiempo_minutos) || hoursToMinutes(row.tiempo_horas),
+    propina: toNumeric(row.propina)
+  }));
   state.detalleCalculo = detalle.map((row, index) => ({
     ...row,
     row_id: row.row_id || `${row.fecha || "fila"}-${row.hora_inicio || "inicio"}-${row.hora_fin || "fin"}-${index}`,
@@ -487,6 +528,27 @@ const calculateDetalleRowValue = (row) => {
     (parseHoursToDecimal(row.horas_dominicales_nocturnas) * tarifas.dominicales_nocturnas);
   const fallback = toNumeric(row.valor_diurnas) + toNumeric(row.valor_nocturnas) + toNumeric(row.valor_dominical_diurnas) + toNumeric(row.valor_dominical_nocturnas);
   return calculated > 0 ? calculated : fallback;
+};
+
+
+const renderApoyos = () => {
+  if (!apoyosBody) return;
+  apoyosBody.innerHTML = (state.apoyosDetalle.length ? state.apoyosDetalle : [{ fecha_turno: "-", responsable_turno_id: "", apoyo_responsable_id: "", tiempo_minutos: 0, hora_inicio: "-", hora_fin: "-", propina: 0 }])
+    .map((row, index) => {
+      const disabled = state.apoyosDetalle.length ? "" : "disabled";
+      const apoyoNombre = resolveResponsableName(row.apoyo_responsable_id, state.empleadoDetalle?.nombre || "-");
+      const responsableNombre = resolveResponsableName(row.responsable_turno_id, "-");
+      return `<tr data-apoyo-index="${index}" class="${row.incluido === false ? "nomina-row-descartada" : ""}">
+        <td><input type="checkbox" class="nomina-apoyo-validar" ${row.incluido !== false ? "checked" : ""} ${disabled} aria-label="Validar apoyo ${row.fecha_turno || index + 1}"></td>
+        <td>${row.fecha_turno || "-"}</td>
+        <td>${responsableNombre}</td>
+        <td>${apoyoNombre}</td>
+        <td><input class="nomina-apoyo-tiempo" value="${minutesToHourText(row.tiempo_minutos)}" ${disabled}></td>
+        <td>${row.hora_inicio || "-"}</td>
+        <td>${row.hora_fin || "-"}</td>
+        <td><input class="nomina-apoyo-propina" type="number" min="0" step="0.01" value="${toNumeric(row.propina)}" ${disabled}></td>
+      </tr>`;
+    }).join("");
 };
 
 const renderParametrosYDetalle = () => {
@@ -755,6 +817,7 @@ const consultarNomina = async () => {
     state.horasDetalle = null;
     state.parametrosDetalle = [];
     state.detalleCalculo = [];
+    state.apoyosDetalle = [];
     state.excelTotales = null;
   }
 
@@ -944,7 +1007,7 @@ const descargarExcelEmpleado = async () => {
       return null;
     }
     if (typeof value === "object") {
-      if (Array.isArray(value.parametros) || Array.isArray(value.detalle) || value.resumen || value.totales) return value;
+      if (Array.isArray(value.parametros) || Array.isArray(value.detalle) || Array.isArray(value.apoyos) || value.resumen || value.totales) return value;
       for (const child of Object.values(value)) {
         const parsed = parseWebhookPayload(child, depth + 1);
         if (parsed) return parsed;
@@ -981,6 +1044,7 @@ const descargarExcelEmpleado = async () => {
   const buildExcelHtml = (data) => {
     const parametros = Array.isArray(data.parametros) ? data.parametros : [];
     const detalle = Array.isArray(data.detalle) ? data.detalle : [];
+    const apoyos = Array.isArray(data.apoyos) ? data.apoyos : [];
     const resumen = data.resumen && typeof data.resumen === "object" ? data.resumen : {};
     const totales = data.totales && typeof data.totales === "object" ? data.totales : {};
     const metadata = data.metadata && typeof data.metadata === "object" ? data.metadata : {};
@@ -1041,7 +1105,17 @@ const descargarExcelEmpleado = async () => {
       <tbody>${tableRows(metadataRows.map(([label, value]) => `<tr>${textCell(label)}${textCell(value)}</tr>`))}</tbody>
     </table>`;
 
-    const sheetNames = ["Parámetros", "Detalle Nómina", "Resumen", "Totales Generales"];
+
+    const apoyosHeaders = ["fecha turno", "responsable turno", "apoyo", "tiempo", "hora inicio", "hora fin", "propina"];
+    const apoyosRows = apoyos.map((row) => `<tr>
+      ${textCell(row.fecha_turno)}${textCell(resolveResponsableName(row.responsable_turno_id, row.responsable_turno_id))}${textCell(resolveResponsableName(row.apoyo_responsable_id, empleadoSeleccionado?.nombre_completo || row.apoyo_responsable_id))}${textCell(minutesToHourText(row.tiempo_minutos || hoursToMinutes(row.tiempo_horas)))}${textCell(row.hora_inicio)}${textCell(row.hora_fin)}${moneyCell(row.propina)}
+    </tr>`);
+    const apoyosTable = `<table>
+      <thead>${renderHeaderRow(apoyosHeaders)}</thead>
+      <tbody>${tableRows(apoyosRows.length ? apoyosRows : [`<tr>${textCell("Sin apoyos")}${textCell("")}${textCell("")}${textCell("00:00")}${textCell("")}${textCell("")}${moneyCell(0)}</tr>`])}</tbody>
+    </table>`;
+
+    const sheetNames = ["Parámetros", "Detalle Nómina", "Resumen", "Totales Generales", "Apoyos"];
     return `<!DOCTYPE html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
 <head>
@@ -1067,6 +1141,7 @@ const descargarExcelEmpleado = async () => {
   ${renderSheet("Detalle Nómina", "DETALLE DE NÓMINA", detalleTable)}
   ${renderSheet("Resumen", "RESUMEN DE NÓMINA", resumenTable)}
   ${renderSheet("Totales Generales", "TOTALES GENERALES", totalesTable)}
+  ${renderSheet("Apoyos", "APOYOS", apoyosTable)}
 </body>
 </html>`;
   };
@@ -1152,6 +1227,20 @@ descargarExcelEmpleadoBtn?.addEventListener("click", descargarExcelEmpleado);
 corteSelect?.addEventListener("change", updateDatesByCut);
 fechaInicioInput?.addEventListener("change", clampDatesToToday);
 fechaFinInput?.addEventListener("change", clampDatesToToday);
+apoyosBody?.addEventListener("change", (event) => {
+  const rowEl = event.target?.closest?.("tr[data-apoyo-index]");
+  if (!rowEl) return;
+  const index = Number(rowEl.dataset.apoyoIndex);
+  const row = state.apoyosDetalle[index];
+  if (!row) return;
+
+  if (event.target.classList.contains("nomina-apoyo-validar")) row.incluido = event.target.checked;
+  if (event.target.classList.contains("nomina-apoyo-tiempo")) row.tiempo_minutos = hoursToMinutes(event.target.value);
+  if (event.target.classList.contains("nomina-apoyo-propina")) row.propina = toNumeric(event.target.value);
+
+  recalculatePayrollFromEditableDetail();
+});
+
 detalleCalculoBody?.addEventListener("change", (event) => {
   const rowEl = event.target?.closest?.("tr[data-detail-index]");
   if (!rowEl) return;

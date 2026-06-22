@@ -1,9 +1,10 @@
-import { getUserContext } from "./session.js";
+import { getUserContext, listAvailableLocalContexts } from "./session.js";
 import {
   WEBHOOK_COMPRAS_VERIFICACION_FACTURAS,
   WEBHOOK_COMPRAS_DATOS_FACTURA,
   WEBHOOK_COMPRAS_CONSULTAR_INVENTARIOS,
-  WEBHOOK_COMPRAS_SUBIR_MATCH
+  WEBHOOK_COMPRAS_SUBIR_MATCH,
+  WEBHOOK_COMPRAS_REASIGNAR_LOCAL
 } from "./webhooks.js";
 
 const statusEl = document.getElementById("comprasStatus");
@@ -11,6 +12,7 @@ const facturasWrap = document.getElementById("comprasFacturas");
 const tabPrincipal = document.getElementById("tabComprasPrincipal");
 const tabNoCorresponde = document.getElementById("tabComprasNoCorresponde");
 const tabRevisadas = document.getElementById("tabComprasRevisadas");
+const tabLocales = document.getElementById("tabComprasLocales");
 const detalleWrap = document.getElementById("comprasDetalle");
 const detalleTitulo = document.getElementById("detalleTitulo");
 const detalleBody = document.getElementById("detalleBody");
@@ -25,6 +27,9 @@ let facturasBase = [];
 let facturaActiva = null;
 let detalleSnapshot = [];
 let detailRequestToken = 0;
+let activeView = "principal";
+let localContexts = [];
+const DISTRIBUCION_ACTUAL_KEY = "compras_distribucion_actual_v1";
 
 const setStatus = (msg, type = "info") => {
   statusEl.textContent = msg || "";
@@ -46,6 +51,31 @@ const isIgnorableProduct = (name) => {
 };
 
 const getFacturaKey = (row) => String(row?.uuid || `${row["Prefijo Factura"] || ""}-${row["Consecutivo Factura"] || ""}`);
+
+const readDistribucionActual = () => {
+  try { return JSON.parse(localStorage.getItem(DISTRIBUCION_ACTUAL_KEY) || "{}"); } catch (_error) { return {}; }
+};
+
+const writeDistribucionActual = (map) => {
+  try { localStorage.setItem(DISTRIBUCION_ACTUAL_KEY, JSON.stringify(map || {})); } catch (_error) {}
+};
+
+const markFacturaActual = (facturaKey) => {
+  const map = readDistribucionActual();
+  map[facturaKey] = true;
+  writeDistribucionActual(map);
+};
+
+const isFacturaActualMarcada = (facturaKey) => readDistribucionActual()[facturaKey] === true;
+
+const getPrincipalEmpresaId = () => context?.empresa_principal_id || context?.empresa_id || "";
+
+const getLocalOptionsHtml = () => {
+  const options = localContexts.filter((item) => item?.empresa_id && item.empresa_id !== context?.empresa_id);
+  if (!options.length) return '<option value="">No hay otros locales</option>';
+  return '<option value="">Seleccionar local</option>' + options.map((item) => `<option value="${item.empresa_id}">${item.nombre || item.empresa_id}</option>`).join("");
+};
+
 
 const parseFechaFacturaToTime = (value) => {
   const raw = String(value || "").trim();
@@ -101,6 +131,7 @@ const normalizeRevisionStatus = (value) => {
   if (!raw || raw === "0" || raw === "false" || raw === "null" || raw === "undefined" || raw === "empty") return 0;
   if (raw === "2" || raw.includes("no corresponde")) return 2;
   if (raw === "1" || raw === "true" || raw.includes("revis")) return 1;
+  if (raw === "3" || raw.includes("local") || raw.includes("redirig")) return 3;
   return 0;
 };
 
@@ -128,6 +159,7 @@ function renderFacturas(view = "principal") {
     .filter((f) => {
       if (view === "no_corresponde") return f.revisionEstado === 2;
       if (view === "revisadas") return f.revisionEstado === 1;
+      if (view === "locales") return f.revisionEstado !== 1 && f.revisionEstado !== 2 && !isFacturaActualMarcada(f.key);
       return f.revisionEstado === 0;
     });
   facturasWrap.innerHTML = "";
@@ -137,7 +169,9 @@ function renderFacturas(view = "principal") {
       ? "No hay facturas marcadas como no corresponde."
       : view === "revisadas"
         ? "No hay facturas revisadas."
-        : "No hay facturas pendientes para esta empresa.";
+        : view === "locales"
+          ? "No hay facturas pendientes de distribución entre locales."
+          : "No hay facturas pendientes para esta empresa.";
     facturasWrap.innerHTML = `<p>${emptyMessage}</p>`;
     return;
   }
@@ -153,13 +187,33 @@ function renderFacturas(view = "principal") {
         <div><strong>Factura:</strong> ${f.prefijo} ${f.consecutivo}</div>
         <div><strong>Proveedor:</strong> ${f.proveedor}</div>
         <div><strong>Fecha:</strong> ${f.fecha}</div>
-        <div><span class="factura-tag ${pendiente ? "pendiente" : revisada ? "revisada" : "no-corresponde"}">${pendiente ? "Pendiente" : revisada ? "Revisada" : "No corresponde"}</span></div>
+        <div><span class="factura-tag ${pendiente ? "pendiente" : revisada ? "revisada" : noCorresponde ? "no-corresponde" : "local"}">${pendiente ? "Pendiente" : revisada ? "Revisada" : noCorresponde ? "No corresponde" : "Distribuida"}</span></div>
       </div>
+      ${view === "locales" ? `
+        <div class="factura-local-actions" data-factura-key="${f.key}">
+          <label>Local destino
+            <select class="factura-local-select">${getLocalOptionsHtml()}</select>
+          </label>
+          <button type="button" class="btn-factura-local-confirmar">Enviar a local</button>
+          <button type="button" class="btn-factura-local-actual">Actual</button>
+        </div>` : ""}
     `;
     if (revisada) {
       card.title = "Factura revisada: bloqueada para evitar doble subida.";
     }
-    card.addEventListener("click", () => openDetalleFactura(f));
+    if (view === "locales") {
+      card.querySelector(".btn-factura-local-confirmar")?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const selectedLocalId = card.querySelector(".factura-local-select")?.value || "";
+        reasignarFacturaLocal(f, selectedLocalId);
+      });
+      card.querySelector(".btn-factura-local-actual")?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        marcarFacturaActual(f);
+      });
+    } else {
+      card.addEventListener("click", () => openDetalleFactura(f));
+    }
     facturasWrap.appendChild(card);
   });
 }
@@ -247,6 +301,53 @@ function renderDetalle(factura, detalleRows) {
 
   btnEnviar.disabled = false;
   btnNoCorresponde.disabled = false;
+}
+
+
+async function ensureLocalContexts() {
+  if (localContexts.length) return localContexts;
+  localContexts = await listAvailableLocalContexts().catch(() => []);
+  return localContexts;
+}
+
+async function reasignarFacturaLocal(factura, localDestinoId) {
+  if (!factura || !localDestinoId) {
+    setStatus("Selecciona un local destino para distribuir la factura.", "error");
+    return;
+  }
+
+  const destino = localContexts.find((item) => item.empresa_id === localDestinoId);
+  const usuarioId = context?.user?.id || context?.user?.user_id || "";
+  setStatus("Enviando factura al local seleccionado...", "info");
+  try {
+    await postJson(WEBHOOK_COMPRAS_REASIGNAR_LOCAL, {
+      accion: "reasignar_local",
+      empresa_matriz_id: getPrincipalEmpresaId(),
+      empresa_actual_id: context.empresa_id,
+      tenant_id_origen: context.empresa_id,
+      tenant_id_destino: localDestinoId,
+      local_destino_nombre: destino?.nombre || "",
+      usuario_id: usuarioId,
+      factura_uuid: factura.uuid,
+      factura_prefijo: factura.prefijo,
+      factura_consecutivo: factura.consecutivo,
+      proveedor: factura.proveedor,
+      fecha_factura: factura.fecha
+    });
+    markFacturaActual(factura.key);
+    setStatus("✅ Factura enviada al local seleccionado.", "success");
+    facturasBase = await fetchFacturas();
+    renderFacturas("locales");
+  } catch (error) {
+    setStatus(`No se pudo distribuir la factura: ${error.message}`, "error");
+  }
+}
+
+function marcarFacturaActual(factura) {
+  if (!factura) return;
+  markFacturaActual(factura.key);
+  setStatus("Factura confirmada como perteneciente al local actual.", "success");
+  renderFacturas("locales");
 }
 
 async function openDetalleFactura(factura) {
@@ -398,12 +499,20 @@ async function init() {
       tabPrincipal?.classList.toggle("is-active", view === "principal");
       tabNoCorresponde?.classList.toggle("is-active", view === "no_corresponde");
       tabRevisadas?.classList.toggle("is-active", view === "revisadas");
+      tabLocales?.classList.toggle("is-active", view === "locales");
+      activeView = view;
       renderFacturas(view);
     };
     activateTab("principal");
     tabPrincipal?.addEventListener("click", () => activateTab("principal"));
     tabNoCorresponde?.addEventListener("click", () => activateTab("no_corresponde"));
     tabRevisadas?.addEventListener("click", () => activateTab("revisadas"));
+    tabLocales?.addEventListener("click", async () => {
+      setStatus("Cargando locales disponibles para distribuir facturas...", "info");
+      await ensureLocalContexts();
+      activateTab("locales");
+      setStatus("Selecciona el local destino o confirma que la factura pertenece al local actual.", "info");
+    });
     setStatus("Selecciona una factura para revisar detalle y enviar.", "info");
   } catch (error) {
     setStatus(`Error cargando compras: ${error.message}`, "error");

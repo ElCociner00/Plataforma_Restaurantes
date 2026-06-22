@@ -184,3 +184,44 @@
 }
 .factura-tag.no-corresponde{background:#ffedd5;color:#9a3412}
 .factura-card.is-locked{opacity:.8;border-style:dashed}
+
+.factura-tag.local { background:#dbeafe; color:#1e40af; }
+
+.factura-local-actions {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  gap: 10px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.factura-local-actions label {
+  display: grid;
+  gap: 4px;
+  min-width: 240px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.factura-local-actions select,
+.factura-local-actions button {
+  min-height: 38px;
+  border-radius: 10px;
+}
+
+.factura-local-actions select {
+  border: 1px solid #cbd5e1;
+  padding: 8px 10px;
+}
+
+.factura-local-actions button {
+  border: 0;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.btn-factura-local-confirmar { background:#111827; color:#fff; }
+.btn-factura-local-actual { background:#dcfce7; color:#166534; }

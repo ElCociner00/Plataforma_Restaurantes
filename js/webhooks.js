@@ -180,6 +180,10 @@ export const WEBHOOK_COMPRAS_CONSULTAR_INVENTARIOS =
 export const WEBHOOK_COMPRAS_SUBIR_MATCH =
   "https://n8n.enkrato.com/webhook/Subir_Compras";
 
+// compras/index.html (submódulo: distribución manual de facturas entre locales)
+export const WEBHOOK_COMPRAS_REASIGNAR_LOCAL =
+  "https://n8n.enkrato.com/webhook/compras/reasignar_local";
+
 /**
  * WEBHOOKS CENTRALIZADOS
  * Instrucción: Para modificar URLs, cambiar SOLO aquí

@@ -183,3 +183,19 @@
   opacity: 0.55;
   text-decoration: line-through;
 }
+
+.nomina-apoyos-panel {
+  margin-top: 18px;
+}
+
+.nomina-apoyos-panel table {
+  font-size: 0.9rem;
+}
+
+.nomina-apoyos-panel input {
+  max-width: 92px;
+  padding: 4px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font: inherit;
+}
