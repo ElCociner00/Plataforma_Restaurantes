@@ -156,3 +156,46 @@
 
 .comprobante-table.comparativo { grid-template-columns: 1fr 1fr; }
 .comprobante-table.detalles-horas { grid-template-columns: 1fr; margin-top: 12px; }
+
+.nomina-web-panel {
+  margin-top: 18px;
+}
+
+.nomina-web-panel table {
+  font-size: 0.9rem;
+}
+
+.nomina-web-panel tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.nomina-web-panel input[type="text"],
+.nomina-web-panel .nomina-detalle-horas {
+  width: 72px;
+  max-width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font: inherit;
+}
+
+.nomina-row-descartada {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.nomina-apoyos-panel {
+  margin-top: 18px;
+}
+
+.nomina-apoyos-panel table {
+  font-size: 0.9rem;
+}
+
+.nomina-apoyos-panel input {
+  max-width: 92px;
+  padding: 4px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font: inherit;
+}

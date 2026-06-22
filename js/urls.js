@@ -44,6 +44,7 @@ export const APP_URLS = {
   root: buildAppPath("/"),
   login: buildAppPath("/inicio/"),
   dashboard: buildAppPath("/dashboard/"),
+  localPreselector: buildAppPath("/contexto_local/"),
   registroEmpresa: buildAppPath("/registro/index.html"),
   registroUsuario: buildAppPath("/registro/usuario.html"),
   cierreTurno: buildAppPath("/cierre_turno/"),
@@ -89,6 +90,7 @@ export const APP_URLS = {
 export const PUBLIC_PATHS = [
   APP_URLS.root,
   APP_URLS.login,
+  APP_URLS.localPreselector,
   APP_URLS.registroEmpresa,
   APP_URLS.registroUsuario
 ];
