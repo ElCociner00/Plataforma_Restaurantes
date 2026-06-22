@@ -285,3 +285,10 @@ WEBHOOKS.BILLING_CREAR_CICLOS = {
   metodo: "POST",
   descripcion: "Crea ciclos mensuales de facturacion"
 };
+
+WEBHOOKS.COMPRAS_REASIGNAR_LOCAL = {
+  url: WEBHOOK_COMPRAS_REASIGNAR_LOCAL,
+  archivos_que_usan: ["js/compras.js"],
+  metodo: "POST",
+  descripcion: "Marca facturas de compras como distribuidas (=1) y, si aplica, reasigna tenant/local destino antes del módulo principal"
+};

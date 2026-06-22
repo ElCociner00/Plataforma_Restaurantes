@@ -62,14 +62,16 @@ body {
   padding: 18px;
   text-align: left;
   cursor: pointer;
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 
 .local-option:hover,
 .local-option:focus-visible {
   transform: translateY(-2px);
   border-color: #0284c7;
-  box-shadow: 0 12px 28px rgba(2, 132, 199, 0.14);
+  background: #6d28d9;
+  color: #fff;
+  box-shadow: 0 12px 28px rgba(109, 40, 217, 0.20);
   outline: none;
 }
 
@@ -122,4 +124,11 @@ body {
 .local-preselector-actions .ghost {
   background: #e2e8f0;
   color: #0f172a;
+}
+
+.local-option:hover strong,
+.local-option:focus-visible strong,
+.local-option:hover span,
+.local-option:focus-visible span {
+  color: #fff;
 }

@@ -199,3 +199,27 @@
   border-radius: 6px;
   font: inherit;
 }
+
+
+.nomina-payroll-overrides {
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #eff6ff;
+}
+.nomina-payroll-overrides h3 { margin: 0 0 6px; }
+.nomina-payroll-overrides p { margin: 0 0 12px; color: #475569; }
+.nomina-overrides-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.nomina-overrides-grid label { display: grid; gap: 5px; font-weight: 700; }
+.nomina-overrides-grid span { font-size: 0.78rem; color: #64748b; font-weight: 600; }
+.nomina-overrides-grid select, .nomina-overrides-grid input { width: 100%; min-width: 0; padding: 7px 8px; border: 1px solid #bfdbfe; border-radius: 8px; box-sizing: border-box; }
+.nomina-table th, .nomina-table td, .comprobante-col th, .comprobante-col td { overflow-wrap: anywhere; hyphens: auto; }
+@media (max-width: 760px) {
+  .nomina-main { width: 100%; max-width: 100%; padding-inline: 12px; box-sizing: border-box; }
+  .nomina-cards, .comprobante-top, .comprobante-table, .comprobante-table.comparativo { grid-template-columns: 1fr; }
+  .empleado-data { text-align: left; direction: ltr; }
+  .tabla-wrap, .comprobante-col { max-width: 100%; overflow-x: hidden; }
+  .comprobante-col table { table-layout: fixed; }
+  .comprobante-col th, .comprobante-col td { font-size: 0.78rem; padding: 5px; }
+}
