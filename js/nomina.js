@@ -69,7 +69,13 @@ const state = {
   parametrosDetalle: [],
   detalleCalculo: [],
   apoyosDetalle: [],
-  excelTotales: null
+  excelTotales: null,
+  payrollOverrides: {
+    diurnas: { source: "diurnas", multiplier: 1 },
+    nocturnas: { source: "nocturnas", multiplier: 1 },
+    dominicales_diurnas: { source: "dominicales_diurnas", multiplier: 1 },
+    dominicales_nocturnas: { source: "dominicales_nocturnas", multiplier: 1 }
+  }
 };
 
 
@@ -94,6 +100,42 @@ const toNumeric = (value) => {
   }
   const parsed = Number(text.replace(/[^0-9.-]/g, ""));
   return Number.isFinite(parsed) ? parsed : 0;
+};
+
+
+const PAYROLL_HOUR_FIELDS = [
+  ["diurnas", "Horas diurnas"],
+  ["nocturnas", "Horas nocturnas"],
+  ["dominicales_diurnas", "Dominicales diurnas"],
+  ["dominicales_nocturnas", "Dominicales nocturnas"]
+];
+
+const getPayrollOverride = (key) => {
+  const current = state.payrollOverrides?.[key] || {};
+  const source = PAYROLL_HOUR_FIELDS.some(([field]) => field === current.source) ? current.source : key;
+  const multiplier = Number.isFinite(Number(current.multiplier)) ? Number(current.multiplier) : 1;
+  return { source, multiplier };
+};
+
+const applyPayrollHourOverride = (key, horas) => {
+  const override = getPayrollOverride(key);
+  return toNumeric(horas?.[override.source]) * override.multiplier;
+};
+
+const hasMeaningfulCell = (value) => {
+  if (value === null || value === undefined) return false;
+  const text = String(value).trim();
+  if (!text || ["-", "null", "undefined", "empty"].includes(text.toLowerCase())) return false;
+  if (/^0+(?:[.,]0+)?$/.test(text) || /^00:00$/.test(text)) return false;
+  return true;
+};
+
+const filterEmptyColumns = (headers, rows, protectedIndexes = []) => {
+  const keep = headers.map((_header, index) => protectedIndexes.includes(index) || rows.some((row) => hasMeaningfulCell(row[index])));
+  return {
+    headers: headers.filter((_header, index) => keep[index]),
+    rows: rows.map((row) => row.filter((_cell, index) => keep[index]))
+  };
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -438,10 +480,10 @@ const buildPayrollRowsFromEditableDetail = () => {
     horas_nocturnas: horas.nocturnas,
     horas_dominicales_diurnas: horas.dominicales_diurnas,
     horas_dominicales_nocturnas: horas.dominicales_nocturnas,
-    valor_diurnas: tarifas.diurnas > 0 ? horas.diurnas * tarifas.diurnas : sumMoney("valor_diurnas"),
-    valor_nocturnas: tarifas.nocturnas > 0 ? horas.nocturnas * tarifas.nocturnas : sumMoney("valor_nocturnas"),
-    valor_dominical_diurnas: tarifas.dominicales_diurnas > 0 ? horas.dominicales_diurnas * tarifas.dominicales_diurnas : sumMoney("valor_dominical_diurnas"),
-    valor_dominical_nocturnas: tarifas.dominicales_nocturnas > 0 ? horas.dominicales_nocturnas * tarifas.dominicales_nocturnas : sumMoney("valor_dominical_nocturnas")
+    valor_diurnas: tarifas.diurnas > 0 ? applyPayrollHourOverride("diurnas", horas) * tarifas.diurnas : sumMoney("valor_diurnas"),
+    valor_nocturnas: tarifas.nocturnas > 0 ? applyPayrollHourOverride("nocturnas", horas) * tarifas.nocturnas : sumMoney("valor_nocturnas"),
+    valor_dominical_diurnas: tarifas.dominicales_diurnas > 0 ? applyPayrollHourOverride("dominicales_diurnas", horas) * tarifas.dominicales_diurnas : sumMoney("valor_dominical_diurnas"),
+    valor_dominical_nocturnas: tarifas.dominicales_nocturnas > 0 ? applyPayrollHourOverride("dominicales_nocturnas", horas) * tarifas.dominicales_nocturnas : sumMoney("valor_dominical_nocturnas")
   };
 
   const auxilioDia = findParamValue(parametros, (concepto) => concepto.includes("auxilio") && concepto.includes("transporte"));
@@ -551,7 +593,32 @@ const renderApoyos = () => {
     }).join("");
 };
 
+
+const renderPayrollOverrideControls = () => {
+  const panel = document.getElementById("nominaPayrollOverrides");
+  if (!panel) return;
+  const options = PAYROLL_HOUR_FIELDS.map(([field, label]) => `<option value="${field}">${label}</option>`).join("");
+  panel.innerHTML = `
+    <h3>Ajustes manuales de cálculo</h3>
+    <p>Permite probar matches distintos entre horas calculadas y parámetros monetarios sin alterar el webhook ni los parámetros guardados.</p>
+    <div class="nomina-overrides-grid">
+      ${PAYROLL_HOUR_FIELDS.map(([field, label]) => {
+        const override = getPayrollOverride(field);
+        return `<label>${label}
+          <span>Usar horas de</span>
+          <select class="nomina-override-source" data-field="${field}">${options}</select>
+          <span>Multiplicador</span>
+          <input class="nomina-override-multiplier" data-field="${field}" type="number" step="0.01" min="0" value="${override.multiplier}">
+        </label>`;
+      }).join("")}
+    </div>`;
+  panel.querySelectorAll(".nomina-override-source").forEach((select) => {
+    select.value = getPayrollOverride(select.dataset.field).source;
+  });
+};
+
 const renderParametrosYDetalle = () => {
+  renderPayrollOverrideControls();
   if (parametrosBody) {
     parametrosBody.innerHTML = (state.parametrosDetalle.length ? state.parametrosDetalle : [{ concepto: "Sin parámetros", valor: 0, unidad: "-" }])
       .map((param) => `<tr><td>${param.concepto || param.nombre || "-"}</td><td>${param.valorFormateado || fmtMoney(toNumeric(param.valor))}</td><td>${param.unidad || (normalizeConcept(param.concepto).includes("dia") ? "día" : "hora")}</td></tr>`).join("");
@@ -1054,20 +1121,19 @@ const descargarExcelEmpleado = async () => {
       <tbody>${tableRows(parametros.map((param) => `<tr>${textCell(param.concepto)}${moneyCell(param.valor, "money")}${textCell("COP")}${textCell(param.valorFormateado)}</tr>`))}</tbody>
     </table>`;
 
-    const detalleHeaders = [
+    const detalleHeadersBase = [
       "Responsable", "Día", "Fecha", "Hora Inicio", "Hora Fin", "Horas Totales", "Horas Diurnas", "Horas Nocturnas",
       "Valor Diurnas", "Valor Nocturnas", "Valor Dom. Diurnas", "Valor Dom. Nocturnas", "Total Fila"
     ];
-    const detalleRows = detalle.map((row) => {
+    const detalleMatrix = detalle.map((row) => {
       const totalFila = toMoneyNumber(row.valor_diurnas) + toMoneyNumber(row.valor_nocturnas) + toMoneyNumber(row.valor_dominical_diurnas) + toMoneyNumber(row.valor_dominical_nocturnas);
-      return `<tr>
-        ${textCell(row.responsable)}${textCell(row.dia)}${textCell(row.fecha, "date-text")}${textCell(row.hora_inicio)}${textCell(row.hora_fin)}
-        ${textCell(row.horas_totales)}${textCell(row.horas_diurnas)}${textCell(row.horas_nocturnas)}
-        ${moneyCell(row.valor_diurnas)}${moneyCell(row.valor_nocturnas)}${moneyCell(row.valor_dominical_diurnas)}${moneyCell(row.valor_dominical_nocturnas)}${moneyCell(totalFila)}
-      </tr>`;
+      return [row.responsable, row.dia, row.fecha, row.hora_inicio, row.hora_fin, row.horas_totales, row.horas_diurnas, row.horas_nocturnas, row.valor_diurnas, row.valor_nocturnas, row.valor_dominical_diurnas, row.valor_dominical_nocturnas, totalFila];
     });
+    const detalleFiltered = filterEmptyColumns(detalleHeadersBase, detalleMatrix, [2]);
+    const moneyHeaders = new Set(["Valor Diurnas", "Valor Nocturnas", "Valor Dom. Diurnas", "Valor Dom. Nocturnas", "Total Fila"]);
+    const detalleRows = detalleFiltered.rows.map((row) => `<tr>${row.map((cell, index) => moneyHeaders.has(detalleFiltered.headers[index]) ? moneyCell(cell) : textCell(cell, detalleFiltered.headers[index] === "Fecha" ? "date-text" : "")).join("")}</tr>`);
     const detalleTable = `<table>
-      <thead>${renderHeaderRow(detalleHeaders)}</thead>
+      <thead>${renderHeaderRow(detalleFiltered.headers)}</thead>
       <tbody>${tableRows(detalleRows)}</tbody>
     </table>`;
 
@@ -1258,6 +1324,14 @@ detalleCalculoBody?.addEventListener("change", (event) => {
   }
 
   recalculatePayrollFromEditableDetail();
+});
+
+document.getElementById("nominaPayrollOverrides")?.addEventListener("change", (event) => {
+  const field = event.target?.dataset?.field;
+  if (!field || !state.payrollOverrides[field]) return;
+  if (event.target.classList.contains("nomina-override-source")) state.payrollOverrides[field].source = event.target.value;
+  if (event.target.classList.contains("nomina-override-multiplier")) state.payrollOverrides[field].multiplier = Math.max(0, toNumeric(event.target.value) || 0);
+  if (state.detalleCalculo.length) recalculatePayrollFromEditableDetail();
 });
 
 init();

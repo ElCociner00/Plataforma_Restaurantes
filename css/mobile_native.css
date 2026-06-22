@@ -204,3 +204,23 @@ body.mobile-native svg {
 body.mobile-native .impago-modal {
   padding: 12px;
 }
+
+body.mobile-native .tabla-wrap,
+body.mobile-native .table-wrap,
+body.mobile-native .factura-table-wrap,
+body.mobile-native .comprobante-col,
+body.mobile-native .compras-facturas {
+  overflow-x: hidden !important;
+}
+
+body.mobile-native table:not([data-mobile-stack="true"]) {
+  table-layout: fixed;
+  width: 100%;
+}
+
+body.mobile-native th,
+body.mobile-native td {
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: auto;
+}

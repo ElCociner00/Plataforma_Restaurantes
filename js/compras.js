@@ -126,6 +126,13 @@ async function fetchInventarios() {
   return normalizeList(data).filter((p) => p?.id && p?.nombre);
 }
 
+const normalizeDistribucionStatus = (value) => {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw || raw === "0" || raw === "false" || raw === "null" || raw === "undefined" || raw === "empty") return 0;
+  if (raw === "1" || raw === "true" || raw === "si" || raw === "sí" || raw.includes("distrib")) return 1;
+  return 0;
+};
+
 const normalizeRevisionStatus = (value) => {
   const raw = String(value ?? "").trim().toLowerCase();
   if (!raw || raw === "0" || raw === "false" || raw === "null" || raw === "undefined" || raw === "empty") return 0;
@@ -147,7 +154,8 @@ function groupFacturas(rows) {
         consecutivo: row["Consecutivo Factura"] || "",
         proveedor: row.Proveedor || "",
         fecha: row["Fecha Factura"] || "",
-        revisionEstado: normalizeRevisionStatus(row.Revisada)
+        revisionEstado: normalizeRevisionStatus(row.Revisada),
+        distribucionEstado: normalizeDistribucionStatus(row.Distribuida ?? row.distribuida)
       });
     }
   });
@@ -159,8 +167,8 @@ function renderFacturas(view = "principal") {
     .filter((f) => {
       if (view === "no_corresponde") return f.revisionEstado === 2;
       if (view === "revisadas") return f.revisionEstado === 1;
-      if (view === "locales") return f.revisionEstado !== 1 && f.revisionEstado !== 2 && !isFacturaActualMarcada(f.key);
-      return f.revisionEstado === 0;
+      if (view === "locales") return f.revisionEstado !== 1 && f.revisionEstado !== 2 && f.distribucionEstado !== 1 && !isFacturaActualMarcada(f.key);
+      return f.revisionEstado === 0 && f.distribucionEstado === 1;
     });
   facturasWrap.innerHTML = "";
 
@@ -310,30 +318,40 @@ async function ensureLocalContexts() {
   return localContexts;
 }
 
+async function confirmarDistribucionFactura(factura, localDestinoId = context?.empresa_id, accion = "mantener_empresa_actual") {
+  if (!factura || !localDestinoId) {
+    setStatus("No se pudo identificar el destino para distribuir la factura.", "error");
+    return;
+  }
+
+  const destino = localContexts.find((item) => item.empresa_id === localDestinoId);
+  const usuarioId = context?.user?.id || context?.user?.user_id || "";
+  await postJson(WEBHOOK_COMPRAS_REASIGNAR_LOCAL, {
+    accion,
+    empresa_matriz_id: getPrincipalEmpresaId(),
+    empresa_actual_id: context.empresa_id,
+    tenant_id_origen: context.empresa_id,
+    tenant_id_destino: localDestinoId,
+    local_destino_nombre: destino?.nombre || context?.empresa_nombre || context?.nombre_empresa || "Empresa actual",
+    usuario_id: usuarioId,
+    factura_uuid: factura.uuid,
+    factura_prefijo: factura.prefijo,
+    factura_consecutivo: factura.consecutivo,
+    proveedor: factura.proveedor,
+    fecha_factura: factura.fecha,
+    distribuida: 1
+  });
+}
+
 async function reasignarFacturaLocal(factura, localDestinoId) {
   if (!factura || !localDestinoId) {
     setStatus("Selecciona un local destino para distribuir la factura.", "error");
     return;
   }
 
-  const destino = localContexts.find((item) => item.empresa_id === localDestinoId);
-  const usuarioId = context?.user?.id || context?.user?.user_id || "";
   setStatus("Enviando factura al local seleccionado...", "info");
   try {
-    await postJson(WEBHOOK_COMPRAS_REASIGNAR_LOCAL, {
-      accion: "reasignar_local",
-      empresa_matriz_id: getPrincipalEmpresaId(),
-      empresa_actual_id: context.empresa_id,
-      tenant_id_origen: context.empresa_id,
-      tenant_id_destino: localDestinoId,
-      local_destino_nombre: destino?.nombre || "",
-      usuario_id: usuarioId,
-      factura_uuid: factura.uuid,
-      factura_prefijo: factura.prefijo,
-      factura_consecutivo: factura.consecutivo,
-      proveedor: factura.proveedor,
-      fecha_factura: factura.fecha
-    });
+    await confirmarDistribucionFactura(factura, localDestinoId, "reasignar_local");
     markFacturaActual(factura.key);
     setStatus("✅ Factura enviada al local seleccionado.", "success");
     facturasBase = await fetchFacturas();
@@ -343,11 +361,18 @@ async function reasignarFacturaLocal(factura, localDestinoId) {
   }
 }
 
-function marcarFacturaActual(factura) {
+async function marcarFacturaActual(factura) {
   if (!factura) return;
-  markFacturaActual(factura.key);
-  setStatus("Factura confirmada como perteneciente al local actual.", "success");
-  renderFacturas("locales");
+  setStatus("Confirmando factura en la empresa actual...", "info");
+  try {
+    await confirmarDistribucionFactura(factura, context.empresa_id, "mantener_empresa_actual");
+    markFacturaActual(factura.key);
+    setStatus("✅ Factura distribuida en la empresa actual.", "success");
+    facturasBase = await fetchFacturas();
+    renderFacturas("locales");
+  } catch (error) {
+    setStatus(`No se pudo confirmar la empresa actual: ${error.message}`, "error");
+  }
 }
 
 async function openDetalleFactura(factura) {
@@ -503,7 +528,8 @@ async function init() {
       activeView = view;
       renderFacturas(view);
     };
-    activateTab("principal");
+    await ensureLocalContexts();
+    activateTab("locales");
     tabPrincipal?.addEventListener("click", () => activateTab("principal"));
     tabNoCorresponde?.addEventListener("click", () => activateTab("no_corresponde"));
     tabRevisadas?.addEventListener("click", () => activateTab("revisadas"));
@@ -513,7 +539,7 @@ async function init() {
       activateTab("locales");
       setStatus("Selecciona el local destino o confirma que la factura pertenece al local actual.", "info");
     });
-    setStatus("Selecciona una factura para revisar detalle y enviar.", "info");
+    setStatus("Primero distribuye las facturas pendientes entre locales o confirma la empresa actual.", "info");
   } catch (error) {
     setStatus(`Error cargando compras: ${error.message}`, "error");
   }
