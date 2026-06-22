@@ -12,6 +12,7 @@ import { descargarImagenResumenCierreTurno } from "./cierre_turno_png.js";
 const log = (...args) => console.info("[cierre_turno_auxiliar]", ...args);
 const warn = (...args) => console.warn("[cierre_turno_auxiliar]", ...args);
 const errorLog = (...args) => console.error("[cierre_turno_auxiliar]", ...args);
+const enforceOneNumericInput = (element) => enforceNumericInput([element]);
 
 document.addEventListener("DOMContentLoaded", () => {
   const fecha = document.getElementById("fecha");
@@ -182,7 +183,7 @@ document.addEventListener("DOMContentLoaded", () => {
         input.inputMode = "numeric";
         input.pattern = "[0-9]*";
         input.value = "0";
-        enforceNumericInput(input);
+        enforceOneNumericInput(input);
         input.addEventListener("input", () => { verificado = false; renderTotalizados(); });
         row.append(label, input);
         extrasList.appendChild(row);
@@ -273,7 +274,7 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
       </div>`;
     const propinaInput = row.querySelector('[data-field="propina"]');
-    enforceNumericInput(propinaInput);
+    enforceOneNumericInput(propinaInput);
     row.querySelectorAll("input,select").forEach((el) => el.addEventListener("input", () => { verificado = false; }));
     row.querySelectorAll("select").forEach((el) => el.addEventListener("change", () => { verificado = false; }));
     return row;
@@ -474,7 +475,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const init = async () => {
     setStatus("Cargando cierre turno auxiliar...", "info");
-    document.querySelectorAll('input[inputmode="numeric"], input[type="text"]').forEach((input) => enforceNumericInput(input));
+    document.querySelectorAll('input[inputmode="numeric"], input[type="text"]').forEach((input) => enforceOneNumericInput(input));
     Object.values(inputsFinanzas).forEach((group) => {
       group.sistema.removeAttribute("readonly");
       group.real.removeAttribute("readonly");
