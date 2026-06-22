@@ -48,6 +48,7 @@ export const APP_URLS = {
   registroEmpresa: buildAppPath("/registro/index.html"),
   registroUsuario: buildAppPath("/registro/usuario.html"),
   cierreTurno: buildAppPath("/cierre_turno/"),
+  cierreTurnoAuxiliar: buildAppPath("/cierre_turno/auxiliar.html"),
   historicoCierreTurno: buildAppPath("/cierre_turno/historico_cierre_turno.html"),
   cierreInventarios: buildAppPath("/cierre_inventarios/"),
   historicoCierreInventarios: buildAppPath("/cierre_inventarios/historico_cierre_inventarios.html"),

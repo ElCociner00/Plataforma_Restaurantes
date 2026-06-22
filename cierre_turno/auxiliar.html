@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>AXIOMA | Cierre turno auxiliar</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/cierre_turno.css">
+</head>
+
+<body style="display:none">
+
+  <!-- 🔐 Auth global -->
+  <script type="module" src="../js/router.js"></script>
+
+  <!-- 🔐 Permisos -->
+<!-- 🧭 Header -->
+  <script type="module" src="../js/header.js"></script>
+
+  <div class="main">
+    <h1>Cierre turno auxiliar</h1>
+    <p class="auxiliar-note">Modo manual de contingencia: no usa n8n ni consultas externas; guarda directamente en Supabase.</p>
+
+    <section class="bloque">
+      <h2>Información del Turno</h2>
+      <input id="fecha" type="date">
+      <select id="responsable">
+        <option value="">Seleccione responsable</option>
+      </select>
+
+      <h4>Datos del turno</h4>
+      <div class="turno-datos-grid">
+        <div class="turno-datos-card">
+          <h5>Hora de llegada</h5>
+          <div class="hora-llegada-grid">
+            <label>
+              Hora
+              <select id="hora_llegada_hora"></select>
+            </label>
+            <label>
+              Minuto
+              <select id="hora_llegada_minuto"></select>
+            </label>
+            <label>
+              Momento
+              <select id="hora_llegada_momento">
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="turno-datos-card">
+          <h5>Duración del turno</h5>
+          <div class="turno-grid">
+            <label>
+              Hora inicio
+              <input id="hora_inicio" type="time">
+            </label>
+            <label>
+              Hora fin
+              <input id="hora_fin" type="time">
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="apertura-grid">
+        <label>
+          Efectivo Apertura
+          <input id="efectivo_apertura" type="text" inputmode="numeric" pattern="[0-9]*">
+        </label>
+
+        <div class="apertura-note" role="note">
+          <p>Modo auxiliar: escribe manualmente los valores porque Loggro/n8n no está disponible.</p>
+        </div>
+      </div>
+
+      <div class="contables-extra-grid contables-principales-grid">
+        <label>
+          Bolsa
+          <input id="bolsa" type="text" inputmode="numeric" pattern="[0-9]*">
+        </label>
+        <label>
+          Caja
+          <input id="caja" type="text" inputmode="numeric" pattern="[0-9]*">
+        </label>
+      </div>
+
+      <div class="acciones-cierre acciones-cierre-top">
+        <button id="verificar" type="button">Verificar manual</button>
+        <button id="enviar" disabled>Subir cierre</button>
+        <span class="hint-icon" title="Al subir cierre exitosamente se descargará la constancia PNG automáticamente.">🔍</span>
+        <button id="limpiarDatos" type="button">Limpiar datos</button>
+      </div>
+      <div class="correccion-wrap is-hidden" id="correccionWrap">
+        <button id="solicitarCorreccion" type="button" class="btn-correccion">Me equivoqué y necesito corregir algo</button>
+      </div>
+      <div class="modal-alerta is-hidden" id="modalCorreccion" role="dialog" aria-modal="true">
+        <div class="modal-alerta-card">
+          <p>Manipular los datos de forma malintencionada despues de generar una constancia visual es un delito, tu empleador a sido informado de que estás realizando un cambio, ten en cuenta que todos los datos sean veridicos y revisa varias veces los datos antes de descargar el resumen y darle a subir cierre.</p>
+          <button id="aceptarCorreccion" type="button">Entiendo y Acepto</button>
+        </div>
+      </div>
+      <div id="confirmacionEnvio" class="confirmacion-envio is-hidden">
+        <p id="mensajeEnvio"></p>
+        <p class="confirmacion-pregunta">¿Estás seguro de subir este cierre?</p>
+        <div class="confirmacion-acciones">
+          <button id="confirmarEnvio" type="button">Sí</button>
+          <button id="cancelarEnvio" type="button">No</button>
+        </div>
+      </div>
+      <div id="status"></div>
+
+      <div class="apoyos-inline-block">
+        <h3>Apoyos del turno</h3>
+        <div class="apoyos-head-grid">
+          <label class="apoyos-question">
+            <span>¿Hubo apoyos durante el turno?</span>
+            <select id="apoyo_hubo" required>
+              <option value="">Selecciona</option>
+              <option value="si">SI</option>
+              <option value="no">NO</option>
+            </select>
+          </label>
+          <label id="apoyoCantidadWrap" class="apoyos-cantidad is-hidden">
+            <span>¿Cuántas personas?</span>
+            <select id="apoyo_cantidad">
+              <option value="">Selecciona</option>
+            </select>
+          </label>
+          <div class="apoyos-consulta-box is-hidden" id="apoyosConsultaBox">
+            <button id="consultarPropinaApoyos" type="button">Confirmar apoyo</button>
+            <small id="apoyosConsultaNota">Antes de consultar, completa los datos de apoyos (responsable + horario) para enviarlos al webhook.</small>
+          </div>
+        </div>
+
+        <div id="apoyoTablaWrap" class="apoyo-tabla-wrap is-hidden">
+          <div class="apoyo-tabla-head">
+            <span>Responsable</span>
+            <span>Propina</span>
+            <span>Tiempo</span>
+          </div>
+          <div id="apoyoRows" class="apoyo-rows"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bloque">
+  <h2>Datos Financieros</h2>
+
+  <div class="finanzas-grid">
+    <div></div>
+    <div class="col-title">Sistema</div>
+    <div class="col-title">Real</div>
+    <div class="col-title">Diferencias</div>
+
+    <div class="finanzas-row" data-field="efectivo">
+      <div class="row-title">Efectivo</div>
+      <div class="efectivo-sistema-wrap">
+        <input id="efectivo_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+        <button id="toggleEfectivoSistema" class="icon-btn" type="button" title="Cambiar valor visible" aria-label="Cambiar valor visible de efectivo sistema">↻</button>
+        <small id="efectivoSistemaModo" class="field-note">efectivo bruto</small>
+      </div>
+      <div class="input-with-hint">
+        <input id="efectivo_real" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+        <span class="hint-icon" title="Este valor proviene de la suma entre bolsa y caja.">🔍</span>
+      </div>
+      <div class="diff-cell">
+        <input id="efectivo_diferencia" type="text" inputmode="numeric" pattern="[0-9-]*" readonly class="diff-input">
+        <div class="diff-note" id="efectivo_diferencia_nota"></div>
+      </div>
+    </div>
+
+    <div class="finanzas-row" data-field="datafono">
+      <div class="row-title">Datáfono</div>
+      <input id="datafono_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+      <input id="datafono_real" type="text" inputmode="numeric" pattern="[0-9]*">
+      <div class="diff-cell">
+        <input id="datafono_diferencia" type="text" inputmode="numeric" pattern="[0-9-]*" readonly class="diff-input">
+        <div class="diff-note" id="datafono_diferencia_nota"></div>
+      </div>
+    </div>
+
+    <div class="finanzas-row" data-field="rappi">
+      <div class="row-title">Rappi</div>
+      <input id="rappi_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+      <input id="rappi_real" type="text" inputmode="numeric" pattern="[0-9]*">
+      <div class="diff-cell">
+        <input id="rappi_diferencia" type="text" inputmode="numeric" pattern="[0-9-]*" readonly class="diff-input">
+        <div class="diff-note" id="rappi_diferencia_nota"></div>
+      </div>
+    </div>
+
+    <div class="finanzas-row" data-field="nequi">
+      <div class="row-title">Nequi</div>
+      <input id="nequi_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+      <input id="nequi_real" type="text" inputmode="numeric" pattern="[0-9]*">
+      <div class="diff-cell">
+        <input id="nequi_diferencia" type="text" inputmode="numeric" pattern="[0-9-]*" readonly class="diff-input">
+        <div class="diff-note" id="nequi_diferencia_nota"></div>
+      </div>
+    </div>
+
+    <div class="finanzas-row" data-field="transferencias">
+      <div class="row-title">Transferencias</div>
+      <input id="transferencias_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+      <input id="transferencias_real" type="text" inputmode="numeric" pattern="[0-9]*">
+      <div class="diff-cell">
+        <input id="transferencias_diferencia" type="text" inputmode="numeric" pattern="[0-9-]*" readonly class="diff-input">
+        <div class="diff-note" id="transferencias_diferencia_nota"></div>
+      </div>
+    </div>
+
+    <div class="finanzas-row" data-field="bono_regalo">
+      <div class="row-title">Bono de regalo</div>
+      <input id="bono_regalo_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
+      <input id="bono_regalo_real" type="text" inputmode="numeric" pattern="[0-9]*">
+      <div class="diff-cell">
+        <input id="bono_regalo_diferencia" type="text" inputmode="numeric" pattern="[0-9-]*" readonly class="diff-input">
+        <div class="diff-note" id="bono_regalo_diferencia_nota"></div>
+      </div>
+    </div>
+
+    <div class="finanzas-row" data-field="propina">
+      <div class="row-title">Propina</div>
+      <input id="propina" type="text" inputmode="numeric" pattern="[0-9]*" readonly class="input-span-3">
+    </div>
+
+    <div class="finanzas-row" data-field="domicilios">
+      <div class="row-title">Domicilios</div>
+      <input id="domicilios" type="text" inputmode="numeric" pattern="[0-9]*" readonly class="input-span-3">
+    </div>
+  </div>
+
+  <textarea placeholder="Comentarios"></textarea>
+    </section>
+
+    <section class="bloque">
+      <h2>Gastos (extras)</h2>
+      <div id="extrasList" class="extras-list"></div>
+      <div class="extra-total-row">
+        <strong>Total gastos extras</strong>
+        <span id="totalGastosExtras">0</span>
+      </div>
+    </section>
+
+    <section class="bloque">
+      <h2>Totalizados del cierre</h2>
+      <div class="totales-grid">
+        <div class="total-card">
+          <span class="total-label">Ingresos sistema</span>
+          <strong id="totalIngresosSistema">$0,00</strong>
+        </div>
+        <div class="total-card">
+          <span class="total-label">Ingresos reales</span>
+          <strong id="totalIngresosReales">$0,00</strong>
+        </div>
+        <div class="total-card">
+          <span class="total-label">Gastos extras</span>
+          <strong id="totalGastosTurno">$0,00</strong>
+        </div>
+        <div class="total-card">
+          <span class="total-label">Venta del día (sin gastos)</span>
+          <strong id="totalVentaDiaBruta">$0,00</strong>
+        </div>
+        <div class="total-card">
+          <span class="total-label">Venta del día (con gastos)</span>
+          <strong id="totalVentaDiaNeta">$0,00</strong>
+        </div>
+        <div class="total-card">
+          <span class="total-label">Diferencia general</span>
+          <strong id="totalDiferenciaGeneral">$0,00</strong>
+        </div>
+      </div>
+      <p class="totales-note">
+        Incluye las fuentes de ingreso del turno (efectivo, datáfono, rappi, nequi, transferencias y bono regalo),
+        mostrando el total con y sin gastos extras.
+      </p>
+    </section>
+  </div>
+
+  <script type="module" src="../js/cierre_turno_auxiliar.js"></script>
+
+  <script type="module" src="../js/footer.js"></script>
+</body>
+</html>
