@@ -23,18 +23,18 @@
       Configura las credenciales de Credibanco para habilitar las integraciones de pagos.
     </p>
 
-    <form id="credibancoForm" class="formulario">
+    <form id="credibancoForm" class="formulario" autocomplete="off" data-lpignore="true">
       <div class="campo">
         <label for="credibancoClientId">Client ID</label>
         <p class="ayuda">Ingresa el Client ID entregado por Credibanco.</p>
-        <input id="credibancoClientId" type="text" required autocomplete="off">
+        <input id="credibancoClientId" name="credibanco_client_id_no_autofill" type="text" required autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="">
       </div>
 
       <div class="campo">
         <label for="credibancoClientSecret">Client Secret</label>
         <p class="ayuda">Ingresa el Client Secret entregado por Credibanco.</p>
         <div class="password-wrap">
-          <input id="credibancoClientSecret" type="password" required autocomplete="off">
+          <input id="credibancoClientSecret" name="credibanco_client_secret_no_autofill" type="password" required autocomplete="new-password" autocapitalize="off" spellcheck="false" data-lpignore="true" value="">
           <button type="button" id="toggleCredibancoSecret" class="btn-ojito" aria-label="Mostrar client secret">👁</button>
         </div>
       </div>

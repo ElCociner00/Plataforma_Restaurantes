@@ -278,6 +278,13 @@ const calculateAuxilioQuantity = (match, days) => {
   return safeDays;
 };
 
+const toDateSortValue = (value) => {
+  const date = new Date(`${value || ""}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+};
+
+const sortByDateDesc = (rows, field = "fecha") => [...(rows || [])].sort((a, b) => toDateSortValue(b?.[field]) - toDateSortValue(a?.[field]));
+
 const findParamValue = (parametros, matcher) => {
   const found = (parametros || []).find((param) => matcher(normalizeConcept(param?.concepto || param?.nombre)));
   return toNumeric(found?.valor);
@@ -559,7 +566,7 @@ const buildExcelWebhookPayload = (empleadoId) => ({
 
 const calculateMoneyByDetail = () => {
   ensureParametroCalculo();
-  const rowsIncluidas = (state.detalleCalculo || []).filter((row) => row.incluido !== false);
+  const rowsIncluidas = sortByDateDesc((state.detalleCalculo || []).filter((row) => row.incluido !== false), "fecha");
   const parametros = state.parametrosDetalle || [];
   const uniqueDays = new Set(rowsIncluidas.map((row) => String(row.fecha || "").trim()).filter(Boolean));
   const diasTrabajados = uniqueDays.size || rowsIncluidas.length;
@@ -625,8 +632,8 @@ const buildPayrollRowsFromEditableDetail = () => {
     { tipo: "Horas de apoyo", naturaleza: "Devengo", valor: 0, cantidad: totalApoyoHoras, unidad: "h", fuente: "web" },
     { tipo: "Propinas de apoyo", naturaleza: "Devengo", valor: totalApoyoPropinas, cantidad: apoyosIncluidos.length, unidad: "apoyo(s)", fuente: "web" },
     { tipo: "Auxilio de transporte", naturaleza: "Devengo", valor: calculation.transporteCalculado, cantidad: calculation.transporteCantidad, unidad: calculation.auxMatch, fuente: "web" },
-    ...state.ingresosAuxiliares.map((item) => ({ ...item, naturaleza: "Devengo", fuente: "auxiliar" })),
-    ...state.deduccionesAuxiliares.map((item) => ({ ...item, naturaleza: "Deducción", fuente: "auxiliar" }))
+    ...state.ingresosAuxiliares.map((item) => ({ ...item, valor: toNumeric(item.valor) * (toNumeric(item.cantidad) || 1), naturaleza: "Devengo", fuente: "auxiliar" })),
+    ...state.deduccionesAuxiliares.map((item) => ({ ...item, valor: toNumeric(item.valor) * (toNumeric(item.cantidad) || 1), naturaleza: "Deducción", fuente: "auxiliar" }))
   ];
 };
 
@@ -652,14 +659,14 @@ const normalizeExcelPayrollForUi = (data, empleadoSeleccionado = null) => {
   }));
   state.parametrosCalculo = {};
   state.excelTotales = totales;
-  state.apoyosDetalle = apoyos.map((row, index) => ({
+  state.apoyosDetalle = sortByDateDesc(apoyos, "fecha_turno").map((row, index) => ({
     ...row,
     row_id: row.row_id || `${row.fecha_turno || "apoyo"}-${row.hora_inicio || "inicio"}-${row.hora_fin || "fin"}-${index}`,
     incluido: row.incluido !== false,
     tiempo_minutos: toNumeric(row.tiempo_minutos) || hoursToMinutes(row.tiempo_horas),
     propina: toNumeric(row.propina)
   }));
-  state.detalleCalculo = detalle.map((row, index) => ({
+  state.detalleCalculo = sortByDateDesc(detalle, "fecha").map((row, index) => ({
     ...row,
     row_id: row.row_id || `${row.fecha || "fila"}-${row.hora_inicio || "inicio"}-${row.hora_fin || "fin"}-${index}`,
     incluido: row.incluido !== false,
@@ -719,14 +726,14 @@ const renderApoyos = () => {
 
 const renderAuxiliaresPanel = () => {
   if (!auxiliaresPanel) return;
-  const renderRows = (rows, type) => (rows.length ? rows : [{ tipo: "", valor: 0, cantidad: 1, unidad: "" }]).map((row, index) => `
+  const renderRows = (rows, type) => rows.length ? rows.map((row, index) => `
     <tr data-aux-type="${type}" data-aux-index="${index}">
       <td><input class="nomina-aux-concepto" placeholder="Concepto" value="${escapeHtml(row.tipo || "")}"></td>
       <td><input class="nomina-aux-cantidad" type="number" step="0.01" value="${toNumeric(row.cantidad ?? 1)}"></td>
       <td><input class="nomina-aux-unidad" placeholder="Unidad" value="${escapeHtml(row.unidad || "")}"></td>
       <td><input class="nomina-aux-valor" type="number" step="0.01" value="${toNumeric(row.valor)}"></td>
       <td><button type="button" class="nomina-remove-aux">Eliminar</button></td>
-    </tr>`).join("");
+    </tr>`).join("") : '<tr><td colspan="5" class="nomina-aux-empty">Sin auxiliares. Usa el botón para añadir una fila editable.</td></tr>';
   auxiliaresPanel.innerHTML = `
     <div class="nomina-aux-grid">
       <div><h3>Ingresos auxiliares</h3><p>No se guardan; afectan el comprobante actual.</p><table><thead><tr><th>Concepto</th><th>Cantidad</th><th>Unidad</th><th>Valor</th><th></th></tr></thead><tbody>${renderRows(state.ingresosAuxiliares, "ingreso")}</tbody></table><button type="button" data-add-aux="ingreso">Añadir ingreso auxiliar</button></div>
@@ -1588,7 +1595,7 @@ auxiliaresPanel?.addEventListener("click", (event) => {
   }
 });
 
-auxiliaresPanel?.addEventListener("change", (event) => {
+auxiliaresPanel?.addEventListener("input", (event) => {
   const rowEl = event.target?.closest?.("tr[data-aux-type]");
   if (!rowEl) return;
   const target = rowEl.dataset.auxType === "deduccion" ? state.deduccionesAuxiliares : state.ingresosAuxiliares;

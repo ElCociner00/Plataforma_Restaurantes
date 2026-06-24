@@ -19,6 +19,21 @@ const toggleSecretBtn = document.getElementById("toggleCredibancoSecret");
 const status = document.getElementById("status");
 const getTimestamp = () => new Date().toISOString();
 
+const clearCredentialFields = () => {
+  if (clientIdInput) {
+    clientIdInput.defaultValue = "";
+    clientIdInput.value = "";
+  }
+  if (clientSecretInput) {
+    clientSecretInput.defaultValue = "";
+    clientSecretInput.value = "";
+  }
+};
+
+clearCredentialFields();
+window.addEventListener("pageshow", clearCredentialFields);
+setTimeout(clearCredentialFields, 250);
+
 const setStatus = (message) => {
   if (status) status.textContent = message || "";
 };
