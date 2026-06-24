@@ -223,3 +223,41 @@
   .comprobante-col table { table-layout: fixed; }
   .comprobante-col th, .comprobante-col td { font-size: 0.78rem; padding: 5px; }
 }
+
+.nomina-wide-panel { grid-template-columns: 1fr; }
+.nomina-help { margin: 6px 0 10px; color: #64748b; font-size: 0.86rem; }
+.nomina-web-panel input,
+.nomina-web-panel select,
+.nomina-auxiliares-panel input,
+.nomina-auxiliares-panel select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 5px 7px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  font: inherit;
+}
+.nomina-web-panel input[readonly] { background: #f8fafc; color: #334155; }
+.nomina-parametro-auxiliar td,
+.nomina-parametro-aviso td {
+  background: rgba(251, 146, 60, 0.16);
+  border-color: rgba(249, 115, 22, 0.45);
+}
+.nomina-parametro-aviso td { color: #9a3412; font-weight: 700; font-size: 0.8rem; }
+.nomina-total-row td { background: #e0f2fe; font-weight: 800; }
+.nomina-auxiliares-panel {
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  background: #fff7ed;
+}
+.nomina-aux-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+.nomina-aux-grid h3 { margin: 0 0 4px; }
+.nomina-aux-grid p { margin: 0 0 10px; color: #9a3412; }
+.nomina-aux-grid table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+.nomina-aux-grid th,
+.nomina-aux-grid td { border: 1px solid #fed7aa; padding: 6px; font-size: 0.84rem; }
+.nomina-aux-grid th { background: #ffedd5; }
+@media (max-width: 760px) { .nomina-aux-grid { grid-template-columns: 1fr; } }
