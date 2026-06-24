@@ -76,3 +76,20 @@
   font-size: 13px;
   margin-top: 8px;
 }
+
+.config-emergency-access {
+  margin-top: 18px;
+  padding: 10px 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.88rem;
+}
+.config-emergency-access summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #475569;
+}
+.config-emergency-access p { margin: 8px 0; }
+.config-emergency-access a { color: #334155; font-weight: 700; }
