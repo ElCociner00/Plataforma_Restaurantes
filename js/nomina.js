@@ -56,6 +56,10 @@ const totalDeduccionesTablaEl = document.getElementById("nominaTotalDeduccionesT
 const netoPagarEl = document.getElementById("nominaNetoPagarComprobante");
 const parametrosBody = document.getElementById("nominaParametrosBody");
 const detalleCalculoBody = document.getElementById("nominaDetalleCalculoBody");
+const parametrosTiempoBody = document.getElementById("nominaParametrosTiempoBody");
+const parametrosCalculoBody = document.getElementById("nominaParametrosCalculoBody");
+const detallesCalculosBody = document.getElementById("nominaDetallesCalculosBody");
+const auxiliaresPanel = document.getElementById("nominaAuxiliaresPanel");
 const apoyosBody = document.getElementById("nominaApoyosBody");
 
 const state = {
@@ -70,6 +74,13 @@ const state = {
   detalleCalculo: [],
   apoyosDetalle: [],
   excelTotales: null,
+  parametrosTiempo: [
+    { key: "diurnas", momento: "Diurnas", inicio: "06:00", fin: "18:00" },
+    { key: "nocturnas", momento: "Nocturnas", inicio: "18:00", fin: "24:00" }
+  ],
+  parametrosCalculo: {},
+  ingresosAuxiliares: [],
+  deduccionesAuxiliares: [],
   payrollOverrides: {
     diurnas: { source: "diurnas", multiplier: 1 },
     nocturnas: { source: "nocturnas", multiplier: 1 },
@@ -179,6 +190,93 @@ const normalizeConcept = (value) => String(value || "")
   .replace(/\s+/g, " ")
   .trim()
   .toLowerCase();
+
+
+const escapeHtml = (value) => String(value ?? "")
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;");
+
+const buildTimeOptions = () => {
+  const items = [];
+  for (let minutes = 0; minutes <= 24 * 60; minutes += 5) {
+    const value = minutes === 24 * 60 ? "24:00" : minutesToHourText(minutes);
+    const hour24 = minutes === 24 * 60 ? 24 : Math.floor(minutes / 60);
+    const mm = String(minutes % 60).padStart(2, "0");
+    const suffix = hour24 >= 12 && hour24 < 24 ? "pm" : "am";
+    const hour12 = hour24 === 0 || hour24 === 24 ? 12 : (hour24 > 12 ? hour24 - 12 : hour24);
+    items.push(`<option value="${value}">${hour12}:${mm} ${suffix}</option>`);
+  }
+  return items.join("");
+};
+
+const dateToDayName = (value) => {
+  const date = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return "-";
+  return new Intl.DateTimeFormat("es-CO", { weekday: "long" }).format(date);
+};
+
+const isWeekendPayrollDay = (dayName) => ["sábado", "sabado", "domingo"].includes(normalizeConcept(dayName));
+
+const getTimeParam = (key, fallback) => state.parametrosTiempo.find((item) => item.key === key) || fallback;
+
+const overlapMinutes = (startA, endA, startB, endB) => {
+  const start = Math.max(startA, startB);
+  const end = Math.min(endA, endB);
+  return Math.max(0, end - start);
+};
+
+const calculateWorkedMinutesInRange = (workStart, workEnd, rangeStart, rangeEnd) => {
+  const ranges = rangeEnd <= rangeStart ? [[rangeStart, 1440], [0, rangeEnd]] : [[rangeStart, rangeEnd]];
+  return ranges.reduce((acc, [start, end]) => acc + overlapMinutes(workStart, workEnd, start, end), 0);
+};
+
+const calculateDetalleTimes = (row) => {
+  const workStart = hoursToMinutes(row.hora_inicio);
+  let workEnd = hoursToMinutes(row.hora_fin);
+  if (workEnd < workStart) workEnd += 1440;
+  const dayName = row.dia || dateToDayName(row.fecha);
+  const diurna = getTimeParam("diurnas", { inicio: "06:00", fin: "18:00" });
+  const nocturna = getTimeParam("nocturnas", { inicio: "18:00", fin: "24:00" });
+  const diurnaMinutes = calculateWorkedMinutesInRange(workStart, workEnd, hoursToMinutes(diurna.inicio), hoursToMinutes(diurna.fin));
+  const nocturnaMinutes = calculateWorkedMinutesInRange(workStart, workEnd, hoursToMinutes(nocturna.inicio), hoursToMinutes(nocturna.fin));
+  const weekend = isWeekendPayrollDay(dayName);
+  return {
+    dia: dayName,
+    horas_diurnas: weekend ? "00:00" : minutesToHourText(diurnaMinutes),
+    horas_nocturnas: weekend ? "00:00" : minutesToHourText(nocturnaMinutes),
+    horas_dominicales_diurnas: weekend ? minutesToHourText(diurnaMinutes) : "00:00",
+    horas_dominicales_nocturnas: weekend ? minutesToHourText(nocturnaMinutes) : "00:00"
+  };
+};
+
+const defaultParametroCalculo = (concepto) => {
+  const normalized = normalizeConcept(concepto);
+  if (normalized.includes("auxilio") && normalized.includes("transporte")) return "dia";
+  if (normalized.includes("dominical") && normalized.includes("hora nocturna")) return "horas_dominicales_nocturnas";
+  if (normalized.includes("dominical") && normalized.includes("hora diurna")) return "horas_dominicales_diurnas";
+  if (normalized.includes("hora nocturna")) return "horas_nocturnas";
+  if (normalized.includes("hora diurna")) return "horas_diurnas";
+  return "horas_diurnas";
+};
+
+const ensureParametroCalculo = () => {
+  (state.parametrosDetalle || []).forEach((param, index) => {
+    const key = param.row_id || `${param.concepto || param.nombre || "param"}-${index}`;
+    param.row_id = key;
+    if (!state.parametrosCalculo[key]) state.parametrosCalculo[key] = defaultParametroCalculo(param.concepto || param.nombre);
+  });
+};
+
+const calculateAuxilioQuantity = (match, days) => {
+  const safeDays = Math.max(0, days);
+  if (match === "semana") return safeDays / 7;
+  if (match === "mes") return safeDays / 30;
+  if (match === "trimestre") return safeDays / 90;
+  if (match === "semestre") return safeDays / 180;
+  return safeDays;
+};
 
 const findParamValue = (parametros, matcher) => {
   const found = (parametros || []).find((param) => matcher(normalizeConcept(param?.concepto || param?.nombre)));
@@ -459,58 +557,76 @@ const buildExcelWebhookPayload = (empleadoId) => ({
 });
 
 
-const buildPayrollRowsFromEditableDetail = () => {
-  const detalle = state.detalleCalculo || [];
+const calculateMoneyByDetail = () => {
+  ensureParametroCalculo();
+  const rowsIncluidas = (state.detalleCalculo || []).filter((row) => row.incluido !== false);
   const parametros = state.parametrosDetalle || [];
-  const rowsIncluidas = detalle.filter((row) => row.incluido !== false);
-  const sumField = (field) => rowsIncluidas.reduce((acc, row) => acc + parseHoursToDecimal(row[field]), 0);
-  const sumMoney = (field) => rowsIncluidas.reduce((acc, row) => acc + toNumeric(row[field]), 0);
   const uniqueDays = new Set(rowsIncluidas.map((row) => String(row.fecha || "").trim()).filter(Boolean));
   const diasTrabajados = uniqueDays.size || rowsIncluidas.length;
 
-  const horas = {
-    diurnas: sumField("horas_diurnas"),
-    nocturnas: sumField("horas_nocturnas"),
-    dominicales_diurnas: sumField("horas_dominicales_diurnas"),
-    dominicales_nocturnas: sumField("horas_dominicales_nocturnas")
-  };
-  const tarifas = getPayrollTarifas();
-  const totals = {
-    horas_diurnas: horas.diurnas,
-    horas_nocturnas: horas.nocturnas,
-    horas_dominicales_diurnas: horas.dominicales_diurnas,
-    horas_dominicales_nocturnas: horas.dominicales_nocturnas,
-    valor_diurnas: tarifas.diurnas > 0 ? applyPayrollHourOverride("diurnas", horas) * tarifas.diurnas : sumMoney("valor_diurnas"),
-    valor_nocturnas: tarifas.nocturnas > 0 ? applyPayrollHourOverride("nocturnas", horas) * tarifas.nocturnas : sumMoney("valor_nocturnas"),
-    valor_dominical_diurnas: tarifas.dominicales_diurnas > 0 ? applyPayrollHourOverride("dominicales_diurnas", horas) * tarifas.dominicales_diurnas : sumMoney("valor_dominical_diurnas"),
-    valor_dominical_nocturnas: tarifas.dominicales_nocturnas > 0 ? applyPayrollHourOverride("dominicales_nocturnas", horas) * tarifas.dominicales_nocturnas : sumMoney("valor_dominical_nocturnas")
-  };
+  const detailRows = rowsIncluidas.map((row) => {
+    const calculatedTimes = calculateDetalleTimes(row);
+    const base = { ...row, ...calculatedTimes };
+    const values = { horas_diurnas: 0, horas_nocturnas: 0, horas_dominicales_diurnas: 0, horas_dominicales_nocturnas: 0, total: 0 };
+    parametros.forEach((param) => {
+      const match = state.parametrosCalculo[param.row_id] || defaultParametroCalculo(param.concepto || param.nombre);
+      const unitValue = toNumeric(param.valor);
+      const normalized = normalizeConcept(param.concepto || param.nombre);
+      if (normalized.includes("auxilio") && normalized.includes("transporte")) return;
+      if (!Object.prototype.hasOwnProperty.call(values, match)) return;
+      values[match] += parseHoursToDecimal(base[match]) * unitValue;
+    });
+    values.total = values.horas_diurnas + values.horas_nocturnas + values.horas_dominicales_diurnas + values.horas_dominicales_nocturnas;
+    return { ...base, calculos: values };
+  });
 
-  const auxilioDia = findParamValue(parametros, (concepto) => concepto.includes("auxilio") && concepto.includes("transporte"));
-  const transporteCalculado = auxilioDia > 0 ? auxilioDia * diasTrabajados : toNumeric(state.excelTotales?.transporte);
+  const totals = detailRows.reduce((acc, row) => {
+    acc.horas_diurnas += parseHoursToDecimal(row.horas_diurnas);
+    acc.horas_nocturnas += parseHoursToDecimal(row.horas_nocturnas);
+    acc.horas_dominicales_diurnas += parseHoursToDecimal(row.horas_dominicales_diurnas);
+    acc.horas_dominicales_nocturnas += parseHoursToDecimal(row.horas_dominicales_nocturnas);
+    acc.valor_diurnas += row.calculos.horas_diurnas;
+    acc.valor_nocturnas += row.calculos.horas_nocturnas;
+    acc.valor_dominical_diurnas += row.calculos.horas_dominicales_diurnas;
+    acc.valor_dominical_nocturnas += row.calculos.horas_dominicales_nocturnas;
+    return acc;
+  }, { horas_diurnas: 0, horas_nocturnas: 0, horas_dominicales_diurnas: 0, horas_dominicales_nocturnas: 0, valor_diurnas: 0, valor_nocturnas: 0, valor_dominical_diurnas: 0, valor_dominical_nocturnas: 0 });
+
+  const auxParam = parametros.find((param) => {
+    const normalized = normalizeConcept(param.concepto || param.nombre);
+    return normalized.includes("auxilio") && normalized.includes("transporte");
+  });
+  const auxMatch = auxParam ? (state.parametrosCalculo[auxParam.row_id] || "dia") : "dia";
+  const transporteCantidad = calculateAuxilioQuantity(auxMatch, diasTrabajados);
+  const transporteCalculado = auxParam ? toNumeric(auxParam.valor) * transporteCantidad : toNumeric(state.excelTotales?.transporte);
+
+  return { rows: detailRows, totals, diasTrabajados, transporteCantidad, transporteCalculado, auxMatch };
+};
+
+const buildPayrollRowsFromEditableDetail = () => {
+  const calculation = calculateMoneyByDetail();
   const apoyosIncluidos = (state.apoyosDetalle || []).filter((row) => row.incluido !== false);
   const totalApoyoHoras = apoyosIncluidos.reduce((acc, row) => acc + (toNumeric(row.tiempo_minutos) / 60), 0);
   const totalApoyoPropinas = apoyosIncluidos.reduce((acc, row) => acc + toNumeric(row.propina), 0);
-  const tarifaApoyo = findParamValue(parametros, (concepto) => concepto.includes("extra") && concepto.includes("hora")) ||
-    findParamValue(parametros, (concepto) => concepto.includes("hora diurna") && !concepto.includes("dominical"));
-  const valorApoyos = totalApoyoHoras * tarifaApoyo;
 
   state.horasDetalle = {
-    diurnas: totals.horas_diurnas,
-    nocturnas: totals.horas_nocturnas,
-    dominicales_diurnas: totals.horas_dominicales_diurnas,
-    dominicales_nocturnas: totals.horas_dominicales_nocturnas,
-    total: totals.horas_diurnas + totals.horas_nocturnas + totals.horas_dominicales_diurnas + totals.horas_dominicales_nocturnas
+    diurnas: calculation.totals.horas_diurnas,
+    nocturnas: calculation.totals.horas_nocturnas,
+    dominicales_diurnas: calculation.totals.horas_dominicales_diurnas,
+    dominicales_nocturnas: calculation.totals.horas_dominicales_nocturnas,
+    total: calculation.totals.horas_diurnas + calculation.totals.horas_nocturnas + calculation.totals.horas_dominicales_diurnas + calculation.totals.horas_dominicales_nocturnas
   };
 
   return [
-    { tipo: "Horas diurnas", naturaleza: "Devengo", valor: totals.valor_diurnas, cantidad: totals.horas_diurnas, unidad: "h", fuente: "webhook_excel" },
-    { tipo: "Horas nocturnas", naturaleza: "Devengo", valor: totals.valor_nocturnas, cantidad: totals.horas_nocturnas, unidad: "h", fuente: "webhook_excel" },
-    { tipo: "Dominicales diurnas", naturaleza: "Devengo", valor: totals.valor_dominical_diurnas, cantidad: totals.horas_dominicales_diurnas, unidad: "h", fuente: "webhook_excel" },
-    { tipo: "Dominicales nocturnas", naturaleza: "Devengo", valor: totals.valor_dominical_nocturnas, cantidad: totals.horas_dominicales_nocturnas, unidad: "h", fuente: "webhook_excel" },
-    { tipo: "Horas de apoyo", naturaleza: "Devengo", valor: valorApoyos, cantidad: totalApoyoHoras, unidad: "h", fuente: "webhook_excel" },
-    { tipo: "Propinas de apoyo", naturaleza: "Devengo", valor: totalApoyoPropinas, cantidad: apoyosIncluidos.length, unidad: "apoyo(s)", fuente: "webhook_excel" },
-    { tipo: "Auxilio de transporte", naturaleza: "Devengo", valor: transporteCalculado, cantidad: diasTrabajados, unidad: "día(s)", fuente: "webhook_excel" }
+    { tipo: "Horas diurnas", naturaleza: "Devengo", valor: calculation.totals.valor_diurnas, cantidad: calculation.totals.horas_diurnas, unidad: "h", fuente: "web" },
+    { tipo: "Horas nocturnas", naturaleza: "Devengo", valor: calculation.totals.valor_nocturnas, cantidad: calculation.totals.horas_nocturnas, unidad: "h", fuente: "web" },
+    { tipo: "Dominicales diurnas", naturaleza: "Devengo", valor: calculation.totals.valor_dominical_diurnas, cantidad: calculation.totals.horas_dominicales_diurnas, unidad: "h", fuente: "web" },
+    { tipo: "Dominicales nocturnas", naturaleza: "Devengo", valor: calculation.totals.valor_dominical_nocturnas, cantidad: calculation.totals.horas_dominicales_nocturnas, unidad: "h", fuente: "web" },
+    { tipo: "Horas de apoyo", naturaleza: "Devengo", valor: 0, cantidad: totalApoyoHoras, unidad: "h", fuente: "web" },
+    { tipo: "Propinas de apoyo", naturaleza: "Devengo", valor: totalApoyoPropinas, cantidad: apoyosIncluidos.length, unidad: "apoyo(s)", fuente: "web" },
+    { tipo: "Auxilio de transporte", naturaleza: "Devengo", valor: calculation.transporteCalculado, cantidad: calculation.transporteCantidad, unidad: calculation.auxMatch, fuente: "web" },
+    ...state.ingresosAuxiliares.map((item) => ({ ...item, naturaleza: "Devengo", fuente: "auxiliar" })),
+    ...state.deduccionesAuxiliares.map((item) => ({ ...item, naturaleza: "Deducción", fuente: "auxiliar" }))
   ];
 };
 
@@ -529,7 +645,12 @@ const normalizeExcelPayrollForUi = (data, empleadoSeleccionado = null) => {
   const totales = data?.totales && typeof data.totales === "object" ? data.totales : {};
   const apoyos = Array.isArray(data?.apoyos) ? data.apoyos : [];
 
-  state.parametrosDetalle = parametros;
+  state.parametrosDetalle = parametros.map((param, index) => ({
+    ...param,
+    row_id: param.row_id || `${param.concepto || param.nombre || "param"}-${index}`,
+    valor: toNumeric(param.valor)
+  }));
+  state.parametrosCalculo = {};
   state.excelTotales = totales;
   state.apoyosDetalle = apoyos.map((row, index) => ({
     ...row,
@@ -542,9 +663,11 @@ const normalizeExcelPayrollForUi = (data, empleadoSeleccionado = null) => {
     ...row,
     row_id: row.row_id || `${row.fecha || "fila"}-${row.hora_inicio || "inicio"}-${row.hora_fin || "fin"}-${index}`,
     incluido: row.incluido !== false,
+    dia: row.dia || dateToDayName(row.fecha),
     horas_dominicales_diurnas: row.horas_dominicales_diurnas ?? row.horas_dom_diurnas ?? "00:00",
     horas_dominicales_nocturnas: row.horas_dominicales_nocturnas ?? row.horas_dom_nocturnas ?? "00:00"
   }));
+  ensureParametroCalculo();
 
   state.empleadoDetalle = { nombre: empleadoSeleccionado?.nombre_completo || data?.empleado?.nombre || "-", cargo: empleadoSeleccionado?.rol || data?.empleado?.cargo || "-" };
   state.periodoDetalle = { inicio: data?.periodo?.inicio || fechaInicioInput.value, fin: data?.periodo?.fin || fechaFinInput.value };
@@ -594,51 +717,75 @@ const renderApoyos = () => {
 };
 
 
-const renderPayrollOverrideControls = () => {
-  const panel = document.getElementById("nominaPayrollOverrides");
-  if (!panel) return;
-  const options = PAYROLL_HOUR_FIELDS.map(([field, label]) => `<option value="${field}">${label}</option>`).join("");
-  panel.innerHTML = `
-    <h3>Ajustes manuales de cálculo</h3>
-    <p>Permite probar matches distintos entre horas calculadas y parámetros monetarios sin alterar el webhook ni los parámetros guardados.</p>
-    <div class="nomina-overrides-grid">
-      ${PAYROLL_HOUR_FIELDS.map(([field, label]) => {
-        const override = getPayrollOverride(field);
-        return `<label>${label}
-          <span>Usar horas de</span>
-          <select class="nomina-override-source" data-field="${field}">${options}</select>
-          <span>Multiplicador</span>
-          <input class="nomina-override-multiplier" data-field="${field}" type="number" step="0.01" min="0" value="${override.multiplier}">
-        </label>`;
-      }).join("")}
+const renderAuxiliaresPanel = () => {
+  if (!auxiliaresPanel) return;
+  const renderRows = (rows, type) => (rows.length ? rows : [{ tipo: "", valor: 0, cantidad: 1, unidad: "" }]).map((row, index) => `
+    <tr data-aux-type="${type}" data-aux-index="${index}">
+      <td><input class="nomina-aux-concepto" placeholder="Concepto" value="${escapeHtml(row.tipo || "")}"></td>
+      <td><input class="nomina-aux-cantidad" type="number" step="0.01" value="${toNumeric(row.cantidad ?? 1)}"></td>
+      <td><input class="nomina-aux-unidad" placeholder="Unidad" value="${escapeHtml(row.unidad || "")}"></td>
+      <td><input class="nomina-aux-valor" type="number" step="0.01" value="${toNumeric(row.valor)}"></td>
+      <td><button type="button" class="nomina-remove-aux">Eliminar</button></td>
+    </tr>`).join("");
+  auxiliaresPanel.innerHTML = `
+    <div class="nomina-aux-grid">
+      <div><h3>Ingresos auxiliares</h3><p>No se guardan; afectan el comprobante actual.</p><table><thead><tr><th>Concepto</th><th>Cantidad</th><th>Unidad</th><th>Valor</th><th></th></tr></thead><tbody>${renderRows(state.ingresosAuxiliares, "ingreso")}</tbody></table><button type="button" data-add-aux="ingreso">Añadir ingreso auxiliar</button></div>
+      <div><h3>Deducciones auxiliares</h3><p>No se guardan; descuentan del neto actual.</p><table><thead><tr><th>Concepto</th><th>Cantidad</th><th>Unidad</th><th>Valor</th><th></th></tr></thead><tbody>${renderRows(state.deduccionesAuxiliares, "deduccion")}</tbody></table><button type="button" data-add-aux="deduccion">Añadir deducción auxiliar</button></div>
     </div>`;
-  panel.querySelectorAll(".nomina-override-source").forEach((select) => {
-    select.value = getPayrollOverride(select.dataset.field).source;
-  });
 };
 
 const renderParametrosYDetalle = () => {
-  renderPayrollOverrideControls();
+  ensureParametroCalculo();
+  renderAuxiliaresPanel();
+  const timeOptions = buildTimeOptions();
   if (parametrosBody) {
-    parametrosBody.innerHTML = (state.parametrosDetalle.length ? state.parametrosDetalle : [{ concepto: "Sin parámetros", valor: 0, unidad: "-" }])
-      .map((param) => `<tr><td>${param.concepto || param.nombre || "-"}</td><td>${param.valorFormateado || fmtMoney(toNumeric(param.valor))}</td><td>${param.unidad || (normalizeConcept(param.concepto).includes("dia") ? "día" : "hora")}</td></tr>`).join("");
+    parametrosBody.innerHTML = (state.parametrosDetalle.length ? state.parametrosDetalle : [{ concepto: "Sin parámetros", valor: 0, unidad: "-", row_id: "empty" }])
+      .map((param, index) => {
+        const isAux = param.auxiliar === true;
+        return `<tr data-param-index="${index}" class="${isAux ? "nomina-parametro-auxiliar" : ""}">
+          <td><input class="nomina-param-concepto" value="${escapeHtml(param.concepto || param.nombre || "-")}" ${isAux ? "" : "readonly"}></td>
+          <td><input class="nomina-param-valor" type="number" step="0.01" value="${toNumeric(param.valor)}"></td>
+          <td><input class="nomina-param-unidad" value="${escapeHtml(param.unidad || (normalizeConcept(param.concepto).includes("dia") ? "día" : "hora"))}"></td>
+          <td>${isAux ? '<button type="button" class="nomina-remove-param">Eliminar</button>' : '-'}</td>
+        </tr>${isAux ? '<tr class="nomina-parametro-aviso"><td colspan="4">los parámetros auxiliares no se guardan y la próxima vez que quieras usarlo tendrás que añadirlo manualmente denuevo</td></tr>' : ''}`;
+      }).join("");
+  }
+  if (parametrosTiempoBody) {
+    parametrosTiempoBody.innerHTML = state.parametrosTiempo.map((row, index) => `<tr data-time-index="${index}"><td>${row.momento}</td><td><select class="nomina-time-start">${timeOptions}</select></td><td><select class="nomina-time-end">${timeOptions}</select></td></tr>`).join("");
+    parametrosTiempoBody.querySelectorAll("tr[data-time-index]").forEach((tr) => {
+      const row = state.parametrosTiempo[Number(tr.dataset.timeIndex)];
+      tr.querySelector(".nomina-time-start").value = row.inicio;
+      tr.querySelector(".nomina-time-end").value = row.fin;
+    });
   }
   if (detalleCalculoBody) {
-    detalleCalculoBody.innerHTML = (state.detalleCalculo.length ? state.detalleCalculo : [{ fecha: "-", hora_inicio: "-", hora_fin: "-", horas_diurnas: 0, horas_nocturnas: 0, horas_dominicales_diurnas: 0, horas_dominicales_nocturnas: 0 }])
+    detalleCalculoBody.innerHTML = (state.detalleCalculo.length ? state.detalleCalculo : [{ fecha: "-", hora_inicio: "-", hora_fin: "-" }])
       .map((row, index) => {
-        const totalFila = calculateDetalleRowValue(row);
+        const calculated = calculateDetalleTimes(row);
         const disabled = state.detalleCalculo.length ? "" : "disabled";
         return `<tr data-detail-index="${index}" class="${row.incluido === false ? "nomina-row-descartada" : ""}">
-          <td><input type="checkbox" class="nomina-detalle-validar" ${row.incluido !== false ? "checked" : ""} ${disabled} aria-label="Validar fila ${row.fecha || index + 1}"></td>
-          <td>${row.fecha || "-"}</td>
-          <td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}</td>
-          <td><input class="nomina-detalle-horas" data-field="horas_diurnas" value="${row.horas_diurnas || "00:00"}" ${disabled}></td>
-          <td><input class="nomina-detalle-horas" data-field="horas_nocturnas" value="${row.horas_nocturnas || "00:00"}" ${disabled}></td>
-          <td><input class="nomina-detalle-horas" data-field="horas_dominicales_diurnas" value="${row.horas_dominicales_diurnas || "00:00"}" ${disabled}></td>
-          <td><input class="nomina-detalle-horas" data-field="horas_dominicales_nocturnas" value="${row.horas_dominicales_nocturnas || "00:00"}" ${disabled}></td>
-          <td>${fmtMoney(totalFila)}</td>
+          <td><input type="checkbox" class="nomina-detalle-validar" ${row.incluido !== false ? "checked" : ""} ${disabled}></td>
+          <td>${row.fecha || "-"}</td><td>${calculated.dia}</td><td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}</td>
+          <td>${calculated.horas_diurnas}</td><td>${calculated.horas_nocturnas}</td><td>${calculated.horas_dominicales_diurnas}</td><td>${calculated.horas_dominicales_nocturnas}</td>
         </tr>`;
       }).join("");
+  }
+  if (parametrosCalculoBody) {
+    const detailOptions = '<option value="horas_diurnas">Diurnas</option><option value="horas_nocturnas">Nocturnas</option><option value="horas_dominicales_diurnas">Dom. diurnas</option><option value="horas_dominicales_nocturnas">Dom. nocturnas</option>';
+    const periodOptions = '<option value="dia">día</option><option value="semana">semana</option><option value="mes">mes</option><option value="trimestre">trimestre</option><option value="semestre">semestre</option>';
+    parametrosCalculoBody.innerHTML = (state.parametrosDetalle || []).map((param) => {
+      const normalized = normalizeConcept(param.concepto || param.nombre);
+      const options = normalized.includes("auxilio") && normalized.includes("transporte") ? periodOptions : detailOptions;
+      return `<tr data-calc-param="${param.row_id}"><td>${escapeHtml(param.concepto || param.nombre || "-")}</td><td><select class="nomina-calc-match">${options}</select></td></tr>`;
+    }).join("");
+    parametrosCalculoBody.querySelectorAll("tr[data-calc-param]").forEach((tr) => { tr.querySelector("select").value = state.parametrosCalculo[tr.dataset.calcParam] || "horas_diurnas"; });
+  }
+  if (detallesCalculosBody) {
+    const calculation = calculateMoneyByDetail();
+    const rows = calculation.rows.map((row) => `<tr><td>${row.fecha || "-"}</td><td>${row.dia || "-"}</td><td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}</td><td>${fmtMoney(row.calculos.horas_diurnas)}</td><td>${fmtMoney(row.calculos.horas_nocturnas)}</td><td>${fmtMoney(row.calculos.horas_dominicales_diurnas)}</td><td>${fmtMoney(row.calculos.horas_dominicales_nocturnas)}</td><td>${fmtMoney(row.calculos.total)}</td></tr>`);
+    const total = calculation.rows.reduce((acc, row) => acc + row.calculos.total, 0);
+    rows.push(`<tr class="nomina-total-row"><td colspan="7">Total</td><td>${fmtMoney(total)}</td></tr>`);
+    detallesCalculosBody.innerHTML = rows.join("");
   }
 };
 const renderComprobanteHeader = (empleado) => {
@@ -1226,6 +1373,53 @@ const descargarExcelEmpleado = async () => {
     setStatus(`Excel de nómina generado con ${detalleCount} filas de detalle y 4 tablas.`);
   };
 
+  const buildCurrentCalculatedData = () => {
+    const calculation = calculateMoneyByDetail();
+    const detalle = calculation.rows.map((row) => ({
+      responsable: empleadoId,
+      dia: row.dia,
+      fecha: row.fecha,
+      hora_inicio: row.hora_inicio,
+      hora_fin: row.hora_fin,
+      horas_totales: row.horas_totales,
+      horas_diurnas: row.horas_diurnas,
+      horas_nocturnas: row.horas_nocturnas,
+      horas_dominicales_diurnas: row.horas_dominicales_diurnas,
+      horas_dominicales_nocturnas: row.horas_dominicales_nocturnas,
+      valor_diurnas: row.calculos.horas_diurnas,
+      valor_nocturnas: row.calculos.horas_nocturnas,
+      valor_dominical_diurnas: row.calculos.horas_dominicales_diurnas,
+      valor_dominical_nocturnas: row.calculos.horas_dominicales_nocturnas
+    }));
+    const totalHoras = calculation.totals.valor_diurnas + calculation.totals.valor_nocturnas + calculation.totals.valor_dominical_diurnas + calculation.totals.valor_dominical_nocturnas;
+    return {
+      parametros: state.parametrosDetalle,
+      detalle,
+      apoyos: state.apoyosDetalle,
+      resumen: {
+        total_diurnas: calculation.totals.valor_diurnas,
+        total_nocturnas: calculation.totals.valor_nocturnas,
+        total_dominical_diurnas: calculation.totals.valor_dominical_diurnas,
+        total_dominical_nocturnas: calculation.totals.valor_dominical_nocturnas
+      },
+      totales: {
+        dias_trabajados: calculation.diasTrabajados,
+        horas_trabajadas: state.horasDetalle?.total,
+        horas_trabajadas_formato: fmtHours(state.horasDetalle?.total),
+        valor_horas: totalHoras,
+        transporte: calculation.transporteCalculado,
+        total_general: totalHoras + calculation.transporteCalculado
+      },
+      metadata: { total_filas_procesadas: detalle.length, fecha_proceso: new Date().toISOString(), fuente: "interfaz_web" }
+    };
+  };
+
+  if (state.detalleCalculo.length) {
+    const currentData = buildCurrentCalculatedData();
+    triggerExcelDownload(buildExcelHtml(currentData), currentData.detalle.length);
+    return;
+  }
+
   setStatus("Solicitando nómina calculada del empleado...");
   try {
     const authHeaders = await buildRequestHeaders({ includeTenant: true });
@@ -1332,6 +1526,79 @@ document.getElementById("nominaPayrollOverrides")?.addEventListener("change", (e
   if (event.target.classList.contains("nomina-override-source")) state.payrollOverrides[field].source = event.target.value;
   if (event.target.classList.contains("nomina-override-multiplier")) state.payrollOverrides[field].multiplier = Math.max(0, toNumeric(event.target.value) || 0);
   if (state.detalleCalculo.length) recalculatePayrollFromEditableDetail();
+});
+
+
+parametrosBody?.addEventListener("change", (event) => {
+  const rowEl = event.target?.closest?.("tr[data-param-index]");
+  if (!rowEl) return;
+  const param = state.parametrosDetalle[Number(rowEl.dataset.paramIndex)];
+  if (!param) return;
+  if (event.target.classList.contains("nomina-param-concepto")) param.concepto = event.target.value;
+  if (event.target.classList.contains("nomina-param-valor")) param.valor = toNumeric(event.target.value);
+  if (event.target.classList.contains("nomina-param-unidad")) param.unidad = event.target.value;
+  if (state.detalleCalculo.length) recalculatePayrollFromEditableDetail();
+});
+
+document.getElementById("nominaAddParametroAux")?.addEventListener("click", () => {
+  const index = state.parametrosDetalle.length;
+  state.parametrosDetalle.push({ row_id: `auxiliar-${Date.now()}`, concepto: "Parámetro auxiliar", valor: 0, unidad: "unidad", auxiliar: true });
+  ensureParametroCalculo();
+  renderMovimientos();
+});
+
+parametrosBody?.addEventListener("click", (event) => {
+  if (event.target?.classList?.contains("nomina-remove-param")) {
+    const rowEl = event.target.closest("tr[data-param-index]");
+    const index = Number(rowEl?.dataset?.paramIndex);
+    if (state.parametrosDetalle[index]?.auxiliar) state.parametrosDetalle.splice(index, 1);
+    renderMovimientos();
+  }
+});
+
+parametrosTiempoBody?.addEventListener("change", (event) => {
+  const rowEl = event.target?.closest?.("tr[data-time-index]");
+  const row = state.parametrosTiempo[Number(rowEl?.dataset?.timeIndex)];
+  if (!row) return;
+  if (event.target.classList.contains("nomina-time-start")) row.inicio = event.target.value;
+  if (event.target.classList.contains("nomina-time-end")) row.fin = event.target.value;
+  if (state.detalleCalculo.length) recalculatePayrollFromEditableDetail();
+});
+
+parametrosCalculoBody?.addEventListener("change", (event) => {
+  const rowEl = event.target?.closest?.("tr[data-calc-param]");
+  if (!rowEl || !event.target.classList.contains("nomina-calc-match")) return;
+  state.parametrosCalculo[rowEl.dataset.calcParam] = event.target.value;
+  if (state.detalleCalculo.length) recalculatePayrollFromEditableDetail();
+});
+
+auxiliaresPanel?.addEventListener("click", (event) => {
+  const addType = event.target?.dataset?.addAux;
+  if (addType) {
+    const target = addType === "deduccion" ? state.deduccionesAuxiliares : state.ingresosAuxiliares;
+    target.push({ tipo: addType === "deduccion" ? "Deducción auxiliar" : "Ingreso auxiliar", cantidad: 1, unidad: "unidad", valor: 0 });
+    recalculatePayrollFromEditableDetail();
+    return;
+  }
+  if (event.target?.classList?.contains("nomina-remove-aux")) {
+    const rowEl = event.target.closest("tr[data-aux-type]");
+    const target = rowEl.dataset.auxType === "deduccion" ? state.deduccionesAuxiliares : state.ingresosAuxiliares;
+    target.splice(Number(rowEl.dataset.auxIndex), 1);
+    recalculatePayrollFromEditableDetail();
+  }
+});
+
+auxiliaresPanel?.addEventListener("change", (event) => {
+  const rowEl = event.target?.closest?.("tr[data-aux-type]");
+  if (!rowEl) return;
+  const target = rowEl.dataset.auxType === "deduccion" ? state.deduccionesAuxiliares : state.ingresosAuxiliares;
+  const row = target[Number(rowEl.dataset.auxIndex)];
+  if (!row) return;
+  if (event.target.classList.contains("nomina-aux-concepto")) row.tipo = event.target.value;
+  if (event.target.classList.contains("nomina-aux-cantidad")) row.cantidad = toNumeric(event.target.value);
+  if (event.target.classList.contains("nomina-aux-unidad")) row.unidad = event.target.value;
+  if (event.target.classList.contains("nomina-aux-valor")) row.valor = toNumeric(event.target.value);
+  recalculatePayrollFromEditableDetail();
 });
 
 init();

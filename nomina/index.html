@@ -92,26 +92,58 @@
           </div>
         </div>
 
-        <div id="nominaPayrollOverrides" class="nomina-payroll-overrides" aria-live="polite"></div>
+        <div id="nominaAuxiliaresPanel" class="nomina-auxiliares-panel" aria-live="polite"></div>
 
         <div class="comprobante-table nomina-web-panel">
           <div class="comprobante-col">
-            <h3>Parámetros usados</h3>
+            <h3>Parámetros</h3>
             <table>
-              <thead><tr><th>Concepto</th><th>Valor</th><th>Unidad</th></tr></thead>
+              <thead><tr><th>Concepto</th><th>Valor</th><th>Unidad</th><th>Acción</th></tr></thead>
               <tbody id="nominaParametrosBody"></tbody>
+              <tfoot><tr><td colspan="4"><button type="button" id="nominaAddParametroAux">Añadir parámetro auxiliar</button></td></tr></tfoot>
             </table>
           </div>
           <div class="comprobante-col">
-            <h3>Detalle calculado</h3>
+            <h3>Parámetros tiempo</h3>
             <table>
-              <thead><tr><th>Validar</th><th>Fecha</th><th>Horario</th><th>Diurnas</th><th>Nocturnas</th><th>Dom. diurnas</th><th>Dom. nocturnas</th><th>Valor fila</th></tr></thead>
+              <thead><tr><th>Momento</th><th>Inicio</th><th>Fin</th></tr></thead>
+              <tbody id="nominaParametrosTiempoBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="comprobante-table nomina-web-panel nomina-wide-panel">
+          <div class="comprobante-col">
+            <h3>Detalles</h3>
+            <table>
+              <thead><tr><th>Validar</th><th>Fecha</th><th>Día</th><th>Horario</th><th>Diurnas</th><th>Nocturnas</th><th>Dom. diurnas</th><th>Dom. nocturnas</th></tr></thead>
               <tbody id="nominaDetalleCalculoBody"></tbody>
             </table>
           </div>
         </div>
 
-        <div class="comprobante-table nomina-apoyos-panel">
+        <div class="comprobante-table nomina-web-panel nomina-wide-panel">
+          <div class="comprobante-col">
+            <h3>Parámetros cálculo</h3>
+            <p class="nomina-help">Relaciona cada parámetro monetario con la columna de tiempo usada para calcular ingresos. Los cambios son temporales.</p>
+            <table>
+              <thead><tr><th>Parámetro nómina</th><th>Tiempo</th></tr></thead>
+              <tbody id="nominaParametrosCalculoBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="comprobante-table nomina-web-panel nomina-wide-panel">
+          <div class="comprobante-col">
+            <h3>Detalles cálculos</h3>
+            <table>
+              <thead><tr><th>Fecha</th><th>Día</th><th>Horario</th><th>Diurnas</th><th>Nocturnas</th><th>Dom. diurnas</th><th>Dom. nocturnas</th><th>Total</th></tr></thead>
+              <tbody id="nominaDetallesCalculosBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="comprobante-table nomina-apoyos-panel nomina-wide-panel">
           <div class="comprobante-col">
             <h3>Apoyos</h3>
             <table>
