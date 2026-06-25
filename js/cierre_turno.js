@@ -409,6 +409,25 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  const firstPresentValue = (source, keys, fallback = 0) => {
+    if (!source || typeof source !== "object") return fallback;
+    for (const key of keys) {
+      if (source[key] !== undefined && source[key] !== null && source[key] !== "") return source[key];
+    }
+    return fallback;
+  };
+
+  const resolveTransferenciasSistema = (data) => firstPresentValue(data, [
+    "transferencias_sistema",
+    "transferencias_total",
+    "transferencia_sistema",
+    "transferencia_total",
+    "transferencias_bancolombia_total",
+    "transferencias_bancolombia_valor",
+    "bancolombia_total",
+    "bancolombia_valor"
+  ], 0);
+
   const normalizeExtras = (raw) => {
     if (!raw) return [];
 
@@ -1337,7 +1356,7 @@ document.addEventListener("DOMContentLoaded", () => {
       inputsFinanzas.datafono.sistema.value = data.datafono_sistema ?? "";
       inputsFinanzas.rappi.sistema.value = data.rappi_sistema ?? "";
       inputsFinanzas.nequi.sistema.value = data.nequi_sistema ?? "";
-      inputsFinanzas.transferencias.sistema.value = data.transferencias_sistema ?? "";
+      inputsFinanzas.transferencias.sistema.value = resolveTransferenciasSistema(data);
       inputsFinanzas.bono_regalo.sistema.value = data.bono_regalo_sistema ?? "";
       inputsSoloVista.propina.value = data.propina ?? "";
       apoyosPropinaManager?.reset?.();
