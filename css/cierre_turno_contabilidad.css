@@ -1,0 +1,43 @@
+.cierre-money-visual-wrap {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+.cierre-money-visual-wrap > input {
+  color: transparent;
+  caret-color: #111827;
+}
+
+.cierre-money-visual-wrap > input::placeholder {
+  color: transparent;
+}
+
+.cierre-money-visual-wrap > input:disabled {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.cierre-money-visual-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  color: #111827;
+  font: inherit;
+  line-height: normal;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cierre-money-visual-wrap > input:focus + .cierre-money-visual-value {
+  color: #111827;
+}
+
+.cierre-money-visual-wrap > input[readonly] + .cierre-money-visual-value,
+.cierre-money-visual-wrap > input:disabled + .cierre-money-visual-value {
+  color: #374151;
+}

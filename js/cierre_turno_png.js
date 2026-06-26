@@ -104,6 +104,7 @@ export const descargarImagenResumenCierreTurno = ({
 
   // Obtener propina del responsable (primer apoyo o valor separado)
   const propinaResponsable = snapshotContext.inputsSoloVista?.propina?.value || "0";
+  const comentarioUsuario = String(meta.comentarioUsuario || "").trim() || "Sin comentario del usuario.";
   
   // Agregar responsable a la lista de apoyos con su propina
   const responsableRow = {
@@ -124,7 +125,8 @@ export const descargarImagenResumenCierreTurno = ({
   const tableX = cardX + 32;
   const tableW = cardW - 64;
   const rowH = 42;
-  const baseContentHeight = 260 + 34 + 14 + rowH + (finanzas.length * rowH) + 40 + 16 + 14 + rowH + 26 + 30 + 20 + (totales.length * rowH);
+  const comentarioSectionHeight = 132;
+  const baseContentHeight = 260 + 34 + 14 + rowH + (finanzas.length * rowH) + 40 + 16 + 14 + rowH + 26 + 30 + 20 + (totales.length * rowH) + comentarioSectionHeight;
 
   const getRequiredPageHeight = (pageApoyos = [], isApoyoContinuation = false) => {
     const apoyoRowsCount = Math.max(pageApoyos.length, 1);
@@ -343,6 +345,38 @@ export const descargarImagenResumenCierreTurno = ({
       drawTotal(gastoY, label, formatCOP(value), idx === totales.length - 1);
       gastoY += rowH;
     });
+
+    const drawWrappedText = (text, x, startY, maxWidth, lineHeight, maxLines) => {
+      const words = String(text || "").split(/\s+/).filter(Boolean);
+      const lines = [];
+      let line = "";
+      words.forEach((word) => {
+        const testLine = line ? `${line} ${word}` : word;
+        if (ctx.measureText(testLine).width <= maxWidth) {
+          line = testLine;
+          return;
+        }
+        if (line) lines.push(line);
+        line = word;
+      });
+      if (line) lines.push(line);
+      const visibleLines = lines.slice(0, maxLines);
+      if (lines.length > maxLines && visibleLines.length) {
+        visibleLines[visibleLines.length - 1] = `${visibleLines[visibleLines.length - 1].replace(/…$/, "")}…`;
+      }
+      visibleLines.forEach((item, index) => ctx.fillText(item, x, startY + (index * lineHeight)));
+      return visibleLines.length * lineHeight;
+    };
+
+    gastoY += 24;
+    ctx.fillStyle = "#5b21b6";
+    ctx.font = "bold 26px Arial";
+    ctx.fillText("Comentario del usuario", cardX + 36, gastoY);
+    gastoY += 34;
+    ctx.fillStyle = "#27272a";
+    ctx.font = "20px Arial";
+    drawWrappedText(comentarioUsuario, tableX, gastoY, tableW - 20, 26, 3);
+    gastoY += 74;
 
     if (isApoyoContinuation || pageApoyos.length) {
       let apoyoY = gastoY + 26;

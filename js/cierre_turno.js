@@ -1267,7 +1267,8 @@ document.addEventListener("DOMContentLoaded", () => {
       empresaNombre: nombreEmpresaActual || "Empresa",
       efectivoApertura: efectivoApertura?.value || 0,
       bolsa: bolsa?.value || 0,
-      caja: caja?.value || 0
+      caja: caja?.value || 0,
+      comentarioUsuario: comentarios?.value || ""
     };
 
     const ok = descargarImagenResumenCierreTurno({
