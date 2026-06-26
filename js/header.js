@@ -217,7 +217,6 @@ function buildMenu({ context, environmentForMenu, localContexts = [] }) {
         <button type="button" class="nav-dropdown-toggle">Cierre de turno</button>
         <div class="nav-dropdown-menu">
           <a href="${APP_URLS.cierreTurno}">Cierre turno</a>
-          <a href="${APP_URLS.cierreTurnoAuxiliar}">Auxiliar</a>
           <a href="${APP_URLS.historicoCierreTurno}">Histórico</a>
         </div>
       </div>

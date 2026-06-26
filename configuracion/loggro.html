@@ -27,14 +27,14 @@
       <div class="campo">
         <label for="loggroEmail">Correo de Loggro</label>
         <p class="ayuda">Ingresa el correo con el que inicias sesión en Loggro.</p>
-        <input id="loggroEmail" type="email" required autocomplete="email">
+        <input id="loggroEmail" name="loggro_email_no_autofill" type="email" required autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="">
       </div>
 
       <div class="campo">
         <label for="loggroPassword">Contraseña de Loggro</label>
         <p class="ayuda">Ingresa la contraseña con la que inicias sesión en Loggro.</p>
         <div class="password-wrap">
-          <input id="loggroPassword" type="password" required autocomplete="current-password">
+          <input id="loggroPassword" name="loggro_password_no_autofill" type="password" required autocomplete="new-password" autocapitalize="off" spellcheck="false" data-lpignore="true" value="">
           <button type="button" id="toggleLoggroPassword" class="btn-ojito" aria-label="Mostrar contraseña">👁</button>
         </div>
       </div>

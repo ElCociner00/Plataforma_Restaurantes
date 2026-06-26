@@ -8,6 +8,8 @@ const retryBtn = document.getElementById("localPreselectorRetry");
 
 const MAX_ATTEMPTS = 6;
 const RETRY_DELAY_MS = 1200;
+const PENDING_REDIRECT_KEY = "plataforma_local_context_pending_redirect_v1";
+const CONFIRMED_PATH_KEY = "plataforma_local_context_confirmed_path_v1";
 
 const setStatus = (message) => {
   if (statusEl) statusEl.textContent = message || "";
@@ -15,7 +17,27 @@ const setStatus = (message) => {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function consumePendingRedirect() {
+  const pending = sessionStorage.getItem(PENDING_REDIRECT_KEY) || "";
+  sessionStorage.removeItem(PENDING_REDIRECT_KEY);
+  if (!pending) return "";
+  try {
+    const url = new URL(pending, window.location.origin);
+    if (url.origin !== window.location.origin) return "";
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch (_error) {
+    return "";
+  }
+}
+
 async function redirectToApp() {
+  const pendingTarget = consumePendingRedirect();
+  if (pendingTarget) {
+    sessionStorage.setItem(CONFIRMED_PATH_KEY, pendingTarget);
+    window.location.href = pendingTarget;
+    return;
+  }
+
   const target = await resolvePostLoginRoute().catch(() => "../dashboard/");
   window.location.href = target || "../dashboard/";
 }
