@@ -31,11 +31,30 @@ const currencyFormatter = new Intl.NumberFormat("es-CO", {
 function parseMoneyValue(value) {
   const raw = String(value ?? "").trim();
   if (!raw) return null;
-  const normalized = raw
-    .replace(/[^0-9,.-]/g, "")
-    .replace(/\.(?=\d{3}(\D|$))/g, "")
-    .replace(",", ".");
-  const amount = Number(normalized);
+
+  const cleaned = raw.replace(/[^0-9,.-]/g, "");
+  if (!cleaned || cleaned === "-" || cleaned === "." || cleaned === ",") return null;
+
+  const sign = cleaned.trim().startsWith("-") ? "-" : "";
+  const unsigned = cleaned.replace(/-/g, "");
+  const lastDot = unsigned.lastIndexOf(".");
+  const lastComma = unsigned.lastIndexOf(",");
+  let normalized = unsigned;
+
+  if (lastDot >= 0 && lastComma >= 0) {
+    const decimalSeparator = lastDot > lastComma ? "." : ",";
+    const thousandsSeparator = decimalSeparator === "." ? "," : ".";
+    normalized = unsigned.split(thousandsSeparator).join("");
+    if (decimalSeparator === ",") normalized = normalized.replace(/,/g, ".");
+  } else if (lastComma >= 0) {
+    normalized = unsigned.replace(/\./g, "").replace(/,/g, ".");
+  } else if (lastDot >= 0) {
+    normalized = unsigned.replace(/,/g, "");
+  } else {
+    normalized = unsigned;
+  }
+
+  const amount = Number(`${sign}${normalized}`);
   return Number.isFinite(amount) ? amount : null;
 }
 
