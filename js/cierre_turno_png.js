@@ -1,3 +1,22 @@
+const toPngNumber = (value) => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (value === null || value === undefined) return 0;
+  let text = String(value).trim();
+  if (!text) return 0;
+  const hasComma = text.includes(",");
+  const hasDot = text.includes(".");
+  text = text.replace(/\$/g, "").replace(/\s+/g, "");
+  if (hasComma && hasDot) {
+    text = text.lastIndexOf(",") > text.lastIndexOf(".")
+      ? text.replace(/\./g, "").replace(",", ".")
+      : text.replace(/,/g, "");
+  } else if (hasComma && !hasDot) {
+    text = text.replace(/\./g, "").replace(/,/g, ".");
+  }
+  const parsed = Number(text.replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 /**
  * MAPA DE MANTENIMIENTO (guía rápida para cambios manuales)
  * Archivo: js/cierre_turno_png.js
@@ -21,7 +40,8 @@
  * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
  */
 const getSnapshotRows = ({
-  snapshotContext
+  snapshotContext,
+  meta = {}
 }) => {
   const {
     inputsFinanzas,
@@ -59,13 +79,16 @@ const getSnapshotRows = ({
   const totalSistema = getTotalIngresosSistema();
   const totalReal = getTotalIngresosReales();
   const totalGastos = getTotalGastosExtras();
-  const ventaBruta = totalReal;
-  const ventaNeta = totalReal - totalGastos;
-  const diferenciaGeneral = totalReal - totalSistema;
+  const efectivoApertura = toPngNumber(meta.efectivoApertura);
+  const totalVentasSinApertura = totalReal - efectivoApertura;
+  const totalSistemaSinApertura = totalSistema - efectivoApertura;
+  const ventaBruta = totalVentasSinApertura;
+  const ventaNeta = totalVentasSinApertura - totalGastos;
+  const diferenciaGeneral = totalVentasSinApertura - totalSistemaSinApertura;
 
   const totales = [
     ["Total ingresos sistema", totalSistema],
-    ["Total ventas", totalReal],
+    ["Total ventas (sin efectivo apertura)", totalVentasSinApertura],
     ["Total gastos", totalGastos],
     ["Venta bruta (sin gastos)", ventaBruta],
     ["Venta neta (después de gastos)", ventaNeta],
@@ -87,7 +110,7 @@ const getSnapshotRows = ({
     };
   });
 
-  return { finanzas, gastos, totales, apoyos };
+  return { finanzas, gastos, totales, apoyos, totalVentasSinApertura };
 };
 
 export const descargarImagenResumenCierreTurno = ({
@@ -96,7 +119,7 @@ export const descargarImagenResumenCierreTurno = ({
   formatCOP,
   setStatus
 }) => {
-  const { finanzas, gastos, totales, apoyos } = getSnapshotRows({ snapshotContext });
+  const { finanzas, gastos, totales, apoyos, totalVentasSinApertura } = getSnapshotRows({ snapshotContext, meta });
 
   const marcaAxioma = "AXIOMA by Global Nexo Shop";
   const fechaExpedicion = new Date().toLocaleDateString("es-CO");
@@ -213,7 +236,7 @@ export const descargarImagenResumenCierreTurno = ({
     ctx.fillText("Total ventas (sin efectivo apertura):", tableX + 10, startY);
     ctx.fillStyle = "#9b4d96";
     ctx.font = "bold 26px Arial";
-    ctx.fillText(formatCOP(snapshotContext.getTotalIngresosReales()), tableX + 470, startY);
+    ctx.fillText(formatCOP(totalVentasSinApertura), tableX + 470, startY);
     startY += spacing + 20;
     
     return startY;
