@@ -251,6 +251,22 @@ const calculateDetalleTimes = (row) => {
   };
 };
 
+
+const PAYROLL_DETAIL_FIELDS = [
+  ["horas_diurnas", "Diurnas"],
+  ["horas_nocturnas", "Nocturnas"],
+  ["horas_dominicales_diurnas", "Dom. diurnas"],
+  ["horas_dominicales_nocturnas", "Dom. nocturnas"]
+];
+
+const getDetalleEditableValue = (row, field, calculatedTimes = null) => {
+  const validField = `${field}_validas`;
+  const rawValue = row?.[validField];
+  if (rawValue !== null && rawValue !== undefined && String(rawValue).trim() !== "") return rawValue;
+  const calculated = calculatedTimes || calculateDetalleTimes(row || {});
+  return calculated[field] || "00:00";
+};
+
 const defaultParametroCalculo = (concepto) => {
   const normalized = normalizeConcept(concepto);
   if (normalized.includes("auxilio") && normalized.includes("transporte")) return "dia";
@@ -573,7 +589,11 @@ const calculateMoneyByDetail = () => {
 
   const detailRows = rowsIncluidas.map((row) => {
     const calculatedTimes = calculateDetalleTimes(row);
-    const base = { ...row, ...calculatedTimes };
+    const effectiveTimes = PAYROLL_DETAIL_FIELDS.reduce((acc, [field]) => {
+      acc[field] = getDetalleEditableValue(row, field, calculatedTimes);
+      return acc;
+    }, {});
+    const base = { ...row, ...calculatedTimes, ...effectiveTimes };
     const values = { horas_diurnas: 0, horas_nocturnas: 0, horas_dominicales_diurnas: 0, horas_dominicales_nocturnas: 0, total: 0 };
     parametros.forEach((param) => {
       const match = state.parametrosCalculo[param.row_id] || defaultParametroCalculo(param.concepto || param.nombre);
@@ -770,10 +790,14 @@ const renderParametrosYDetalle = () => {
       .map((row, index) => {
         const calculated = calculateDetalleTimes(row);
         const disabled = state.detalleCalculo.length ? "" : "disabled";
+        const editableCells = PAYROLL_DETAIL_FIELDS.map(([field, label]) => {
+          const value = getDetalleEditableValue(row, field, calculated);
+          return `<td><input class="nomina-detalle-horas" data-field="${field}_validas" value="${escapeHtml(value)}" ${disabled} aria-label="${label} válidas ${row.fecha || index + 1}"></td>`;
+        }).join("");
         return `<tr data-detail-index="${index}" class="${row.incluido === false ? "nomina-row-descartada" : ""}">
           <td><input type="checkbox" class="nomina-detalle-validar" ${row.incluido !== false ? "checked" : ""} ${disabled}></td>
           <td>${row.fecha || "-"}</td><td>${calculated.dia}</td><td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}</td>
-          <td>${calculated.horas_diurnas}</td><td>${calculated.horas_nocturnas}</td><td>${calculated.horas_dominicales_diurnas}</td><td>${calculated.horas_dominicales_nocturnas}</td>
+          <td>${calculated.horas_diurnas}</td><td>${calculated.horas_nocturnas}</td><td>${calculated.horas_dominicales_diurnas}</td><td>${calculated.horas_dominicales_nocturnas}</td>${editableCells}
         </tr>`;
       }).join("");
   }
