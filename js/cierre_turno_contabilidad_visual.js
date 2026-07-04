@@ -21,12 +21,14 @@ const MONEY_INPUT_IDS = [
   "domicilios"
 ];
 
-const currencyFormatter = new Intl.NumberFormat("es-CO", {
-  style: "currency",
-  currency: "COP",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
-});
+const currencyFormatter = typeof Intl !== "undefined" && typeof Intl.NumberFormat === "function"
+  ? new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
+  : null;
 
 function parseMoneyValue(value) {
   const raw = String(value ?? "").trim();
@@ -60,7 +62,11 @@ function parseMoneyValue(value) {
 
 function formatMoneyValue(value) {
   const amount = parseMoneyValue(value);
-  return amount === null ? "" : currencyFormatter.format(amount).replace(/\s+/g, " ");
+  if (amount === null) return "";
+  if (currencyFormatter) return currencyFormatter.format(amount).replace(/\s+/g, " ");
+  const rounded = Math.round(amount);
+  const miles = Math.abs(rounded).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${rounded < 0 ? "-" : ""}$${miles},00`;
 }
 
 function ensureVisualWrapper(input) {

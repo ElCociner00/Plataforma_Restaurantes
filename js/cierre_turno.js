@@ -173,7 +173,27 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const toNumberValue = (value) => {
-    const parsed = Number(value);
+    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+    const raw = String(value ?? "").trim();
+    if (!raw) return 0;
+    const cleaned = raw.replace(/[^0-9,.-]/g, "");
+    if (!cleaned || cleaned === "-" || cleaned === "." || cleaned === ",") return 0;
+    const sign = cleaned.startsWith("-") ? "-" : "";
+    const unsigned = cleaned.replace(/-/g, "");
+    const lastDot = unsigned.lastIndexOf(".");
+    const lastComma = unsigned.lastIndexOf(",");
+    let normalized = unsigned;
+    if (lastDot >= 0 && lastComma >= 0) {
+      const decimalSeparator = lastDot > lastComma ? "." : ",";
+      const thousandsSeparator = decimalSeparator === "." ? "," : ".";
+      normalized = unsigned.split(thousandsSeparator).join("");
+      if (decimalSeparator === ",") normalized = normalized.replace(/,/g, ".");
+    } else if (lastComma >= 0) {
+      normalized = unsigned.replace(/\./g, "").replace(/,/g, ".");
+    } else if (lastDot >= 0) {
+      normalized = unsigned.replace(/,/g, "");
+    }
+    const parsed = Number(`${sign}${normalized}`);
     return Number.isFinite(parsed) ? parsed : 0;
   };
 
