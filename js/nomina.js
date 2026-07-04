@@ -412,6 +412,20 @@ const deepExtractPayrollObject = (node, depth = 0, maxDepth = 12, visited = new 
   return null;
 };
 
+const normalizeJsonLikeValue = (value, maxDepth = 8) => {
+  let current = value;
+  for (let depth = 0; depth < maxDepth && typeof current === "string"; depth += 1) {
+    const text = current.trim();
+    if (!text) return null;
+    try {
+      current = JSON.parse(text);
+    } catch (_error) {
+      return value;
+    }
+  }
+  return current;
+};
+
 const extractPayrollArrayCandidates = (value, maxDepth = 8) => {
   const visited = new WeakSet();
   const queue = [{ node: value, depth: 0 }];
@@ -871,7 +885,7 @@ const normalizeNominaWebhookRows = async (payload, empleadoSeleccionado = null) 
     if (!hasPrototype) return null;
 
     const horas = Object.entries(candidate.detalle_horas || {}).map(([tipo, value]) => ({
-      tipo: `Horas ${tipo.replaceAll("_", " ")}`,
+      tipo: `Horas ${String(tipo).replace(/_/g, " ")}`,
       naturaleza: "Devengo",
       valor: toNumeric(value?.total),
       fuente: "webhook",
