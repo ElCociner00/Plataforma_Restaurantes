@@ -148,6 +148,10 @@ export const WEBHOOK_NOMINA_CONSULTAR =
 export const WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO =
   "https://n8n.enkrato.com/webhook/consultar_nomina_nuevo";
 
+// nomina/index.html (botón: "Descargar comprobante"; guardado por bloques para Histórico Nómina)
+export const WEBHOOK_NOMINA_HISTORICO_GUARDAR =
+  "https://n8n.enkrato.com/webhook/nomina_historico_guardar";
+
 // configuracion/parametros_nomina.html (selector: "Concepto")
 export const WEBHOOK_NOMINA_CONCEPTOS_CONSULTAR =
   "https://n8n.enkrato.com/webhook/consultar_concepto_nómina";
@@ -241,6 +245,13 @@ WEBHOOKS.NOMINA_CONSULTAR = {
   archivos_que_usan: ["js/nomina.js"],
   metodo: "POST",
   descripcion: "Consulta movimientos de nómina por empresa, empleado y rango de fechas"
+};
+
+WEBHOOKS.NOMINA_HISTORICO_GUARDAR = {
+  url: WEBHOOK_NOMINA_HISTORICO_GUARDAR,
+  archivos_que_usan: ["js/nomina.js"],
+  metodo: "POST",
+  descripcion: "Guarda la nómina calculada por bloques para el submódulo Histórico Nómina"
 };
 
 WEBHOOKS.NOMINA_CONCEPTOS_CONSULTAR = {
