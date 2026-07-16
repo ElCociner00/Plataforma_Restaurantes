@@ -317,3 +317,39 @@
 .nomina-row-validada td { background: rgba(34, 197, 94, 0.1) !important; border-top: 2px solid rgba(34, 197, 94, 0.45); border-bottom: 2px solid rgba(34, 197, 94, 0.45); }
 .nomina-row-apoyo small { color: #2563eb; font-weight: 700; }
 @media (max-width: 760px) { .nomina-actions { flex-direction: column; } .nomina-actions button { width: min(100%, 320px); } }
+.nomina-locales-panel {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: #eff6ff;
+}
+.nomina-locales-panel h3 { margin: 0 0 4px; }
+.nomina-locales-panel p { margin: 0 0 10px; color: #475569; font-size: 0.86rem; }
+.nomina-locales-list { display: flex; flex-wrap: wrap; gap: 10px; }
+.nomina-local-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #93c5fd;
+  border-radius: 999px;
+  background: #fff;
+  font-weight: 700;
+}
+.nomina-local-option span { display: inline-flex; flex-direction: column; gap: 2px; }
+.nomina-local-option small { color: #64748b; font-size: 0.72rem; font-weight: 600; }
+.nomina-submodule-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid #2563eb;
+  border-radius: 8px;
+  color: #2563eb;
+  background: #eff6ff;
+  font-weight: 700;
+  text-decoration: none;
+}
+@media (max-width: 760px) { .nomina-locales-list { flex-direction: column; } .nomina-local-option, .nomina-submodule-link { width: min(100%, 320px); box-sizing: border-box; } }

@@ -23,7 +23,7 @@
  *
  * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
  */
-import { buildRequestHeaders, getUserContext } from "./session.js";
+import { buildRequestHeaders, getUserContext, listAvailableLocalContexts } from "./session.js";
 import { fetchResponsablesActivos } from "./responsables.js";
 import { getActiveEnvironment } from "./environment.js";
 import { supabase } from "./supabase.js";
@@ -61,10 +61,12 @@ const parametrosCalculoBody = document.getElementById("nominaParametrosCalculoBo
 const detallesCalculosBody = document.getElementById("nominaDetallesCalculosBody");
 const auxiliaresPanel = document.getElementById("nominaAuxiliaresPanel");
 const apoyosBody = document.getElementById("nominaApoyosBody");
+const localesPanel = document.getElementById("nominaLocalesPanel");
 
 const state = {
   context: null,
   responsables: [],
+  localesNomina: [],
   empresa: null,
   movimientos: [],
   empleadoDetalle: null,
@@ -326,6 +328,48 @@ const resolveResponsableName = (id, fallback = "-") => {
   const found = state.responsables.find((item) => String(item.id || "") === safeId);
   return found?.nombre_completo || fallback || safeId;
 };
+
+const renderLocalesNomina = () => {
+  if (!localesPanel) return;
+  const locales = state.localesNomina.length ? state.localesNomina : [{ empresa_id: state.context?.empresa_id || "", nombre: "Sede actual", activo: true }];
+  localesPanel.innerHTML = `
+    <h3>Locales / sedes a consultar</h3>
+    <p>Selecciona una o varias sedes. Se enviará nombre y tenant ID al webhook de nómina.</p>
+    <div class="nomina-locales-list">
+      ${locales.map((local, index) => `
+        <label class="nomina-local-option">
+          <input type="checkbox" class="nomina-local-check" data-local-index="${index}" ${local.activo !== false ? "checked" : ""}>
+          <span>${escapeHtml(local.nombre || local.empresa_id || "Sede")}<small>${escapeHtml(local.empresa_id || "")}</small></span>
+        </label>`).join("")}
+    </div>`;
+};
+
+const getSelectedLocalesNomina = () => {
+  const selected = (state.localesNomina || []).filter((local) => local.seleccionado !== false);
+  const source = selected.length ? selected : (state.localesNomina.length ? state.localesNomina : [{ empresa_id: state.context?.empresa_id || "", nombre: state.empresa?.nombre_comercial || "Sede actual" }]);
+  return source.map((local) => ({
+    tenant_id: local.empresa_id || "",
+    empresa_id: local.empresa_id || "",
+    nombre: local.nombre || local.empresa_id || "Sede",
+    tipo: local.tipo || ""
+  })).filter((local) => local.tenant_id);
+};
+
+const buildApoyoDetailRows = () => (state.apoyosDetalle || [])
+  .filter((row) => row.incluido !== false)
+  .map((row, index) => ({
+    row_id: `apoyo-${row.row_id || index}`,
+    fecha: row.fecha_turno,
+    dia: dateToDayName(row.fecha_turno),
+    hora_inicio: row.hora_inicio || "",
+    hora_fin: row.hora_fin || "",
+    hora_inicio_valida: row.hora_inicio || "",
+    hora_fin_valida: row.hora_fin || "",
+    propina: toNumeric(row.propina),
+    incluido: true,
+    incluidoTransporte: true,
+    es_apoyo: true
+  }));
 
 const setStatus = (message) => {
   if (statusEl) statusEl.textContent = message || "";
@@ -604,19 +648,22 @@ const buildExcelWebhookPayload = (empleadoId) => ({
   corte: corteSelect?.value || "quincenal",
   fecha_inicio: fechaInicioInput.value || "",
   fecha_fin: fechaFinInput.value || "",
-  entorno: getActiveEnvironment() || "global"
+  entorno: getActiveEnvironment() || "global",
+  sedes: getSelectedLocalesNomina(),
+  tenant_ids: getSelectedLocalesNomina().map((local) => local.tenant_id),
+  sedes_nombres: getSelectedLocalesNomina().map((local) => local.nombre)
 });
 
 
 const calculateMoneyByDetail = () => {
   ensureParametroCalculo();
-  const rowsIncluidas = sortByDateDesc((state.detalleCalculo || []).filter((row) => row.incluido !== false), "fecha");
+  const calculationSourceRows = sortByDateDesc([...(state.detalleCalculo || []), ...buildApoyoDetailRows()].filter((row) => row.incluido !== false), "fecha");
   const parametros = state.parametrosDetalle || [];
-  const transporteRows = (state.detalleCalculo || []).filter((row) => row.incluido !== false && row.incluidoTransporte !== false);
+  const transporteRows = calculationSourceRows.filter((row) => row.incluido !== false && row.incluidoTransporte !== false);
   const uniqueDays = new Set(transporteRows.map((row) => String(row.fecha || "").trim()).filter(Boolean));
   const diasTrabajados = uniqueDays.size || transporteRows.length;
 
-  const detailRows = rowsIncluidas.map((row) => {
+  const detailRows = calculationSourceRows.map((row) => {
     const calculatedTimes = calculateDetalleTimes(row);
     const base = { ...row, ...calculatedTimes };
     const values = { horas_diurnas: 0, horas_nocturnas: 0, horas_dominicales_diurnas: 0, horas_dominicales_nocturnas: 0, total: 0 };
@@ -722,20 +769,7 @@ const normalizeExcelPayrollForUi = (data, empleadoSeleccionado = null) => {
     horas_dominicales_diurnas: row.horas_dominicales_diurnas ?? row.horas_dom_diurnas ?? "00:00",
     horas_dominicales_nocturnas: row.horas_dominicales_nocturnas ?? row.horas_dom_nocturnas ?? "00:00"
   }));
-  const detalleApoyos = state.apoyosDetalle.map((row, index) => ({
-    row_id: `apoyo-${row.row_id || index}`,
-    fecha: row.fecha_turno,
-    dia: dateToDayName(row.fecha_turno),
-    hora_inicio: row.hora_inicio || "",
-    hora_fin: row.hora_fin || "",
-    hora_inicio_valida: row.hora_inicio || "",
-    hora_fin_valida: row.hora_fin || "",
-    propina: toNumeric(row.propina),
-    incluido: row.incluido !== false,
-    incluidoTransporte: row.incluido !== false,
-    es_apoyo: true
-  }));
-  state.detalleCalculo = sortByDateDesc([...detalleNormal, ...detalleApoyos], "fecha");
+  state.detalleCalculo = sortByDateDesc(detalleNormal, "fecha");
   markDuplicateDetailRows();
   ensureParametroCalculo();
 
@@ -829,12 +863,12 @@ const renderParametrosYDetalle = () => {
     });
   }
   if (detalleCalculoBody) {
-    detalleCalculoBody.innerHTML = (state.detalleCalculo.length ? state.detalleCalculo : [{ fecha: "-", hora_inicio: "-", hora_fin: "-" }])
+    detalleCalculoBody.innerHTML = (state.detalleCalculo.length ? sortByDateDesc(state.detalleCalculo, "fecha") : [{ fecha: "-", hora_inicio: "-", hora_fin: "-" }])
       .map((row, index) => {
         const calculated = calculateDetalleTimes(row);
         const disabled = state.detalleCalculo.length ? "" : "disabled";
         const rowClasses = [row.incluido === false ? "nomina-row-descartada" : "", row.duplicado ? (row.incluidoTransporte === false ? "nomina-row-duplicada" : "nomina-row-validada") : "", row.es_apoyo ? "nomina-row-apoyo" : ""].filter(Boolean).join(" ");
-        return `<tr data-detail-index="${index}" class="${rowClasses}">
+        return `<tr data-detail-index="${index}" data-detail-id="${escapeHtml(row.row_id || "")}" class="${rowClasses}">
           <td><input type="checkbox" class="nomina-detalle-validar" ${row.incluidoTransporte !== false ? "checked" : ""} ${disabled} aria-label="Validar transporte ${row.fecha || index + 1}"></td>
           <td>${row.fecha || "-"}</td><td>${calculated.dia}</td><td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}${row.es_apoyo ? "<br><small>Apoyo</small>" : ""}</td><td>${fmtMoney(row.propina || 0)}</td>
           <td>${calculated.horas_diurnas}</td><td>${calculated.horas_nocturnas}</td><td>${calculated.horas_dominicales_diurnas}</td><td>${calculated.horas_dominicales_nocturnas}</td>
@@ -1540,7 +1574,10 @@ const init = async () => {
   }
 
   state.responsables = await fetchResponsablesActivos(state.context.empresa_id).catch(() => []);
+  state.localesNomina = await listAvailableLocalContexts().catch(() => []);
+  state.localesNomina = (state.localesNomina.length ? state.localesNomina : [{ empresa_id: state.context.empresa_id, nombre: "Sede actual", activo: true }]).map((local) => ({ ...local, seleccionado: local.activo !== false }));
   renderEmpleadoOptions();
+  renderLocalesNomina();
 
   const { data: empresa } = await supabase
     .from("empresas")
@@ -1577,8 +1614,9 @@ apoyosBody?.addEventListener("change", (event) => {
 detalleCalculoBody?.addEventListener("change", (event) => {
   const rowEl = event.target?.closest?.("tr[data-detail-index]");
   if (!rowEl) return;
+  const detailId = rowEl.dataset.detailId;
   const index = Number(rowEl.dataset.detailIndex);
-  const row = state.detalleCalculo[index];
+  const row = state.detalleCalculo.find((item) => String(item.row_id || "") === detailId) || state.detalleCalculo[index];
   if (!row) return;
 
   if (event.target.classList.contains("nomina-detalle-validar")) {
@@ -1700,5 +1738,27 @@ const guardarHistoricoNomina = async () => {
     setStatus("Comprobante descargado. No fue posible enviar el histórico de nómina en este momento.");
   }
 };
+
+let detalleHoraTimer = null;
+detalleCalculoBody?.addEventListener("input", (event) => {
+  if (!event.target.classList.contains("nomina-detalle-hora-valida")) return;
+  const rowEl = event.target.closest("tr[data-detail-index]");
+  const detailId = rowEl?.dataset?.detailId;
+  const row = state.detalleCalculo.find((item) => String(item.row_id || "") === detailId);
+  const field = event.target.dataset.field;
+  if (!row || !field) return;
+  row[field] = event.target.value;
+  clearTimeout(detalleHoraTimer);
+  detalleHoraTimer = setTimeout(() => {
+    recalculatePayrollFromEditableDetail();
+  }, 450);
+});
+
+localesPanel?.addEventListener("change", (event) => {
+  if (!event.target.classList.contains("nomina-local-check")) return;
+  const local = state.localesNomina[Number(event.target.dataset.localIndex)];
+  if (!local) return;
+  local.seleccionado = event.target.checked;
+});
 
 init();
