@@ -339,17 +339,4 @@
 }
 .nomina-local-option span { display: inline-flex; flex-direction: column; gap: 2px; }
 .nomina-local-option small { color: #64748b; font-size: 0.72rem; font-weight: 600; }
-.nomina-submodule-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 36px;
-  padding: 0 14px;
-  border: 1px solid #2563eb;
-  border-radius: 8px;
-  color: #2563eb;
-  background: #eff6ff;
-  font-weight: 700;
-  text-decoration: none;
-}
-@media (max-width: 760px) { .nomina-locales-list { flex-direction: column; } .nomina-local-option, .nomina-submodule-link { width: min(100%, 320px); box-sizing: border-box; } }
+@media (max-width: 760px) { .nomina-locales-list { flex-direction: column; } .nomina-local-option { width: min(100%, 320px); box-sizing: border-box; } }
