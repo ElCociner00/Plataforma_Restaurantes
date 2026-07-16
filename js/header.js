@@ -229,13 +229,27 @@ function buildMenu({ context, environmentForMenu, localContexts = [] }) {
       </div>
     `;
     menu += `<a class="nav-link-btn" href="${APP_URLS.compras}">Compras</a>`;
-    menu += `<a class="nav-link-btn" href="${APP_URLS.nomina}">Nomina</a>`;
+    menu += `
+      <div class="nav-dropdown">
+        <button type="button" class="nav-dropdown-toggle">Nomina</button>
+        <div class="nav-dropdown-menu">
+          <a href="${APP_URLS.nomina}">Nómina</a>
+          <a href="${APP_URLS.nominaHistorico}">Histórico Nómina</a>
+        </div>
+      </div>`;
   }
 
   if (environmentForMenu === ENV_SIIGO) {
     menu += `<a class="nav-link-btn" href="${APP_URLS.dashboardSiigo}">Dashboard</a>`;
     menu += `<a class="nav-link-btn" href="${APP_URLS.subirFacturasSiigo}">Ver o subir facturas correo</a>`;
-    menu += `<a class="nav-link-btn" href="${APP_URLS.nomina}">Nomina</a>`;
+    menu += `
+      <div class="nav-dropdown">
+        <button type="button" class="nav-dropdown-toggle">Nomina</button>
+        <div class="nav-dropdown-menu">
+          <a href="${APP_URLS.nomina}">Nómina</a>
+          <a href="${APP_URLS.nominaHistorico}">Histórico Nómina</a>
+        </div>
+      </div>`;
   }
 
   menu += `<a class="nav-link-btn" href="${APP_URLS.facturacion}">Facturacion</a>`;

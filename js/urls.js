@@ -75,6 +75,7 @@ export const APP_URLS = {
   subirFacturasSiigo: buildAppPath("/siigo/subir_facturas_siigo/"),
   historicoFacturasSiigo: buildAppPath("/siigo/subir_facturas_siigo/"),
   nomina: buildAppPath("/nomina/"),
+  nominaHistorico: buildAppPath("/nomina/historico.html"),
   logoImage: buildAppPath("/images/Logo.webp"),
   mobileCss: buildAppPath("/css/mobile_native.css"),
   impagoBannerHtml: buildAppPath("/components/banner_impago.html"),
