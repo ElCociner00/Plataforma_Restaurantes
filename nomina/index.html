@@ -18,16 +18,6 @@
     <section class="bloque">
       <h2>Periodo de nómina</h2>
       <div class="nomina-grid">
-        <label>Corte
-          <select id="nominaCorte">
-            <option value="semanal">Semanal</option>
-            <option value="quincenal">Quincenal</option>
-            <option value="mensual">Mensual</option>
-            <option value="trimestral">Trimestral</option>
-            <option value="semestral">Semestral</option>
-            <option value="anual">Anual</option>
-          </select>
-        </label>
         <label>Fecha inicio
           <input id="nominaFechaInicio" type="date">
         </label>
@@ -95,41 +85,12 @@
 
         <div id="nominaAuxiliaresPanel" class="nomina-auxiliares-panel" aria-live="polite"></div>
 
-        <div class="comprobante-table nomina-web-panel">
-          <div class="comprobante-col">
-            <h3>Parámetros</h3>
-            <table>
-              <thead><tr><th>Concepto</th><th>Valor</th><th>Unidad</th><th>Acción</th></tr></thead>
-              <tbody id="nominaParametrosBody"></tbody>
-              <tfoot><tr><td colspan="4"><button type="button" id="nominaAddParametroAux">Añadir parámetro auxiliar</button></td></tr></tfoot>
-            </table>
-          </div>
-          <div class="comprobante-col">
-            <h3>Parámetros tiempo</h3>
-            <table>
-              <thead><tr><th>Momento</th><th>Inicio</th><th>Fin</th></tr></thead>
-              <tbody id="nominaParametrosTiempoBody"></tbody>
-            </table>
-          </div>
-        </div>
-
         <div class="comprobante-table nomina-web-panel nomina-wide-panel">
           <div class="comprobante-col">
             <h3>Detalles</h3>
             <table>
-              <thead><tr><th>Validar</th><th>Fecha</th><th>Día</th><th>Horario</th><th>Diurnas</th><th>Nocturnas</th><th>Dom. diurnas</th><th>Dom. nocturnas</th><th>Diurnas vál.</th><th>Nocturnas vál.</th><th>Dom. diurnas vál.</th><th>Dom. nocturnas vál.</th></tr></thead>
+              <thead><tr><th>Validar transporte</th><th>Fecha</th><th>Día</th><th>Horario</th><th>Propinas</th><th>Diurnas</th><th>Nocturnas</th><th>Dom. diurnas</th><th>Dom. nocturnas</th><th>Inicio válido <span class="nomina-format-note" title="Usa hora en formato 24H, por ejemplo 02:00 o 14:00">ⓘ 24H</span></th><th>Fin válido <span class="nomina-format-note" title="Usa hora en formato 24H, por ejemplo 02:00 o 14:00">ⓘ 24H</span></th></tr></thead>
               <tbody id="nominaDetalleCalculoBody"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="comprobante-table nomina-web-panel nomina-wide-panel">
-          <div class="comprobante-col">
-            <h3>Parámetros cálculo</h3>
-            <p class="nomina-help">Relaciona cada parámetro monetario con la columna de tiempo usada para calcular ingresos. Los cambios son temporales.</p>
-            <table>
-              <thead><tr><th>Parámetro nómina</th><th>Tiempo</th></tr></thead>
-              <tbody id="nominaParametrosCalculoBody"></tbody>
             </table>
           </div>
         </div>
@@ -150,6 +111,24 @@
             <table>
               <thead><tr><th>Validar</th><th>fecha turno</th><th>responsable turno</th><th>apoyo</th><th>tiempo</th><th>hora inicio</th><th>hora fin</th><th>propina</th></tr></thead>
               <tbody id="nominaApoyosBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="comprobante-table nomina-web-panel">
+          <div class="comprobante-col">
+            <h3>Parámetros</h3>
+            <table>
+              <thead><tr><th>Concepto</th><th>Valor</th><th>Unidad</th><th>Acción</th></tr></thead>
+              <tbody id="nominaParametrosBody"></tbody>
+              <tfoot><tr><td colspan="4"><button type="button" id="nominaAddParametroAux">Añadir parámetro auxiliar</button></td></tr></tfoot>
+            </table>
+          </div>
+          <div class="comprobante-col">
+            <h3>Parámetros tiempo</h3>
+            <table>
+              <thead><tr><th>Momento</th><th>Inicio</th><th>Fin</th></tr></thead>
+              <tbody id="nominaParametrosTiempoBody"></tbody>
             </table>
           </div>
         </div>

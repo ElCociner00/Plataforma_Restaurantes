@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Enkrato | Histórico Nómina</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/nomina.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../js/router.js"></script>
+  <script type="module" src="../js/header.js"></script>
+  <script type="module" src="../js/local_context_navigation_guard.js"></script>
+
+  <main class="main nomina-main">
+    <h1>Histórico Nómina</h1>
+    <p class="intro">Submódulo aislado para renderizar nóminas guardadas por bloques desde el comprobante de nómina.</p>
+    <section class="bloque">
+      <h2>Consulta histórica</h2>
+      <p class="nomina-help">La conexión de lectura queda preparada para el webhook o tabla histórica que almacene los bloques enviados desde Nómina.</p>
+      <div id="historicoNominaStatus" class="status">Histórico Nómina creado. Pendiente conectar endpoint de lectura cuando el backend exponga la consulta.</div>
+    </section>
+  </main>
+
+  <script type="module" src="../js/footer.js"></script>
+  <script type="module" src="../js/module_fix/init.js"></script>
+</body>
+</html>
