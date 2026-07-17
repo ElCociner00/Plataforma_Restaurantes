@@ -340,6 +340,13 @@ const resolveResponsableName = (id, fallback = "-") => {
   return found?.nombre_completo || fallback || safeId;
 };
 
+const resolveSedeName = (id, fallback = "Sede actual") => {
+  const safeId = String(id || "").trim();
+  if (!safeId) return fallback;
+  const found = (state.localesNomina || []).find((local) => String(local.empresa_id || local.tenant_id || "") === safeId);
+  return found?.nombre || "Sede sin nombre";
+};
+
 const renderLocalesNomina = () => {
   if (!localesPanel) return;
   const locales = state.localesNomina.length ? state.localesNomina : [{ empresa_id: state.context?.empresa_id || "", nombre: "Sede actual", activo: true }];
@@ -386,7 +393,56 @@ const getDetallePropina = (row = {}) => toNumeric(
   row.propina ?? row.propinas ?? row.valor_propina ?? row.valor_propinas ?? row.total_propina ?? row.total_propinas ?? row.propina_turno ?? row.propinas_turno ?? 0
 );
 
-const hasValidTimeText = (value) => /^\d{1,2}:\d{2}$/.test(String(value || "").trim());
+const hasValidTimeText = (value) => /^(?:[01]?\d|2[0-3]):[0-5]\d$/.test(String(value || "").trim()) || String(value || "").trim() === "24:00";
+
+const normalizeTimeInput = (value) => {
+  const text = String(value || "").trim();
+  if (hasValidTimeText(text)) return minutesToHourText(hoursToMinutes(text));
+  const digits = text.replace(/\D/g, "").slice(0, 4);
+  if (!digits) return "";
+  if (digits.length <= 2) return digits;
+  const minutesDigits = digits.slice(0, 2);
+  const hourDigits = digits.slice(2);
+  const hours = Math.min(23, Number(hourDigits));
+  const minutes = Math.min(59, Number(minutesDigits));
+  return `${hours}:${String(minutes).padStart(2, "0")}`;
+};
+
+const normalizeFinalTimeInput = (value, fallback = "") => {
+  const text = String(value || "").trim();
+  if (hasValidTimeText(text)) return minutesToHourText(hoursToMinutes(text));
+  const normalized = normalizeTimeInput(value);
+  if (!normalized) return "";
+  if (hasValidTimeText(normalized)) return minutesToHourText(hoursToMinutes(normalized));
+  const digits = String(normalized).replace(/\D/g, "");
+  if (digits.length <= 2) return `${String(Math.min(23, Number(digits) || 0)).padStart(2, "0")}:00`;
+  return hasValidTimeText(fallback) ? fallback : "";
+};
+
+const findSelectedEmployeeEquivalentIds = async (empleadoId, sedes) => {
+  const selected = state.responsables.find((item) => String(item.id || "") === String(empleadoId || ""));
+  const selectedName = normalizeConcept(selected?.nombre_completo);
+  const selectedCedula = String(selected?.cedula || "").trim();
+  const results = await Promise.all((sedes || []).map(async (sede) => {
+    const tenantId = sede.tenant_id || sede.empresa_id || "";
+    if (!tenantId) return null;
+    let responsables = tenantId === state.context?.empresa_id ? state.responsables : [];
+    if (!responsables.length) responsables = await fetchResponsablesActivos(tenantId).catch(() => []);
+    const match = responsables.find((item) => selectedCedula && String(item.cedula || "").trim() === selectedCedula)
+      || responsables.find((item) => selectedName && normalizeConcept(item.nombre_completo) === selectedName)
+      || responsables.find((item) => String(item.id || "") === String(empleadoId || ""));
+    return {
+      tenant_id: tenantId,
+      empresa_id: tenantId,
+      sede_nombre: sede.nombre || tenantId,
+      responsable_id: match?.id || empleadoId,
+      usuario_id: match?.id || empleadoId,
+      empleado_id: match?.id || empleadoId,
+      nombre: match?.nombre_completo || selected?.nombre_completo || ""
+    };
+  }));
+  return results.filter(Boolean);
+};
 
 const setStatus = (message) => {
   if (statusEl) statusEl.textContent = message || "";
@@ -656,8 +712,9 @@ const parseExcelWebhookPayload = (value, depth = 0) => {
   return null;
 };
 
-const buildExcelWebhookPayload = (empleadoId) => {
+const buildExcelWebhookPayload = async (empleadoId) => {
   const sedes = getSelectedLocalesNomina();
+  const responsable_tenants = await findSelectedEmployeeEquivalentIds(empleadoId, sedes);
   return {
     empresa_id: state.context?.empresa_id || "",
     tenant_id: state.context?.empresa_id || "",
@@ -673,7 +730,10 @@ const buildExcelWebhookPayload = (empleadoId) => {
     tenant_ids: sedes.map((local) => local.tenant_id),
     locales_tenant_ids: sedes.map((local) => local.tenant_id),
     sedes_nombres: sedes.map((local) => local.nombre),
-    locales_nombres: sedes.map((local) => local.nombre)
+    locales_nombres: sedes.map((local) => local.nombre),
+    responsable_tenants,
+    empleado_tenants: responsable_tenants,
+    usuario_tenants: responsable_tenants
   };
 };
 
@@ -787,8 +847,8 @@ const normalizeExcelPayrollForUi = (data, empleadoSeleccionado = null) => {
     incluidoTransporte: row.incluidoTransporte,
     dia: row.dia || dateToDayName(row.fecha),
     propina: getDetallePropina(row),
-    hora_inicio_valida: row.hora_inicio_valida || row.hora_inicio || "",
-    hora_fin_valida: row.hora_fin_valida || row.hora_fin || "",
+    hora_inicio_valida: normalizeFinalTimeInput(row.hora_inicio_valida || row.hora_inicio || ""),
+    hora_fin_valida: normalizeFinalTimeInput(row.hora_fin_valida || row.hora_fin || ""),
     horas_dominicales_diurnas: row.horas_dominicales_diurnas ?? row.horas_dom_diurnas ?? "00:00",
     horas_dominicales_nocturnas: row.horas_dominicales_nocturnas ?? row.horas_dom_nocturnas ?? "00:00"
   }));
@@ -893,7 +953,7 @@ const renderParametrosYDetalle = () => {
         const rowClasses = [row.incluido === false ? "nomina-row-descartada" : "", row.duplicado ? (row.incluidoTransporte === false ? "nomina-row-duplicada" : "nomina-row-validada") : "", row.es_apoyo ? "nomina-row-apoyo" : ""].filter(Boolean).join(" ");
         return `<tr data-detail-index="${index}" data-detail-id="${escapeHtml(row.row_id || "")}" class="${rowClasses}">
           <td><input type="checkbox" class="nomina-detalle-validar" ${row.incluidoTransporte !== false ? "checked" : ""} ${disabled} aria-label="Validar transporte ${row.fecha || index + 1}"></td>
-          <td>${row.fecha || "-"}</td><td>${calculated.dia}</td><td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}${row.es_apoyo ? "<br><small>Apoyo</small>" : ""}</td><td>${fmtMoney(row.propina || 0)}</td>
+          <td>${escapeHtml(resolveSedeName(row.sede || row.tenant_id || row.empresa_id))}</td><td>${row.fecha || "-"}</td><td>${calculated.dia}</td><td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}${row.es_apoyo ? "<br><small>Apoyo</small>" : ""}</td><td>${fmtMoney(row.propina || 0)}</td>
           <td data-calc-field="horas_diurnas">${calculated.horas_diurnas}</td><td data-calc-field="horas_nocturnas">${calculated.horas_nocturnas}</td><td data-calc-field="horas_dominicales_diurnas">${calculated.horas_dominicales_diurnas}</td><td data-calc-field="horas_dominicales_nocturnas">${calculated.horas_dominicales_nocturnas}</td>
           <td><input class="nomina-detalle-hora-valida" data-field="hora_inicio_valida" value="${escapeHtml(getValidShiftTime(row, "hora_inicio_valida"))}" ${disabled} aria-label="Inicio válido ${row.fecha || index + 1}"></td>
           <td><input class="nomina-detalle-hora-valida" data-field="hora_fin_valida" value="${escapeHtml(getValidShiftTime(row, "hora_fin_valida"))}" ${disabled} aria-label="Fin válido ${row.fecha || index + 1}"></td>
@@ -1109,7 +1169,7 @@ const consultarNomina = async () => {
   state.empleadoDetalle = { nombre: empleadoSeleccionado?.nombre_completo || "-", cargo: empleadoSeleccionado?.rol || "-" };
   setStatus("Consultando movimientos de nómina...");
   const loadingStart = Date.now();
-  const payload = buildExcelWebhookPayload(empleadoId);
+  const payload = await buildExcelWebhookPayload(empleadoId);
 
   let rows = [];
 
@@ -1299,7 +1359,7 @@ const descargarExcelEmpleado = async () => {
     return;
   }
 
-  const payload = buildExcelWebhookPayload(empleadoId);
+  const payload = await buildExcelWebhookPayload(empleadoId);
 
   const empleadoSeleccionado = state.responsables.find((item) => item.id === empleadoId);
   const periodoInicio = fechaInicioInput.value || "inicio";
@@ -1394,14 +1454,14 @@ const descargarExcelEmpleado = async () => {
     </table>`;
 
     const detalleHeadersBase = [
-      "Responsable", "Día", "Fecha", "Hora Inicio", "Hora Fin", "Horas Totales", "Horas Diurnas", "Horas Nocturnas",
+      "Responsable", "Sede", "Día", "Fecha", "Hora Inicio", "Hora Fin", "Horas Totales", "Horas Diurnas", "Horas Nocturnas",
       "Valor Diurnas", "Valor Nocturnas", "Valor Dom. Diurnas", "Valor Dom. Nocturnas", "Total Fila"
     ];
     const detalleMatrix = detalle.map((row) => {
       const totalFila = toMoneyNumber(row.valor_diurnas) + toMoneyNumber(row.valor_nocturnas) + toMoneyNumber(row.valor_dominical_diurnas) + toMoneyNumber(row.valor_dominical_nocturnas);
-      return [row.responsable, row.dia, row.fecha, row.hora_inicio, row.hora_fin, row.horas_totales, row.horas_diurnas, row.horas_nocturnas, row.valor_diurnas, row.valor_nocturnas, row.valor_dominical_diurnas, row.valor_dominical_nocturnas, totalFila];
+      return [row.responsable, row.sede || "-", row.dia, row.fecha, row.hora_inicio, row.hora_fin, row.horas_totales, row.horas_diurnas, row.horas_nocturnas, row.valor_diurnas, row.valor_nocturnas, row.valor_dominical_diurnas, row.valor_dominical_nocturnas, totalFila];
     });
-    const detalleFiltered = filterEmptyColumns(detalleHeadersBase, detalleMatrix, [2]);
+    const detalleFiltered = filterEmptyColumns(detalleHeadersBase, detalleMatrix, [3]);
     const moneyHeaders = new Set(["Valor Diurnas", "Valor Nocturnas", "Valor Dom. Diurnas", "Valor Dom. Nocturnas", "Total Fila"]);
     const detalleRows = detalleFiltered.rows.map((row) => `<tr>${row.map((cell, index) => moneyHeaders.has(detalleFiltered.headers[index]) ? moneyCell(cell) : textCell(cell, detalleFiltered.headers[index] === "Fecha" ? "date-text" : "")).join("")}</tr>`);
     const detalleTable = `<table>
@@ -1502,6 +1562,7 @@ const descargarExcelEmpleado = async () => {
     const calculation = calculateMoneyByDetail();
     const detalle = calculation.rows.map((row) => ({
       responsable: empleadoId,
+      sede: resolveSedeName(row.sede || row.tenant_id || row.empresa_id),
       dia: row.dia,
       fecha: row.fecha,
       hora_inicio: row.hora_inicio,
@@ -1677,7 +1738,10 @@ detalleCalculoBody?.addEventListener("change", (event) => {
 
   if (event.target.classList.contains("nomina-detalle-hora-valida")) {
     const field = event.target.dataset.field;
-    if (field) row[field] = event.target.value;
+    if (field) {
+      row[field] = normalizeFinalTimeInput(event.target.value, getValidShiftTime(row, field));
+      event.target.value = row[field];
+    }
   }
 
   recalculatePayrollFromEditableDetail();
@@ -1768,7 +1832,7 @@ const guardarHistoricoNomina = async () => {
   if (!state.movimientos.length || !empleadoSelect.value) return;
   try {
     const calculation = calculateMoneyByDetail();
-    const base = { ...buildExcelWebhookPayload(empleadoSelect.value), empresa: state.empresa, empleado: state.empleadoDetalle, periodo: state.periodoDetalle, generado_en: new Date().toISOString() };
+    const base = { ...await buildExcelWebhookPayload(empleadoSelect.value), empresa: state.empresa, empleado: state.empleadoDetalle, periodo: state.periodoDetalle, generado_en: new Date().toISOString() };
     const bloques = [
       ["resumen", { movimientos: state.movimientos, horas: state.horasDetalle, totales: calculation.totals, neto: netoPagarEl?.textContent || "" }],
       ["detalle", calculation.rows],
@@ -1798,7 +1862,9 @@ detalleCalculoBody?.addEventListener("input", (event) => {
   const row = state.detalleCalculo.find((item) => String(item.row_id || "") === detailId);
   const field = event.target.dataset.field;
   if (!row || !field) return;
-  row[field] = event.target.value;
+  const normalized = normalizeTimeInput(event.target.value);
+  row[field] = normalized;
+  if (event.target.value !== normalized) event.target.value = normalized;
   recalculatePayrollInline(row, rowEl);
 });
 
