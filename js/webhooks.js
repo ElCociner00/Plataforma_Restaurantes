@@ -152,6 +152,10 @@ export const WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO =
 export const WEBHOOK_NOMINA_HISTORICO_GUARDAR =
   "https://n8n.enkrato.com/webhook/nomina_historico_guardar";
 
+// nomina/index.html (botón: "Enviar deducciones"; genera y envía autorización de descuento al correo del empleado)
+export const WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR =
+  "https://n8n.enkrato.com/webhook/nomina_deducciones_enviar";
+
 // configuracion/parametros_nomina.html (selector: "Concepto")
 export const WEBHOOK_NOMINA_CONCEPTOS_CONSULTAR =
   "https://n8n.enkrato.com/webhook/consultar_concepto_nómina";
@@ -252,6 +256,13 @@ WEBHOOKS.NOMINA_HISTORICO_GUARDAR = {
   archivos_que_usan: ["js/nomina.js"],
   metodo: "POST",
   descripcion: "Guarda la nómina calculada por bloques para el submódulo Histórico Nómina"
+};
+
+WEBHOOKS.NOMINA_DEDUCCIONES_ENVIAR = {
+  url: WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR,
+  archivos_que_usan: ["js/nomina.js"],
+  metodo: "POST",
+  descripcion: "Recibe la autorización HTML/PDF de descuentos de nómina para generar PDF en backend y enviarlo al correo del empleado"
 };
 
 WEBHOOKS.NOMINA_CONCEPTOS_CONSULTAR = {
