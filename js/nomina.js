@@ -27,7 +27,7 @@ import { buildRequestHeaders, getUserContext, listAvailableLocalContexts } from 
 import { fetchResponsablesActivos } from "./responsables.js";
 import { getActiveEnvironment } from "./environment.js";
 import { supabase } from "./supabase.js";
-import { WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO, WEBHOOK_NOMINA_HISTORICO_GUARDAR } from "./webhooks.js";
+import { WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO, WEBHOOK_NOMINA_HISTORICO_GUARDAR, WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR } from "./webhooks.js";
 import { drawPngBrandWatermark } from "./png_branding.js";
 import { nominaLog, nominaWarn } from "./nomina.debug.js";
 
@@ -38,6 +38,7 @@ const empleadoSelect = document.getElementById("nominaEmpleado");
 const consultarBtn = document.getElementById("consultarNomina");
 const descargarBtn = document.getElementById("descargarComprobanteNomina");
 const descargarExcelEmpleadoBtn = document.getElementById("descargarExcelEmpleadoNomina");
+const enviarDeduccionesBtn = document.getElementById("enviarDeduccionesNomina");
 
 const totalDevengadoEl = document.getElementById("nominaTotalDevengado");
 const totalDeduccionesEl = document.getElementById("nominaTotalDeducciones");
@@ -158,6 +159,45 @@ const fmtMoney = (value) => Number(value || 0).toLocaleString("es-CO", {
   maximumFractionDigits: 0
 });
 const fmtHours = (value) => Number(value || 0).toFixed(2);
+
+const formatDateCo = (value = new Date()) => {
+  const date = value instanceof Date ? value : new Date(`${value || ""}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return new Intl.DateTimeFormat("es-CO").format(new Date());
+  return new Intl.DateTimeFormat("es-CO", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
+};
+
+const formatMoneyPlain = (value) => toNumeric(value).toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const findEmpleadoContacto = async (empleadoId) => {
+  const safeId = String(empleadoId || "").trim();
+  if (!safeId) return {};
+  const selected = state.responsables.find((item) => String(item.id || "") === safeId) || {};
+  const selectedName = normalizeConcept(selected.nombre_completo);
+  const selectedCedula = String(selected.cedula || "").trim();
+  const tables = [
+    { table: "empleados", select: "id,nombre_completo,cedula,email,correo,empresa_id" },
+    { table: "otros_usuarios", select: "id,nombre_completo,cedula,email,correo,empresa_id" },
+    { table: "usuarios_sistema", select: "id,nombre_completo,email,correo,empresa_id" }
+  ];
+  for (const source of tables) {
+    const { data } = await supabase.from(source.table).select(source.select).eq("id", safeId).maybeSingle().catch(() => ({ data: null }));
+    if (data) return { ...data, source: source.table, email: data.email || data.correo || "" };
+  }
+  if (selectedCedula) {
+    for (const source of tables.slice(0, 2)) {
+      const { data } = await supabase.from(source.table).select(source.select).eq("cedula", selectedCedula).maybeSingle().catch(() => ({ data: null }));
+      if (data) return { ...data, source: source.table, email: data.email || data.correo || "" };
+    }
+  }
+  if (selectedName) {
+    for (const source of tables) {
+      const { data } = await supabase.from(source.table).select(source.select).eq("empresa_id", state.context?.empresa_id || "").catch(() => ({ data: [] }));
+      const match = (Array.isArray(data) ? data : []).find((row) => normalizeConcept(row.nombre_completo) === selectedName);
+      if (match) return { ...match, source: source.table, email: match.email || match.correo || "" };
+    }
+  }
+  return { ...selected, email: selected.email || selected.correo || "", source: "responsables_cache" };
+};
 
 const parseHoursToDecimal = (value) => {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -340,6 +380,13 @@ const resolveResponsableName = (id, fallback = "-") => {
   return found?.nombre_completo || fallback || safeId;
 };
 
+const resolveSedeName = (id, fallback = "Sede actual") => {
+  const safeId = String(id || "").trim();
+  if (!safeId) return fallback;
+  const found = (state.localesNomina || []).find((local) => String(local.empresa_id || local.tenant_id || "") === safeId);
+  return found?.nombre || "Sede sin nombre";
+};
+
 const renderLocalesNomina = () => {
   if (!localesPanel) return;
   const locales = state.localesNomina.length ? state.localesNomina : [{ empresa_id: state.context?.empresa_id || "", nombre: "Sede actual", activo: true }];
@@ -386,7 +433,56 @@ const getDetallePropina = (row = {}) => toNumeric(
   row.propina ?? row.propinas ?? row.valor_propina ?? row.valor_propinas ?? row.total_propina ?? row.total_propinas ?? row.propina_turno ?? row.propinas_turno ?? 0
 );
 
-const hasValidTimeText = (value) => /^\d{1,2}:\d{2}$/.test(String(value || "").trim());
+const hasValidTimeText = (value) => /^(?:[01]?\d|2[0-3]):[0-5]\d$/.test(String(value || "").trim()) || String(value || "").trim() === "24:00";
+
+const normalizeTimeInput = (value) => {
+  const text = String(value || "").trim();
+  if (hasValidTimeText(text)) return minutesToHourText(hoursToMinutes(text));
+  const digits = text.replace(/\D/g, "").slice(0, 4);
+  if (!digits) return "";
+  if (digits.length <= 2) return digits;
+  const minutesDigits = digits.slice(0, 2);
+  const hourDigits = digits.slice(2);
+  const hours = Math.min(23, Number(hourDigits));
+  const minutes = Math.min(59, Number(minutesDigits));
+  return `${hours}:${String(minutes).padStart(2, "0")}`;
+};
+
+const normalizeFinalTimeInput = (value, fallback = "") => {
+  const text = String(value || "").trim();
+  if (hasValidTimeText(text)) return minutesToHourText(hoursToMinutes(text));
+  const normalized = normalizeTimeInput(value);
+  if (!normalized) return "";
+  if (hasValidTimeText(normalized)) return minutesToHourText(hoursToMinutes(normalized));
+  const digits = String(normalized).replace(/\D/g, "");
+  if (digits.length <= 2) return `${String(Math.min(23, Number(digits) || 0)).padStart(2, "0")}:00`;
+  return hasValidTimeText(fallback) ? fallback : "";
+};
+
+const findSelectedEmployeeEquivalentIds = async (empleadoId, sedes) => {
+  const selected = state.responsables.find((item) => String(item.id || "") === String(empleadoId || ""));
+  const selectedName = normalizeConcept(selected?.nombre_completo);
+  const selectedCedula = String(selected?.cedula || "").trim();
+  const results = await Promise.all((sedes || []).map(async (sede) => {
+    const tenantId = sede.tenant_id || sede.empresa_id || "";
+    if (!tenantId) return null;
+    let responsables = tenantId === state.context?.empresa_id ? state.responsables : [];
+    if (!responsables.length) responsables = await fetchResponsablesActivos(tenantId).catch(() => []);
+    const match = responsables.find((item) => selectedCedula && String(item.cedula || "").trim() === selectedCedula)
+      || responsables.find((item) => selectedName && normalizeConcept(item.nombre_completo) === selectedName)
+      || responsables.find((item) => String(item.id || "") === String(empleadoId || ""));
+    return {
+      tenant_id: tenantId,
+      empresa_id: tenantId,
+      sede_nombre: sede.nombre || tenantId,
+      responsable_id: match?.id || empleadoId,
+      usuario_id: match?.id || empleadoId,
+      empleado_id: match?.id || empleadoId,
+      nombre: match?.nombre_completo || selected?.nombre_completo || ""
+    };
+  }));
+  return results.filter(Boolean);
+};
 
 const setStatus = (message) => {
   if (statusEl) statusEl.textContent = message || "";
@@ -656,8 +752,9 @@ const parseExcelWebhookPayload = (value, depth = 0) => {
   return null;
 };
 
-const buildExcelWebhookPayload = (empleadoId) => {
+const buildExcelWebhookPayload = async (empleadoId) => {
   const sedes = getSelectedLocalesNomina();
+  const responsable_tenants = await findSelectedEmployeeEquivalentIds(empleadoId, sedes);
   return {
     empresa_id: state.context?.empresa_id || "",
     tenant_id: state.context?.empresa_id || "",
@@ -673,7 +770,10 @@ const buildExcelWebhookPayload = (empleadoId) => {
     tenant_ids: sedes.map((local) => local.tenant_id),
     locales_tenant_ids: sedes.map((local) => local.tenant_id),
     sedes_nombres: sedes.map((local) => local.nombre),
-    locales_nombres: sedes.map((local) => local.nombre)
+    locales_nombres: sedes.map((local) => local.nombre),
+    responsable_tenants,
+    empleado_tenants: responsable_tenants,
+    usuario_tenants: responsable_tenants
   };
 };
 
@@ -787,8 +887,8 @@ const normalizeExcelPayrollForUi = (data, empleadoSeleccionado = null) => {
     incluidoTransporte: row.incluidoTransporte,
     dia: row.dia || dateToDayName(row.fecha),
     propina: getDetallePropina(row),
-    hora_inicio_valida: row.hora_inicio_valida || row.hora_inicio || "",
-    hora_fin_valida: row.hora_fin_valida || row.hora_fin || "",
+    hora_inicio_valida: normalizeFinalTimeInput(row.hora_inicio_valida || row.hora_inicio || ""),
+    hora_fin_valida: normalizeFinalTimeInput(row.hora_fin_valida || row.hora_fin || ""),
     horas_dominicales_diurnas: row.horas_dominicales_diurnas ?? row.horas_dom_diurnas ?? "00:00",
     horas_dominicales_nocturnas: row.horas_dominicales_nocturnas ?? row.horas_dom_nocturnas ?? "00:00"
   }));
@@ -893,7 +993,7 @@ const renderParametrosYDetalle = () => {
         const rowClasses = [row.incluido === false ? "nomina-row-descartada" : "", row.duplicado ? (row.incluidoTransporte === false ? "nomina-row-duplicada" : "nomina-row-validada") : "", row.es_apoyo ? "nomina-row-apoyo" : ""].filter(Boolean).join(" ");
         return `<tr data-detail-index="${index}" data-detail-id="${escapeHtml(row.row_id || "")}" class="${rowClasses}">
           <td><input type="checkbox" class="nomina-detalle-validar" ${row.incluidoTransporte !== false ? "checked" : ""} ${disabled} aria-label="Validar transporte ${row.fecha || index + 1}"></td>
-          <td>${row.fecha || "-"}</td><td>${calculated.dia}</td><td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}${row.es_apoyo ? "<br><small>Apoyo</small>" : ""}</td><td>${fmtMoney(row.propina || 0)}</td>
+          <td>${escapeHtml(resolveSedeName(row.sede || row.tenant_id || row.empresa_id))}</td><td>${row.fecha || "-"}</td><td>${calculated.dia}</td><td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}${row.es_apoyo ? "<br><small>Apoyo</small>" : ""}</td><td>${fmtMoney(row.propina || 0)}</td>
           <td data-calc-field="horas_diurnas">${calculated.horas_diurnas}</td><td data-calc-field="horas_nocturnas">${calculated.horas_nocturnas}</td><td data-calc-field="horas_dominicales_diurnas">${calculated.horas_dominicales_diurnas}</td><td data-calc-field="horas_dominicales_nocturnas">${calculated.horas_dominicales_nocturnas}</td>
           <td><input class="nomina-detalle-hora-valida" data-field="hora_inicio_valida" value="${escapeHtml(getValidShiftTime(row, "hora_inicio_valida"))}" ${disabled} aria-label="Inicio válido ${row.fecha || index + 1}"></td>
           <td><input class="nomina-detalle-hora-valida" data-field="hora_fin_valida" value="${escapeHtml(getValidShiftTime(row, "hora_fin_valida"))}" ${disabled} aria-label="Fin válido ${row.fecha || index + 1}"></td>
@@ -1109,7 +1209,7 @@ const consultarNomina = async () => {
   state.empleadoDetalle = { nombre: empleadoSeleccionado?.nombre_completo || "-", cargo: empleadoSeleccionado?.rol || "-" };
   setStatus("Consultando movimientos de nómina...");
   const loadingStart = Date.now();
-  const payload = buildExcelWebhookPayload(empleadoId);
+  const payload = await buildExcelWebhookPayload(empleadoId);
 
   let rows = [];
 
@@ -1299,7 +1399,7 @@ const descargarExcelEmpleado = async () => {
     return;
   }
 
-  const payload = buildExcelWebhookPayload(empleadoId);
+  const payload = await buildExcelWebhookPayload(empleadoId);
 
   const empleadoSeleccionado = state.responsables.find((item) => item.id === empleadoId);
   const periodoInicio = fechaInicioInput.value || "inicio";
@@ -1394,14 +1494,14 @@ const descargarExcelEmpleado = async () => {
     </table>`;
 
     const detalleHeadersBase = [
-      "Responsable", "Día", "Fecha", "Hora Inicio", "Hora Fin", "Horas Totales", "Horas Diurnas", "Horas Nocturnas",
+      "Responsable", "Sede", "Día", "Fecha", "Hora Inicio", "Hora Fin", "Horas Totales", "Horas Diurnas", "Horas Nocturnas",
       "Valor Diurnas", "Valor Nocturnas", "Valor Dom. Diurnas", "Valor Dom. Nocturnas", "Total Fila"
     ];
     const detalleMatrix = detalle.map((row) => {
       const totalFila = toMoneyNumber(row.valor_diurnas) + toMoneyNumber(row.valor_nocturnas) + toMoneyNumber(row.valor_dominical_diurnas) + toMoneyNumber(row.valor_dominical_nocturnas);
-      return [row.responsable, row.dia, row.fecha, row.hora_inicio, row.hora_fin, row.horas_totales, row.horas_diurnas, row.horas_nocturnas, row.valor_diurnas, row.valor_nocturnas, row.valor_dominical_diurnas, row.valor_dominical_nocturnas, totalFila];
+      return [row.responsable, row.sede || "-", row.dia, row.fecha, row.hora_inicio, row.hora_fin, row.horas_totales, row.horas_diurnas, row.horas_nocturnas, row.valor_diurnas, row.valor_nocturnas, row.valor_dominical_diurnas, row.valor_dominical_nocturnas, totalFila];
     });
-    const detalleFiltered = filterEmptyColumns(detalleHeadersBase, detalleMatrix, [2]);
+    const detalleFiltered = filterEmptyColumns(detalleHeadersBase, detalleMatrix, [3]);
     const moneyHeaders = new Set(["Valor Diurnas", "Valor Nocturnas", "Valor Dom. Diurnas", "Valor Dom. Nocturnas", "Total Fila"]);
     const detalleRows = detalleFiltered.rows.map((row) => `<tr>${row.map((cell, index) => moneyHeaders.has(detalleFiltered.headers[index]) ? moneyCell(cell) : textCell(cell, detalleFiltered.headers[index] === "Fecha" ? "date-text" : "")).join("")}</tr>`);
     const detalleTable = `<table>
@@ -1502,6 +1602,7 @@ const descargarExcelEmpleado = async () => {
     const calculation = calculateMoneyByDetail();
     const detalle = calculation.rows.map((row) => ({
       responsable: empleadoId,
+      sede: resolveSedeName(row.sede || row.tenant_id || row.empresa_id),
       dia: row.dia,
       fecha: row.fecha,
       hora_inicio: row.hora_inicio,
@@ -1647,6 +1748,7 @@ const init = async () => {
 consultarBtn?.addEventListener("click", consultarNomina);
 descargarBtn?.addEventListener("click", () => { descargarComprobante(); guardarHistoricoNomina(); });
 descargarExcelEmpleadoBtn?.addEventListener("click", descargarExcelEmpleado);
+enviarDeduccionesBtn?.addEventListener("click", () => enviarDeduccionesNomina());
 corteSelect?.addEventListener("change", updateDatesByCut);
 fechaInicioInput?.addEventListener("change", clampDatesToToday);
 fechaFinInput?.addEventListener("change", clampDatesToToday);
@@ -1677,7 +1779,10 @@ detalleCalculoBody?.addEventListener("change", (event) => {
 
   if (event.target.classList.contains("nomina-detalle-hora-valida")) {
     const field = event.target.dataset.field;
-    if (field) row[field] = event.target.value;
+    if (field) {
+      row[field] = normalizeFinalTimeInput(event.target.value, getValidShiftTime(row, field));
+      event.target.value = row[field];
+    }
   }
 
   recalculatePayrollFromEditableDetail();
@@ -1764,27 +1869,134 @@ auxiliaresPanel?.addEventListener("change", (event) => {
   recalculatePayrollFromEditableDetail();
 });
 
+
+const buildHistoricoNominaPayload = async () => {
+  const calculation = calculateMoneyByDetail();
+  const base = await buildExcelWebhookPayload(empleadoSelect.value);
+  return {
+    ...base,
+    empresa: state.empresa,
+    empleado: state.empleadoDetalle,
+    periodo: state.periodoDetalle,
+    generado_en: new Date().toISOString(),
+    tablas: {
+      resumen: { movimientos: state.movimientos, horas: state.horasDetalle, totales: calculation.totals, neto: netoPagarEl?.textContent || "" },
+      ingresos: state.movimientos.filter((item) => String(item.naturaleza || "").toLowerCase().includes("devengo")),
+      deducciones: state.movimientos.filter((item) => String(item.naturaleza || "").toLowerCase().includes("dedu")),
+      detalle: calculation.rows.map((row) => ({ ...row, sede_nombre: resolveSedeName(row.sede || row.tenant_id || row.empresa_id) })),
+      apoyos: state.apoyosDetalle,
+      parametros: state.parametrosDetalle,
+      parametros_tiempo: state.parametrosTiempo,
+      parametros_calculo: state.parametrosCalculo,
+      auxiliares: { ingresos: state.ingresosAuxiliares, deducciones: state.deduccionesAuxiliares }
+    }
+  };
+};
+
+const buildDeduccionesRows = () => {
+  const deducciones = state.movimientos.filter((item) => String(item.naturaleza || "").toLowerCase().includes("dedu"));
+  return deducciones.map((item) => {
+    const cantidad = toNumeric(item.cantidad ?? 1) || 1;
+    const valorEmpleado = toNumeric(item.valor);
+    const valorUnitario = toNumeric(item.valor_unitario ?? item.valor_base ?? (valorEmpleado / cantidad));
+    const total = toNumeric(item.total ?? (valorUnitario * cantidad));
+    return {
+      producto: item.tipo || item.concepto || "Deducción",
+      cantidad,
+      valor: valorUnitario,
+      total,
+      valor_empleado: valorEmpleado
+    };
+  });
+};
+
+const buildAutorizacionDeduccionesHtml = ({ empleado, contacto, rows, fecha }) => {
+  const empleadoNombre = String(empleado?.nombre || contacto?.nombre_completo || "EMPLEADO").toUpperCase();
+  const cedula = contacto?.cedula || empleado?.cedula || "";
+  const total = rows.reduce((acc, row) => acc + toNumeric(row.valor_empleado), 0);
+  const rowsHtml = rows.map((row) => `<tr><td>${escapeHtml(row.producto)}</td><td>${escapeHtml(row.cantidad)}</td><td>${formatMoneyPlain(row.valor)}</td><td>${formatMoneyPlain(row.total)}</td><td>${formatMoneyPlain(row.valor_empleado)}</td></tr>`).join("");
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+    @page { size: Letter portrait; margin: 2.5cm 2.2cm; }
+    body { margin: 0; background: #fff; color: #000; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.15; }
+    .doc { width: 100%; margin: 0 auto; }
+    .head { text-align: center; margin-top: 0; margin-bottom: 22px; font-weight: 700; }
+    .empresa { font-size: 18px; text-transform: uppercase; }
+    .nit { margin-top: 6px; font-size: 15px; }
+    .titulo { margin-top: 15px; font-size: 16px; text-transform: uppercase; }
+    .fecha { margin: 18px 0; text-align: left; }
+    p { text-align: justify; margin: 0 0 12px; }
+    table { width: 82%; margin: 22px auto 0; border-collapse: collapse; border: 1px solid #000; }
+    th, td { border: 1px solid #000; padding: 7px 6px; text-align: center; vertical-align: middle; }
+    th { background: #f3f4f6; font-weight: 700; text-transform: uppercase; }
+    th:nth-child(1), td:nth-child(1) { width: 28%; }
+    th:nth-child(n+2), td:nth-child(n+2) { width: 18%; }
+    .total-row td { font-weight: 700; }
+    .total { margin: 25px auto 20px; width: 82%; display: flex; justify-content: space-between; font-weight: 700; }
+    .sep { border-top: 1px solid #e5e7eb; margin: 28px 0 18px; }
+    .firma h3 { font-size: 14pt; margin: 0 0 12px; }
+    .firma p { text-align: left; margin: 8px 0; }
+    .firma-empleador img { max-width: 210px; max-height: 90px; object-fit: contain; display: block; margin: 8px 0; }
+  </style></head><body><main class="doc">
+    <section class="head"><div class="empresa">BATUTCO S.A.S.</div><div class="nit">NIT 901.973.863-2</div><div class="titulo">AUTORIZACIÓN DE DESCUENTO</div></section>
+    <div class="fecha">Fecha: ${escapeHtml(fecha)}</div>
+    <p>Yo, <strong>${escapeHtml(empleadoNombre)}</strong>, identificado(a) con cédula de ciudadanía No. <strong>${escapeHtml(cedula)}</strong>, actuando en mi calidad de trabajador(a) de BATUTCO S.A.S., manifiesto que de manera libre, expresa, consciente e informada autorizo irrevocablemente a la empresa para efectuar descuentos sobre mi salario, prestaciones sociales, liquidación definitiva y cualquier otro valor que legalmente me corresponda recibir, derivados de productos adquiridos para consumo personal, bienes entregados, faltantes previamente aceptados o cualquier obligación económica reconocida por mí, conforme al siguiente detalle:</p>
+    <table><thead><tr><th>Producto</th><th>Cantidad</th><th>Valor</th><th>Total</th><th>Valor empleado</th></tr></thead><tbody>${rowsHtml}<tr class="total-row"><td></td><td></td><td></td><td></td><td>${formatMoneyPlain(total)}</td></tr></tbody></table>
+    <div class="total"><span>TOTAL A DESCONTAR</span><span>${fmtMoney(total)}</span></div>
+    <p>Declaro que los bienes, productos, servicios o conceptos anteriormente relacionados fueron recibidos a satisfacción o aceptados expresamente por mí, y reconozco que los valores aquí indicados corresponden al precio informado y aceptado.</p>
+    <p>En consecuencia, autorizo expresa e irrevocablemente a BATUTCO S.A.S. para efectuar el descuento del valor anteriormente señalado sobre mi salario, prestaciones sociales, liquidación definitiva o cualquier otra suma que legalmente me corresponda recibir, siempre que dicho descuento resulte procedente conforme a la legislación laboral colombiana y respete los límites establecidos en los artículos 149 y siguientes del Código Sustantivo del Trabajo y demás normas aplicables.</p>
+    <p>Declaro igualmente que la presente autorización se suscribe de manera libre, consciente y voluntaria, sin existir error, fuerza, dolo, intimidación, presión o cualquier otra circunstancia que afecte mi consentimiento.</p>
+    <div class="sep"></div><section class="firma"><h3>Firma del trabajador</h3><p>Nombre: ___________________________</p><p>C.C.: ___________________________</p></section>
+    <div class="sep"></div><section class="firma firma-empleador"><h3>Firma del empleador</h3><img src="images/firma.webp" alt="Firma empleador"><p>BATUTCO S.A.S.</p><p>Fecha: ${escapeHtml(fecha)}</p></section>
+  </main></body></html>`;
+};
+
+const enviarDeduccionesNomina = async () => {
+  const empleadoId = empleadoSelect.value;
+  if (!empleadoId) return setStatus("Selecciona un empleado antes de enviar deducciones.");
+  const rows = buildDeduccionesRows();
+  if (!rows.length) return setStatus("No hay deducciones para enviar en este comprobante.");
+  setStatus("Preparando autorización de descuentos para envío...");
+  try {
+    const contacto = await findEmpleadoContacto(empleadoId);
+    if (!contacto?.email) return setStatus("No se encontró correo del empleado en empleados/otros_usuarios/usuarios_sistema. No se envió la autorización.");
+    const fecha = formatDateCo(new Date());
+    const empleado = { ...state.empleadoDetalle, cedula: contacto.cedula || "" };
+    const payloadBase = await buildExcelWebhookPayload(empleadoId);
+    const html = buildAutorizacionDeduccionesHtml({ empleado, contacto, rows, fecha });
+    const payload = {
+      ...payloadBase,
+      tipo_documento: "autorizacion_descuento_nomina",
+      formato: "letter_vertical_pdf_html",
+      webhook_destino_sugerido: WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR,
+      empleado: { ...empleado, email: contacto.email, cedula: contacto.cedula || "", contacto_source: contacto.source || "" },
+      correo_destino: contacto.email,
+      fecha_documento: fecha,
+      firma_empleador_asset: "images/firma.webp",
+      deducciones: rows,
+      total_a_descontar: rows.reduce((acc, row) => acc + toNumeric(row.valor_empleado), 0),
+      pdf_html: html
+    };
+    const authHeaders = await buildRequestHeaders({ includeTenant: true });
+    const response = await fetch(WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders }, body: JSON.stringify(payload) });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    setStatus(`Autorización de descuentos enviada al webhook para ${contacto.email}.`);
+  } catch (error) {
+    nominaWarn("deducciones.enviar.error", error?.message || error);
+    setStatus(`No fue posible enviar deducciones (${error.message || "sin detalle"}).`);
+  }
+};
+
 const guardarHistoricoNomina = async () => {
   if (!state.movimientos.length || !empleadoSelect.value) return;
   try {
-    const calculation = calculateMoneyByDetail();
-    const base = { ...buildExcelWebhookPayload(empleadoSelect.value), empresa: state.empresa, empleado: state.empleadoDetalle, periodo: state.periodoDetalle, generado_en: new Date().toISOString() };
-    const bloques = [
-      ["resumen", { movimientos: state.movimientos, horas: state.horasDetalle, totales: calculation.totals, neto: netoPagarEl?.textContent || "" }],
-      ["detalle", calculation.rows],
-      ["apoyos", state.apoyosDetalle],
-      ["parametros", state.parametrosDetalle],
-      ["parametros_tiempo", state.parametrosTiempo]
-    ];
+    const payload = await buildHistoricoNominaPayload();
     const authHeaders = await buildRequestHeaders({ includeTenant: true });
-    for (const [bloque, contenido] of bloques) {
-      await fetch(WEBHOOK_NOMINA_HISTORICO_GUARDAR, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify({ ...base, bloque, contenido })
-      });
-    }
-    setStatus("Comprobante descargado y nómina enviada al histórico por bloques.");
+    await fetch(WEBHOOK_NOMINA_HISTORICO_GUARDAR, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders },
+      body: JSON.stringify(payload)
+    });
+    setStatus("Comprobante descargado y nómina enviada al histórico en un único JSON por tablas.");
   } catch (error) {
     nominaWarn("historico.guardar.error", error?.message || error);
     setStatus("Comprobante descargado. No fue posible enviar el histórico de nómina en este momento.");
@@ -1798,7 +2010,9 @@ detalleCalculoBody?.addEventListener("input", (event) => {
   const row = state.detalleCalculo.find((item) => String(item.row_id || "") === detailId);
   const field = event.target.dataset.field;
   if (!row || !field) return;
-  row[field] = event.target.value;
+  const normalized = normalizeTimeInput(event.target.value);
+  row[field] = normalized;
+  if (event.target.value !== normalized) event.target.value = normalized;
   recalculatePayrollInline(row, rowEl);
 });
 
