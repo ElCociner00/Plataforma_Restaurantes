@@ -178,6 +178,46 @@ const safeSupabaseQuery = async (builder, fallback = { data: null, error: null }
   }
 };
 
+
+// MANTENIMIENTO MULTISEDE: copia datos reales para nómina sin mutar contexto/login/locales compartidos.
+const resolveUsuarioPrincipalNomina = async (usuarioId) => {
+  const safeId = String(usuarioId || "").trim();
+  if (!safeId) return { id: "", empresa_id: "" };
+
+  const principal = await safeSupabaseQuery(
+    supabase
+      .from("usuarios_sistema")
+      .select("id, empresa_id, activo")
+      .eq("id", safeId)
+      .maybeSingle(),
+    { data: null }
+  );
+  if (principal.data?.id) return { id: principal.data.id, empresa_id: principal.data.empresa_id || "" };
+
+  const local = await safeSupabaseQuery(
+    supabase
+      .from("usuarios_locales")
+      .select("id, usuario_principal_id, empresa_id, activo")
+      .eq("id", safeId)
+      .maybeSingle(),
+    { data: null }
+  );
+  if (!local.data?.usuario_principal_id) return { id: safeId, empresa_id: "" };
+
+  const principalFromLocal = await safeSupabaseQuery(
+    supabase
+      .from("usuarios_sistema")
+      .select("id, empresa_id, activo")
+      .eq("id", local.data.usuario_principal_id)
+      .maybeSingle(),
+    { data: null }
+  );
+  return {
+    id: local.data.usuario_principal_id,
+    empresa_id: principalFromLocal.data?.empresa_id || ""
+  };
+};
+
 // MANTENIMIENTO DEDUCCIONES: busca el correo del empleado para el webhook de PDF/correo. Si cambia la tabla de contactos, ajustar aquí.
 const findEmpleadoContacto = async (empleadoId) => {
   const safeId = String(empleadoId || "").trim();
@@ -476,22 +516,22 @@ const normalizeFinalTimeInput = (value, fallback = "") => {
 // MANTENIMIENTO MULTISEDE: enriquece cada objeto de `sedes` con el usuario_id local correcto.
 // Conecta con Supabase (`usuarios_locales`) y con responsables ya cargados; si necesitas probar IDs por sede, inspecciona el array `sedes` del payload.
 const enrichSelectedSedesWithUserIds = async (empleadoId, sedes) => {
-  const selected = state.responsables.find((item) => String(item.id || "") === String(empleadoId || "")) || {};
+  const usuarioPrincipal = await resolveUsuarioPrincipalNomina(empleadoId);
+  const usuarioPrincipalId = usuarioPrincipal.id || empleadoId;
+  const selected = state.responsables.find((item) => String(item.id || "") === String(empleadoId || "") || String(item.id || "") === String(usuarioPrincipalId || "")) || {};
   const selectedName = normalizeConcept(selected?.nombre_completo);
   const selectedCedula = String(selected?.cedula || "").trim();
 
   const findLocalUserId = async (tenantId) => {
-    if (!tenantId) return empleadoId;
-    const selectedLocal = (state.localesNomina || []).find((local) => String(local.empresa_id || "") === String(tenantId));
-    if (selectedLocal?.usuario_id) return selectedLocal.usuario_id;
-    if (tenantId === state.context?.empresa_id) return state.context?.user?.id || empleadoId;
+    if (!tenantId) return usuarioPrincipalId || empleadoId;
+    if (usuarioPrincipal.empresa_id && String(tenantId) === String(usuarioPrincipal.empresa_id)) return usuarioPrincipalId || empleadoId;
 
     const byPrincipal = await safeSupabaseQuery(
       supabase
         .from("usuarios_locales")
         .select("id, usuario_principal_id, empresa_id, nombre_completo, activo")
         .eq("empresa_id", tenantId)
-        .eq("usuario_principal_id", empleadoId)
+        .eq("usuario_principal_id", usuarioPrincipalId || empleadoId)
         .eq("activo", true)
         .maybeSingle(),
       { data: null }
@@ -513,7 +553,7 @@ const enrichSelectedSedesWithUserIds = async (empleadoId, sedes) => {
     const match = responsables.find((item) => selectedCedula && String(item.cedula || "").trim() === selectedCedula)
       || responsables.find((item) => selectedName && normalizeConcept(item.nombre_completo) === selectedName)
       || responsables.find((item) => String(item.id || "") === String(empleadoId || ""));
-    return match?.id || empleadoId;
+    return match?.id || usuarioPrincipalId || empleadoId;
   };
 
   const enriched = await Promise.all((sedes || []).map(async (sede) => {
@@ -815,10 +855,7 @@ const buildExcelWebhookPayload = async (empleadoId) => {
     tenant_ids: sedes.map((local) => local.tenant_id),
     locales_tenant_ids: sedes.map((local) => local.tenant_id),
     sedes_nombres: sedes.map((local) => local.nombre),
-    locales_nombres: sedes.map((local) => local.nombre),
-    responsable_tenants,
-    empleado_tenants: responsable_tenants,
-    usuario_tenants: responsable_tenants
+    locales_nombres: sedes.map((local) => local.nombre)
   };
   return payload;
 };
@@ -1940,6 +1977,106 @@ const buildHistoricoNominaPayload = async () => {
   };
 };
 
+
+const PDF_SIGNATURE_ASSET = "images/firma.webp";
+
+const escapePdfText = (value) => String(value ?? "")
+  .replace(/\\/g, "\\\\")
+  .replace(/\(/g, "\\(")
+  .replace(/\)/g, "\\)")
+  .replace(/[\r\n]+/g, " ");
+
+const blobToBytes = async (blob) => new Uint8Array(await blob.arrayBuffer());
+
+const loadSignatureAsJpeg = async () => {
+  const image = new Image();
+  image.src = PDF_SIGNATURE_ASSET;
+  await new Promise((resolve, reject) => {
+    image.onload = resolve;
+    image.onerror = reject;
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = 400;
+  canvas.height = 63;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+  if (!blob) return null;
+  return { bytes: await blobToBytes(blob), width: 400, height: 63 };
+};
+
+const createSimplePdf = async ({ empleado, rows, fecha }) => {
+  const signature = await loadSignatureAsJpeg().catch(() => null);
+  const total = rows.reduce((acc, row) => acc + toNumeric(row.valor_empleado), 0);
+  const empleadoNombre = String(empleado?.nombre || empleado?.nombre_completo || "EMPLEADO").toUpperCase();
+  const cedula = empleado?.cedula || "";
+  const lines = [
+    { text: "BATUTCO S.A.S.", x: 236, y: 742, size: 14, bold: true },
+    { text: "NIT 901.973.863-2", x: 243, y: 722, size: 11 },
+    { text: "AUTORIZACION DE DESCUENTO", x: 204, y: 700, size: 12, bold: true },
+    { text: `Fecha: ${fecha}`, x: 72, y: 666, size: 10 },
+    { text: `Yo, ${empleadoNombre}, identificado(a) con C.C. ${cedula}, autorizo el descuento de nomina`, x: 72, y: 636, size: 9 },
+    { text: "por los conceptos relacionados a continuacion, conforme a la legislacion laboral colombiana.", x: 72, y: 622, size: 9 },
+    { text: "Producto", x: 82, y: 586, size: 9, bold: true },
+    { text: "Cant.", x: 290, y: 586, size: 9, bold: true },
+    { text: "Valor", x: 350, y: 586, size: 9, bold: true },
+    { text: "Total", x: 430, y: 586, size: 9, bold: true },
+    { text: "Valor empleado", x: 485, y: 586, size: 9, bold: true }
+  ];
+  let y = 566;
+  rows.slice(0, 12).forEach((row) => {
+    lines.push(
+      { text: row.producto, x: 82, y, size: 8 },
+      { text: row.cantidad, x: 298, y, size: 8 },
+      { text: formatMoneyPlain(row.valor), x: 350, y, size: 8 },
+      { text: formatMoneyPlain(row.total), x: 430, y, size: 8 },
+      { text: formatMoneyPlain(row.valor_empleado), x: 500, y, size: 8 }
+    );
+    y -= 18;
+  });
+  lines.push(
+    { text: `TOTAL A DESCONTAR: ${fmtMoney(total)}`, x: 72, y: y - 18, size: 10, bold: true },
+    { text: "Firma del trabajador: ______________________________", x: 72, y: 190, size: 10 },
+    { text: "Nombre: ______________________________  C.C.: __________________", x: 72, y: 170, size: 9 },
+    { text: "Firma del empleador", x: 72, y: 130, size: 10, bold: true },
+    { text: `BATUTCO S.A.S. - Fecha: ${fecha}`, x: 72, y: 72, size: 9 }
+  );
+
+  const content = ["BT"];
+  lines.forEach((line) => {
+    content.push(`/${line.bold ? "F2" : "F1"} ${line.size} Tf ${line.x} ${line.y} Td (${escapePdfText(line.text)}) Tj ${-line.x} ${-line.y} Td`);
+  });
+  content.push("ET");
+  if (signature) content.push("q 200 0 0 31.5 72 92 cm /Im1 Do Q");
+  const contentText = content.join("\n");
+  const encoder = new TextEncoder();
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> ${signature ? "/XObject << /Im1 7 0 R >>" : ""} >> /Contents 6 0 R >>`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>",
+    `<< /Length ${encoder.encode(contentText).length} >>\nstream\n${contentText}\nendstream`
+  ];
+  if (signature) objects.push(`<< /Type /XObject /Subtype /Image /Width ${signature.width} /Height ${signature.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${signature.bytes.length} >>\nstream\n__SIGNATURE__\nendstream`);
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((obj, index) => {
+    offsets.push(encoder.encode(pdf).length);
+    pdf += `${index + 1} 0 obj\n${obj}\nendobj\n`;
+  });
+  const xrefOffset = encoder.encode(pdf).length + (signature ? signature.bytes.length - "__SIGNATURE__".length : 0);
+  let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => { xref += `${String(offset).padStart(10, "0")} 00000 n \n`; });
+  const trailer = `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  if (!signature) return new Blob([pdf, xref, trailer], { type: "application/pdf" });
+  const [before, after] = pdf.split("__SIGNATURE__");
+  return new Blob([before, signature.bytes, after, xref, trailer], { type: "application/pdf" });
+};
+
 const buildDeduccionesRows = () => {
   const deducciones = state.movimientos.filter((item) => String(item.naturaleza || "").toLowerCase().includes("dedu"));
   return deducciones.map((item) => {
@@ -1997,37 +2134,40 @@ const buildAutorizacionDeduccionesHtml = ({ empleado, contacto, rows, fecha }) =
   </main></body></html>`;
 };
 
-// MANTENIMIENTO DEDUCCIONES: botón Enviar deducciones; no descarga PDF, envía HTML al webhook para conversión/envío por correo.
+// MANTENIMIENTO DEDUCCIONES: genera PDF local y lo envía como binario al webhook; el correo se resuelve fuera del frontend.
 const enviarDeduccionesNomina = async () => {
   const empleadoId = empleadoSelect.value;
   if (!empleadoId) return setStatus("Selecciona un empleado antes de enviar deducciones.");
   const rows = buildDeduccionesRows();
   if (!rows.length) return setStatus("No hay deducciones para enviar en este comprobante.");
-  setStatus("Preparando autorización de descuentos para envío...");
+  setStatus("Generando PDF de autorización de descuentos...");
   try {
-    const contacto = await findEmpleadoContacto(empleadoId);
-    if (!contacto?.email) return setStatus("No se encontró correo del empleado en empleados/otros_usuarios/usuarios_sistema. No se envió la autorización.");
     const fecha = formatDateCo(new Date());
-    const empleado = { ...state.empleadoDetalle, cedula: contacto.cedula || "" };
+    const empleado = {
+      ...(state.empleadoDetalle || {}),
+      nombre: state.empleadoDetalle?.nombre || state.responsables.find((item) => String(item.id || "") === String(empleadoId))?.nombre_completo || "Empleado"
+    };
     const payloadBase = await buildExcelWebhookPayload(empleadoId);
-    const html = buildAutorizacionDeduccionesHtml({ empleado, contacto, rows, fecha });
-    const payload = {
+    const pdfBlob = await createSimplePdf({ empleado, rows, fecha });
+    const metadata = {
       ...payloadBase,
       tipo_documento: "autorizacion_descuento_nomina",
-      formato: "letter_vertical_pdf_html",
-      webhook_destino_sugerido: WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR,
-      empleado: { ...empleado, email: contacto.email, cedula: contacto.cedula || "", contacto_source: contacto.source || "" },
-      correo_destino: contacto.email,
+      formato: "letter_vertical_pdf_binario",
+      empleado,
       fecha_documento: fecha,
-      firma_empleador_asset: "images/firma.webp",
+      firma_empleador_asset: PDF_SIGNATURE_ASSET,
+      firma_empleador_dimensiones_px: { width: 400, height: 63 },
       deducciones: rows,
-      total_a_descontar: rows.reduce((acc, row) => acc + toNumeric(row.valor_empleado), 0),
-      pdf_html: html
+      total_a_descontar: rows.reduce((acc, row) => acc + toNumeric(row.valor_empleado), 0)
     };
+    const formData = new FormData();
+    formData.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }), "metadata.json");
+    formData.append("pdf", pdfBlob, `autorizacion-deducciones-${empleadoId}.pdf`);
+
     const authHeaders = await buildRequestHeaders({ includeTenant: true });
-    const response = await fetch(WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders }, body: JSON.stringify(payload) });
+    const response = await fetch(WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR, { method: "POST", headers: authHeaders, body: formData });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    setStatus(`Autorización de descuentos enviada al webhook para ${contacto.email}.`);
+    setStatus("PDF de autorización de descuentos enviado al webhook para procesamiento seguro.");
   } catch (error) {
     nominaWarn("deducciones.enviar.error", error?.message || error);
     setStatus(`No fue posible enviar deducciones (${error.message || "sin detalle"}).`);
