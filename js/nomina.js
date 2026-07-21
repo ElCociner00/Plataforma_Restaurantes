@@ -811,7 +811,10 @@ const buildExcelWebhookPayload = async (empleadoId) => {
     tenant_ids: sedes.map((local) => local.tenant_id),
     locales_tenant_ids: sedes.map((local) => local.tenant_id),
     sedes_nombres: sedes.map((local) => local.nombre),
-    locales_nombres: sedes.map((local) => local.nombre)
+    locales_nombres: sedes.map((local) => local.nombre),
+    responsable_tenants,
+    empleado_tenants: responsable_tenants,
+    usuario_tenants: responsable_tenants
   };
   delete payload.responsable_tenants;
   delete payload.empleado_tenants;
