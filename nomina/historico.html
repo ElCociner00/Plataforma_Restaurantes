@@ -13,7 +13,8 @@
 
   <main class="main nomina-main">
     <h1>Histórico Nómina</h1>
-    <p class="intro">Submódulo aislado para renderizar nóminas guardadas por bloques desde el comprobante de nómina.</p>
+    <p class="intro">Submódulo aislado para renderizar nóminas guardadas desde el webhook histórico de nómina.</p>
+    <!-- MANTENIMIENTO HISTÓRICO: esta página no toca login/sesión/header; solo carga js/nomina_historico.js para consultar el webhook centralizado. -->
     <section class="bloque">
       <h2>Consulta histórica</h2>
       <p class="nomina-help">Borrador funcional del submódulo: permite visualizar cómo se seleccionarán nóminas guardadas por periodo, empleado y sede cuando el backend exponga la lectura histórica.</p>
@@ -32,21 +33,22 @@
         </label>
       </div>
       <div class="nomina-actions">
-        <button type="button" disabled>Consultar histórico</button>
+        <button type="button" id="consultarHistoricoNomina">Consultar histórico</button>
       </div>
       <div class="comprobante-table nomina-web-panel nomina-wide-panel">
         <div class="comprobante-col">
           <h3>Nóminas guardadas</h3>
           <table>
             <thead><tr><th>Seleccionar</th><th>Periodo</th><th>Empleado</th><th>Sedes</th><th>Estado</th></tr></thead>
-            <tbody><tr><td colspan="5">Pendiente conectar endpoint de lectura histórica.</td></tr></tbody>
+            <tbody id="historicoNominaBody"><tr><td colspan="5">Consultando histórico...</td></tr></tbody>
           </table>
         </div>
       </div>
-      <div id="historicoNominaStatus" class="status">El guardado se nutre desde el webhook https://n8n.enkrato.com/webhook/nomina_historico_guardar al usar Descargar comprobante.</div>
+      <div id="historicoNominaStatus" class="status">El listado se carga desde el webhook https://n8n.enkrato.com/webhook/nomina_historico_renderizar.</div>
     </section>
   </main>
 
+  <script type="module" src="../js/nomina_historico.js"></script>
   <script type="module" src="../js/footer.js"></script>
   <script type="module" src="../js/module_fix/init.js"></script>
 </body>
