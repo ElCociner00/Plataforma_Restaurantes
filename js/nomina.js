@@ -419,6 +419,9 @@ const getSelectedLocalesNomina = () => {
   return source.map((local) => ({
     tenant_id: local.empresa_id || "",
     empresa_id: local.empresa_id || "",
+    usuario_id: local.usuario_id || local.user_id || "",
+    responsable_id: local.usuario_id || local.user_id || "",
+    empleado_id: local.usuario_id || local.user_id || "",
     nombre: local.nombre || local.empresa_id || "Sede",
     tipo: local.tipo || ""
   })).filter((local) => local.tenant_id);
@@ -479,7 +482,9 @@ const enrichSelectedSedesWithUserIds = async (empleadoId, sedes) => {
 
   const findLocalUserId = async (tenantId) => {
     if (!tenantId) return empleadoId;
-    if (tenantId === state.context?.empresa_id) return empleadoId;
+    const selectedLocal = (state.localesNomina || []).find((local) => String(local.empresa_id || "") === String(tenantId));
+    if (selectedLocal?.usuario_id) return selectedLocal.usuario_id;
+    if (tenantId === state.context?.empresa_id) return state.context?.user?.id || empleadoId;
 
     const byPrincipal = await safeSupabaseQuery(
       supabase
@@ -794,8 +799,7 @@ const parseExcelWebhookPayload = (value, depth = 0) => {
 
 const buildExcelWebhookPayload = async (empleadoId) => {
   const sedes = await enrichSelectedSedesWithUserIds(empleadoId, getSelectedLocalesNomina());
-  // MANTENIMIENTO MULTISEDE: no crear arrays paralelos como responsable_tenants;
-  // el ID local viaja dentro de cada item de `sedes`/`locales` para conservar la estructura del webhook.
+  // MANTENIMIENTO MULTISEDE: el ID local viaja dentro de cada item de `sedes`/`locales` para conservar la estructura del webhook.
   const payload = {
     empresa_id: state.context?.empresa_id || "",
     tenant_id: state.context?.empresa_id || "",
@@ -816,9 +820,6 @@ const buildExcelWebhookPayload = async (empleadoId) => {
     empleado_tenants: responsable_tenants,
     usuario_tenants: responsable_tenants
   };
-  delete payload.responsable_tenants;
-  delete payload.empleado_tenants;
-  delete payload.usuario_tenants;
   return payload;
 };
 
