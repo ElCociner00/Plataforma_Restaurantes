@@ -794,7 +794,9 @@ const parseExcelWebhookPayload = (value, depth = 0) => {
 
 const buildExcelWebhookPayload = async (empleadoId) => {
   const sedes = await enrichSelectedSedesWithUserIds(empleadoId, getSelectedLocalesNomina());
-  return {
+  // MANTENIMIENTO MULTISEDE: no crear arrays paralelos como responsable_tenants;
+  // el ID local viaja dentro de cada item de `sedes`/`locales` para conservar la estructura del webhook.
+  const payload = {
     empresa_id: state.context?.empresa_id || "",
     tenant_id: state.context?.empresa_id || "",
     responsable_id: empleadoId,
@@ -814,6 +816,10 @@ const buildExcelWebhookPayload = async (empleadoId) => {
     empleado_tenants: responsable_tenants,
     usuario_tenants: responsable_tenants
   };
+  delete payload.responsable_tenants;
+  delete payload.empleado_tenants;
+  delete payload.usuario_tenants;
+  return payload;
 };
 
 
