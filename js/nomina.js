@@ -179,10 +179,10 @@ const safeSupabaseQuery = async (builder, fallback = { data: null, error: null }
 };
 
 
-// MANTENIMIENTO MULTISEDE: resuelve el usuario principal real antes de buscar equivalencias en `usuarios_locales`.
-const resolveUsuarioPrincipalId = async (usuarioId) => {
+// MANTENIMIENTO MULTISEDE: copia datos reales para nómina sin mutar contexto/login/locales compartidos.
+const resolveUsuarioPrincipalNomina = async (usuarioId) => {
   const safeId = String(usuarioId || "").trim();
-  if (!safeId) return "";
+  if (!safeId) return { id: "", empresa_id: "" };
 
   const principal = await safeSupabaseQuery(
     supabase
@@ -192,7 +192,7 @@ const resolveUsuarioPrincipalId = async (usuarioId) => {
       .maybeSingle(),
     { data: null }
   );
-  if (principal.data?.id) return principal.data.id;
+  if (principal.data?.id) return { id: principal.data.id, empresa_id: principal.data.empresa_id || "" };
 
   const local = await safeSupabaseQuery(
     supabase
@@ -202,7 +202,20 @@ const resolveUsuarioPrincipalId = async (usuarioId) => {
       .maybeSingle(),
     { data: null }
   );
-  return local.data?.usuario_principal_id || safeId;
+  if (!local.data?.usuario_principal_id) return { id: safeId, empresa_id: "" };
+
+  const principalFromLocal = await safeSupabaseQuery(
+    supabase
+      .from("usuarios_sistema")
+      .select("id, empresa_id, activo")
+      .eq("id", local.data.usuario_principal_id)
+      .maybeSingle(),
+    { data: null }
+  );
+  return {
+    id: local.data.usuario_principal_id,
+    empresa_id: principalFromLocal.data?.empresa_id || ""
+  };
 };
 
 // MANTENIMIENTO DEDUCCIONES: busca el correo del empleado para el webhook de PDF/correo. Si cambia la tabla de contactos, ajustar aquí.
@@ -503,14 +516,15 @@ const normalizeFinalTimeInput = (value, fallback = "") => {
 // MANTENIMIENTO MULTISEDE: enriquece cada objeto de `sedes` con el usuario_id local correcto.
 // Conecta con Supabase (`usuarios_locales`) y con responsables ya cargados; si necesitas probar IDs por sede, inspecciona el array `sedes` del payload.
 const enrichSelectedSedesWithUserIds = async (empleadoId, sedes) => {
-  const usuarioPrincipalId = await resolveUsuarioPrincipalId(empleadoId);
+  const usuarioPrincipal = await resolveUsuarioPrincipalNomina(empleadoId);
+  const usuarioPrincipalId = usuarioPrincipal.id || empleadoId;
   const selected = state.responsables.find((item) => String(item.id || "") === String(empleadoId || "") || String(item.id || "") === String(usuarioPrincipalId || "")) || {};
   const selectedName = normalizeConcept(selected?.nombre_completo);
   const selectedCedula = String(selected?.cedula || "").trim();
 
   const findLocalUserId = async (tenantId) => {
     if (!tenantId) return usuarioPrincipalId || empleadoId;
-    if (tenantId === state.context?.empresa_id) return usuarioPrincipalId || empleadoId;
+    if (usuarioPrincipal.empresa_id && String(tenantId) === String(usuarioPrincipal.empresa_id)) return usuarioPrincipalId || empleadoId;
 
     const byPrincipal = await safeSupabaseQuery(
       supabase
