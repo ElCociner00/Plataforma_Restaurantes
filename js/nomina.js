@@ -27,7 +27,7 @@ import { buildRequestHeaders, getUserContext, listAvailableLocalContexts } from 
 import { fetchResponsablesActivos } from "./responsables.js";
 import { getActiveEnvironment } from "./environment.js";
 import { supabase } from "./supabase.js";
-import { WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO, WEBHOOK_NOMINA_HISTORICO_GUARDAR, WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR } from "./webhooks.js";
+import { WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO, WEBHOOK_NOMINA_HISTORICO_GUARDAR, WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR } from "./webhooks.js"; // MANTENIMIENTO: URLs centralizadas; cambiar endpoints solo en js/webhooks.js.
 import { drawPngBrandWatermark } from "./png_branding.js";
 import { nominaLog, nominaWarn } from "./nomina.debug.js";
 
@@ -168,6 +168,17 @@ const formatDateCo = (value = new Date()) => {
 
 const formatMoneyPlain = (value) => toNumeric(value).toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+// MANTENIMIENTO DEDUCCIONES: ejecutar consultas Supabase sin `.catch()` encadenado; en este cliente algunas queries no exponen catch.
+const safeSupabaseQuery = async (builder, fallback = { data: null, error: null }) => {
+  try {
+    const result = await builder;
+    return result || fallback;
+  } catch (error) {
+    return { ...fallback, error };
+  }
+};
+
+// MANTENIMIENTO DEDUCCIONES: busca el correo del empleado para el webhook de PDF/correo. Si cambia la tabla de contactos, ajustar aquí.
 const findEmpleadoContacto = async (empleadoId) => {
   const safeId = String(empleadoId || "").trim();
   if (!safeId) return {};
@@ -180,18 +191,18 @@ const findEmpleadoContacto = async (empleadoId) => {
     { table: "usuarios_sistema", select: "id,nombre_completo,email,correo,empresa_id" }
   ];
   for (const source of tables) {
-    const { data } = await supabase.from(source.table).select(source.select).eq("id", safeId).maybeSingle().catch(() => ({ data: null }));
+    const { data } = await safeSupabaseQuery(supabase.from(source.table).select(source.select).eq("id", safeId).maybeSingle(), { data: null });
     if (data) return { ...data, source: source.table, email: data.email || data.correo || "" };
   }
   if (selectedCedula) {
     for (const source of tables.slice(0, 2)) {
-      const { data } = await supabase.from(source.table).select(source.select).eq("cedula", selectedCedula).maybeSingle().catch(() => ({ data: null }));
+      const { data } = await safeSupabaseQuery(supabase.from(source.table).select(source.select).eq("cedula", selectedCedula).maybeSingle(), { data: null });
       if (data) return { ...data, source: source.table, email: data.email || data.correo || "" };
     }
   }
   if (selectedName) {
     for (const source of tables) {
-      const { data } = await supabase.from(source.table).select(source.select).eq("empresa_id", state.context?.empresa_id || "").catch(() => ({ data: [] }));
+      const { data } = await safeSupabaseQuery(supabase.from(source.table).select(source.select).eq("empresa_id", state.context?.empresa_id || ""), { data: [] });
       const match = (Array.isArray(data) ? data : []).find((row) => normalizeConcept(row.nombre_completo) === selectedName);
       if (match) return { ...match, source: source.table, email: match.email || match.correo || "" };
     }
@@ -459,29 +470,58 @@ const normalizeFinalTimeInput = (value, fallback = "") => {
   return hasValidTimeText(fallback) ? fallback : "";
 };
 
-const findSelectedEmployeeEquivalentIds = async (empleadoId, sedes) => {
-  const selected = state.responsables.find((item) => String(item.id || "") === String(empleadoId || ""));
+// MANTENIMIENTO MULTISEDE: enriquece cada objeto de `sedes` con el usuario_id local correcto.
+// Conecta con Supabase (`usuarios_locales`) y con responsables ya cargados; si necesitas probar IDs por sede, inspecciona el array `sedes` del payload.
+const enrichSelectedSedesWithUserIds = async (empleadoId, sedes) => {
+  const selected = state.responsables.find((item) => String(item.id || "") === String(empleadoId || "")) || {};
   const selectedName = normalizeConcept(selected?.nombre_completo);
   const selectedCedula = String(selected?.cedula || "").trim();
-  const results = await Promise.all((sedes || []).map(async (sede) => {
-    const tenantId = sede.tenant_id || sede.empresa_id || "";
-    if (!tenantId) return null;
-    let responsables = tenantId === state.context?.empresa_id ? state.responsables : [];
-    if (!responsables.length) responsables = await fetchResponsablesActivos(tenantId).catch(() => []);
+
+  const findLocalUserId = async (tenantId) => {
+    if (!tenantId) return empleadoId;
+    if (tenantId === state.context?.empresa_id) return empleadoId;
+
+    const byPrincipal = await safeSupabaseQuery(
+      supabase
+        .from("usuarios_locales")
+        .select("id, usuario_principal_id, empresa_id, nombre_completo, activo")
+        .eq("empresa_id", tenantId)
+        .eq("usuario_principal_id", empleadoId)
+        .eq("activo", true)
+        .maybeSingle(),
+      { data: null }
+    );
+    if (byPrincipal.data?.id) return byPrincipal.data.id;
+
+    const localUsers = await safeSupabaseQuery(
+      supabase
+        .from("usuarios_locales")
+        .select("id, usuario_principal_id, empresa_id, nombre_completo, activo")
+        .eq("empresa_id", tenantId)
+        .eq("activo", true),
+      { data: [] }
+    );
+    const byName = (Array.isArray(localUsers.data) ? localUsers.data : []).find((row) => selectedName && normalizeConcept(row.nombre_completo) === selectedName);
+    if (byName?.id) return byName.id;
+
+    const responsables = await fetchResponsablesActivos(tenantId).catch(() => []);
     const match = responsables.find((item) => selectedCedula && String(item.cedula || "").trim() === selectedCedula)
       || responsables.find((item) => selectedName && normalizeConcept(item.nombre_completo) === selectedName)
       || responsables.find((item) => String(item.id || "") === String(empleadoId || ""));
+    return match?.id || empleadoId;
+  };
+
+  const enriched = await Promise.all((sedes || []).map(async (sede) => {
+    const tenantId = sede.tenant_id || sede.empresa_id || "";
+    const usuarioId = await findLocalUserId(tenantId);
     return {
-      tenant_id: tenantId,
-      empresa_id: tenantId,
-      sede_nombre: sede.nombre || tenantId,
-      responsable_id: match?.id || empleadoId,
-      usuario_id: match?.id || empleadoId,
-      empleado_id: match?.id || empleadoId,
-      nombre: match?.nombre_completo || selected?.nombre_completo || ""
+      ...sede,
+      usuario_id: usuarioId,
+      responsable_id: usuarioId,
+      empleado_id: usuarioId
     };
   }));
-  return results.filter(Boolean);
+  return enriched;
 };
 
 const setStatus = (message) => {
@@ -753,8 +793,7 @@ const parseExcelWebhookPayload = (value, depth = 0) => {
 };
 
 const buildExcelWebhookPayload = async (empleadoId) => {
-  const sedes = getSelectedLocalesNomina();
-  const responsable_tenants = await findSelectedEmployeeEquivalentIds(empleadoId, sedes);
+  const sedes = await enrichSelectedSedesWithUserIds(empleadoId, getSelectedLocalesNomina());
   return {
     empresa_id: state.context?.empresa_id || "",
     tenant_id: state.context?.empresa_id || "",
@@ -1870,6 +1909,7 @@ auxiliaresPanel?.addEventListener("change", (event) => {
 });
 
 
+// MANTENIMIENTO HISTÓRICO: arma un único JSON con todas las tablas renderizadas para WEBHOOK_NOMINA_HISTORICO_GUARDAR.
 const buildHistoricoNominaPayload = async () => {
   const calculation = calculateMoneyByDetail();
   const base = await buildExcelWebhookPayload(empleadoSelect.value);
@@ -1950,6 +1990,7 @@ const buildAutorizacionDeduccionesHtml = ({ empleado, contacto, rows, fecha }) =
   </main></body></html>`;
 };
 
+// MANTENIMIENTO DEDUCCIONES: botón Enviar deducciones; no descarga PDF, envía HTML al webhook para conversión/envío por correo.
 const enviarDeduccionesNomina = async () => {
   const empleadoId = empleadoSelect.value;
   if (!empleadoId) return setStatus("Selecciona un empleado antes de enviar deducciones.");
