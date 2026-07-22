@@ -1,4 +1,5 @@
 import { listLocalContextsForSwitcher, prepareLocalContextSwitch } from "./local_context_switcher.js";
+import { clearUserContextCache } from "./session.js";
 import { resolvePostLoginRoute } from "./post_login_route.js";
 
 const statusEl = document.getElementById("localPreselectorStatus");
@@ -46,6 +47,7 @@ async function chooseContext(empresaId) {
   setStatus("Aplicando contexto seleccionado...");
   try {
     await prepareLocalContextSwitch(empresaId);
+    clearUserContextCache();
     await redirectToApp();
   } catch (error) {
     console.error("[local_preselector] No se pudo cambiar contexto:", error);

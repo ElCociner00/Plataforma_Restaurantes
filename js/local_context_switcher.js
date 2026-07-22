@@ -9,6 +9,8 @@ const ACTIVE_LOCAL_CONTEXT_KEY = "plataforma_active_local_context_v1";
 const normalizeId = (value) => String(value || "").trim();
 
 const uniqueIds = (values = []) => [...new Set(values.map(normalizeId).filter(Boolean))];
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const isUuidLike = (value) => UUID_PATTERN.test(normalizeId(value));
 
 const isAdminRootContext = (context) => context?.rol === "admin_root" || context?.super_admin === true;
 
@@ -249,8 +251,8 @@ export async function getLocalesList(empresaId = null) {
     const formattedLocales = locales.map(local => ({
       id: local.empresa_id,
       grupo_id: local.grupo_id,
-      nombre: local.local_nombre_comercial || local.local_razon_social || `Local ${local.empresa_id}`,
-      razon_social: local.local_razon_social || local.local_nombre_comercial || `Local ${local.empresa_id}`,
+      nombre: local.local_nombre_comercial || local.local_razon_social || "Nombre no disponible",
+      razon_social: local.local_razon_social || local.local_nombre_comercial || "Razón social no disponible",
       plan: local.plan_grupo,
       activo: local.activo && local.local_activo,
       nombre_grupo: local.nombre_grupo,
@@ -331,11 +333,9 @@ export async function switchToLocal(localEmpresaId) {
     let usuarioId = principalUserId;
     const esAdmin = isAdminRootContext(context);
     
-    if (!esAdmin) {
-      const usuarioLocal = await getLocalUserForTenant(principalUserId, localEmpresaId);
-      if (usuarioLocal) {
-        usuarioId = usuarioLocal.id;
-      }
+    const usuarioLocal = await getLocalUserForTenant(principalUserId, localEmpresaId);
+    if (usuarioLocal) {
+      usuarioId = usuarioLocal.id;
     }
     
     writeStoredLocalSelection({ 
@@ -523,7 +523,8 @@ export async function listLocalContextsForSwitcher() {
 
   const labelForEmpresa = (empresaId, fallback) => {
     const empresa = empresaById.get(normalizeId(empresaId));
-    return String(empresa?.nombre_comercial || empresa?.razon_social || fallback || `Local ${empresaId}`).trim();
+    const label = String(empresa?.nombre_comercial || empresa?.razon_social || fallback || "Nombre no disponible").trim();
+    return isUuidLike(label) ? "Nombre no disponible" : label;
   };
 
   const usuarioLocalByEmpresaId = new Map(usuariosLocales.map((usuarioLocal) => [usuarioLocal.empresa_id, usuarioLocal]));
@@ -547,7 +548,7 @@ export async function listLocalContextsForSwitcher() {
     locales.push({
       empresa_id: row.empresa_id,
       usuario_id: row.id,
-      nombre: labelForEmpresa(row.empresa_id),
+      nombre: labelForEmpresa(row.empresa_id, grupo?.local_nombre_comercial || grupo?.local_razon_social || ""),
       tipo: "local",
       rol: row.rol || "",
       activo: normalizeId(context.empresa_id) === normalizeId(row.empresa_id),
@@ -629,11 +630,9 @@ export async function prepareLocalContextSwitch(empresaId) {
   let usuarioId = principalUserId;
   const esAdmin = isAdminRootContext(context);
   
-  if (!esAdmin) {
-    const usuarioLocal = await getLocalUserForTenant(principalUserId, targetEmpresaId);
-    if (usuarioLocal) {
-      usuarioId = usuarioLocal.id;
-    }
+  const usuarioLocal = await getLocalUserForTenant(principalUserId, targetEmpresaId);
+  if (usuarioLocal) {
+    usuarioId = usuarioLocal.id;
   }
 
   writeStoredLocalSelection({ empresa_id: targetEmpresaId, grupo_id: principalEmpresaId });
