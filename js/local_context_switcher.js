@@ -195,21 +195,28 @@ async function fetchGroupLocales(principalEmpresaId) {
       return [];
     }
 
-    // Recuperación RLS: no consultar `empresas` aquí. Si una política de empresas está rota,
-    // filtrar por esa tabla oculta locales válidos y deja el selector sin opciones.
-    // Los nombres de `grupos_empresariales` son suficientes para construir el switcher.
-    const enrichedLocales = groupRelations.map(rel => ({
-      empresa_id: rel.empresa_id,
-      grupo_id: rel.grupo_id,
-      nombre_grupo: rel.nombre_grupo,
-      razon_social_grupo: rel.razon_social_grupo,
-      plan_grupo: rel.plan_grupo,
-      activo: rel.activo,
-      local_nombre_comercial: rel.nombre_grupo || null,
-      local_razon_social: rel.razon_social_grupo || null,
-      local_activo: rel.activo !== false,
-      local_exists_in_empresas: true
-    }));
+    // Los nombres visibles del local NO salen de `grupos_empresariales`: esa tabla
+    // solo relaciona `grupo_id` (empresa principal) con `empresa_id` (tenant/local).
+    // La identidad comercial real se toma desde `empresas` por `id = empresa_id`.
+    const empresaIds = uniqueIds(groupRelations.map((rel) => rel?.empresa_id));
+    const empresas = await fetchEmpresasByIds(empresaIds);
+    const empresaById = new Map(empresas.map((empresa) => [normalizeId(empresa.id), empresa]));
+
+    const enrichedLocales = groupRelations.map((rel) => {
+      const empresa = empresaById.get(normalizeId(rel.empresa_id));
+      return {
+        empresa_id: rel.empresa_id,
+        grupo_id: rel.grupo_id,
+        nombre_grupo: rel.nombre_grupo,
+        razon_social_grupo: rel.razon_social_grupo,
+        plan_grupo: rel.plan_grupo,
+        activo: rel.activo,
+        local_nombre_comercial: empresa?.nombre_comercial || null,
+        local_razon_social: empresa?.razon_social || null,
+        local_activo: empresa?.activo !== false,
+        local_exists_in_empresas: !!empresa
+      };
+    });
 
     console.log(`[local_context_switcher] ✅ Locales del grupo disponibles:`, enrichedLocales.length);
     return enrichedLocales;
@@ -242,8 +249,8 @@ export async function getLocalesList(empresaId = null) {
     const formattedLocales = locales.map(local => ({
       id: local.empresa_id,
       grupo_id: local.grupo_id,
-      nombre: local.local_nombre_comercial || local.nombre_grupo || "Local sin nombre",
-      razon_social: local.local_razon_social || local.razon_social_grupo,
+      nombre: local.local_nombre_comercial || local.local_razon_social || `Local ${local.empresa_id}`,
+      razon_social: local.local_razon_social || local.local_nombre_comercial || `Local ${local.empresa_id}`,
       plan: local.plan_grupo,
       activo: local.activo && local.local_activo,
       nombre_grupo: local.nombre_grupo,
@@ -511,12 +518,12 @@ export async function listLocalContextsForSwitcher() {
     : uniqueIds(usuariosLocales.map((usuarioLocal) => usuarioLocal?.empresa_id));
   
   const empresas = await fetchEmpresasByIds([...visibleLocalIds]);
-  const empresaById = new Map(empresas.map((empresa) => [empresa.id, empresa]));
+  const empresaById = new Map(empresas.map((empresa) => [normalizeId(empresa.id), empresa]));
   const grupoByEmpresaId = new Map(grupos.map((grupo) => [grupo.empresa_id, grupo]));
 
   const labelForEmpresa = (empresaId, fallback) => {
-    const empresa = empresaById.get(empresaId);
-    return String(empresa?.nombre_comercial || empresa?.razon_social || fallback || empresaId).trim();
+    const empresa = empresaById.get(normalizeId(empresaId));
+    return String(empresa?.nombre_comercial || empresa?.razon_social || fallback || `Local ${empresaId}`).trim();
   };
 
   const usuarioLocalByEmpresaId = new Map(usuariosLocales.map((usuarioLocal) => [usuarioLocal.empresa_id, usuarioLocal]));
@@ -540,7 +547,7 @@ export async function listLocalContextsForSwitcher() {
     locales.push({
       empresa_id: row.empresa_id,
       usuario_id: row.id,
-      nombre: labelForEmpresa(row.empresa_id, grupo?.nombre_grupo || "Local"),
+      nombre: labelForEmpresa(row.empresa_id),
       tipo: "local",
       rol: row.rol || "",
       activo: normalizeId(context.empresa_id) === normalizeId(row.empresa_id),
@@ -580,7 +587,7 @@ async function fetchEmpresasByIds(empresaIds) {
   try {
     const { data, error } = await supabase
       .from("empresas")
-      .select("id, nombre_comercial, razon_social")
+      .select("id, nombre_comercial, razon_social, activo")
       .in("id", ids);
 
     if (error) {

@@ -649,3 +649,80 @@ location.reload();
 - `node --check js/header.js`: valida sintaxis de la integración del header.
 - `node --check js/session.js`: confirma que el archivo restaurado sigue con sintaxis válida.
 - `git diff --check`: valida que no existan errores de whitespace.
+
+---
+
+# Parche 5 — 2026-07-22 — Corrección de nombres reales de empresa/local en selector contextual
+
+## 1. Objetivo de la petición
+
+Corregir la identificación visual del selector de empresa principal/locales para que el nombre mostrado de cada local salga de la tabla `empresas` y no de `grupos_empresariales`. La tabla `grupos_empresariales` se conserva únicamente como relación entre `grupo_id` (empresa principal) y `empresa_id` (tenant/local destino). El nombre comercial o razón social visible se resuelve por `empresas.id = grupos_empresariales.empresa_id`.
+
+## 2. Archivos implicados y tipo de modificación
+
+### `js/local_context_switcher.js` — modificación funcional aislada
+
+- Se modificó `fetchGroupLocales()` para consultar los IDs relacionados desde `grupos_empresariales` y luego enriquecerlos con `nombre_comercial`, `razon_social` y `activo` desde `empresas`.
+- Se dejó explícito en comentarios que `nombre_grupo` y `razon_social_grupo` no deben usarse como nombre visible del local porque pertenecen al grupo/empresa madre o a la relación, no a la identidad comercial del tenant destino.
+- Se ajustó `getLocalesList()` para mostrar `nombre_comercial` o `razon_social` del local; si no se puede leer `empresas`, el fallback visible será `Local <empresa_id>` y no el nombre del grupo, evitando repetir incorrectamente el nombre de la empresa principal.
+- Se ajustó `listLocalContextsForSwitcher()` para normalizar las claves del mapa de empresas y evitar que el fallback con `nombre_grupo` vuelva a pintar el mismo nombre para empresa principal y local.
+- Se amplió `fetchEmpresasByIds()` para traer también `activo`, permitiendo conservar el filtro visual de locales inactivos sin depender de campos de grupo.
+
+### `docs/2026-06-11_selector_cambio_local_contexto_usuario_y_5_parches.md` — documentación actualizada
+
+- Se renombró el documento anterior de 4 a 5 parches, siguiendo la convención de parches posteriores solicitada.
+- Se agregó esta sección con objetivo, alcance, reversión, exportación y checklist funcional.
+
+## 3. Notas de emergencia para revertir este parche
+
+### Revertir `js/local_context_switcher.js`
+
+1. En `fetchGroupLocales()`, reemplazar el bloque que crea `empresaIds`, llama `fetchEmpresasByIds()` y arma `empresaById` por el mapeo anterior basado solo en `groupRelations`.
+2. En ese mismo mapeo anterior, restaurar:
+
+```js
+local_nombre_comercial: rel.nombre_grupo || null,
+local_razon_social: rel.razon_social_grupo || null,
+local_activo: rel.activo !== false,
+local_exists_in_empresas: true
+```
+
+3. En `getLocalesList()`, restaurar el nombre visible anterior si se necesita volver al comportamiento viejo:
+
+```js
+nombre: local.local_nombre_comercial || local.nombre_grupo || "Local sin nombre",
+razon_social: local.local_razon_social || local.razon_social_grupo,
+```
+
+4. En `listLocalContextsForSwitcher()`, volver a pasar `grupo?.nombre_grupo || "Local"` como fallback de `labelForEmpresa()` si se desea recuperar el nombre del grupo cuando no se pueda leer `empresas`.
+5. En `fetchEmpresasByIds()`, se puede retirar `activo` del `select` si el repositorio destino no lo necesita.
+
+### Revertir documentación
+
+1. Borrar esta sección completa de Parche 5.
+2. Renombrar el archivo a `docs/2026-06-11_selector_cambio_local_contexto_usuario_y_4_parches.md` si el parche se revierte totalmente.
+
+## 4. Indicaciones para exportar este parche a otro repositorio
+
+1. Exportar junto con el módulo aislado `js/local_context_switcher.js`; no tocar login, sesión, contexto global ni header salvo que el repositorio destino todavía no tenga conectado el selector.
+2. Validar que el repositorio destino tenga una tabla equivalente a `empresas` con columnas `id`, `nombre_comercial`, `razon_social` y, si existe, `activo`.
+3. Validar que la relación equivalente a `grupos_empresariales` mantenga esta semántica: `grupo_id` es la empresa principal y `empresa_id` es el tenant/local destino.
+4. Si el destino ya tiene otro método de nombres para locales, priorizar una sola fuente: `empresas.id = empresa_id`. No mezclar el nombre del grupo con el nombre comercial del local.
+5. Este repositorio centraliza URLs en `js/urls.js`, pero este parche no agrega rutas ni webhooks; por eso no requiere cambios de centralización de URLs.
+6. Antes de portar, revisar si las políticas RLS del destino permiten leer nombres básicos de `empresas`; si no lo permiten, el selector mostrará `Local <empresa_id>` como fallback seguro en vez de repetir un nombre incorrecto.
+7. Validar con datos reales que un caso como empresa principal `Restaurante Prueba` y local `Prueba Global Nexo 2` aparezca con nombres diferentes en el selector y en los payloads de sedes/locales de nómina.
+
+## 5. Checklist funcional / logs
+
+- ✅ Selector de locales: conserva la consulta por `grupos_empresariales.grupo_id` para encontrar locales de la empresa principal.
+- ✅ Nombre visible del local: sale de `empresas.nombre_comercial` o `empresas.razon_social` usando `empresas.id = empresa_id`.
+- ✅ Empresa principal: mantiene su nombre desde su propia fila en `empresas`.
+- ✅ Usuario local: no se altera la lógica de `usuarios_locales`; los IDs de usuario contextual siguen separados por tenant.
+- ✅ Nómina — selector de sedes/locales: recibe nombres diferenciados desde el módulo contextual cuando consume los locales disponibles.
+- ✅ Login/sesión/header: no se modifican en este parche.
+- ⚠️ Datos/RLS: si `empresas` no es legible para el usuario autenticado, el fallback será `Local <empresa_id>` para no mostrar un nombre de grupo incorrecto.
+
+## 6. Validaciones realizadas
+
+- `node --check js/local_context_switcher.js`: valida sintaxis del módulo aislado modificado.
+- `git diff --check`: valida que no existan errores de whitespace en el parche.
