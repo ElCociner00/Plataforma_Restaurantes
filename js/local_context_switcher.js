@@ -581,9 +581,34 @@ async function fetchUsuariosLocales({ principalUserId, localEmpresaIds }) {
   return Array.isArray(data) ? data : [];
 }
 
+async function fetchEmpresaById(empresaId) {
+  const id = normalizeId(empresaId);
+  if (!id) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from("empresas")
+      .select("id, nombre_comercial, razon_social, activo")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      console.warn(`[local_context_switcher] No se pudo cargar nombre desde empresas para ${id}:`, error?.message || error);
+      return null;
+    }
+
+    return data || null;
+  } catch (error) {
+    console.warn(`[local_context_switcher] Error cargando nombre desde empresas para ${id}:`, error?.message || error);
+    return null;
+  }
+}
+
 async function fetchEmpresasByIds(empresaIds) {
   const ids = uniqueIds(empresaIds);
   if (!ids.length) return [];
+
+  const empresasById = new Map();
 
   try {
     const { data, error } = await supabase
@@ -592,15 +617,30 @@ async function fetchEmpresasByIds(empresaIds) {
       .in("id", ids);
 
     if (error) {
-      console.warn("[local_context_switcher] No se pudieron cargar nombres desde empresas; usando nombres de grupo.", error?.message || error);
-      return [];
+      console.warn("[local_context_switcher] La carga agrupada de nombres desde empresas falló; intentando consultas individuales por id.", error?.message || error);
+    } else {
+      (Array.isArray(data) ? data : []).forEach((empresa) => {
+        empresasById.set(normalizeId(empresa?.id), empresa);
+      });
     }
-
-    return Array.isArray(data) ? data : [];
   } catch (error) {
-    console.warn("[local_context_switcher] Error cargando nombres desde empresas; usando nombres de grupo.", error?.message || error);
-    return [];
+    console.warn("[local_context_switcher] Error en carga agrupada de nombres desde empresas; intentando consultas individuales por id.", error?.message || error);
   }
+
+  const missingIds = ids.filter((id) => !empresasById.has(id));
+  if (missingIds.length) {
+    const fetchedIndividually = await Promise.all(missingIds.map((id) => fetchEmpresaById(id)));
+    fetchedIndividually.filter(Boolean).forEach((empresa) => {
+      empresasById.set(normalizeId(empresa.id), empresa);
+    });
+  }
+
+  const unresolvedIds = ids.filter((id) => !empresasById.has(id));
+  if (unresolvedIds.length) {
+    console.warn("[local_context_switcher] No se resolvieron nombres en empresas para:", unresolvedIds);
+  }
+
+  return ids.map((id) => empresasById.get(id)).filter(Boolean);
 }
 
 export async function prepareLocalContextSwitch(empresaId) {
