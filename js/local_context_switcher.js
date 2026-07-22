@@ -504,9 +504,7 @@ export async function listLocalContextsForSwitcher() {
   const grupos = await fetchGroupLocales(principalEmpresaId);
   const localEmpresaIds = uniqueIds(grupos.map((grupo) => grupo?.empresa_id));
   const adminRoot = isAdminRootContext(context);
-  const usuariosLocales = adminRoot
-    ? []
-    : await fetchUsuariosLocales({ principalUserId, localEmpresaIds });
+  const usuariosLocales = await fetchUsuariosLocales({ principalUserId, localEmpresaIds });
 
   const visibleLocalIds = adminRoot
     ? localEmpresaIds
@@ -521,13 +519,17 @@ export async function listLocalContextsForSwitcher() {
     return String(empresa?.nombre_comercial || empresa?.razon_social || fallback || empresaId).trim();
   };
 
+  const usuarioLocalByEmpresaId = new Map(usuariosLocales.map((usuarioLocal) => [usuarioLocal.empresa_id, usuarioLocal]));
   const rowsForMenu = adminRoot
-    ? grupos.map((grupo) => ({
-        empresa_id: grupo.empresa_id,
-        id: principalUserId,
-        rol: context.rol,
-        grupo
-      }))
+    ? grupos.map((grupo) => {
+        const usuarioLocal = usuarioLocalByEmpresaId.get(grupo.empresa_id);
+        return {
+          empresa_id: grupo.empresa_id,
+          id: usuarioLocal?.id || principalUserId,
+          rol: usuarioLocal?.rol || context.rol,
+          grupo
+        };
+      })
     : usuariosLocales.map((usuarioLocal) => ({
         ...usuarioLocal,
         grupo: grupoByEmpresaId.get(usuarioLocal.empresa_id)

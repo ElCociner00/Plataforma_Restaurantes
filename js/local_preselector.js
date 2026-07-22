@@ -1,4 +1,4 @@
-import { listAvailableLocalContexts, switchLocalContext } from "./session.js";
+import { listLocalContextsForSwitcher, prepareLocalContextSwitch } from "./local_context_switcher.js";
 import { resolvePostLoginRoute } from "./post_login_route.js";
 
 const statusEl = document.getElementById("localPreselectorStatus");
@@ -45,7 +45,7 @@ async function redirectToApp() {
 async function chooseContext(empresaId) {
   setStatus("Aplicando contexto seleccionado...");
   try {
-    await switchLocalContext(empresaId);
+    await prepareLocalContextSwitch(empresaId);
     await redirectToApp();
   } catch (error) {
     console.error("[local_preselector] No se pudo cambiar contexto:", error);
@@ -72,7 +72,7 @@ async function loadContexts() {
 
   let contexts = [];
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    contexts = await listAvailableLocalContexts().catch((error) => {
+    contexts = await listLocalContextsForSwitcher().catch((error) => {
       console.warn("[local_preselector] Intento fallido:", error);
       return [];
     });
@@ -100,7 +100,7 @@ async function loadContexts() {
 }
 
 continueBtn?.addEventListener("click", async () => {
-  const contexts = await listAvailableLocalContexts().catch(() => []);
+  const contexts = await listLocalContextsForSwitcher().catch(() => []);
   const principal = contexts.find((item) => item.tipo === "principal");
   if (principal?.empresa_id) await chooseContext(principal.empresa_id);
   else await redirectToApp();
