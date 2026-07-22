@@ -89,6 +89,8 @@ function mapContextPayload(data, fallbackUser) {
     empresa_id: data?.empresa_id || null,
     rol,
     nombre: data?.nombre || email || "Usuario",
+    nombre_comercial: data?.nombre_comercial || data?.empresa_nombre || "",
+    razon_social: data?.razon_social || "",
     plan: String(data?.plan || "free").trim().toLowerCase() || "free",
     activa: data?.activa !== false,
     permisos: sanitizePermisos(data?.permisos),
@@ -164,7 +166,7 @@ async function getContextFromTables(user) {
 
   const { data: empresa, error: empresaError } = await supabase
     .from("empresas")
-    .select("id, plan, plan_actual, activa, activo")
+    .select("id, plan, plan_actual, activa, activo, nombre_comercial, razon_social")
     .eq("id", usuarioSistema.empresa_id)
     .maybeSingle();
 
@@ -182,6 +184,8 @@ async function getContextFromTables(user) {
     empresa_id: usuarioSistema.empresa_id || null,
     rol: usuarioSistema.rol || "operativo",
     nombre: usuarioSistema.nombre_completo || user.email || "Usuario",
+    nombre_comercial: empresa?.nombre_comercial || "",
+    razon_social: empresa?.razon_social || "",
     plan: empresa?.plan || empresa?.plan_actual || "free",
     activa: empresa?.activa !== false && empresa?.activo !== false,
     permisos: {},
@@ -279,6 +283,8 @@ async function applyLocalContextOverride(baseContext, authUser) {
       empresa_principal_id: principalEmpresaId,
       empresa_id: selection.empresa_id,
       nombre: usuarioLocal?.nombre_completo || baseContext.nombre,
+      nombre_comercial: empresa.nombre_comercial || grupo.nombre_grupo || "",
+      razon_social: empresa.razon_social || grupo.razon_social_grupo || "",
       rol,
       plan: String(empresa.plan || empresa.plan_actual || grupo.plan_grupo || baseContext.plan || "free").trim().toLowerCase() || "free",
       activa: empresa.activa !== false && empresa.activo !== false,
@@ -337,9 +343,18 @@ export async function listAvailableLocalContexts() {
     principalEmpresaId,
     ...(isAdminRoot ? localEmpresaIds : usuariosLocales.map((row) => row.empresa_id).filter(Boolean))
   ];
-  // Recuperación RLS: no bloquear el switcher por una consulta secundaria a `empresas`.
-  // Si `empresas` está limitada o su política falla, se usan los nombres de grupos_empresariales.
-  const empresaById = new Map();
+  const { data: empresas, error: empresasError } = visibleEmpresaIds.length
+    ? await supabase
+        .from("empresas")
+        .select("id, nombre_comercial, razon_social")
+        .in("id", visibleEmpresaIds)
+    : { data: [], error: null };
+
+  if (empresasError) {
+    console.warn("[session] No se pudieron cargar nombres desde empresas para locales; usando fallback.", empresasError?.message || empresasError);
+  }
+
+  const empresaById = new Map((empresas || []).map((empresa) => [empresa.id, empresa]));
   const grupoByEmpresaId = new Map((grupos || []).map((grupo) => [grupo.empresa_id, grupo]));
   const labelForEmpresa = (empresaId, fallback = "") => {
     const empresa = empresaById.get(empresaId);
