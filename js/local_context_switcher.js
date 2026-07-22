@@ -575,9 +575,22 @@ async function fetchEmpresasByIds(empresaIds) {
   const ids = uniqueIds(empresaIds);
   if (!ids.length) return [];
 
-  // Recuperación RLS: evitar una consulta secundaria a `empresas` para no romper el switcher
-  // si la política de esa tabla está en recuperación. Los labels caen al nombre del grupo.
-  return [];
+  try {
+    const { data, error } = await supabase
+      .from("empresas")
+      .select("id, nombre_comercial, razon_social")
+      .in("id", ids);
+
+    if (error) {
+      console.warn("[local_context_switcher] No se pudieron cargar nombres desde empresas; usando nombres de grupo.", error?.message || error);
+      return [];
+    }
+
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.warn("[local_context_switcher] Error cargando nombres desde empresas; usando nombres de grupo.", error?.message || error);
+    return [];
+  }
 }
 
 export async function prepareLocalContextSwitch(empresaId) {

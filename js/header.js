@@ -172,12 +172,11 @@ const resolveRouteForEnv = async (env, context) => {
 
 const obtenerNombreEmpresa = async (empresaId, fallback = "") => {
   const safeFallback = String(fallback || "").trim();
-  if (safeFallback) return safeFallback;
-  if (!empresaId) return "";
+  if (!empresaId) return safeFallback;
   try {
     const { data, error } = await supabase
       .from("empresas")
-      .select("nombre_comercial")
+      .select("nombre_comercial, razon_social")
       .eq("id", empresaId)
       .maybeSingle();
 
@@ -185,9 +184,9 @@ const obtenerNombreEmpresa = async (empresaId, fallback = "") => {
       console.warn("[header] Nombre de empresa no disponible por RLS; usando fallback vacío.", error?.message || error);
       return "";
     }
-    return String(data?.nombre_comercial || "").trim();
+    return String(data?.nombre_comercial || data?.razon_social || safeFallback).trim();
   } catch (_error) {
-    return "";
+    return safeFallback;
   }
 };
 
@@ -383,7 +382,7 @@ async function renderAuthenticatedHeader() {
   }
 
   const environmentForMenu = getActiveEnvironment() || (isGlobalNoTenantPage ? ENV_LOGGRO : inferEnvironmentFromPath());
-  const nombreEmpresa = await obtenerNombreEmpresa(context.empresa_id, context.nombre);
+  const nombreEmpresa = await obtenerNombreEmpresa(context.empresa_id, context.nombre_comercial || context.razon_social);
   
   let localContexts = [];
   try {
@@ -437,7 +436,7 @@ window.addEventListener('localContextReady', async () => {
       const isGlobalNoTenantPage = currentPath.includes("/gestion_empresas/") || currentPath.includes("/facturacion/");
       const inferEnvironmentFromPath = () => currentPath.includes("/siigo/") ? ENV_SIIGO : ENV_LOGGRO;
       const environmentForMenu = getActiveEnvironment() || (isGlobalNoTenantPage ? ENV_LOGGRO : inferEnvironmentFromPath());
-      const nombreEmpresa = await obtenerNombreEmpresa(context?.empresa_id, context?.nombre);
+      const nombreEmpresa = await obtenerNombreEmpresa(context?.empresa_id, context?.nombre_comercial || context?.razon_social);
       const menu = buildMenu({ context, environmentForMenu, localContexts });
       
       header.innerHTML = `
