@@ -433,7 +433,7 @@ const resolveResponsableName = (id, fallback = "-") => {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const isUuidLike = (value) => UUID_PATTERN.test(String(value || "").trim());
-const visibleSedeName = (local, fallback = "Local sin nombre") => {
+const visibleSedeName = (local, fallback = "Nombre no disponible") => {
   const label = String(local?.nombre || local?.razon_social || "").trim();
   if (label && !isUuidLike(label)) return label;
   return local?.tipo === "principal" ? "Empresa principal" : fallback;
@@ -443,13 +443,13 @@ const resolveSedeName = (id, fallback = "Sede actual") => {
   const safeId = String(id || "").trim();
   if (!safeId) return fallback;
   const found = (state.localesNomina || []).find((local) => String(local.empresa_id || local.tenant_id || "") === safeId);
-  return found ? visibleSedeName(found, "Sede sin nombre") : "Sede sin nombre";
+  return found ? visibleSedeName(found, "Sede no disponible") : "Sede no disponible";
 };
 
 const renderLocalesNomina = () => {
   if (!localesPanel) return;
   const locales = state.localesNomina.length ? state.localesNomina : [{ empresa_id: state.context?.empresa_id || "", nombre: "Sede actual", activo: true }];
-  const localLabel = (local) => visibleSedeName(local, "Local sin nombre");
+  const localLabel = (local) => visibleSedeName(local, "Nombre no disponible");
   localesPanel.innerHTML = `
     <h3>Locales / sedes a consultar</h3>
     <p>Selecciona una o varias sedes. Se enviará la selección necesaria al webhook de nómina.</p>
@@ -471,7 +471,7 @@ const getSelectedLocalesNomina = () => {
     usuario_id: local.usuario_id || local.user_id || "",
     responsable_id: local.usuario_id || local.user_id || "",
     empleado_id: local.usuario_id || local.user_id || "",
-    nombre: visibleSedeName(local, "Local sin nombre"),
+    nombre: visibleSedeName(local, "Nombre no disponible"),
     tipo: local.tipo || ""
   })).filter((local) => local.tenant_id);
 };
