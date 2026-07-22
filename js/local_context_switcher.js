@@ -9,6 +9,8 @@ const ACTIVE_LOCAL_CONTEXT_KEY = "plataforma_active_local_context_v1";
 const normalizeId = (value) => String(value || "").trim();
 
 const uniqueIds = (values = []) => [...new Set(values.map(normalizeId).filter(Boolean))];
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const isUuidLike = (value) => UUID_PATTERN.test(normalizeId(value));
 
 const isAdminRootContext = (context) => context?.rol === "admin_root" || context?.super_admin === true;
 
@@ -249,8 +251,8 @@ export async function getLocalesList(empresaId = null) {
     const formattedLocales = locales.map(local => ({
       id: local.empresa_id,
       grupo_id: local.grupo_id,
-      nombre: local.local_nombre_comercial || local.local_razon_social || `Local ${local.empresa_id}`,
-      razon_social: local.local_razon_social || local.local_nombre_comercial || `Local ${local.empresa_id}`,
+      nombre: local.local_nombre_comercial || local.local_razon_social || "Local sin nombre",
+      razon_social: local.local_razon_social || local.local_nombre_comercial || "Local sin razón social",
       plan: local.plan_grupo,
       activo: local.activo && local.local_activo,
       nombre_grupo: local.nombre_grupo,
@@ -523,7 +525,8 @@ export async function listLocalContextsForSwitcher() {
 
   const labelForEmpresa = (empresaId, fallback) => {
     const empresa = empresaById.get(normalizeId(empresaId));
-    return String(empresa?.nombre_comercial || empresa?.razon_social || fallback || `Local ${empresaId}`).trim();
+    const label = String(empresa?.nombre_comercial || empresa?.razon_social || fallback || "Local sin nombre").trim();
+    return isUuidLike(label) ? "Local sin nombre" : label;
   };
 
   const usuarioLocalByEmpresaId = new Map(usuariosLocales.map((usuarioLocal) => [usuarioLocal.empresa_id, usuarioLocal]));
