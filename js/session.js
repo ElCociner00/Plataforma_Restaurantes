@@ -252,11 +252,15 @@ async function applyLocalContextOverride(baseContext, authUser) {
       usuarioLocal = data;
     }
 
-    const empresa = await loadEmpresaForContext(selection.empresa_id);
-    if (!empresa) {
-      clearActiveLocalContext();
-      return baseContext;
-    }
+    const empresa = await loadEmpresaForContext(selection.empresa_id) || {
+      id: selection.empresa_id,
+      plan: grupo.plan_grupo || baseContext.plan || "free",
+      plan_actual: grupo.plan_grupo || baseContext.plan || "free",
+      activa: true,
+      activo: true,
+      nombre_comercial: grupo.nombre_grupo || "Local",
+      razon_social: grupo.razon_social_grupo || grupo.nombre_grupo || "Local"
+    };
 
     const contextualUserId = isAdminRoot ? authUser.id : usuarioLocal.id;
     const rol = normalizeRole(isAdminRoot ? baseContext.rol : (usuarioLocal.rol || baseContext.rol));
@@ -333,16 +337,9 @@ export async function listAvailableLocalContexts() {
     principalEmpresaId,
     ...(isAdminRoot ? localEmpresaIds : usuariosLocales.map((row) => row.empresa_id).filter(Boolean))
   ];
-  let empresas = [];
-  if (visibleEmpresaIds.length) {
-    const { data, error } = await supabase
-      .from("empresas")
-      .select("id, nombre_comercial, razon_social")
-      .in("id", [...new Set(visibleEmpresaIds)]);
-    if (!error) empresas = data || [];
-  }
-
-  const empresaById = new Map(empresas.map((empresa) => [empresa.id, empresa]));
+  // Recuperación RLS: no bloquear el switcher por una consulta secundaria a `empresas`.
+  // Si `empresas` está limitada o su política falla, se usan los nombres de grupos_empresariales.
+  const empresaById = new Map();
   const grupoByEmpresaId = new Map((grupos || []).map((grupo) => [grupo.empresa_id, grupo]));
   const labelForEmpresa = (empresaId, fallback = "") => {
     const empresa = empresaById.get(empresaId);
