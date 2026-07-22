@@ -170,7 +170,9 @@ const resolveRouteForEnv = async (env, context) => {
   return resolveFirstAllowedRoute(context?.rol, env, permisos);
 };
 
-const obtenerNombreEmpresa = async (empresaId) => {
+const obtenerNombreEmpresa = async (empresaId, fallback = "") => {
+  const safeFallback = String(fallback || "").trim();
+  if (safeFallback) return safeFallback;
   if (!empresaId) return "";
   try {
     const { data, error } = await supabase
@@ -179,7 +181,10 @@ const obtenerNombreEmpresa = async (empresaId) => {
       .eq("id", empresaId)
       .maybeSingle();
 
-    if (error) return "";
+    if (error) {
+      console.warn("[header] Nombre de empresa no disponible por RLS; usando fallback vacío.", error?.message || error);
+      return "";
+    }
     return String(data?.nombre_comercial || "").trim();
   } catch (_error) {
     return "";
@@ -378,7 +383,7 @@ async function renderAuthenticatedHeader() {
   }
 
   const environmentForMenu = getActiveEnvironment() || (isGlobalNoTenantPage ? ENV_LOGGRO : inferEnvironmentFromPath());
-  const nombreEmpresa = await obtenerNombreEmpresa(context.empresa_id);
+  const nombreEmpresa = await obtenerNombreEmpresa(context.empresa_id, context.nombre);
   
   let localContexts = [];
   try {
@@ -432,7 +437,7 @@ window.addEventListener('localContextReady', async () => {
       const isGlobalNoTenantPage = currentPath.includes("/gestion_empresas/") || currentPath.includes("/facturacion/");
       const inferEnvironmentFromPath = () => currentPath.includes("/siigo/") ? ENV_SIIGO : ENV_LOGGRO;
       const environmentForMenu = getActiveEnvironment() || (isGlobalNoTenantPage ? ENV_LOGGRO : inferEnvironmentFromPath());
-      const nombreEmpresa = await obtenerNombreEmpresa(context?.empresa_id);
+      const nombreEmpresa = await obtenerNombreEmpresa(context?.empresa_id, context?.nombre);
       const menu = buildMenu({ context, environmentForMenu, localContexts });
       
       header.innerHTML = `

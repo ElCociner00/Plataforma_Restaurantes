@@ -195,51 +195,24 @@ async function fetchGroupLocales(principalEmpresaId) {
       return [];
     }
 
-    const localIds = groupRelations.map(rel => rel.empresa_id);
-    console.log(`[local_context_switcher] IDs de locales a consultar:`, localIds);
+    // Recuperación RLS: no consultar `empresas` aquí. Si una política de empresas está rota,
+    // filtrar por esa tabla oculta locales válidos y deja el selector sin opciones.
+    // Los nombres de `grupos_empresariales` son suficientes para construir el switcher.
+    const enrichedLocales = groupRelations.map(rel => ({
+      empresa_id: rel.empresa_id,
+      grupo_id: rel.grupo_id,
+      nombre_grupo: rel.nombre_grupo,
+      razon_social_grupo: rel.razon_social_grupo,
+      plan_grupo: rel.plan_grupo,
+      activo: rel.activo,
+      local_nombre_comercial: rel.nombre_grupo || null,
+      local_razon_social: rel.razon_social_grupo || null,
+      local_activo: rel.activo !== false,
+      local_exists_in_empresas: true
+    }));
 
-    const { data: empresasData, error: empresasError } = await supabase
-      .from("empresas")
-      .select("id, nombre_comercial, razon_social, activo")
-      .in("id", localIds)
-      .eq("activo", true);
-
-    if (empresasError) {
-      console.error("[local_context_switcher] ❌ Error al consultar empresas:", empresasError);
-      return groupRelations;
-    }
-
-    console.log(`[local_context_switcher] ✅ Empresas encontradas:`, empresasData?.length || 0);
-
-    const empresasMap = new Map();
-    empresasData?.forEach(empresa => {
-      empresasMap.set(empresa.id, empresa);
-    });
-
-    const enrichedLocales = groupRelations.map(rel => {
-      const empresaInfo = empresasMap.get(rel.empresa_id);
-      
-      return {
-        empresa_id: rel.empresa_id,
-        grupo_id: rel.grupo_id,
-        nombre_grupo: rel.nombre_grupo,
-        razon_social_grupo: rel.razon_social_grupo,
-        plan_grupo: rel.plan_grupo,
-        activo: rel.activo,
-        local_nombre_comercial: empresaInfo?.nombre_comercial || null,
-        local_razon_social: empresaInfo?.razon_social || null,
-        local_activo: empresaInfo?.activo || false,
-        local_exists_in_empresas: !!empresaInfo
-      };
-    });
-
-    const validLocales = enrichedLocales.filter(local => local.local_exists_in_empresas);
-    
-    if (validLocales.length !== enrichedLocales.length) {
-      console.warn(`[local_context_switcher] ⚠️ Se filtraron ${enrichedLocales.length - validLocales.length} locales que no existen en empresas`);
-    }
-    
-    return validLocales;
+    console.log(`[local_context_switcher] ✅ Locales del grupo disponibles:`, enrichedLocales.length);
+    return enrichedLocales;
     
   } catch (error) {
     console.error("[local_context_switcher] 💥 Excepción catastrófica:", error);
@@ -602,17 +575,9 @@ async function fetchEmpresasByIds(empresaIds) {
   const ids = uniqueIds(empresaIds);
   if (!ids.length) return [];
 
-  const { data, error } = await supabase
-    .from("empresas")
-    .select("id, nombre_comercial, razon_social")
-    .in("id", ids);
-
-  if (error) {
-    console.warn("[local_context_switcher] No se pudieron cargar nombres de empresas/locales:", error);
-    return [];
-  }
-
-  return Array.isArray(data) ? data : [];
+  // Recuperación RLS: evitar una consulta secundaria a `empresas` para no romper el switcher
+  // si la política de esa tabla está en recuperación. Los labels caen al nombre del grupo.
+  return [];
 }
 
 export async function prepareLocalContextSwitch(empresaId) {

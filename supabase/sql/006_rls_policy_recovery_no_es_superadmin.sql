@@ -11,6 +11,10 @@ set search_path = public
 as $$
   select exists (
     select 1
+    from public.system_users su
+    where lower(coalesce(su.correo, '')) = lower(coalesce(auth.jwt() ->> 'email', ''))
+  ) or exists (
+    select 1
     from public.usuarios_sistema us
     where us.id = auth.uid()
       and lower(coalesce(us.rol, '')) = 'admin_root'
