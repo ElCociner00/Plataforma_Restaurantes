@@ -453,3 +453,56 @@ th.dragging {
     grid-template-columns: repeat(2, minmax(140px, 1fr));
   }
 }
+
+/* Parche histórico 2026-07-23: tabla más legible, colorida y sin quiebres verticales en números/fechas. */
+.filtros select,
+.filtros input {
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: #ffffff;
+  color: #1f2937;
+}
+
+.tabla-wrap {
+  background: linear-gradient(180deg, #ffffff 0%, #fbfaff 100%);
+  box-shadow: 0 10px 24px rgba(49, 46, 129, 0.08);
+}
+
+table {
+  table-layout: auto;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: linear-gradient(135deg, #312e81 0%, #4f46e5 100%);
+  color: #ffffff;
+  border-bottom: 0;
+}
+
+tbody tr:nth-child(even) {
+  background: #f8f7ff;
+}
+
+tbody tr:hover {
+  background: #eef2ff;
+}
+
+.tabla-wrap td,
+.tabla-wrap th {
+  min-width: 112px;
+  vertical-align: middle;
+}
+
+.tabla-wrap td {
+  color: #1f2937;
+  line-height: 1.35;
+}
+
+.tabla-wrap td:nth-child(n + 2) {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}
