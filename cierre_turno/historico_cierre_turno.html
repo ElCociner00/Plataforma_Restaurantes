@@ -19,24 +19,29 @@
       <h2>Filtros</h2>
       <div class="filtros-grid">
         <label>
-          Fecha desde
-          <input type="date" id="filtroFechaDesde">
+          Periodo
+          <select id="filtroPeriodo">
+            <option value="personalizado">Personalizado</option>
+            <option value="hoy">Hoy</option>
+            <option value="semana">Semana actual</option>
+            <option value="mes">Mes actual</option>
+          </select>
         </label>
         <label>
-          Número de turno
-          <input type="text" id="filtroNumeroTurno" placeholder="Ej: 2">
+          Fecha desde
+          <input type="date" id="filtroFechaDesde">
         </label>
         <label>
           Fecha hasta
           <input type="date" id="filtroFechaHasta">
         </label>
         <label>
-          Hora inicio
-          <input type="time" id="filtroHoraInicio">
-        </label>
-        <label>
-          Hora fin
-          <input type="time" id="filtroHoraFin">
+          Momento
+          <select id="filtroMomento">
+            <option value="">Todos</option>
+            <option value="mañana">Mañana</option>
+            <option value="tarde">Tarde</option>
+          </select>
         </label>
       </div>
       <div class="acciones-filtros">

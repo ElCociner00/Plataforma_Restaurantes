@@ -46,9 +46,8 @@ const detalleTurno = document.getElementById("detalleTurno");
 
 const filtroFechaDesde = document.getElementById("filtroFechaDesde");
 const filtroFechaHasta = document.getElementById("filtroFechaHasta");
-const filtroHoraInicio = document.getElementById("filtroHoraInicio");
-const filtroHoraFin = document.getElementById("filtroHoraFin");
-const filtroNumeroTurno = document.getElementById("filtroNumeroTurno");
+const filtroPeriodo = document.getElementById("filtroPeriodo");
+const filtroMomento = document.getElementById("filtroMomento");
 const coincidenciasSimilares = document.getElementById("coincidenciasSimilares");
 
 const btnAplicarFiltros = document.getElementById("aplicarFiltros");
@@ -61,11 +60,16 @@ const btnDescargarPngTurnoSeleccionado = document.getElementById("descargarPngTu
 
 const PAGE_SIZE = 20;
 const MAX_LOADING_MS = 5000;
-const EXCLUDED_GENERAL_FIELDS = new Set(["empresa_id", "registrado_por", "responsable_id", "total_variables", "diferencia_caja", "variables_detalle", "created_at", "turno_nombre"]);
+const SUPABASE_PAGE_SIZE = 1000;
+const TURNO_TABLES = { principal: "turnos_agrupados", local: "turnos_agrupados_locales" };
+const CIERRE_FINAL_TABLES = { principal: "cierres_turno_final", local: "cierres_turno_final_locales" };
+const EXCLUDED_GENERAL_FIELDS = new Set(["empresa_id", "registrado_por", "responsable_id", "total_variables", "diferencia_caja", "variables_detalle", "created_at", "turno_nombre", "nombre_turno"]);
 const EXCLUDED_DETAIL_FIELDS = new Set(["id"]);
 const normalizeFieldKey = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 const shouldExcludeGeneralField = (key) => EXCLUDED_GENERAL_FIELDS.has(key) || normalizeFieldKey(key).includes("responsableid");
 const getTimestamp = () => new Date().toISOString();
+const isLocalContext = () => state.context?.local_context === true || (state.context?.empresa_principal_id && state.context?.empresa_id && state.context.empresa_principal_id !== state.context.empresa_id);
+const getScopedTable = (tables) => tables[isLocalContext() ? "local" : "principal"];
 
 const state = {
   context: null,
@@ -219,7 +223,7 @@ const fuzzyMatches = (query, value, threshold = 0.8) => {
 
 const getDisplayValue = (value) => toReadableLabel(formatCellValue(value));
 
-const getRowId = (row, index) => String(row.turno_nombre || `${row.fecha_turno || "sin_fecha"}-${row.numero_turno || "sin_turno"}-${index}`);
+const getRowId = (row, index) => String(row.id || row.turno_nombre || `${row.fecha_turno || "sin_fecha"}-${row.numero_turno || "sin_turno"}-${row.hora_inicio || "sin_inicio"}-${row.hora_fin || "sin_fin"}-${index}`);
 
 const getDetailItemKey = (detail) => `${String(detail.variable || "")}|${String(detail.categoria || "")}`;
 
@@ -261,7 +265,7 @@ const resolveResponsableId = (rawRow = {}) => {
 };
 
 const resolveResponsableName = (rawRow = {}, mapById = {}) => {
-  const direct = getGeneralValue(rawRow, ["responsable", "responsable_nombre", "nombre_responsable", "responsableName"]);
+  const direct = getGeneralValue(rawRow, ["responsable", "responsable_nombre", "nombre_responsable", "responsableName", "registrado_por_nombre", "usuario_nombre"]);
   if (direct) return direct;
 
   const responsableId = resolveResponsableId(rawRow);
@@ -290,6 +294,8 @@ const sanitizeRow = (rawRow, index) => {
   if (String(cajaAlias || "").trim()) general.caja_final = cajaAlias;
 
   general.responsable = resolveResponsableName(rawRow, state.responsableNamesById);
+  const momento = getGeneralValue(rawRow, ["momento", "nombre_turno", "jornada"]);
+  if (momento) general.momento = momento;
 
   const detailsRaw = Array.isArray(rawRow?.variables_detalle) ? rawRow.variables_detalle : (typeof rawRow?.variables_detalle === "string" ? (() => { try { const parsed = JSON.parse(rawRow.variables_detalle); return Array.isArray(parsed) ? parsed : []; } catch { return []; } })() : []);
   const details = sortDetailsBase(detailsRaw.map((item) => {
@@ -397,11 +403,11 @@ const enrichRowsWithCierreTurnoFinal = async (rows = [], empresaId = "") => {
   if (!Array.isArray(rows) || !rows.length || !empresaId) return rows;
 
   const { data, error } = await supabase
-    .from("cierres_turno_final")
+    .from(getScopedTable(CIERRE_FINAL_TABLES))
     .select("id, fecha_turno, responsable_id, hora_inicio, hora_fin, bolsa_global, caja_global, created_at")
     .eq("empresa_id", empresaId)
     .order("created_at", { ascending: false })
-    .limit(Math.max(250, rows.length * 8));
+    .limit(Math.max(1000, rows.length * 8));
 
   if (error || !Array.isArray(data) || !data.length) return rows;
 
@@ -445,6 +451,65 @@ const enrichRowsWithCierreTurnoFinal = async (rows = [], empresaId = "") => {
   });
 
   return rows;
+};
+
+
+const fetchAllSupabaseRows = async (tableName, empresaId) => {
+  const rows = [];
+  let from = 0;
+  while (true) {
+    let query = supabase
+      .from(tableName)
+      .select("*")
+      .order("fecha_turno", { ascending: false })
+      .order("numero_turno", { ascending: false })
+      .range(from, from + SUPABASE_PAGE_SIZE - 1);
+
+    if (empresaId) query = query.eq("empresa_id", empresaId);
+    const { data, error } = await query;
+    if (error) return { data: rows, error };
+    const chunk = Array.isArray(data) ? data : [];
+    rows.push(...chunk);
+    if (chunk.length < SUPABASE_PAGE_SIZE) return { data: rows, error: null };
+    from += SUPABASE_PAGE_SIZE;
+  }
+};
+
+const mergeRowsByIdentity = (...groups) => {
+  const merged = new Map();
+  groups.flatMap((group) => normalizeRows(group)).forEach((row, index) => {
+    const key = getRowId(row, index);
+    if (!merged.has(key)) {
+      merged.set(key, row);
+      return;
+    }
+
+    const current = merged.get(key);
+    const currentResponsable = getGeneralValue(current, ["responsable", "responsable_nombre", "nombre_responsable", "responsableName", "registrado_por_nombre", "usuario_nombre"]);
+    const incomingResponsable = getGeneralValue(row, ["responsable", "responsable_nombre", "nombre_responsable", "responsableName", "registrado_por_nombre", "usuario_nombre"]);
+    merged.set(key, {
+      ...row,
+      ...current,
+      responsable: currentResponsable || incomingResponsable || current?.responsable || row?.responsable,
+      variables_detalle: current.variables_detalle || row.variables_detalle
+    });
+  });
+  return Array.from(merged.values());
+};
+
+const fetchWebhookRows = async (payload) => {
+  try {
+    const headers = await buildRequestHeaders({ includeTenant: true });
+    const webhookResponse = await fetchWithTimeout(WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(payload)
+    });
+    if (!webhookResponse.ok) return [];
+    return normalizeRows(await webhookResponse.json());
+  } catch (_error) {
+    return [];
+  }
 };
 
 const enrichRowsWithApoyosTurno = async (rows = [], empresaId = "") => {
@@ -784,14 +849,10 @@ const renderSimilarMatches = (rows, query, label) => {
 const applyFilters = () => {
   const fechaDesde = filtroFechaDesde.value;
   const fechaHasta = filtroFechaHasta.value;
-  const horaInicio = filtroHoraInicio.value;
-  const horaFin = filtroHoraFin.value;
-  const numeroTurno = filtroNumeroTurno?.value?.trim() || "";
+  const momento = normalizeSearchText(filtroMomento?.value || "");
 
   const fechaCol = getCandidateColumn(state.allGeneralColumns, ["fecha", "date"]);
-  const horaInicioCol = getCandidateColumn(state.allGeneralColumns, ["hora_inicio", "inicio"]);
-  const horaFinCol = getCandidateColumn(state.allGeneralColumns, ["hora_fin", "fin"]);
-  const numeroCol = getCandidateColumn(state.allGeneralColumns, ["numero_turno", "turno", "numero"]);
+  const momentoCol = getCandidateColumn(state.allGeneralColumns, ["momento", "nombre_turno", "jornada"]);
 
   const similarRows = [];
 
@@ -810,25 +871,9 @@ const applyFilters = () => {
       }
     }
 
-    if (horaInicio && horaInicioCol) {
-      const value = String(row.general[horaInicioCol] ?? "").slice(0, 5);
-      if (value && value < horaInicio) {
-        if (fuzzyMatches(horaInicio, value, 0.6)) similarRows.push(row);
-        return false;
-      }
-    }
-
-    if (horaFin && horaFinCol) {
-      const value = String(row.general[horaFinCol] ?? "").slice(0, 5);
-      if (value && value > horaFin) {
-        if (fuzzyMatches(horaFin, value, 0.6)) similarRows.push(row);
-        return false;
-      }
-    }
-
-    if (numeroTurno) {
-      const value = getDisplayValue(row.general[numeroCol] || row.general.numero_turno || "");
-      if (!value.toLowerCase().includes(numeroTurno.toLowerCase())) return false;
+    if (momento) {
+      const value = normalizeSearchText(row.general[momentoCol] || row.general.momento || row.general.nombre_turno || "");
+      if (value !== momento) return false;
     }
 
     return true;
@@ -836,7 +881,7 @@ const applyFilters = () => {
 
   state.currentPage = 1;
   renderTable();
-  renderSimilarMatches(similarRows, horaInicio || horaFin, "horario");
+  renderSimilarMatches(similarRows, momento, "momento");
 };
 
 const escapeHtml = (value) => String(value)
@@ -1349,6 +1394,47 @@ const downloadTurnoPng = (row) => {
   setStatus("PNG del turno descargado.");
 };
 
+const enrichResponsableNamesForLocalContext = async (empresaId) => {
+  if (!isLocalContext() || !empresaId) return;
+
+  const { data: localUsers, error } = await supabase
+    .from("usuarios_locales")
+    .select("id, usuario_principal_id, nombre_completo, activo")
+    .eq("empresa_id", empresaId);
+
+  if (error || !Array.isArray(localUsers) || !localUsers.length) return;
+
+  localUsers.forEach((user) => {
+    const localId = String(user?.id || "").trim();
+    const principalId = String(user?.usuario_principal_id || "").trim();
+    const name = String(user?.nombre_completo || "").trim();
+    if (name) {
+      if (localId) state.responsableNamesById[localId] = name;
+      if (principalId) state.responsableNamesById[principalId] = name;
+    }
+  });
+
+  const missingPrincipalIds = [...new Set(localUsers
+    .map((user) => String(user?.usuario_principal_id || "").trim())
+    .filter((id) => id && !state.responsableNamesById[id]))];
+
+  if (!missingPrincipalIds.length) return;
+
+  const [usuariosSistemaRes, otrosUsuariosRes, empleadosRes] = await Promise.all([
+    supabase.from("usuarios_sistema").select("id, nombre_completo").in("id", missingPrincipalIds),
+    supabase.from("otros_usuarios").select("id, nombre_completo").in("id", missingPrincipalIds),
+    supabase.from("empleados").select("id, nombre_completo").in("id", missingPrincipalIds)
+  ]);
+
+  [usuariosSistemaRes, otrosUsuariosRes, empleadosRes].forEach((result) => {
+    (Array.isArray(result.data) ? result.data : []).forEach((row) => {
+      const id = String(row?.id || "").trim();
+      const name = String(row?.nombre_completo || "").trim();
+      if (id && name) state.responsableNamesById[id] = name;
+    });
+  });
+};
+
 const loadInitialData = async () => {
   state.context = await getUserContext();
   if (!state.context) return setStatus("No se pudo validar la sesión.");
@@ -1379,47 +1465,20 @@ const loadInitialData = async () => {
       if (key && value) acc[key] = value;
       return acc;
     }, {});
+    await enrichResponsableNamesForLocalContext(payload.empresa_id);
 
-    let rowsData = null;
-    const query = supabase
-      .from("turnos_agrupados")
-      .select("*")
-      .order("fecha_turno", { ascending: false })
-      .order("numero_turno", { ascending: false });
+    const tableName = getScopedTable(TURNO_TABLES);
+    const [directResult, webhookRows] = await Promise.all([
+      fetchAllSupabaseRows(tableName, state.context.empresa_id),
+      fetchWebhookRows(payload)
+    ]);
 
-    if (state.context.empresa_id) {
-      query.eq("empresa_id", state.context.empresa_id);
+    if (directResult.error && !webhookRows.length) {
+      throw new Error(directResult.error.message || directResult.error.code || "Sin detalle.");
     }
 
-    const { data: directRows, error: rowsError } = await query;
-    const hasDirectRows = Array.isArray(directRows) && directRows.length > 0;
-
-    if (!rowsError && hasDirectRows) {
-      rowsData = directRows;
-    } else {
-      const headers = await buildRequestHeaders({ includeTenant: true });
-      const webhookResponse = await fetchWithTimeout(
-        WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...headers },
-          body: JSON.stringify(payload)
-        }
-      );
-
-      if (webhookResponse.ok) {
-        rowsData = await webhookResponse.json();
-      } else if (!rowsError) {
-        rowsData = directRows || [];
-      } else {
-        throw new Error(
-          "No se pudo cargar el histórico (" + webhookResponse.status + "). " +
-          (rowsError.message || rowsError.code || "Sin detalle.")
-        );
-      }
-    }
-
-    const sanitizedRows = normalizeRows(rowsData).map(sanitizeRow);
+    const rowsData = mergeRowsByIdentity(directResult.data, webhookRows);
+    const sanitizedRows = rowsData.map(sanitizeRow);
     const enrichedRows = await enrichRowsWithCierreTurnoFinal(sanitizedRows, payload.empresa_id);
     state.allRows = await enrichRowsWithApoyosTurno(enrichedRows, payload.empresa_id);
     state.filteredRows = [...state.allRows];
@@ -1462,14 +1521,43 @@ const loadInitialData = async () => {
   }
 };
 
+
+const formatDateInput = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+const applyPeriodPreset = () => {
+  const value = filtroPeriodo?.value || "personalizado";
+  if (value === "personalizado") return;
+  const today = new Date();
+  let from = new Date(today);
+  if (value === "semana") from.setDate(today.getDate() - today.getDay() + 1);
+  if (value === "mes") from = new Date(today.getFullYear(), today.getMonth(), 1);
+  filtroFechaDesde.value = formatDateInput(from);
+  filtroFechaHasta.value = formatDateInput(today);
+};
+
+filtroPeriodo?.addEventListener("change", () => {
+  applyPeriodPreset();
+  applyFilters();
+});
+
+[filtroFechaDesde, filtroFechaHasta].forEach((input) => {
+  input?.addEventListener("input", () => {
+    if (filtroPeriodo) filtroPeriodo.value = "personalizado";
+  });
+});
+
 btnAplicarFiltros.addEventListener("click", applyFilters);
 
 btnLimpiarFiltros.addEventListener("click", () => {
   filtroFechaDesde.value = "";
   filtroFechaHasta.value = "";
-  filtroHoraInicio.value = "";
-  filtroHoraFin.value = "";
-  if (filtroNumeroTurno) filtroNumeroTurno.value = "";
+  if (filtroPeriodo) filtroPeriodo.value = "personalizado";
+  if (filtroMomento) filtroMomento.value = "";
   if (coincidenciasSimilares) coincidenciasSimilares.innerHTML = "";
   state.filteredRows = [...state.allRows];
   state.currentPage = 1;

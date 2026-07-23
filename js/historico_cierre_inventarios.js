@@ -30,8 +30,9 @@
  *
  * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
  */
-import { getUserContext } from "./session.js";
+import { buildRequestHeaders, getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
+import { WEBHOOK_HISTORICO_CIERRE_INVENTARIOS_DATOS } from "./webhooks.js";
 
 const head = document.getElementById("historicoHead");
 const body = document.getElementById("historicoBody");
@@ -41,8 +42,8 @@ const status = document.getElementById("status");
 
 const filtroFechaDesde = document.getElementById("filtroFechaDesde");
 const filtroFechaHasta = document.getElementById("filtroFechaHasta");
-const filtroHoraInicio = document.getElementById("filtroHoraInicio");
-const filtroHoraFin = document.getElementById("filtroHoraFin");
+const filtroPeriodo = document.getElementById("filtroPeriodo");
+const filtroMomento = document.getElementById("filtroMomento");
 const filtroProducto = document.getElementById("filtroProducto");
 
 const btnAplicarFiltros = document.getElementById("aplicarFiltros");
@@ -51,7 +52,11 @@ const tipoDescarga = document.getElementById("tipoDescarga");
 const btnDescargarDatos = document.getElementById("descargarDatos");
 
 const PAGE_SIZE = 20;
+const SUPABASE_PAGE_SIZE = 1000;
+const INVENTARIO_TABLES = { principal: "inventario_diario_resumen", local: "inventario_diario_resumen_locales" };
 const getTimestamp = () => new Date().toISOString();
+const isLocalContext = () => state.context?.local_context === true || (state.context?.empresa_principal_id && state.context?.empresa_id && state.context.empresa_principal_id !== state.context.empresa_id);
+const getScopedInventoryTable = () => INVENTARIO_TABLES[isLocalContext() ? "local" : "principal"];
 const getGeneralVisibilityKey = (tenantId) => `historico_cierre_inventarios_visibilidad_${tenantId || "global"}`;
 const getDetailVisibilityKey = (tenantId) => `historico_cierre_inventarios_detalle_visibilidad_${tenantId || "global"}`;
 const getDetailProductVisibilityKey = (tenantId) => `historico_cierre_inventarios_productos_visibilidad_${tenantId || "global"}`;
@@ -100,7 +105,7 @@ const toDateValue = (value) => {
   return Number.isNaN(date.getTime()) ? null : new Date(date.getFullYear(), date.getMonth(), date.getDate());
 };
 
-const normalizeTime = (value) => String(value || "").trim().slice(0, 5);
+const normalizeText = (value) => String(value || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
 const normalizeRows = (raw) => {
   if (Array.isArray(raw)) return raw;
@@ -110,6 +115,57 @@ const normalizeRows = (raw) => {
     if (Array.isArray(raw[key])) return raw[key];
   }
   return [];
+};
+
+
+const fetchWithTimeout = async (url, options = {}, timeoutMs = 5000) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try { return await fetch(url, { ...options, signal: controller.signal }); }
+  finally { clearTimeout(timeoutId); }
+};
+
+const fetchAllInventoryRows = async (tableName, empresaId) => {
+  const rows = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from(tableName)
+      .select("*")
+      .eq("empresa_id", empresaId)
+      .order("fecha_cierre", { ascending: false })
+      .range(from, from + SUPABASE_PAGE_SIZE - 1);
+    if (error) return { data: rows, error };
+    const chunk = Array.isArray(data) ? data : [];
+    rows.push(...chunk);
+    if (chunk.length < SUPABASE_PAGE_SIZE) return { data: rows, error: null };
+    from += SUPABASE_PAGE_SIZE;
+  }
+};
+
+const fetchWebhookInventoryRows = async (payload) => {
+  try {
+    const headers = await buildRequestHeaders({ includeTenant: true });
+    const response = await fetchWithTimeout(WEBHOOK_HISTORICO_CIERRE_INVENTARIOS_DATOS, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) return [];
+    return normalizeRows(await response.json());
+  } catch (_error) {
+    return [];
+  }
+};
+
+const getInventoryRowKey = (row, index) => String(row?.id || `${row?.fecha_cierre || row?.fecha || "sin_fecha"}-${row?.hora_inicio || ""}-${row?.hora_fin || ""}-${index}`);
+const mergeInventoryRows = (...groups) => {
+  const merged = new Map();
+  groups.flatMap((group) => normalizeRows(group)).forEach((row, index) => {
+    const key = getInventoryRowKey(row, index);
+    merged.set(key, { ...(merged.get(key) || {}), ...row });
+  });
+  return Array.from(merged.values());
 };
 
 const filteredProducts = (row) => {
@@ -228,8 +284,7 @@ const renderTable = () => {
 const applyFilters = () => {
   const desde = filtroFechaDesde.value;
   const hasta = filtroFechaHasta.value;
-  const hi = filtroHoraInicio.value;
-  const hf = filtroHoraFin.value;
+  const momento = normalizeText(filtroMomento?.value || "");
   const producto = filtroProducto.value.trim().toLowerCase();
 
   state.filteredRows = state.allRows.filter((row) => {
@@ -244,19 +299,9 @@ const applyFilters = () => {
     }
 
     const productos = Array.isArray(row.productos) ? row.productos : [];
-    if (hi) {
-      const hiNorm = normalizeTime(hi);
-      if (!productos.some((p) => {
-        const ini = normalizeTime(p.hora_inicio);
-        return ini && ini >= hiNorm;
-      })) return false;
-    }
-    if (hf) {
-      const hfNorm = normalizeTime(hf);
-      if (!productos.some((p) => {
-        const fin = normalizeTime(p.hora_fin);
-        return fin && fin <= hfNorm;
-      })) return false;
+    if (momento) {
+      const value = normalizeText(row.momento || row.nombre_turno || row.momento_inventario || "");
+      if (value !== momento) return false;
     }
     if (producto && !productos.some((p) => String(p.producto_nombre || "").toLowerCase().includes(producto))) return false;
 
@@ -356,21 +401,23 @@ const loadData = async () => {
     empresa_id: context.empresa_id,
     usuario_id: context.user?.id || context.user?.user_id,
     rol: context.rol,
+    local_context: context.local_context === true,
+    empresa_principal_id: context.empresa_principal_id,
     timestamp: getTimestamp()
   };
 
   setStatus("Cargando historico de inventarios...");
 
   try {
-    const { data: rowsData, error: rowsError } = await supabase
-      .from("inventario_diario_resumen")
-      .select("*")
-      .eq("empresa_id", state.context.empresa_id)
-      .order("fecha_cierre", { ascending: false });
+    const tableName = getScopedInventoryTable();
+    const [directResult, webhookRows] = await Promise.all([
+      fetchAllInventoryRows(tableName, state.context.empresa_id),
+      fetchWebhookInventoryRows(state.context)
+    ]);
 
-    if (rowsError) throw rowsError;
+    if (directResult.error && !webhookRows.length) throw directResult.error;
 
-    const rows = normalizeRows(rowsData).map((item, idx) => ({ id: item.id || item._id || `inv-${idx}`, ...item }));
+    const rows = mergeInventoryRows(directResult.data, webhookRows).map((item, idx) => ({ id: item.id || item._id || `inv-${idx}`, ...item }));
     state.allRows = rows;
 
     const savedGeneralOrder = loadJson(getGeneralOrderKey(state.context.tenant_id), null);
@@ -394,9 +441,27 @@ const loadData = async () => {
   }
 };
 
+
+const formatDateInput = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+const applyPeriodPreset = () => {
+  const value = filtroPeriodo?.value || "personalizado";
+  if (value === "personalizado") return;
+  const today = new Date();
+  let from = new Date(today);
+  if (value === "semana") from.setDate(today.getDate() - today.getDay() + 1);
+  if (value === "mes") from = new Date(today.getFullYear(), today.getMonth(), 1);
+  filtroFechaDesde.value = formatDateInput(from);
+  filtroFechaHasta.value = formatDateInput(today);
+};
+
+filtroPeriodo?.addEventListener("change", () => { applyPeriodPreset(); applyFilters(); });
+[filtroFechaDesde, filtroFechaHasta].forEach((input) => input?.addEventListener("input", () => { if (filtroPeriodo) filtroPeriodo.value = "personalizado"; }));
+
 btnAplicarFiltros.addEventListener("click", applyFilters);
 btnLimpiarFiltros.addEventListener("click", () => {
-  [filtroFechaDesde, filtroFechaHasta, filtroHoraInicio, filtroHoraFin, filtroProducto].forEach((el) => { el.value = ""; });
+  [filtroFechaDesde, filtroFechaHasta, filtroProducto].forEach((el) => { el.value = ""; });
+  if (filtroPeriodo) filtroPeriodo.value = "personalizado";
+  if (filtroMomento) filtroMomento.value = "";
   applyFilters();
 });
 
