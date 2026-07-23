@@ -265,7 +265,7 @@ const resolveResponsableId = (rawRow = {}) => {
 };
 
 const resolveResponsableName = (rawRow = {}, mapById = {}) => {
-  const direct = getGeneralValue(rawRow, ["responsable", "responsable_nombre", "nombre_responsable", "responsableName"]);
+  const direct = getGeneralValue(rawRow, ["responsable", "responsable_nombre", "nombre_responsable", "responsableName", "registrado_por_nombre", "usuario_nombre"]);
   if (direct) return direct;
 
   const responsableId = resolveResponsableId(rawRow);
@@ -479,8 +479,20 @@ const mergeRowsByIdentity = (...groups) => {
   const merged = new Map();
   groups.flatMap((group) => normalizeRows(group)).forEach((row, index) => {
     const key = getRowId(row, index);
-    if (!merged.has(key)) merged.set(key, row);
-    else merged.set(key, { ...row, ...merged.get(key), variables_detalle: merged.get(key).variables_detalle || row.variables_detalle });
+    if (!merged.has(key)) {
+      merged.set(key, row);
+      return;
+    }
+
+    const current = merged.get(key);
+    const currentResponsable = getGeneralValue(current, ["responsable", "responsable_nombre", "nombre_responsable", "responsableName", "registrado_por_nombre", "usuario_nombre"]);
+    const incomingResponsable = getGeneralValue(row, ["responsable", "responsable_nombre", "nombre_responsable", "responsableName", "registrado_por_nombre", "usuario_nombre"]);
+    merged.set(key, {
+      ...row,
+      ...current,
+      responsable: currentResponsable || incomingResponsable || current?.responsable || row?.responsable,
+      variables_detalle: current.variables_detalle || row.variables_detalle
+    });
   });
   return Array.from(merged.values());
 };
@@ -1382,6 +1394,47 @@ const downloadTurnoPng = (row) => {
   setStatus("PNG del turno descargado.");
 };
 
+const enrichResponsableNamesForLocalContext = async (empresaId) => {
+  if (!isLocalContext() || !empresaId) return;
+
+  const { data: localUsers, error } = await supabase
+    .from("usuarios_locales")
+    .select("id, usuario_principal_id, nombre_completo, activo")
+    .eq("empresa_id", empresaId);
+
+  if (error || !Array.isArray(localUsers) || !localUsers.length) return;
+
+  localUsers.forEach((user) => {
+    const localId = String(user?.id || "").trim();
+    const principalId = String(user?.usuario_principal_id || "").trim();
+    const name = String(user?.nombre_completo || "").trim();
+    if (name) {
+      if (localId) state.responsableNamesById[localId] = name;
+      if (principalId) state.responsableNamesById[principalId] = name;
+    }
+  });
+
+  const missingPrincipalIds = [...new Set(localUsers
+    .map((user) => String(user?.usuario_principal_id || "").trim())
+    .filter((id) => id && !state.responsableNamesById[id]))];
+
+  if (!missingPrincipalIds.length) return;
+
+  const [usuariosSistemaRes, otrosUsuariosRes, empleadosRes] = await Promise.all([
+    supabase.from("usuarios_sistema").select("id, nombre_completo").in("id", missingPrincipalIds),
+    supabase.from("otros_usuarios").select("id, nombre_completo").in("id", missingPrincipalIds),
+    supabase.from("empleados").select("id, nombre_completo").in("id", missingPrincipalIds)
+  ]);
+
+  [usuariosSistemaRes, otrosUsuariosRes, empleadosRes].forEach((result) => {
+    (Array.isArray(result.data) ? result.data : []).forEach((row) => {
+      const id = String(row?.id || "").trim();
+      const name = String(row?.nombre_completo || "").trim();
+      if (id && name) state.responsableNamesById[id] = name;
+    });
+  });
+};
+
 const loadInitialData = async () => {
   state.context = await getUserContext();
   if (!state.context) return setStatus("No se pudo validar la sesión.");
@@ -1412,6 +1465,7 @@ const loadInitialData = async () => {
       if (key && value) acc[key] = value;
       return acc;
     }, {});
+    await enrichResponsableNamesForLocalContext(payload.empresa_id);
 
     const tableName = getScopedTable(TURNO_TABLES);
     const [directResult, webhookRows] = await Promise.all([
