@@ -439,6 +439,7 @@ const enrichRowsWithCierreTurnoFinal = async (rows = [], empresaId = "") => {
 
   const byId = new Map();
   const byComposite = new Map();
+  const byFechaHoras = new Map();
 
   data.forEach((item) => {
     const sourceId = String(item?.id || "").trim();
@@ -452,6 +453,14 @@ const enrichRowsWithCierreTurnoFinal = async (rows = [], empresaId = "") => {
     ].join("|");
 
     if (!byComposite.has(composite)) byComposite.set(composite, item);
+
+    const fechaHoras = [
+      String(item?.fecha_turno || "").trim(),
+      String(item?.hora_inicio || "").trim(),
+      String(item?.hora_fin || "").trim()
+    ].join("|");
+
+    if (!byFechaHoras.has(fechaHoras)) byFechaHoras.set(fechaHoras, item);
   });
 
   rows.forEach((row) => {
@@ -466,14 +475,25 @@ const enrichRowsWithCierreTurnoFinal = async (rows = [], empresaId = "") => {
       String(row?.meta?.hora_fin || row?.general?.hora_fin || "").trim()
     ].join("|");
     const compositeMatch = byComposite.get(composite);
-    const fallback = sourceMatch || compositeMatch;
+    const fechaHoras = [
+      String(row?.meta?.fecha_turno || row?.general?.fecha_turno || "").trim(),
+      String(row?.meta?.hora_inicio || row?.general?.hora_inicio || "").trim(),
+      String(row?.meta?.hora_fin || row?.general?.hora_fin || "").trim()
+    ].join("|");
+    const fechaHorasMatch = byFechaHoras.get(fechaHoras);
+    const fallback = sourceMatch || compositeMatch || fechaHorasMatch;
     if (!fallback) return;
 
     const fallbackBolsa = toNumber(fallback?.bolsa_global);
     const fallbackCaja = toNumber(fallback?.caja_global);
+    const fallbackResponsableId = String(fallback?.responsable_id || "").trim();
+    const currentResponsable = String(row?.general?.responsable || "").trim();
+    const fallbackResponsableName = fallbackResponsableId ? state.responsableNamesById?.[fallbackResponsableId] : "";
 
     if ((currentBolsa === null || currentBolsa === 0) && fallbackBolsa !== null) row.general.bolsa = fallbackBolsa;
     if ((currentCaja === null || currentCaja === 0) && fallbackCaja !== null) row.general.caja_final = fallbackCaja;
+    if (!currentResponsable && fallbackResponsableName) row.general.responsable = fallbackResponsableName;
+    if (!row.meta.responsable_id && fallbackResponsableId) row.meta.responsable_id = fallbackResponsableId;
   });
 
   return rows;
