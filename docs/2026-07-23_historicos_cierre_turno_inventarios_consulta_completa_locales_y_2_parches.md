@@ -104,3 +104,48 @@ Corregir el caso donde los cierres históricos de locales cargan correctamente l
 - Cierre turno histórico en empresa principal: mantiene comportamiento anterior.
 - Cierre inventarios histórico: no se modificó en este parche.
 - Login / sesión / contexto / header: no fueron modificados.
+
+---
+
+## Parche 2 — 2026-07-23 — Fusión robusta de responsables desde webhook auxiliar
+
+### Objetivo del parche
+Resolver el caso persistente donde el histórico de cierre turno de locales seguía mostrando el responsable vacío aunque el webhook auxiliar sí enviara `responsable` completo. La causa probable era que la mezcla anterior identificaba filas con una llave dependiente del `id`, `turno_nombre` o del índice de arreglo; si Supabase y el webhook no compartían el mismo `id` o llegaban en orden diferente, ambas filas no se fusionaban y el nombre del webhook no alcanzaba a completar la fila renderizada.
+
+### Archivo modificado
+
+#### `js/historico_cierre_turno.js`
+- **Tipo de modificación:** parche aislado de normalización/fusión de datos, sin tocar login, sesión, contexto ni header.
+- **Qué hace explícitamente:**
+  - Se agregó `getRowIdentityParts()` para extraer de cada turno las piezas estables: `id`, `turno_nombre`, `fecha_turno`, `numero_turno`, `nombre_turno`, `hora_inicio` y `hora_fin`.
+  - Se agregó `buildTurnoIdentityKeys()` para construir varias llaves de coincidencia por turno: por `id`, por `turno_nombre`, por `fecha + número + horas` y por `fecha + nombre/momento + horas`.
+  - `getRowId()` ahora toma la primera llave estable generada por `buildTurnoIdentityKeys()`, evitando depender directamente del índice salvo como último recurso.
+  - `mergeRowsByIdentity()` ahora mantiene aliases de llaves; si una fila de Supabase coincide con una fila del webhook por cualquiera de las llaves alternativas, se fusionan en el mismo registro y se conserva el `responsable` textual recibido desde el webhook cuando el registro directo lo trae vacío.
+
+### Cómo se resuelve en empresas principales y por qué fallaba en locales
+- En empresas principales, el flujo normal carga responsables con `fetchResponsablesActivos(empresa_id)`, que consulta `usuarios_sistema`, `otros_usuarios` y `empleados`; luego `state.responsableNamesById` permite resolver `responsable_id` durante `sanitizeRow()`.
+- En locales, hay más puntos de desalineación: el cierre puede venir con ID local de `usuarios_locales`, ID principal (`usuario_principal_id`) o sin nombre resuelto por RLS/consulta directa. El parche 1 agregó lectura de `usuarios_locales`, pero si la fila que se renderizaba era solo la fila directa de Supabase y no se fusionaba con la fila del webhook auxiliar, el campo textual `responsable` del webhook se perdía.
+- Este parche no cambia RLS ni tablas: hace que la fusión frontend use llaves funcionales del turno. Si después de esto sigue faltando el nombre, revisar RLS/SELECT sobre `usuarios_locales` y confirmar que `turnos_agrupados_locales` o el webhook traigan al menos una de estas combinaciones: `id`, `turno_nombre`, o `fecha_turno + numero_turno/nombre_turno + hora_inicio + hora_fin`.
+
+### Reversión de emergencia del parche 2
+1. Renombrar este documento de vuelta a `docs/2026-07-23_historicos_cierre_turno_inventarios_consulta_completa_locales_y_1_parche.md` si solo se revierte este parche.
+2. En `js/historico_cierre_turno.js`, borrar completas las funciones `getRowIdentityParts()` y `buildTurnoIdentityKeys()`.
+3. Restaurar `getRowId()` al formato anterior:
+   ```js
+   const getRowId = (row, index) => String(row.id || row.turno_nombre || `${row.fecha_turno || "sin_fecha"}-${row.numero_turno || "sin_turno"}-${row.hora_inicio || "sin_inicio"}-${row.hora_fin || "sin_fin"}-${index}`);
+   ```
+4. Restaurar `mergeRowsByIdentity()` para crear solo `const merged = new Map();`, calcular `const key = getRowId(row, index);` y fusionar por esa llave única, sin `aliases` ni `buildTurnoIdentityKeys()`.
+
+### Exportación del parche 2 a otro repositorio
+- Generar el parche incremental desde este commit: `git format-patch -1 --stdout > historicos_responsables_locales_fusion_robusta_2026-07-23.patch`.
+- En el repositorio destino, validar primero: `git apply --check historicos_responsables_locales_fusion_robusta_2026-07-23.patch`.
+- Aplicar después: `git apply historicos_responsables_locales_fusion_robusta_2026-07-23.patch`.
+- Particularidades de este repositorio: las URLs están centralizadas en `js/webhooks.js`; este parche no agrega URL nueva, pero depende de que `WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS` siga apuntando al webhook auxiliar que entrega `responsable` textual.
+- Validar que el destino conserve equivalentes de `turnos_agrupados`, `turnos_agrupados_locales`, `usuarios_locales` y del webhook auxiliar. Si el destino usa otros nombres de campos para fecha, número, momento u horas, adaptar solo `getRowIdentityParts()` agregando esos aliases en las listas de candidatos.
+
+### Check funcional actualizado
+- Cierre turno histórico en locales: debe mostrar responsable si el nombre llega por webhook auxiliar o si se puede resolver por `usuarios_locales`/tablas principales.
+- Cierre turno histórico en empresa principal: mantiene el flujo existente por `fetchResponsablesActivos()` y no depende del webhook para nombres.
+- Cierre inventarios histórico: no se modificó en este parche.
+- Login / sesión / contexto / header: no fueron modificados.
+- Riesgo pendiente: si Supabase bloquea por RLS tanto `usuarios_locales` como el webhook no devuelve campos suficientes para empatar filas, el frontend no podrá inventar el nombre; en ese caso corregir políticas SELECT de `usuarios_locales` y/o payload del webhook.
