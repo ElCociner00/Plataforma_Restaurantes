@@ -223,7 +223,33 @@ const fuzzyMatches = (query, value, threshold = 0.8) => {
 
 const getDisplayValue = (value) => toReadableLabel(formatCellValue(value));
 
-const getRowId = (row, index) => String(row.id || row.turno_nombre || `${row.fecha_turno || "sin_fecha"}-${row.numero_turno || "sin_turno"}-${row.hora_inicio || "sin_inicio"}-${row.hora_fin || "sin_fin"}-${index}`);
+const getRowIdentityParts = (row = {}) => ({
+  id: String(row.id || "").trim(),
+  turno_nombre: String(row.turno_nombre || "").trim(),
+  fecha_turno: String(getGeneralValue(row, ["fecha_turno", "fecha"]) || "").trim(),
+  numero_turno: String(getGeneralValue(row, ["numero_turno", "turno", "turno_numero"]) || "").trim(),
+  nombre_turno: String(getGeneralValue(row, ["nombre_turno", "momento", "jornada"]) || "").trim(),
+  hora_inicio: String(getGeneralValue(row, ["hora_inicio", "hora_llegada", "hora_entrada"]) || "").trim(),
+  hora_fin: String(getGeneralValue(row, ["hora_fin", "hora_salida"]) || "").trim()
+});
+
+const buildTurnoIdentityKeys = (row = {}, index = 0) => {
+  const parts = getRowIdentityParts(row);
+  const keys = [];
+  if (parts.id) keys.push(`id:${parts.id}`);
+  if (parts.turno_nombre) keys.push(`turno:${parts.turno_nombre}`);
+
+  const compositeBase = [parts.fecha_turno, parts.numero_turno, parts.hora_inicio, parts.hora_fin];
+  if (compositeBase.some(Boolean)) keys.push(`fecha-num-horas:${compositeBase.join("|")}`);
+
+  const compositeName = [parts.fecha_turno, parts.nombre_turno, parts.hora_inicio, parts.hora_fin];
+  if (compositeName.some(Boolean)) keys.push(`fecha-nombre-horas:${compositeName.join("|")}`);
+
+  if (!keys.length) keys.push(`fallback:${index}`);
+  return [...new Set(keys)];
+};
+
+const getRowId = (row, index) => buildTurnoIdentityKeys(row, index)[0];
 
 const getDetailItemKey = (detail) => `${String(detail.variable || "")}|${String(detail.categoria || "")}`;
 
@@ -413,6 +439,7 @@ const enrichRowsWithCierreTurnoFinal = async (rows = [], empresaId = "") => {
 
   const byId = new Map();
   const byComposite = new Map();
+  const byFechaHoras = new Map();
 
   data.forEach((item) => {
     const sourceId = String(item?.id || "").trim();
@@ -426,6 +453,14 @@ const enrichRowsWithCierreTurnoFinal = async (rows = [], empresaId = "") => {
     ].join("|");
 
     if (!byComposite.has(composite)) byComposite.set(composite, item);
+
+    const fechaHoras = [
+      String(item?.fecha_turno || "").trim(),
+      String(item?.hora_inicio || "").trim(),
+      String(item?.hora_fin || "").trim()
+    ].join("|");
+
+    if (!byFechaHoras.has(fechaHoras)) byFechaHoras.set(fechaHoras, item);
   });
 
   rows.forEach((row) => {
@@ -440,14 +475,25 @@ const enrichRowsWithCierreTurnoFinal = async (rows = [], empresaId = "") => {
       String(row?.meta?.hora_fin || row?.general?.hora_fin || "").trim()
     ].join("|");
     const compositeMatch = byComposite.get(composite);
-    const fallback = sourceMatch || compositeMatch;
+    const fechaHoras = [
+      String(row?.meta?.fecha_turno || row?.general?.fecha_turno || "").trim(),
+      String(row?.meta?.hora_inicio || row?.general?.hora_inicio || "").trim(),
+      String(row?.meta?.hora_fin || row?.general?.hora_fin || "").trim()
+    ].join("|");
+    const fechaHorasMatch = byFechaHoras.get(fechaHoras);
+    const fallback = sourceMatch || compositeMatch || fechaHorasMatch;
     if (!fallback) return;
 
     const fallbackBolsa = toNumber(fallback?.bolsa_global);
     const fallbackCaja = toNumber(fallback?.caja_global);
+    const fallbackResponsableId = String(fallback?.responsable_id || "").trim();
+    const currentResponsable = String(row?.general?.responsable || "").trim();
+    const fallbackResponsableName = fallbackResponsableId ? state.responsableNamesById?.[fallbackResponsableId] : "";
 
     if ((currentBolsa === null || currentBolsa === 0) && fallbackBolsa !== null) row.general.bolsa = fallbackBolsa;
     if ((currentCaja === null || currentCaja === 0) && fallbackCaja !== null) row.general.caja_final = fallbackCaja;
+    if (!currentResponsable && fallbackResponsableName) row.general.responsable = fallbackResponsableName;
+    if (!row.meta.responsable_id && fallbackResponsableId) row.meta.responsable_id = fallbackResponsableId;
   });
 
   return rows;
@@ -477,17 +523,24 @@ const fetchAllSupabaseRows = async (tableName, empresaId) => {
 
 const mergeRowsByIdentity = (...groups) => {
   const merged = new Map();
+  const aliases = new Map();
+
   groups.flatMap((group) => normalizeRows(group)).forEach((row, index) => {
-    const key = getRowId(row, index);
-    if (!merged.has(key)) {
-      merged.set(key, row);
+    const keys = buildTurnoIdentityKeys(row, index);
+    const existingKey = keys.map((key) => aliases.get(key) || key).find((key) => merged.has(key));
+    const primaryKey = existingKey || keys[0];
+
+    keys.forEach((key) => aliases.set(key, primaryKey));
+
+    if (!merged.has(primaryKey)) {
+      merged.set(primaryKey, row);
       return;
     }
 
-    const current = merged.get(key);
+    const current = merged.get(primaryKey);
     const currentResponsable = getGeneralValue(current, ["responsable", "responsable_nombre", "nombre_responsable", "responsableName", "registrado_por_nombre", "usuario_nombre"]);
     const incomingResponsable = getGeneralValue(row, ["responsable", "responsable_nombre", "nombre_responsable", "responsableName", "registrado_por_nombre", "usuario_nombre"]);
-    merged.set(key, {
+    merged.set(primaryKey, {
       ...row,
       ...current,
       responsable: currentResponsable || incomingResponsable || current?.responsable || row?.responsable,
