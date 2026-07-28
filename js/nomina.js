@@ -1989,6 +1989,9 @@ const buildHistoricoNominaPayload = async () => {
 const PDF_SIGNATURE_ASSET = "https://raw.githubusercontent.com/ElCociner00/Plataforma_Restaurantes/main/images/firma.webp";
 
 const escapePdfText = (value) => String(value ?? "")
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .replace(/[¿¡]/g, "")
   .replace(/\\/g, "\\\\")
   .replace(/\(/g, "\\(")
   .replace(/\)/g, "\\)")
@@ -1998,6 +2001,8 @@ const blobToBytes = async (blob) => new Uint8Array(await blob.arrayBuffer());
 
 const loadSignatureAsJpeg = async () => {
   const image = new Image();
+  image.crossOrigin = "anonymous";
+  image.referrerPolicy = "no-referrer";
   image.src = PDF_SIGNATURE_ASSET;
   await new Promise((resolve, reject) => {
     image.onload = resolve;
@@ -2034,8 +2039,10 @@ const createSimplePdf = async ({ empleado, rows, fecha }) => {
   const empleadoNombre = String(empleado?.nombre || empleado?.nombre_completo || "EMPLEADO").toUpperCase();
   const cedula = getEmpleadoCedula(empleado);
   const content = ["BT"];
-  const drawText = (text, x, y, size = 9, bold = false) => {
-    content.push(`/${bold ? "F2" : "F1"} ${size} Tf ${x} ${y} Td (${escapePdfText(text)}) Tj ${-x} ${-y} Td`);
+  const estimatePdfTextWidth = (text, size) => String(text || "").length * size * 0.48;
+  const drawText = (text, x, y, size = 9, bold = false, wordSpacing = 0) => {
+    const spacing = Number.isFinite(wordSpacing) && wordSpacing > 0 ? `${wordSpacing.toFixed(2)} Tw ` : "0 Tw ";
+    content.push(`/${bold ? "F2" : "F1"} ${size} Tf ${spacing}${x} ${y} Td (${escapePdfText(text)}) Tj ${-x} ${-y} Td`);
   };
   const wrapText = (text, maxChars = 106) => {
     const words = String(text || "").split(/\s+/).filter(Boolean);
@@ -2053,10 +2060,17 @@ const createSimplePdf = async ({ empleado, rows, fecha }) => {
     if (line) wrapped.push(line);
     return wrapped;
   };
-  const drawParagraph = (text, x, startY, maxChars = 106, lineHeight = 13, size = 9) => {
+  const drawJustifiedParagraph = (text, x, startY, maxWidth = 468, maxChars = 106, lineHeight = 13, size = 9) => {
     let y = startY;
-    wrapText(text, maxChars).forEach((line) => {
-      drawText(line, x, y, size);
+    const lines = wrapText(text, maxChars);
+    lines.forEach((line, index) => {
+      const spaceCount = (line.match(/ /g) || []).length;
+      const isLastLine = index === lines.length - 1;
+      const estimatedWidth = estimatePdfTextWidth(line, size);
+      const extraSpacing = !isLastLine && spaceCount > 0 && estimatedWidth < maxWidth
+        ? Math.min(6, (maxWidth - estimatedWidth) / spaceCount)
+        : 0;
+      drawText(line, x, y, size, false, extraSpacing);
       y -= lineHeight;
     });
     return y;
@@ -2065,9 +2079,9 @@ const createSimplePdf = async ({ empleado, rows, fecha }) => {
   drawText("Enkrato SAS", 475, 758, 11, true);
   drawText("BATUTCO S.A.S.", 236, 742, 14, true);
   drawText("NIT 901.973.863-2", 243, 722, 11);
-  drawText("AUTORIZACIÓN DE DESCUENTO", 198, 700, 12, true);
+  drawText("AUTORIZACION DE DESCUENTO", 198, 700, 12, true);
   drawText(`Fecha: ${fecha}`, 72, 674, 10);
-  let y = drawParagraph(`Yo, ${empleadoNombre}, identificado(a) con cédula de ciudadanía No. ${cedula || "________________"}, en mi calidad de trabajador(a) de BATUTCO S.A.S., autorizo de manera expresa, libre y voluntaria a la empresa para efectuar el descuento de mi nómina correspondiente a los productos consumidos, adquiridos para uso personal y/o aquellos faltantes cuya responsabilidad haya sido previamente reconocida por mí, de conformidad con la siguiente relación:`, 72, 650, 103, 13, 9) - 10;
+  let y = drawJustifiedParagraph(`Yo, ${empleadoNombre}, identificado(a) con cedula de ciudadania No. ${cedula || "________________"}, en mi calidad de trabajador(a) de BATUTCO S.A.S., autorizo de manera expresa, libre y voluntaria a la empresa para efectuar el descuento de mi nomina correspondiente a los productos consumidos, adquiridos para uso personal y/o aquellos faltantes cuya responsabilidad haya sido previamente reconocida por mi, de conformidad con la siguiente relacion:`, 72, 650, 468, 103, 13, 9) - 10;
 
   const tableTop = y;
   drawText("Producto", 82, y - 16, 8, true);
@@ -2087,17 +2101,20 @@ const createSimplePdf = async ({ empleado, rows, fecha }) => {
   const tableBottom = y + 8;
   drawText(`TOTAL A DESCONTAR: ${fmtMoney(total)}`, 72, y - 12, 10, true);
   y -= 38;
-  y = drawParagraph("Declaro que los productos y/o conceptos anteriormente relacionados fueron recibidos a satisfacción o reconocidos por mí, y que el valor indicado corresponde al precio informado por la empresa.", 72, y, 104, 13, 9) - 4;
-  y = drawParagraph("En consecuencia, autorizo expresamente a BATUTCO S.A.S. para descontar dicho valor del salario, prestaciones sociales, liquidación definitiva o cualquier suma que legalmente me corresponda recibir, siempre que exista saldo pendiente y que el descuento sea legalmente procedente, respetando los límites y requisitos establecidos en los artículos 149 y siguientes del Código Sustantivo del Trabajo.", 72, y, 104, 13, 9) - 4;
-  y = drawParagraph("La presente autorización se suscribe de manera voluntaria, sin error, fuerza, presión o coacción alguna.", 72, y, 104, 13, 9) - 18;
-  drawText("Firma del trabajador: ______________________________", 72, y, 10);
-  drawText(`Nombre: ${empleadoNombre}  C.C.: ${cedula || "________________"}`, 72, y - 20, 9);
-  drawText("Firma del empleador", 72, y - 58, 10, true);
-  drawText(`BATUTCO S.A.S. - Fecha: ${fecha}`, 72, y - 118, 9);
+  y = drawJustifiedParagraph("Declaro que los productos y/o conceptos anteriormente relacionados fueron recibidos a satisfaccion o reconocidos por mi, y que el valor indicado corresponde al precio informado por la empresa.", 72, y, 468, 104, 13, 9) - 4;
+  y = drawJustifiedParagraph("En consecuencia, autorizo expresamente a BATUTCO S.A.S. para descontar dicho valor del salario, prestaciones sociales, liquidacion definitiva o cualquier suma que legalmente me corresponda recibir, siempre que exista saldo pendiente y que el descuento sea legalmente procedente, respetando los limites y requisitos establecidos en los articulos 149 y siguientes del Codigo Sustantivo del Trabajo.", 72, y, 468, 104, 13, 9) - 4;
+  drawJustifiedParagraph("La presente autorizacion se suscribe de manera voluntaria, sin error, fuerza, presion o coaccion alguna.", 72, y, 468, 104, 13, 9);
+
+  drawText("Firma del trabajador", 72, 198, 10, true);
+  drawText(`Nombre: ${empleadoNombre}`, 72, 168, 9);
+  drawText(`C.C.: ${cedula || "________________"}`, 72, 152, 9);
+  drawText("Firma del empleador", 330, 198, 10, true);
+  drawText(`BATUTCO S.A.S. - Fecha: ${fecha}`, 330, 152, 9);
   content.push("ET");
   content.push(`q 0.75 0 0 RG 1 w 72 ${tableBottom} 468 ${tableTop - tableBottom} re S 260 ${tableBottom} m 260 ${tableTop} l S 318 ${tableBottom} m 318 ${tableTop} l S 392 ${tableBottom} m 392 ${tableTop} l S 462 ${tableBottom} m 462 ${tableTop} l S Q`);
   content.push("q 0.61 0.50 0.78 rg 0.61 0.50 0.78 RG 0.5 w 472 754 68 16 re S Q");
-  if (signature) content.push(`q 200 0 0 31.5 72 ${Math.max(58, y - 100)} cm /Im1 Do Q`);
+  content.push("q 0 0 0 RG 0.8 w 72 184 m 272 184 l S 330 184 m 530 184 l S Q");
+  if (signature) content.push("q 200 0 0 31.5 330 186 cm /Im1 Do Q");
   const contentText = content.join("\n");
   const encoder = new TextEncoder();
   const objects = [

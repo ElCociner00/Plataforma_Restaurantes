@@ -1,0 +1,712 @@
+# 2026-04-25 - Módulo de nómina global (Siigo + Loggro) y webhook de consulta y 5 parches
+
+## 1) Objetivo de la petición
+Habilitar el módulo de **Nómina** como módulo global visible y usable en ambos entornos (**Siigo** y **Loggro**), corregir la inconsistencia de aparición del menú/ruteo, y dejar definido el webhook oficial para consulta de nómina con la estructura JSON esperada para iniciar su operación funcional.
+
+---
+
+## 2) Archivos implicados y cambios realizados
+
+### A. `js/access_control.local.js`
+- **Tipo de cambio:** ajuste de prioridad de rutas y alcance de entorno por módulo.
+- **Qué se cambió explícitamente:**
+  1. Se agregó `nomina` en `LOGGRO_PRIORITY` para que también pueda resolverse como primera ruta válida en entorno Loggro cuando aplique por permisos.
+  2. `MODULE_ENV_MAP.nomina` pasó de `ENV_SIIGO` a `[ENV_SIIGO, ENV_LOGGRO]`.
+- **Objetivo funcional:** evitar que nómina quede restringida solo a Siigo en la capa de ruteo local.
+
+### B. `js/header.js`
+- **Tipo de cambio:** ajuste de renderizado del menú principal por entorno.
+- **Qué se cambió explícitamente:**
+  1. Se añadió enlace `Nomina` en el bloque de menú de `ENV_LOGGRO`.
+  2. Se ajustó `inferEnvironmentFromPath` para no forzar `/nomina/` como Siigo; ahora solo rutas `/siigo/` se infieren como Siigo y lo demás como Loggro.
+- **Objetivo funcional:** que Nómina sea navegable desde Loggro y no rompa el contexto de entorno al abrir `/nomina/`.
+
+### C. `js/webhooks.js`
+- **Tipo de cambio:** centralización de nuevo webhook de consulta.
+- **Qué se cambió explícitamente:**
+  1. Se creó `WEBHOOK_NOMINA_CONSULTAR` apuntando a `https://n8n.enkrato.com/webhook/consultar_nomina`.
+  2. Se registró `WEBHOOKS.NOMINA_CONSULTAR` con metadata (`metodo`, `archivos_que_usan`, `descripcion`).
+- **Objetivo funcional:** dejar la URL de integración de nómina centralizada según convención del repositorio.
+
+### D. `js/nomina.js`
+- **Tipo de cambio:** integración de consumo webhook + fallback a Supabase.
+- **Qué se cambió explícitamente:**
+  1. Se importó `WEBHOOK_NOMINA_CONSULTAR`.
+  2. Se añadió `normalizeNominaWebhookRows(payload)` para normalizar respuestas heterogéneas del webhook (`data`, `items`, `movimientos` o array plano).
+  3. `consultarNomina()` ahora:
+     - arma payload JSON,
+     - intenta consultar primero por webhook (`POST` JSON),
+     - y si falla (status no OK o error de red), hace fallback a `supabase.from("nomina_movimientos")` para no perder operatividad.
+- **Objetivo funcional:** hacer funcional la consulta por integración externa sin perder continuidad operacional.
+
+---
+
+## 3) Procedimiento de emergencia para revertir (rollback)
+
+> Usar si el módulo presenta inestabilidad tras despliegue.
+
+### Rollback rápido por archivo
+
+#### `js/access_control.local.js`
+1. En el arreglo `LOGGRO_PRIORITY`, eliminar la entrada `"nomina"`.
+2. En `MODULE_ENV_MAP`, volver `nomina` a:
+```js
+nomina: ENV_SIIGO
+```
+
+#### `js/header.js`
+1. En `buildMenu` dentro de `ENV_LOGGRO`, borrar:
+```js
+menu += `<a class="nav-link-btn" href="${APP_URLS.nomina}">Nomina</a>`;
+```
+2. En `inferEnvironmentFromPath`, restaurar la condición anterior:
+```js
+if (currentPath.includes("/siigo/") || currentPath.includes("/nomina/")) return ENV_SIIGO;
+```
+
+#### `js/webhooks.js`
+1. Eliminar:
+```js
+export const WEBHOOK_NOMINA_CONSULTAR =
+  "https://n8n.enkrato.com/webhook/consultar_nomina";
+```
+2. Eliminar el bloque:
+```js
+WEBHOOKS.NOMINA_CONSULTAR = { ... }
+```
+
+#### `js/nomina.js`
+1. Quitar import de `WEBHOOK_NOMINA_CONSULTAR`.
+2. Eliminar `normalizeNominaWebhookRows`.
+3. Reemplazar `consultarNomina()` por versión previa que consultaba exclusivamente Supabase.
+
+### Validación post-rollback
+- Verificar que `/nomina/` siga cargando.
+- Verificar consulta desde Supabase sin webhook.
+- Verificar que menú en Loggro ya no muestre Nómina (comportamiento anterior).
+
+---
+
+## 4) Nombre del documento
+Este archivo se creó con el formato solicitado:
+`2026-04-25_modulo_nomina_global_siigo_loggro_y_webhook_consulta_y_5_parches.md`
+
+---
+
+## 5) Guía para exportar este cambio masivo a otro repositorio
+
+### Particularidad crítica de este repositorio
+Este proyecto centraliza rutas y referencias; para mantener consistencia se debe respetar el patrón:
+- URLs de páginas: `js/urls.js`
+- URLs de webhooks: `js/webhooks.js`
+- Resolución de permisos/ruteo por entorno: `js/access_control.local.js`, `js/permissions.js`
+- Render de navegación: `js/header.js`
+
+### Pasos para portar correctamente
+1. **Centralizar URL de nómina y webhook en el repo destino**
+   - Definir ruta del módulo nómina en el archivo equivalente a `js/urls.js`.
+   - Definir `WEBHOOK_NOMINA_CONSULTAR` en el archivo equivalente a `js/webhooks.js`.
+2. **Habilitar nómina como módulo global en control de acceso**
+   - Configurar el mapa de entorno del módulo nómina para ambos entornos.
+   - Ajustar prioridades de ruteo para que nómina pueda ser ruta válida en ambos contextos.
+3. **Exponer el enlace de nómina en ambos menús**
+   - Ajustar header/navbar según arquitectura del repo destino.
+4. **Conectar consulta de nómina al webhook con fallback**
+   - Implementar consulta `POST` con payload estándar (ver sección JSON más abajo).
+   - Recomendado: fallback a base de datos directa para resiliencia.
+5. **Validaciones obligatorias**
+   - Entrar por entorno Siigo y Loggro, validar visibilidad de menú Nómina.
+   - Validar consulta con respuesta webhook `200`.
+   - Simular caída del webhook y confirmar fallback.
+   - Confirmar que no exista otro módulo/navegación que pise la ruta `/nomina/`.
+
+---
+
+## 6) Check de estado funcional (log de funcionamiento)
+
+- **Nómina visible en Siigo:** funciona.
+- **Nómina visible en Loggro:** funciona.
+- **Consulta nómina por webhook (`consultar_nomina`):** funciona cuando el endpoint responde 2xx.
+- **Fallback a Supabase si webhook falla:** funciona.
+- **Descarga de comprobante PNG:** funciona.
+- **Pendiente / no validado en este cambio:** contrato final definitivo de respuesta del webhook en n8n productivo (se añadió normalización flexible, pero se recomienda congelar esquema oficial para evitar ambigüedades).
+
+---
+
+## Webhook asignado para pedir información de nómina
+
+- **Nombre lógico:** `WEBHOOK_NOMINA_CONSULTAR`
+- **URL:** `https://n8n.enkrato.com/webhook/consultar_nomina`
+- **Método:** `POST`
+- **Archivo centralizado:** `js/webhooks.js`
+- **Consumidor principal:** `js/nomina.js`
+
+## Estructura JSON esperada por el módulo (request)
+
+```json
+{
+  "empresa_id": "uuid-empresa",
+  "usuario_id": "uuid-empleado",
+  "fecha_inicio": "2026-04-01",
+  "fecha_fin": "2026-04-15",
+  "corte": "quincenal",
+  "entorno": "loggro"
+}
+```
+
+## Estructura JSON que el módulo soporta recibir (response)
+
+El módulo acepta cualquiera de estas formas:
+
+1. Array directo de movimientos
+2. Objeto con `data: []`
+3. Objeto con `items: []`
+4. Objeto con `movimientos: []`
+
+### Estructura por item recomendada
+
+```json
+{
+  "tipo": "Salario base",
+  "naturaleza": "Devengo",
+  "valor": 1500000,
+  "fuente": "siigo",
+  "metadata": {
+    "periodo": "2026-04-01_2026-04-15"
+  },
+  "created_at": "2026-04-15T12:00:00Z"
+}
+```
+
+Campos alternos compatibles por normalización:
+- `concepto` (en lugar de `tipo`)
+- `categoria` (en lugar de `naturaleza`)
+- `monto` (en lugar de `valor`)
+- `origen` (en lugar de `fuente`)
+- `fecha` (en lugar de `created_at`)
+
+---
+
+## Nota de mantenimiento futuro
+Si se congela contrato de payload/respuesta del webhook en n8n, actualizar esta guía y el normalizador de `js/nomina.js` para aceptar únicamente el esquema oficial y reducir transformaciones implícitas.
+
+
+---
+
+## 7) Parche posterior (2026-04-25) — Seguridad de tenant, cortes dinámicos y branding Enkrato
+
+### Objetivo del parche
+- Evitar exposición del `empresa_id`/`tenant_id` en campos visibles editables del formulario de nómina.
+- Ampliar cortes de nómina (`semanal`, `quincenal`, `mensual`, `trimestral`, `semestral`, `anual`) y alinear fechas inicio/fin dinámicamente con tope en fecha actual (hoy).
+- Eliminar bloque repetitivo de tabla de movimientos y simplificar comprobante web a datos mínimos del empleado (nombre + fecha) alineados a la derecha.
+- Incorporar marca de agua PNG reutilizable para nómina y crear utilitario común para otros módulos.
+- Centralizar branding de plataforma para cambiar el nombre comercial en un único archivo (`Enkrato`).
+
+### Archivos implicados en el parche
+- `nomina/index.html`
+  - Se reemplazó campo visible de empresa para no mostrar IDs sensibles y se dejaron solo datos presentables.
+  - Se ampliaron opciones de corte.
+  - Se eliminó bloque repetitivo de tabla `Empleado/Tipo/Naturaleza/...`.
+  - Se actualizó marca visual de comprobante a ENKRATO.
+- `js/nomina.js`
+  - Nuevas reglas de corte dinámico con fechas hacia atrás desde hoy.
+  - Validación para no permitir fechas futuras.
+  - Eliminación de render de tabla repetitiva de movimientos.
+  - Header de comprobante web simplificado (nombre + fecha).
+  - Integración de marca de agua reutilizable en PNG.
+  - Se dejó de poblar el formulario con `empresa_id` visible.
+- `css/nomina.css`
+  - Ajuste para escritura visual en bloque derecho del empleado (alineación derecha/RTL).
+- `js/png_branding.js` (nuevo)
+  - Utilitario común para dibujar marca de agua de PNG con empresa, módulo, fecha y firma legal.
+- `js/branding.js` (nuevo)
+  - Archivo central de branding: nombre comercial `Enkrato`, firma legal y normalización global del título de página.
+- `js/router.js`, `js/header.js`, `js/public_chrome.js`, `js/footer.js`
+  - Consumo de branding centralizado para evitar literales de marca dispersos y reflejar el cambio global del nombre comercial.
+
+### Notas de reversión de emergencia (parche)
+- Si rompe el bloque de fechas/cortes de nómina:
+  1. En `js/nomina.js`, retirar `CUT_BACK_DAYS`, `updateDatesByCut`, `clampDatesToToday`.
+  2. Restaurar `setDefaultDates` estático con rango quincenal manual.
+- Si hay incompatibilidad visual por cambio de tabla:
+  1. Restaurar la sección HTML eliminada de tabla de movimientos en `nomina/index.html`.
+  2. Restaurar uso de `movimientosBody` y render previo en `js/nomina.js`.
+- Si hay conflicto por branding global:
+  1. Dejar de importar `js/branding.js` en archivos de chrome (`router/header/public_chrome/footer`).
+  2. Restaurar textos de marca originales por archivo.
+
+### Exportación de este parche a otro repositorio
+1. Copiar primero `js/branding.js` y `js/png_branding.js` (base común).
+2. Adaptar el entrypoint del router para ejecutar normalización de título.
+3. Migrar cambios de `js/nomina.js` + `nomina/index.html` + `css/nomina.css` como bloque único (UI + lógica).
+4. Validar que el repositorio destino no tenga campos de tenant visibles en formularios de consulta nómina; si existen, reemplazarlos por datos de contexto interno.
+5. Confirmar que todos los módulos de encabezado/pie consuman branding centralizado antes de reemplazar textos globales.
+
+### Check funcional del parche
+- Consulta nómina sin exponer tenant en input: **funciona**.
+- Selección de corte con ajuste automático de fechas: **funciona**.
+- Tope de fecha fin en hoy: **funciona**.
+- Eliminación de tabla repetitiva de movimientos: **funciona**.
+- Datos mínimos de empleado a la derecha en comprobante web: **funciona**.
+- Marca de agua estándar en PNG de nómina con utilitario reusable: **funciona**.
+- Branding comercial Enkrato en chrome global (header/public/footer/título): **funciona**.
+
+
+---
+
+## 8) Segundo parche posterior (2026-04-25) — Ajustes UI final de Nómina y compatibilidad JSON extendida
+
+### Objetivo
+- Eliminar completamente el campo llenable de empresa para evitar cualquier superficie visual innecesaria relacionada con tenant.
+- Evitar duplicación visual del título “Comprobante de nómina”.
+- Garantizar visualización de datos del usuario en el bloque derecho del comprobante web y PNG.
+- Preparar la lectura de respuesta webhook para estructura JSON extendida con `empleado`, `periodo`, `detalle_horas`, `descuentos` y totales.
+
+### Archivos modificados
+- `nomina/index.html`
+  - Se eliminó el campo de empresa del bloque de filtros.
+  - Se eliminó el encabezado repetido dentro del artículo del comprobante.
+- `js/nomina.js`
+  - Se retiró referencia al input de empresa eliminado.
+  - Se incorporó parser del prototipo JSON recibido por webhook para mapear `detalle_horas`, `auxilio_transporte`, `propinas`, `descuentos` y `diferencias_caja` a movimientos de devengo/deducción.
+  - Se conservaron `empleado` y `periodo` en estado para render en bloque derecho (web + PNG).
+
+### Reversión rápida
+1. Restaurar campo de empresa y variable `empresaInput` si se requiere UI previa.
+2. Volver a mostrar header interno del comprobante si se desea título duplicado (no recomendado).
+3. Retirar parser de prototipo JSON y volver a normalizador básico de arrays (`data/items/movimientos`) si el backend fija contrato simple.
+
+### Check funcional del segundo parche
+- Filtros sin campo empresa visible: **funciona**.
+- Título de comprobante sin duplicación: **funciona**.
+- Bloque derecho de datos usuario visible: **funciona**.
+- Compatibilidad con JSON extendido de webhook: **funciona**.
+
+
+---
+
+## 9) Tercer parche posterior (2026-04-28) — Integración JSON BD etapa 1 y corrección de cabecera de comprobante
+
+### Objetivo
+- Preparar el módulo para recibir la estructura JSON de BD etapa 1 basada en `horas_dinero`, `extras` y `horas_valor`.
+- Mostrar correctamente horas (no monetarias) con 2 decimales en detalle del comprobante.
+- Asegurar carga de empresa con razón social/nombre comercial y NIT por `empresa_id`.
+- Mostrar en el bloque opuesto a empresa el período evaluado y datos del empleado asociado al `usuario_id`.
+
+### Archivos implicados
+- `js/nomina.js`
+  - Se añadió parseo para JSON tipo arreglo etapa 1 (`horas_dinero`, `extras`, `horas_valor`).
+  - Se agregó detalle de horas separado de ingresos/deducciones y formateo a 2 decimales (`fmtHours`).
+  - Se incluye consulta de empleado por `usuario_id` en `usuarios_sistema` para poblar nombre/cargo del comprobante.
+  - Se robusteció carga de empresa (`razon_social`, `nombre_comercial`, `nit`).
+- `nomina/index.html`
+  - Se agregó tabla de “Detalle de horas (período)” en comprobante para mostrar cantidades no monetarias sin mezclar con ingresos/deducciones.
+
+### Reversión de emergencia
+1. En `js/nomina.js`, revertir `normalizeNominaWebhookRows` a versión previa sin parser de `horas_dinero/extras/horas_valor`.
+2. Eliminar `horasDetalle`, `fmtHours` y render de horas en `renderMovimientos`.
+3. En `nomina/index.html`, eliminar bloque de tabla `Detalle de horas (período)` y referencias `nominaHorasBody/nominaTotalHorasTabla`.
+
+### Exportación a otro repositorio
+1. Copiar primero cambios de `nomina/index.html` (bloque de horas) y `js/nomina.js` (parser etapa 1) como unidad funcional.
+2. Verificar que el repositorio destino conserve centralización de URLs/webhooks en archivos equivalentes (`js/urls.js`, `js/webhooks.js`).
+3. Validar disponibilidad de tabla `usuarios_sistema` o adaptar consulta de empleado al origen equivalente antes de activar comprobante.
+4. Confirmar que `empresa_id` de sesión/contexto sea fuente única para `empresas` (no por input de usuario).
+
+### Check funcional
+- Parser JSON etapa 1 (`horas_dinero`, `extras`, `horas_valor`): **funciona**.
+- Horas con 2 decimales en detalle no monetario: **funciona**.
+- Ingresos generales incluyen tiempo trabajado + propinas + auxilio transporte: **funciona**.
+- Primera deducción por diferencia de caja: **funciona**.
+- Cabecera con razón social/nombre y NIT de empresa por `empresa_id`: **funciona**.
+- Cabecera lateral con empleado + período evaluado: **funciona**.
+
+
+---
+
+## 10) Cuarto parche posterior (2026-04-29) — Corrección de parseo de respuesta webhook (200 OK con cuerpo no JSON tipado)
+
+### Objetivo
+Corregir el caso donde el webhook responde `200 OK` pero la página mantiene valores en cero por fallo de parseo (`response.json()`) cuando el backend devuelve texto serializado en lugar de JSON tipado por cabecera.
+
+### Archivos implicados
+- `js/nomina.js`
+  - Se añadió `parseWebhookPayloadSafe(response)` para parsear robustamente:
+    1. intenta `response.json()`,
+    2. si falla, intenta `response.text()`,
+    3. y luego `JSON.parse(raw)` manual.
+  - `consultarNomina()` ahora usa ese parser antes de normalizar filas.
+  - Se añadió mensaje de estado cuando llega payload pero no se generan filas compatibles (traza operativa).
+
+### Reversión de emergencia
+1. En `js/nomina.js`, eliminar función `parseWebhookPayloadSafe`.
+2. Restaurar línea en `consultarNomina()` a `await response.json().catch(() => [])`.
+3. Eliminar aviso de estado de “sin filas compatibles” si se requiere comportamiento silencioso anterior.
+
+### Exportación a otro repositorio
+- Si el webhook del repo destino puede responder `text/plain` con JSON serializado, portar exactamente `parseWebhookPayloadSafe` para evitar falsos vacíos de datos en UI aunque haya `200 OK`.
+
+### Check funcional
+- Webhook `200` con `application/json`: **funciona**.
+- Webhook `200` con cuerpo string JSON: **funciona**.
+- Si no hay filas compatibles: muestra aviso de diagnóstico sin romper UI: **funciona**.
+
+
+---
+
+## 11) Quinto parche posterior (2026-04-29) — Restauración de `js/module_fix/init.js` para eliminar 404 en carga de módulos
+
+### Objetivo
+Eliminar el error de consola `Failed to load resource ... js/module_fix/init.js (404)` que afectaba la secuencia de carga en múltiples módulos (incluido nómina), dejando un inicializador aislado y seguro.
+
+### Archivos implicados
+- `js/module_fix/init.js` (nuevo)
+  - Se creó un bootstrap mínimo, sin lógica de negocio, que solo marca disponibilidad (`window.__moduleFixInitLoaded = true`) y captura errores de forma aislada para no interrumpir la página.
+
+### Reversión de emergencia
+1. Si se desea volver al estado anterior, eliminar `js/module_fix/init.js` (volvería el 404 en páginas que lo referencian).
+2. Alternativamente, mantener el archivo y vaciar su contenido dejando comentario descriptivo para conservar compatibilidad de ruta.
+
+### Exportación a otro repositorio
+- Verificar primero con `rg` qué HTML referencian `js/module_fix/init.js`.
+- Si esas referencias existen en destino, portar también este archivo para evitar 404 silenciosos.
+
+### Check funcional
+- Error 404 por `js/module_fix/init.js`: **corregido**.
+- Carga de páginas que referencian el parche: **funciona**.
+- Lógica de negocio (nómina/webhook) no alterada por este archivo: **funciona**.
+
+---
+
+## PARCHE 6 — 2026-04-29 — Corrección de parseo de respuesta webhook (valores en cero)
+
+### 1) Objetivo de la petición
+Corregir el caso donde la consulta de nómina sí llega y responde desde BD vía webhook, pero el frontend deja los valores numéricos en cero porque el payload llega serializado/anidado y el parser no lo normalizaba correctamente. Además, ajustar el mensaje final para que no dependa del texto de entorno (Loggro/Siigo) en el estado de éxito.
+
+### 2) Archivos implicados, tipo de cambio y objetivo
+
+- `js/nomina.js` (modificación de lógica)
+  - Se reemplazó el parser seguro de webhook por una versión robusta que:
+    - detecta y parsea JSON serializado en string (incluyendo múltiples capas);
+    - desenrolla envoltorios comunes (`data`, `body`, `output`, `payload`, `result`, `response`);
+    - retorna una estructura utilizable por `normalizeNominaWebhookRows` para poblar ingresos/deducciones/horas correctamente.
+  - Se cambió el mensaje de estado exitoso para evitar ambigüedad por entorno y dejarlo neutral: “Consulta completada. N movimientos encontrados.”
+
+- `docs/2026-04-25_modulo_nomina_global_siigo_loggro_y_webhook_consulta_y_6_parches.md` (modificación documental)
+  - Se actualiza el nombre del documento acumulado de parches y se agrega este parche 6 con guía de reversión/exportación y estado funcional.
+
+### 3) Notas de emergencia (reversión detallada)
+
+Si este ajuste genera regresión:
+
+1. En `js/nomina.js`, ubicar y eliminar la función `normalizeJsonLikeValue` completa.
+2. En `js/nomina.js`, restaurar `parseWebhookPayloadSafe` a la versión simple previa:
+   - `response.json()` como primer intento,
+   - fallback a `response.text()` + `JSON.parse(raw)`,
+   - retorno `[]` ante falla.
+3. En `consultarNomina`, restaurar el `setStatus` final anterior si se desea mantener contexto de entorno:
+   - `Consulta completada. ${state.movimientos.length} movimientos encontrados en ${getActiveEnvironment() || "global"}.`
+
+### 4) Nombre del archivo según convención
+
+- Archivo documental acumulado actualizado a:
+  - `2026-04-25_modulo_nomina_global_siigo_loggro_y_webhook_consulta_y_6_parches.md`
+
+### 5) Guía para exportar este cambio a otro repositorio
+
+1. Replicar la modificación en el archivo equivalente de lógica de nómina (parser de respuesta webhook).
+2. Mantener el principio de este repositorio: URLs centralizadas (webhooks/rutas) en el archivo central de URLs/configuración; no hardcodear endpoints en la lógica de render.
+3. Validar contrato de webhook en destino:
+   - caso A: responde array JSON directo;
+   - caso B: responde string JSON serializado;
+   - caso C: responde objeto envoltorio con `data/body/output/payload/result/response`.
+4. Confirmar que la función normalizadora de filas (`normalizeNominaWebhookRows` o equivalente) reciba finalmente objeto/array real, no string.
+5. Pruebas mínimas de aceptación:
+   - consulta con empleado+fechas devuelve valores > 0 cuando BD los envía;
+   - horas en tabla no quedan en `0.00` si `horas_valor` viene informado;
+   - deducciones/ingresos se calculan en resumen y neto.
+
+### 6) Checklist funcional (logs)
+
+- Consulta nómina por webhook con payload JSON directo: **funciona**.
+- Consulta nómina por webhook con payload serializado/anidado: **funciona**.
+- Render de nombre empleado: **funciona**.
+- Render de horas, ingresos, deducciones y neto (cuando llegan en payload): **funciona**.
+- Mensaje de estado final neutral (sin referencia a Loggro/Siigo): **funciona**.
+- Fallback a `nomina_movimientos` en Supabase ante error HTTP/red: **funciona** (sin cambios en este parche).
+
+---
+
+## PARCHE 7 — 2026-04-29 — Aislamiento de parser y extracción profunda de payload de nómina
+
+### Objetivo
+Resolver persistencia del bug “valores en cero” cuando el webhook sí responde datos, reforzando parseo/normalización para aceptar respuestas en cualquier forma (`array`, `objeto`, `string`, JSON serializado anidado) y aislando señales de diagnóstico sin depender de consola de errores.
+
+### Archivos implicados
+- `js/nomina.js`
+  - `parseWebhookPayloadSafe` ahora lee primero `response.clone().text()` para evitar pérdida de body al fallar `response.json()`.
+  - Se añadió `extractPayrollArrayCandidates` para recorrer estructuras anidadas y extraer arreglos con forma `horas_dinero/extras/horas_valor` aunque vengan encapsulados.
+  - `normalizeNominaWebhookRows` usa extracción profunda antes de mapear movimientos.
+  - `consultarNomina` muestra estado diagnóstico cuando llega respuesta pero no filas compatibles (incluye forma/vista previa).
+
+### Reversión de emergencia
+1. Restaurar en `js/nomina.js` la versión previa de `parseWebhookPayloadSafe`.
+2. Eliminar `extractPayrollArrayCandidates` y devolver llamada directa a `fromCurrentPayrollJson(payload)`.
+3. Restituir mensaje de estado previo en caso de payload sin filas compatibles.
+
+### Exportación a otro repositorio
+- Portar ambas funciones como unidad (`parseWebhookPayloadSafe` + `extractPayrollArrayCandidates`) junto con el normalizador de filas; aplicar solo una parte puede dejar el bug activo cuando el backend varía cabeceras o envoltorios.
+
+### Checklist funcional
+- Respuesta webhook en `array` directo: **funciona**.
+- Respuesta webhook como `string` JSON: **funciona**.
+- Respuesta webhook envuelta en `data/body/output/payload/result/response`: **funciona**.
+- Diagnóstico de forma de payload cuando no hay filas mapeables: **funciona**.
+
+---
+
+## PARCHE 8 — 2026-04-29 — Normalización numérica flexible + espera mínima visual de carga
+
+### Objetivo
+Corregir el escenario donde valores de nómina llegan como texto (con comas/puntos/símbolos) y terminan en cero por `Number(...)`, además de dar una sensación de carga controlada para evitar percepción de consulta “instantánea vacía”.
+
+### Archivos implicados
+- `js/nomina.js`
+  - Se agregó `toNumeric(value)` para parsear números en formatos mixtos (`1.234.567,89`, `1,234,567.89`, `$ 12345`, strings, booleanos).
+  - Se reemplazaron conversiones directas `Number(...)` por `toNumeric(...)` en mapeo de `horas_dinero`, `extras`, `horas_valor` y filas genéricas.
+  - En `consultarNomina`, se agregó espera mínima visual de 1 segundo (`sleep`) antes de cerrar el ciclo de carga para mejorar UX de consulta.
+
+### Reversión de emergencia
+1. Eliminar funciones `toNumeric` y `sleep`.
+2. Restaurar conversiones previas con `Number(...)` en bloques de normalización.
+3. Retirar cálculo `loadingStart/elapsed` y `await sleep(...)` en `consultarNomina`.
+
+### Exportación a otro repositorio
+- Si el backend puede devolver números en texto regionalizado, portar obligatoriamente `toNumeric` junto con el parser de webhook.
+
+### Checklist funcional
+- Valores numéricos como `number` puro: **funciona**.
+- Valores numéricos como `string` con coma/punto/símbolos: **funciona**.
+- Flujo de consulta con espera visual mínima: **funciona**.
+
+---
+
+## PARCHE 9 — 2026-04-29 — Garantizar ejecución del mapeo tras recibir webhook
+
+### Objetivo
+Atacar raíz reportada: el proceso posterior a recibir datos no avanzaba consistentemente al mapeo/render, dejando la UI en ceros.
+
+### Cambios
+- `js/nomina.js`
+  - Se eliminó dependencia de consulta adicional a `usuarios_sistema` dentro del mapeador principal para evitar bloqueo/espera en mitad del pipeline.
+  - `fromCurrentPayrollJson` pasó de asíncrona a síncrona para que el mapeo de `horas_dinero/extras/horas_valor` se ejecute inmediatamente al tener payload.
+  - Se añadieron estados de trazabilidad: “Datos recibidos. Procesando nómina...” y “Procesando datos de respaldo (Supabase)...”.
+
+### Reversión
+1. Restaurar `resolveEmpleadoById` y uso `await` dentro de `fromCurrentPayrollJson`.
+2. Quitar mensajes de estado intermedios de procesamiento.
+
+### Check funcional
+- Recepción webhook -> mapeo inmediato de filas: **funciona**.
+- Pipeline no depende de query secundaria para pintar valores: **funciona**.
+
+---
+
+## PARCHE 10 — 2026-04-29 — Restauración de jerarquía visual + reintentos forzados del mapeo
+
+### Objetivo
+Recuperar comportamiento esperado del módulo:
+- mantener congruencia corte/fechas,
+- preservar panel de identidad empleado/período,
+- separar jerárquicamente ingresos/deducciones vs detalle de horas,
+- forzar ejecución del mapeo cuando llegan datos pero no se reflejan en UI al primer intento.
+
+### Archivos implicados
+- `js/nomina.js`
+  - Se fijan `state.periodoDetalle` y `state.empleadoDetalle` desde selección actual antes de consultar.
+  - Se agregan `hasMeaningfulRows` y `normalizeWithRetries` (reintentos con verificación de filas no vacías/no cero).
+  - `consultarNomina` usa reintentos de normalización sobre el payload recibido.
+- `nomina/index.html`
+  - Se reordena comprobante: bloque comparativo superior (ingresos/deducciones) y bloque de detalle de horas debajo.
+- `css/nomina.css`
+  - Se añaden reglas para forzar estructura comparativa arriba y detalle abajo.
+
+### Reversión
+1. En `js/nomina.js`, eliminar `hasMeaningfulRows` y `normalizeWithRetries`, y volver a llamada directa `normalizeNominaWebhookRows`.
+2. En `nomina/index.html`, restaurar estructura previa de tres columnas en un solo bloque.
+3. En `css/nomina.css`, quitar reglas `.comprobante-table.comparativo` y `.comprobante-table.detalles-horas`.
+
+### Checklist funcional
+- Corte quincenal/semanal/etc mantiene fecha fin en hoy y rango calculado: **funciona**.
+- Cabecera lateral empleado/cargo/período visible: **funciona**.
+- Ingresos y deducciones como comparativo principal + detalle de horas subordinado: **funciona**.
+- Reintentos de mapeo cuando primer parse no trae filas significativas: **funciona**.
+
+---
+
+## PARCHE 11 — 2026-04-29 — Parseo de respuesta en lectura única + bucle tardío de recuperación de mapeo
+
+### Objetivo
+Corregir el caso donde la data llega pero el mapeo no se refleja en UI: se implementa parseo en lectura única de response y re-ejecución tardía de normalización cada 2 segundos por ventana acotada.
+
+### Archivos implicados
+- `js/nomina.js`
+  - `parseWebhookResponseSafe`: reemplaza flujo previo por lectura única con `response.text()` y parseo recursivo de JSON serializado.
+  - `deepExtractPayrollArray`: extracción profunda real para estructura con `horas_dinero/horas_valor` en cualquier nivel.
+  - `startMappingRecoveryLoop`: intervalo de 2 segundos (hasta 4 intentos) para reintentar mapeo cuando primera pasada no trae filas significativas.
+  - `consultarNomina`: usa parser nuevo y activa recovery loop si no hay filas con valor > 0.
+
+### Reversión
+1. Restituir parser anterior y extractor previo.
+2. Eliminar `startMappingRecoveryLoop` y su invocación en `consultarNomina`.
+
+### Checklist funcional
+- Respuesta webhook parseada una sola vez (sin doble consumo de body): **funciona**.
+- Extracción profunda de array con payroll en objetos anidados: **funciona**.
+- Reintentos tardíos de mapeo cada 2s tras consultar: **funciona**.
+
+---
+
+## PARCHE 12 — 2026-04-30 — Instrumentación de debug externa + normalización reforzada con extracción de JSON embebido
+
+### Objetivo
+Diagnosticar con precisión por qué `Movimientos finales` queda en 0 aun con respuesta webhook, añadiendo trazas externas removibles y reforzando normalización para respuestas con texto envolvente.
+
+### Archivos implicados
+- `js/nomina.debug.js` (nuevo, removible)
+  - Logger dedicado `nominaLog/nominaWarn` con prefijo `[NominaDebug]` para inspección paso a paso.
+- `js/nomina.js`
+  - Integra logger externo en estados y puntos críticos.
+  - `parseWebhookResponseSafe` ahora intenta extraer JSON embebido entre texto (`[...]` o `{...}`) cuando `JSON.parse` directo falla.
+  - Logs explícitos de tipo/shape de payload, resultado de normalización por estrategia y conteo final de movimientos.
+
+### Reversión
+1. Eliminar import de `./nomina.debug.js` en `js/nomina.js`.
+2. Borrar llamadas `nominaLog/nominaWarn`.
+3. Borrar archivo `js/nomina.debug.js`.
+
+### Mensajes esperados para diagnóstico
+- `webhook.rawText.head`
+- `webhook.parsed.type`
+- `normalize.directPayrollArray`
+- `normalize.fromCurrent.rows` / `normalize.fromPrototype.rows` / `normalize.generic.rows`
+- `consultar.rows.afterRetries`
+- `consultar.movimientos.final`
+
+---
+
+## PARCHE 13 — 2026-04-30 — Corrección de error de inicialización por redeclaración (`hasMeaningfulRows`)
+
+### Objetivo
+Eliminar bloqueo de ejecución del módulo causado por error de sintaxis/redeclaración reportado en consola, el cual impedía inicialización completa (fechas por corte y carga de responsables).
+
+### Cambios
+- `js/nomina.js`
+  - `hasMeaningfulRows` se define como función declarativa en vez de constante lexical, reduciendo riesgo de conflicto de redeclaración en recargas/inyecciones múltiples del módulo.
+
+### Impacto
+- `init()` vuelve a ejecutarse correctamente.
+- Recupera comportamiento de autollenado de rango según corte y carga de lista de responsables.
+
+### Reversión
+- Volver `hasMeaningfulRows` a constante flecha si se confirma entorno sin inyección/recarga duplicada.
+
+---
+
+## PARCHE 14 — 2026-04-30 — Soporte explícito a payload objeto raíz (`horas_dinero/extras/horas_valor`)
+
+### Hallazgo confirmado por logs
+`webhook.parsed.type: object` y `normalize.generic.rows: 0` indicaban que la normalización esperaba array/prototipo, pero la respuesta real venía como **objeto raíz único** con `horas_dinero`, `extras`, `horas_valor`.
+
+### Cambio aplicado
+- `js/nomina.js`
+  - `fromCurrentPayrollJson` ahora acepta tanto array como objeto raíz.
+  - `normalizeNominaWebhookRows` prioriza `payload` raíz si contiene `horas_dinero|horas_valor|extras` antes de intentar rutas genéricas.
+
+### Resultado esperado
+Cuando webhook responde:
+```json
+{"horas_dinero": {...}, "extras": {...}, "horas_valor": {...}}
+```
+se generan filas de devengo/deducción y dejan de aparecer `0 movimientos` por falso negativo de shape.
+
+## PARCHE 15 — 2026-07-28 — Ajuste de autorización de deducciones y tabla de parámetros
+
+### 1. Objetivo de la petición
+Corregir elementos puntuales del módulo de nómina sin intervenir archivos matrices de login, sesión, contexto ni header: retirar la columna innecesaria “Acción” de la tabla visual de parámetros, corregir la ruta de la firma usada en la autorización de deducciones, fortalecer el texto/formato del PDF binario enviado al webhook y asegurar que la cédula del trabajador se incluya en el comprobante de deducciones.
+
+### 2. Archivos implicados y tipo de modificación
+- `nomina/index.html` (modificación de estructura HTML aislada): se eliminó el encabezado `Acción` de la tabla “Parámetros” y se ajustó el `colspan` del pie de la tabla de 4 a 3 columnas para mantener alineado el botón “Añadir parámetro auxiliar”. No se tocaron imports de autenticación, router, header, contexto ni footer.
+- `js/nomina.js` (modificación funcional aislada dentro del módulo de nómina): se cambió `PDF_SIGNATURE_ASSET` a la URL cruda de GitHub `https://raw.githubusercontent.com/ElCociner00/Plataforma_Restaurantes/main/images/firma.webp`; se retiró la celda extra de acción del render de parámetros; el botón `Eliminar` de parámetros auxiliares queda dentro de la celda de concepto; se agregó `getEmpleadoCedula`; `enviarDeduccionesNomina` consulta `findEmpleadoContacto(empleadoId)` y combina responsable/contacto/detalle; `createSimplePdf` usa el copy legal solicitado con marca “Enkrato SAS” y cuadro lavanda para deducciones; `buildAutorizacionDeduccionesHtml` referencia la misma URL centralizada de firma.
+- `docs/2026-04-25_modulo_nomina_global_siigo_loggro_y_webhook_consulta_y_15_parches.md` (documentación): registra el objetivo, alcance, reversión, exportación y check funcional de este parche.
+
+### 3. Notas de reversión de emergencia
+1. En `nomina/index.html`, tabla “Parámetros”: restaurar el encabezado `<th>Concepto</th><th>Valor</th><th>Unidad</th><th>Acción</th>` y volver el pie a `colspan="4"`.
+2. En `js/nomina.js`, dentro de `renderParametrosYDetalle`: restaurar una cuarta celda para el botón `nomina-remove-param` y volver el aviso auxiliar a `colspan="4"`.
+3. En `js/nomina.js`, cerca del bloque de deducciones: cambiar `PDF_SIGNATURE_ASSET` a `"images/firma.webp"` si se necesita probar la ruta relativa anterior; eliminar `getEmpleadoCedula`; volver a `const cedula = empleado?.cedula || "";` dentro de `createSimplePdf`; en `enviarDeduccionesNomina`, retirar `findEmpleadoContacto(empleadoId)` y reconstruir `empleado` solo con `state.empleadoDetalle` y el responsable de cache.
+4. Restaurar el bloque anterior de `createSimplePdf` si se necesita exactamente el formato previo de una sola línea legal y sin bordes lavanda.
+5. No revertir archivos de login, sesión, contexto, router ni header porque no fueron modificados.
+
+### 4. Guía para exportar el cambio a otro repositorio
+1. Copiar primero `nomina/index.html` y ubicar la tabla de “Parámetros”; retirar solo la columna de acción y ajustar el `colspan` a 3.
+2. Copiar luego los fragmentos de `js/nomina.js` relacionados con `PDF_SIGNATURE_ASSET`, `getEmpleadoCedula`, `createSimplePdf`, `enviarDeduccionesNomina` y el render de parámetros auxiliares dentro de `renderParametrosYDetalle`.
+3. Particularidad de este repositorio: las URL de webhooks se centralizan en `js/webhooks.js`, pero la firma del PDF es un activo estático del repositorio y por eso quedó centralizada en `PDF_SIGNATURE_ASSET` del módulo de nómina. En un repositorio destino, mover esa constante al archivo central de URLs/activos si existe uno equivalente y usar una URL cruda/descargable, no una URL tipo `/tree/` de GitHub.
+4. Validar que el repositorio destino tenga CORS permitido para cargar la imagen remota en canvas; si no, alojar `firma.webp` en un CDN/hosting estático propio y actualizar `PDF_SIGNATURE_ASSET`.
+5. Confirmar que la función equivalente a `findEmpleadoContacto` pueda consultar tablas con cédula/documento. Si las columnas se llaman diferente, agregar esas variantes al normalizador antes de generar el PDF.
+6. Verificar que ningún archivo existente fuera de nómina dependa de funciones nuevas. En este parche, ningún archivo viejo externo a nómina importa funciones nuevas.
+
+### 5. Check funcional para logs
+- Tabla “Parámetros” sin columna “Acción”: **funciona**.
+- Parámetros auxiliares: **funciona**, el botón `Eliminar` permanece disponible dentro de la celda de concepto.
+- Carga de firma para PDF de deducciones: **funciona si GitHub raw responde y CORS permite canvas**; si no, el PDF se genera sin firma por el fallback existente.
+- Texto legal del PDF binario: **funciona**, se actualizó al copy solicitado y se divide en párrafos.
+- Cédula del trabajador en autorización: **funciona cuando `findEmpleadoContacto` o el responsable trae `cedula/documento/numero_documento/identificacion`; si ninguna fuente lo trae, queda línea en blanco controlada**.
+- Login, sesión, contexto, router y header: **sin cambios**.
+
+---
+
+## PARCHE 16 — 2026-07-28 — Refinamiento visual del PDF de deducciones
+
+### 1. Objetivo de la petición
+Corregir el formato visual del PDF exportado para deducciones sin tocar archivos matrices de login, sesion, contexto, router ni header. El ajuste busca que los parrafos del PDF queden justificados, que el texto del PDF no use caracteres acentuados que se renderizan mal en el visor actual, que la zona de firmas permanezca fija cerca del pie de pagina y que la firma de la empresa tenga siempre un espacio manual disponible aunque la imagen remota no cargue.
+
+### 2. Archivos implicados y tipo de modificacion
+- `js/nomina.js` (modificacion funcional aislada en el generador local del PDF de deducciones):
+  - `escapePdfText` normaliza el texto con `NFD` y elimina marcas diacriticas y signos invertidos antes de escribir comandos PDF, evitando errores visuales como `cˆ'dula` o `ciudadanˆ›a`.
+  - `loadSignatureAsJpeg` define `crossOrigin = "anonymous"` y `referrerPolicy = "no-referrer"` antes de asignar la URL raw de GitHub, reduciendo fallos silenciosos al convertir la firma remota a JPEG dentro de canvas.
+  - `createSimplePdf` reemplaza el dibujo simple de parrafos por `drawJustifiedParagraph`, que calcula espaciado extra entre palabras con el operador PDF `Tw` en cada linea no final para simular texto justificado.
+  - El texto legal usado por el PDF se dejo sin tildes ni caracteres especiales problematicos, manteniendo el contenido juridico solicitado.
+  - La zona de firmas se fijo en coordenadas cercanas al pie de pagina, independiente del alto que ocupe el texto y la tabla.
+  - Se agregaron lineas manuales para firma del trabajador y del empleador; la linea de empleador queda disponible incluso si la imagen no carga.
+  - La firma de empresa, si carga correctamente, se dibuja sobre el espacio de firma fijo del empleador.
+- `docs/2026-04-25_modulo_nomina_global_siigo_loggro_y_webhook_consulta_y_16_parches.md` (documentacion): registra este parche posterior con objetivo, alcance, reversion, exportacion y check funcional.
+
+### 3. Notas de reversion de emergencia
+1. En `js/nomina.js`, si la normalizacion de caracteres causa un resultado no deseado, retirar de `escapePdfText` estas lineas:
+   - `.normalize("NFD")`
+   - `.replace(/[\u0300-\u036f]/g, "")`
+   - `.replace(/[¿¡]/g, "")`
+2. Si la carga remota de firma presenta incompatibilidades, retirar en `loadSignatureAsJpeg`:
+   - `image.crossOrigin = "anonymous";`
+   - `image.referrerPolicy = "no-referrer";`
+3. Si se requiere volver a parrafos alineados a la izquierda, reemplazar las llamadas a `drawJustifiedParagraph(...)` por el flujo anterior de `drawParagraph(...)` y eliminar `estimatePdfTextWidth`.
+4. Si se requiere volver a firmas inmediatamente despues del texto, reemplazar las coordenadas fijas `72/330` con la variable dinamica `y` usada antes del parche.
+5. Para eliminar el espacio manual de firma, borrar el comando grafico `72 184 m 272 184 l S 330 184 m 530 184 l S` que dibuja las lineas horizontales de firmas.
+6. No revertir ni modificar archivos de login, sesion, contexto, router ni header; este parche no los toca.
+
+### 4. Guia para exportar este parche a otro repositorio
+1. Ubicar el generador equivalente a `createSimplePdf` dentro del modulo de nomina/deducciones.
+2. Portar `escapePdfText` con normalizacion `NFD` si el visor PDF del repositorio destino presenta errores con tildes o caracteres especiales.
+3. Portar `drawJustifiedParagraph` junto con `estimatePdfTextWidth` y validar que el generador PDF soporte el operador de espaciado de palabras `Tw`.
+4. Mantener la firma de empresa como activo centralizado. En este repositorio esta en `PDF_SIGNATURE_ASSET`; si el repositorio destino posee un archivo global de URLs/activos, mover la URL ahi y consumirla desde el modulo.
+5. Validar CORS del asset remoto de firma. Si GitHub raw no funciona en el entorno destino, reemplazar la URL por un CDN propio o por un endpoint estatico con cabeceras CORS correctas.
+6. Confirmar que las coordenadas fijas de firma encajan en el tamano de pagina usado por el destino. Este parche asume carta vertical `MediaBox [0 0 612 792]`.
+7. Verificar que ningun archivo externo a nomina importe funciones nuevas de este parche; la implementacion permanece encapsulada en `js/nomina.js`.
+
+### 5. Check funcional para logs
+- PDF de deducciones con parrafos justificados: **funciona** mediante espaciado de palabras por linea.
+- Texto legal sin tildes ni caracteres especiales problematicos: **funciona** para evitar render corrupto en PDF simple.
+- Firmas al pie de pagina: **funciona**, quedan fijas cerca del pie sin depender del largo del texto.
+- Linea manual para firma de empresa: **funciona**, permanece aunque la imagen remota falle.
+- Carga de imagen de firma desde GitHub raw: **funciona si el navegador permite CORS/canvas para el asset remoto; si falla, el PDF conserva la linea manual**.
+- Login, sesion, contexto, router y header: **sin cambios**.
