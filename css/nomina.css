@@ -340,3 +340,46 @@
 .nomina-local-option span { display: inline-flex; flex-direction: column; gap: 2px; }
 .nomina-local-option small { color: #64748b; font-size: 0.72rem; font-weight: 600; }
 @media (max-width: 760px) { .nomina-locales-list { flex-direction: column; } .nomina-local-option { width: min(100%, 320px); box-sizing: border-box; } }
+
+.nomina-historico-row {
+  cursor: pointer;
+}
+
+.nomina-historico-row:hover {
+  background: #eef2ff;
+}
+
+.nomina-detail-panel {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.nomina-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.nomina-detail-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px;
+  background: #f8fafc;
+}
+
+.nomina-detail-card span {
+  display: block;
+  color: #64748b;
+  font-size: 0.82rem;
+  margin-bottom: 4px;
+}
+
+.nomina-secondary-btn {
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  color: #3730a3;
+}

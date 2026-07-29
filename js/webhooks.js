@@ -155,7 +155,7 @@ export const WEBHOOK_NOMINA_HISTORICO_GUARDAR =
 
 // nomina/historico.html (auto-carga histórico de nóminas guardadas; endpoint vacío para estructurar en BD)
 export const WEBHOOK_NOMINA_HISTORICO_RENDERIZAR =
-  "https://n8n.enkrato.com/webhook/nomina_historico_renderizar";
+  "https://n8n.enkrato.com/webhook/nomina_historico_consultar";
 
 // nomina/index.html (botón: "Enviar deducciones"; genera y envía autorización de descuento al correo del empleado)
 export const WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR =
@@ -267,7 +267,7 @@ WEBHOOKS.NOMINA_HISTORICO_RENDERIZAR = {
   url: WEBHOOK_NOMINA_HISTORICO_RENDERIZAR,
   archivos_que_usan: ["js/nomina_historico.js", "nomina/historico.html"],
   metodo: "POST",
-  descripcion: "Renderiza o lista nóminas históricas guardadas; creado vacío para reflejo en BD/n8n"
+  descripcion: "Consulta nóminas históricas guardadas con token y empresa_id para listar fecha/empleado y abrir detalle"
 };
 
 WEBHOOKS.NOMINA_DEDUCCIONES_ENVIAR = {

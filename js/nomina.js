@@ -2106,14 +2106,14 @@ const createSimplePdf = async ({ empleado, rows, fecha }) => {
   drawJustifiedParagraph("La presente autorizacion se suscribe de manera voluntaria, sin error, fuerza, presion o coaccion alguna.", 72, y, 468, 104, 13, 9);
 
   drawText("Firma del trabajador", 72, 198, 10, true);
-  drawText(`Nombre: ${empleadoNombre}`, 72, 168, 9);
-  drawText(`C.C.: ${cedula || "________________"}`, 72, 152, 9);
+  drawText(`Nombre: ${empleadoNombre}`, 72, 150, 9);
+  drawText(`C.C.: ${cedula || "________________"}`, 72, 134, 9);
   drawText("Firma del empleador", 330, 198, 10, true);
-  drawText(`BATUTCO S.A.S. - Fecha: ${fecha}`, 330, 152, 9);
+  drawText(`BATUTCO S.A.S. - Fecha: ${fecha}`, 330, 134, 9);
   content.push("ET");
   content.push(`q 0.75 0 0 RG 1 w 72 ${tableBottom} 468 ${tableTop - tableBottom} re S 260 ${tableBottom} m 260 ${tableTop} l S 318 ${tableBottom} m 318 ${tableTop} l S 392 ${tableBottom} m 392 ${tableTop} l S 462 ${tableBottom} m 462 ${tableTop} l S Q`);
   content.push("q 0.61 0.50 0.78 rg 0.61 0.50 0.78 RG 0.5 w 472 754 68 16 re S Q");
-  content.push("q 0 0 0 RG 0.8 w 72 184 m 272 184 l S 330 184 m 530 184 l S Q");
+  content.push("q 0 0 0 RG 0.8 w 72 168 m 272 168 l S 330 168 m 530 168 l S Q");
   if (signature) content.push("q 200 0 0 31.5 330 186 cm /Im1 Do Q");
   const contentText = content.join("\n");
   const encoder = new TextEncoder();
@@ -2181,8 +2181,9 @@ const buildAutorizacionDeduccionesHtml = ({ empleado, contacto, rows, fecha }) =
     .total-row td { font-weight: 700; }
     .total { margin: 25px auto 20px; width: 82%; display: flex; justify-content: space-between; font-weight: 700; }
     .sep { border-top: 1px solid #e5e7eb; margin: 28px 0 18px; }
-    .firma h3 { font-size: 14pt; margin: 0 0 12px; }
+    .firma h3 { font-size: 14pt; margin: 0 0 28px; }
     .firma p { text-align: left; margin: 8px 0; }
+    .firma-linea { border-top: 1px solid #000; height: 26px; margin: 0 0 8px; }
     .firma-empleador img { max-width: 210px; max-height: 90px; object-fit: contain; display: block; margin: 8px 0; }
   </style></head><body><main class="doc">
     <section class="head"><div class="empresa">BATUTCO S.A.S.</div><div class="nit">NIT 901.973.863-2</div><div class="titulo">AUTORIZACIÓN DE DESCUENTO</div></section>
@@ -2193,7 +2194,7 @@ const buildAutorizacionDeduccionesHtml = ({ empleado, contacto, rows, fecha }) =
     <p>Declaro que los bienes, productos, servicios o conceptos anteriormente relacionados fueron recibidos a satisfacción o aceptados expresamente por mí, y reconozco que los valores aquí indicados corresponden al precio informado y aceptado.</p>
     <p>En consecuencia, autorizo expresa e irrevocablemente a BATUTCO S.A.S. para efectuar el descuento del valor anteriormente señalado sobre mi salario, prestaciones sociales, liquidación definitiva o cualquier otra suma que legalmente me corresponda recibir, siempre que dicho descuento resulte procedente conforme a la legislación laboral colombiana y respete los límites establecidos en los artículos 149 y siguientes del Código Sustantivo del Trabajo y demás normas aplicables.</p>
     <p>Declaro igualmente que la presente autorización se suscribe de manera libre, consciente y voluntaria, sin existir error, fuerza, dolo, intimidación, presión o cualquier otra circunstancia que afecte mi consentimiento.</p>
-    <div class="sep"></div><section class="firma"><h3>Firma del trabajador</h3><p>Nombre: ___________________________</p><p>C.C.: ___________________________</p></section>
+    <div class="sep"></div><section class="firma"><h3>Firma del trabajador</h3><div class="firma-linea"></div><p>Nombre: ___________________________</p><p>C.C.: ___________________________</p></section>
     <div class="sep"></div><section class="firma firma-empleador"><h3>Firma del empleador</h3><img src="${escapeHtml(PDF_SIGNATURE_ASSET)}" alt="Firma empleador"><p>BATUTCO S.A.S.</p><p>Fecha: ${escapeHtml(fecha)}</p></section>
   </main></body></html>`;
 };
@@ -2231,7 +2232,7 @@ const enviarDeduccionesNomina = async () => {
     };
     const formData = new FormData();
     formData.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }), "metadata.json");
-    formData.append("pdf", pdfBlob, `autorizacion-deducciones-${empleadoId}.pdf`);
+    formData.append("pdf", pdfBlob, "Autorización Deducciones.pdf");
 
     const authHeaders = await buildRequestHeaders({ includeTenant: true });
     const response = await fetch(WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR, { method: "POST", headers: authHeaders, body: formData });
