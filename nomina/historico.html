@@ -17,10 +17,10 @@
     <!-- MANTENIMIENTO HISTÓRICO: esta página no toca login/sesión/header; solo carga js/nomina_historico.js para consultar el webhook centralizado. -->
     <section class="bloque">
       <h2>Consulta histórica</h2>
-      <p class="nomina-help">Borrador funcional del submódulo: permite visualizar cómo se seleccionarán nóminas guardadas por periodo, empleado y sede cuando el backend exponga la lectura histórica.</p>
+      <p class="nomina-help">Consulta automática conectada al histórico real. El listado muestra filas resumidas por fecha y empleado; al seleccionar una nómina se abre un submódulo de detalle separado.</p>
       <div class="nomina-grid">
-        <label>Empleado
-          <input id="historicoNominaEmpleado" type="search" placeholder="Nombre o documento">
+        <label>Responsable / empleado
+          <select id="historicoNominaEmpleado"><option value="">Cargando responsables...</option></select>
         </label>
         <label>Periodo desde
           <input id="historicoNominaDesde" type="date">
@@ -35,16 +35,21 @@
       <div class="nomina-actions">
         <button type="button" id="consultarHistoricoNomina">Consultar histórico</button>
       </div>
-      <div class="comprobante-table nomina-web-panel nomina-wide-panel">
+      <div id="historicoNominaListadoPanel" class="comprobante-table nomina-web-panel nomina-wide-panel">
         <div class="comprobante-col">
           <h3>Nóminas guardadas</h3>
           <table>
-            <thead><tr><th>Seleccionar</th><th>Periodo</th><th>Empleado</th><th>Sedes</th><th>Estado</th></tr></thead>
-            <tbody id="historicoNominaBody"><tr><td colspan="5">Consultando histórico...</td></tr></tbody>
+            <thead><tr><th>Fecha</th><th>Empleado</th></tr></thead>
+            <tbody id="historicoNominaBody"><tr><td colspan="2">Consultando histórico...</td></tr></tbody>
           </table>
         </div>
       </div>
-      <div id="historicoNominaStatus" class="status">El listado se carga desde el webhook https://n8n.enkrato.com/webhook/nomina_historico_renderizar.</div>
+      <div id="historicoNominaDetallePanel" class="nomina-detail-panel" hidden>
+        <button type="button" id="historicoNominaVolver" class="nomina-secondary-btn">← Volver al histórico</button>
+        <h3 id="historicoNominaDetalleTitulo">Detalle de nómina</h3>
+        <div id="historicoNominaDetalleResumen" class="nomina-detail-grid"></div>
+      </div>
+      <div id="historicoNominaStatus" class="status">El listado se carga desde el webhook https://n8n.enkrato.com/webhook/nomina_historico_consultar.</div>
     </section>
   </main>
 
