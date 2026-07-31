@@ -43,15 +43,65 @@ const setDefaultDates = () => {
 };
 
 const getResponsableNombre = (id) => state.responsables.find((item) => String(item.id || "") === String(id || ""))?.nombre_completo || "";
-const getEmpleadoNombre = (row) => row?.empleado?.nombre || row?.empleado_nombre || row?.nombre_empleado || row?.responsable_nombre || getResponsableNombre(row?.responsable_id) || row?.ingresos?.find?.((item) => item.empleado_nombre)?.empleado_nombre || "Empleado sin resolver";
-const getRowDate = (row) => row?.fecha || row?.created_at || row?.updated_at || row?.fecha_fin || row?.fin || row?.detalles?.[0]?.fecha || "";
+const getEmpleadoNombre = (row) => row?.empleado?.nombre || row?.empleado?.nombre_completo || row?.resumen?.empleado || row?.resumen?.empleado_nombre || row?.empleado_nombre || row?.nombre_empleado || row?.responsable_nombre || getResponsableNombre(row?.responsable_id) || row?.ingresos?.find?.((item) => item.empleado_nombre)?.empleado_nombre || "Empleado sin resolver";
+const getRowDate = (row) => row?.fecha || row?.fecha_nomina || row?.resumen?.fecha || row?.resumen?.fecha_fin || row?.created_at || row?.updated_at || row?.fecha_fin || row?.fin || row?.detalles?.[0]?.fecha || "";
+
+const parseJsonLike = (value) => {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  if (!trimmed || !/^[\[{]/.test(trimmed)) return value;
+  try { return JSON.parse(trimmed); } catch { return value; }
+};
+
+const firstArrayFromObject = (value) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const preferredKeys = ["data", "nominas", "rows", "items", "result", "payload", "body", "records"];
+  for (const key of preferredKeys) {
+    const parsed = parseJsonLike(value[key]);
+    if (Array.isArray(parsed)) return parsed;
+    const nested = firstArrayFromObject(parsed);
+    if (nested) return nested;
+  }
+  for (const item of Object.values(value)) {
+    const parsed = parseJsonLike(item);
+    if (Array.isArray(parsed)) return parsed;
+    const nested = firstArrayFromObject(parsed);
+    if (nested) return nested;
+  }
+  return null;
+};
+
+const getTablaRows = (row, name) => {
+  const tablas = parseJsonLike(row?.tablas) || {};
+  const direct = parseJsonLike(row?.[name]);
+  const nested = parseJsonLike(tablas?.[name]);
+  if (Array.isArray(direct)) return direct;
+  if (Array.isArray(nested)) return nested;
+  return [];
+};
+
+const normalizeHistoricoRow = (raw) => {
+  const row = parseJsonLike(raw) || {};
+  const tablas = parseJsonLike(row.tablas) || {};
+  const resumen = parseJsonLike(row.resumen) || parseJsonLike(tablas.resumen) || {};
+  return {
+    ...row,
+    resumen,
+    detalles: getTablaRows(row, "detalle").length ? getTablaRows(row, "detalle") : getTablaRows(row, "detalles"),
+    ingresos: getTablaRows(row, "ingresos"),
+    deducciones: getTablaRows(row, "deducciones"),
+    apoyos: getTablaRows(row, "apoyos"),
+    parametros: getTablaRows(row, "parametros"),
+    parametros_tiempo: getTablaRows(row, "parametros_tiempo"),
+    parametros_calculo: getTablaRows(row, "parametros_calculo"),
+    auxiliares: parseJsonLike(row.auxiliares) || parseJsonLike(tablas.auxiliares) || {}
+  };
+};
 
 const normalizeHistoricoRows = (payload) => {
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.data)) return payload.data;
-  if (Array.isArray(payload?.nominas)) return payload.nominas;
-  if (Array.isArray(payload?.rows)) return payload.rows;
-  return [];
+  const parsed = parseJsonLike(payload);
+  const rows = Array.isArray(parsed) ? parsed : firstArrayFromObject(parsed) || [];
+  return rows.map(normalizeHistoricoRow).filter((row) => row && typeof row === "object");
 };
 
 const normalizeResponsablesPayload = (rows) => rows.map((item) => ({ id: String(item?.id || ""), nombre_completo: item?.nombre_completo || item?.nombre || item?.empleado_nombre || item?.id || "Responsable" })).filter((item) => item.id);
@@ -98,18 +148,44 @@ const renderHistoricoRows = (rows) => {
   tbody.innerHTML = filtered.map((row) => { const originalIndex = state.nominas.indexOf(row); return `<tr class="nomina-historico-row" data-nomina-index="${originalIndex}" data-nomina-id="${escapeHtml(row.id || "")}"><td>${escapeHtml(formatDateLong(getRowDate(row)))}</td><td>${escapeHtml(getEmpleadoNombre(row))}</td></tr>`; }).join("");
 };
 
+
+const renderGenericTable = (title, rows) => {
+  if (!Array.isArray(rows) || !rows.length) return "";
+  const keys = Array.from(rows.reduce((set, item) => {
+    Object.keys(item || {}).slice(0, 8).forEach((key) => set.add(key));
+    return set;
+  }, new Set())).slice(0, 8);
+  const cell = (value) => {
+    if (value && typeof value === "object") return escapeHtml(JSON.stringify(value));
+    return escapeHtml(value ?? "-");
+  };
+  return `<div class="comprobante-col"><h3>${escapeHtml(title)}</h3><table><thead><tr>${keys.map((key) => `<th>${escapeHtml(key)}</th>`).join("")}</tr></thead><tbody>${rows.map((item) => `<tr>${keys.map((key) => `<td>${cell(item?.[key])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+};
+
 const renderDetalle = (row) => {
   if (!row || !listadoPanel || !detallePanel) return;
   const detalles = Array.isArray(row.detalles) ? row.detalles : [];
   const ingresos = Array.isArray(row.ingresos) ? row.ingresos : [];
   const deducciones = Array.isArray(row.deducciones) ? row.deducciones : [];
   detalleTitulo.textContent = `Nómina de ${getEmpleadoNombre(row)}`;
+  const totalIngresos = ingresos.reduce((acc, item) => acc + Number(item.valor || item.total || item.valor_empleado || 0), 0);
+  const totalDeducciones = deducciones.reduce((acc, item) => acc + Number(item.valor || item.total || item.valor_empleado || 0), 0);
   detalleResumen.innerHTML = `
     <div class="nomina-detail-card"><span>Fecha</span><strong>${escapeHtml(formatDateLong(getRowDate(row)))}</strong></div>
-    <div class="nomina-detail-card"><span>Periodo</span><strong>${escapeHtml(row.periodo || "Sin periodo")}</strong></div>
-    <div class="nomina-detail-card"><span>Ingresos</span><strong>${escapeHtml(money(ingresos.reduce((acc, item) => acc + Number(item.valor || 0), 0)))}</strong></div>
-    <div class="nomina-detail-card"><span>Deducciones</span><strong>${escapeHtml(money(deducciones.reduce((acc, item) => acc + Number(item.valor || 0), 0)))}</strong></div>
-    <div class="comprobante-table nomina-wide-panel"><div class="comprobante-col"><h3>Detalles recibidos</h3><table><thead><tr><th>Fecha</th><th>Sede</th><th>Horario</th><th>Total</th></tr></thead><tbody>${detalles.slice(0, 20).map((item) => `<tr><td>${escapeHtml(formatDateLong(item.fecha))}</td><td>${escapeHtml(item.sede_nombre || item.sede || "-")}</td><td>${escapeHtml(`${item.hora_inicio || "-"} - ${item.hora_fin || "-"}`)}</td><td>${escapeHtml(money(item.calculos?.total || 0))}</td></tr>`).join("") || '<tr><td colspan="4">Sin detalles internos.</td></tr>'}</tbody></table></div></div>`;
+    <div class="nomina-detail-card"><span>Responsable</span><strong>${escapeHtml(getEmpleadoNombre(row))}</strong></div>
+    <div class="nomina-detail-card"><span>Periodo</span><strong>${escapeHtml(row.periodo || row.resumen?.periodo || "Sin periodo")}</strong></div>
+    <div class="nomina-detail-card"><span>Ingresos</span><strong>${escapeHtml(money(totalIngresos))}</strong></div>
+    <div class="nomina-detail-card"><span>Deducciones</span><strong>${escapeHtml(money(totalDeducciones))}</strong></div>
+    <div class="nomina-detail-card"><span>Neto</span><strong>${escapeHtml(money(row.resumen?.neto || row.neto || (totalIngresos - totalDeducciones)))}</strong></div>
+    <div class="comprobante-table nomina-wide-panel">
+      ${renderGenericTable("Ingresos", ingresos)}
+      ${renderGenericTable("Deducciones", deducciones)}
+      ${renderGenericTable("Detalles recibidos", detalles)}
+      ${renderGenericTable("Apoyos", row.apoyos)}
+      ${renderGenericTable("Parametros", row.parametros)}
+      ${renderGenericTable("Parametros tiempo", row.parametros_tiempo)}
+      ${renderGenericTable("Parametros calculo", row.parametros_calculo)}
+    </div>`;
   listadoPanel.hidden = true;
   detallePanel.hidden = false;
 };

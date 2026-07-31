@@ -146,3 +146,106 @@ Borrar el bloque agregado al final del archivo:
 - `node --check js/nomina_historico.js`
 - `node --check js/nomina.js`
 - `node --check js/webhooks.js`
+
+---
+
+## Parche posterior 1 — 2026-07-31 — Render robusto de historico y ajuste final de deducciones
+
+## 1. Objetivo de esta peticion
+
+Corregir dos problemas aislados del modulo de nomina sin tocar login, sesion, contexto, router ni header:
+
+1. Hacer que el historico de nomina renderice aunque el webhook entregue un conglomerado JSON anidado, serializado o agrupado por tablas. La vista debe mostrar filas generales con fecha y responsable/empleado, y al hacer clic debe abrir un submodulo de detalle con ingresos, deducciones, detalles, apoyos y parametros de esa nomina especifica.
+2. Ajustar el PDF local de deducciones para que los parrafos se generen justificados, el texto sensible no use acentos ni signos que puedan romper la codificacion del visor, las firmas queden fijas cerca del pie de pagina y la firma de empresa tenga linea manual aunque falle la imagen remota.
+
+## 2. Archivos implicados y modificaciones
+
+### `js/nomina_historico.js`
+
+- **Tipo de modificacion:** parche funcional aislado del submodulo historico.
+- **Objetivo:** aceptar respuestas del webhook en forma de arreglo directo, `data`, `nominas`, `rows`, `items`, `result`, `payload`, `body`, `records` o JSON serializado dentro de esas llaves.
+- **Que hace explicitamente:**
+  - Agrega `parseJsonLike()` para convertir cadenas JSON cuando llegan como texto.
+  - Agrega `firstArrayFromObject()` para buscar el primer arreglo util dentro de objetos anidados.
+  - Agrega `getTablaRows()` y `normalizeHistoricoRow()` para reconstruir `detalles`, `ingresos`, `deducciones`, `apoyos`, `parametros`, `parametros_tiempo`, `parametros_calculo` y `auxiliares` desde `tablas` o desde propiedades directas.
+  - Amplia la resolucion de fecha y empleado usando `resumen`, `empleado.nombre_completo` y campos planos.
+  - Agrega `renderGenericTable()` para renderizar tablas completas de detalle sin depender de un esquema fijo.
+  - Mantiene el listado principal en filas de dos columnas: fecha y responsable/empleado.
+
+### `js/nomina.js`
+
+- **Tipo de modificacion:** parche funcional aislado del generador local de PDF de deducciones.
+- **Objetivo:** conservar el PDF binario enviado al webhook, corrigiendo la legibilidad y la zona de firmas.
+- **Que hace explicitamente:**
+  - Mantiene `drawJustifiedParagraph()` con espaciado de palabras para justificar lineas no finales del PDF simple.
+  - Baja la zona de firmas a coordenadas fijas cercanas al pie de pagina (`signatureLineY`, `signatureLabelY`, `signatureImageY`) para que no quede pegada al final del texto variable.
+  - Dibuja siempre la linea de firma del empleador; si la imagen remota no carga, queda el espacio manual utilizable.
+  - Retira acentos del texto de la plantilla HTML de deducciones y del nombre de archivo enviado como `Autorizacion Deducciones.pdf` para evitar errores de codificacion en visores/procesadores externos.
+  - Fija en la plantilla HTML una seccion `.firmas` al pie con dos columnas y linea visible para trabajador y empleador.
+
+### `docs/2026-07-29_historico_nomina_y_pdf_deducciones_y_1_parche.md`
+
+- **Tipo de modificacion:** documentacion del parche posterior.
+- **Objetivo:** dejar trazabilidad, instrucciones de reversa, guia de exportacion y check funcional para logs.
+
+## 3. Notas de emergencia para revertir este parche
+
+### Revertir `js/nomina_historico.js`
+
+1. Eliminar las funciones agregadas `parseJsonLike`, `firstArrayFromObject`, `getTablaRows`, `normalizeHistoricoRow` y `renderGenericTable`.
+2. Restaurar `normalizeHistoricoRows` a la version simple que solo aceptaba:
+   ```js
+   if (Array.isArray(payload)) return payload;
+   if (Array.isArray(payload?.data)) return payload.data;
+   if (Array.isArray(payload?.nominas)) return payload.nominas;
+   if (Array.isArray(payload?.rows)) return payload.rows;
+   return [];
+   ```
+3. Restaurar `getEmpleadoNombre` y `getRowDate` para no leer `resumen` ni `empleado.nombre_completo` si se desea volver al comportamiento anterior.
+4. En `renderDetalle`, volver al bloque anterior que solo renderizaba cards de fecha/periodo/ingresos/deducciones y una tabla resumida de `detalles.slice(0, 20)`.
+
+### Revertir `js/nomina.js`
+
+1. En `createSimplePdf`, quitar las constantes:
+   ```js
+   const signatureLineY = 112;
+   const signatureLabelY = 154;
+   const signatureImageY = 118;
+   ```
+2. Restaurar las coordenadas previas de firmas si se requiere el comportamiento anterior: subtitulos en `198`, lineas en `168`, nombre/fecha alrededor de `150` y `134`, e imagen en `330 186`.
+3. En la plantilla HTML, eliminar `.firmas { position: fixed; ... }` y volver a las secciones con separadores `.sep` si se desea que las firmas fluyan despues del texto.
+4. Si el procesador externo vuelve a soportar acentos sin errores, restaurar los textos con ortografia completa y cambiar el nombre de archivo a `Autorización Deducciones.pdf`.
+
+## 4. Guia para exportar este parche a otro repositorio
+
+1. Generar el parche desde este repositorio:
+   ```bash
+   git diff -- js/nomina_historico.js js/nomina.js docs/2026-07-29_historico_nomina_y_pdf_deducciones_y_1_parche.md > historico-nomina-deducciones-parche-2026-07-31.patch
+   ```
+2. En el repositorio destino, validar primero si existe un normalizador del historico. Si existe, integrar ahi la busqueda de arrays anidados y JSON serializado; no crear otro flujo paralelo que duplique llamadas al webhook.
+3. Este repositorio centraliza endpoints en `js/webhooks.js`; este parche no cambia URLs. En otro repositorio debe mantenerse esa centralizacion y consumir el webhook desde una constante equivalente a `WEBHOOK_NOMINA_HISTORICO_RENDERIZAR`.
+4. Verificar que la pagina historica tenga IDs equivalentes a `historicoNominaBody`, `historicoNominaListadoPanel`, `historicoNominaDetallePanel`, `historicoNominaDetalleTitulo` y `historicoNominaDetalleResumen`.
+5. Validar que el generador PDF equivalente use fuentes basicas o una libreria con soporte real de acentos. Si no se garantiza soporte, conservar textos sin acentos para evitar caracteres rotos.
+6. Probar con tres payloads: arreglo directo, objeto con `data`, y objeto con `payload`/`body` serializado como texto JSON.
+7. Ejecutar validaciones de sintaxis:
+   ```bash
+   node --check js/nomina_historico.js
+   node --check js/nomina.js
+   ```
+
+## 5. Check funcional para logs
+
+- **Login/sesion/header:** no se modificaron.
+- **Historico nomina - llamada webhook:** se mantiene usando la constante centralizada existente.
+- **Historico nomina - render de filas:** funciona para arrays directos, objetos anidados y JSON serializado.
+- **Historico nomina - submodulo detalle:** funciona mostrando tablas genericas de ingresos, deducciones, detalles, apoyos y parametros cuando llegan en el payload.
+- **PDF deducciones - texto justificado:** funciona en el PDF simple mediante `Tw` por linea no final.
+- **PDF deducciones - acentos rotos:** mitigado en textos del documento y nombre de archivo usado en el envio.
+- **PDF deducciones - firmas al pie:** funciona con coordenadas fijas y plantilla HTML con seccion fija inferior.
+- **PDF deducciones - firma empresa sin imagen:** funciona porque siempre se dibuja/renderiza una linea manual.
+- **Nomina operativa principal:** no se cambio la consulta principal ni los calculos existentes.
+
+## 6. Validaciones realizadas
+
+- `node --check js/nomina_historico.js`
+- `node --check js/nomina.js`
