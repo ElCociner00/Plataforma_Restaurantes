@@ -218,7 +218,7 @@ const resolveUsuarioPrincipalNomina = async (usuarioId) => {
   };
 };
 
-// MANTENIMIENTO DEDUCCIONES: busca el correo del empleado para el webhook de PDF/correo. Si cambia la tabla de contactos, ajustar aquí.
+// MANTENIMIENTO DEDUCCIONES: busca el correo del empleado para el webhook de PDF/correo. Si cambia la tabla de contactos, ajustar aqui.
 const findEmpleadoContacto = async (empleadoId) => {
   const safeId = String(empleadoId || "").trim();
   if (!safeId) return {};
@@ -2035,6 +2035,9 @@ const getEmpleadoCedula = (empleado = {}, contacto = {}) => String(
 
 const createSimplePdf = async ({ empleado, rows, fecha }) => {
   const signature = await loadSignatureAsJpeg().catch(() => null);
+  const signatureLineY = 112;
+  const signatureLabelY = 154;
+  const signatureImageY = 118;
   const total = rows.reduce((acc, row) => acc + toNumeric(row.valor_empleado), 0);
   const empleadoNombre = String(empleado?.nombre || empleado?.nombre_completo || "EMPLEADO").toUpperCase();
   const cedula = getEmpleadoCedula(empleado);
@@ -2105,16 +2108,16 @@ const createSimplePdf = async ({ empleado, rows, fecha }) => {
   y = drawJustifiedParagraph("En consecuencia, autorizo expresamente a BATUTCO S.A.S. para descontar dicho valor del salario, prestaciones sociales, liquidacion definitiva o cualquier suma que legalmente me corresponda recibir, siempre que exista saldo pendiente y que el descuento sea legalmente procedente, respetando los limites y requisitos establecidos en los articulos 149 y siguientes del Codigo Sustantivo del Trabajo.", 72, y, 468, 104, 13, 9) - 4;
   drawJustifiedParagraph("La presente autorizacion se suscribe de manera voluntaria, sin error, fuerza, presion o coaccion alguna.", 72, y, 468, 104, 13, 9);
 
-  drawText("Firma del trabajador", 72, 198, 10, true);
-  drawText(`Nombre: ${empleadoNombre}`, 72, 150, 9);
-  drawText(`C.C.: ${cedula || "________________"}`, 72, 134, 9);
-  drawText("Firma del empleador", 330, 198, 10, true);
-  drawText(`BATUTCO S.A.S. - Fecha: ${fecha}`, 330, 134, 9);
+  drawText("Firma del trabajador", 72, signatureLabelY, 10, true);
+  drawText(`Nombre: ${empleadoNombre}`, 72, signatureLineY - 16, 9);
+  drawText(`C.C.: ${cedula || "________________"}`, 72, signatureLineY - 32, 9);
+  drawText("Firma del empleador", 330, signatureLabelY, 10, true);
+  drawText(`BATUTCO S.A.S. - Fecha: ${fecha}`, 330, signatureLineY - 32, 9);
   content.push("ET");
   content.push(`q 0.75 0 0 RG 1 w 72 ${tableBottom} 468 ${tableTop - tableBottom} re S 260 ${tableBottom} m 260 ${tableTop} l S 318 ${tableBottom} m 318 ${tableTop} l S 392 ${tableBottom} m 392 ${tableTop} l S 462 ${tableBottom} m 462 ${tableTop} l S Q`);
   content.push("q 0.61 0.50 0.78 rg 0.61 0.50 0.78 RG 0.5 w 472 754 68 16 re S Q");
-  content.push("q 0 0 0 RG 0.8 w 72 168 m 272 168 l S 330 168 m 530 168 l S Q");
-  if (signature) content.push("q 200 0 0 31.5 330 186 cm /Im1 Do Q");
+  content.push(`q 0 0 0 RG 0.8 w 72 ${signatureLineY} m 272 ${signatureLineY} l S 330 ${signatureLineY} m 530 ${signatureLineY} l S Q`);
+  if (signature) content.push(`q 200 0 0 31.5 330 ${signatureImageY} cm /Im1 Do Q`);
   const contentText = content.join("\n");
   const encoder = new TextEncoder();
   const objects = [
@@ -2181,21 +2184,21 @@ const buildAutorizacionDeduccionesHtml = ({ empleado, contacto, rows, fecha }) =
     .total-row td { font-weight: 700; }
     .total { margin: 25px auto 20px; width: 82%; display: flex; justify-content: space-between; font-weight: 700; }
     .sep { border-top: 1px solid #e5e7eb; margin: 28px 0 18px; }
-    .firma h3 { font-size: 14pt; margin: 0 0 28px; }
+     .firmas { position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 34px; }
+    .firma h3 { font-size: 14pt; margin: 0 0 42px; }
     .firma p { text-align: left; margin: 8px 0; }
-    .firma-linea { border-top: 1px solid #000; height: 26px; margin: 0 0 8px; }
-    .firma-empleador img { max-width: 210px; max-height: 90px; object-fit: contain; display: block; margin: 8px 0; }
+    .firma-linea { border-top: 1px solid #000; height: 30px; margin: 0 0 8px; }
+    .firma-empleador img { max-width: 210px; max-height: 60px; object-fit: contain; display: block; margin: -38px 0 8px; }
   </style></head><body><main class="doc">
-    <section class="head"><div class="empresa">BATUTCO S.A.S.</div><div class="nit">NIT 901.973.863-2</div><div class="titulo">AUTORIZACIÓN DE DESCUENTO</div></section>
+    <section class="head"><div class="empresa">BATUTCO S.A.S.</div><div class="nit">NIT 901.973.863-2</div><div class="titulo">AUTORIZACION DE DESCUENTO</div></section>
     <div class="fecha">Fecha: ${escapeHtml(fecha)}</div>
-    <p>Yo, <strong>${escapeHtml(empleadoNombre)}</strong>, identificado(a) con cédula de ciudadanía No. <strong>${escapeHtml(cedula)}</strong>, actuando en mi calidad de trabajador(a) de BATUTCO S.A.S., manifiesto que de manera libre, expresa, consciente e informada autorizo irrevocablemente a la empresa para efectuar descuentos sobre mi salario, prestaciones sociales, liquidación definitiva y cualquier otro valor que legalmente me corresponda recibir, derivados de productos adquiridos para consumo personal, bienes entregados, faltantes previamente aceptados o cualquier obligación económica reconocida por mí, conforme al siguiente detalle:</p>
+    <p>Yo, <strong>${escapeHtml(empleadoNombre)}</strong>, identificado(a) con cedula de ciudadania No. <strong>${escapeHtml(cedula)}</strong>, actuando en mi calidad de trabajador(a) de BATUTCO S.A.S., manifiesto que de manera libre, expresa, consciente e informada autorizo irrevocablemente a la empresa para efectuar descuentos sobre mi salario, prestaciones sociales, liquidacion definitiva y cualquier otro valor que legalmente me corresponda recibir, derivados de productos adquiridos para consumo personal, bienes entregados, faltantes previamente aceptados o cualquier obligacion economica reconocida por mi, conforme al siguiente detalle:</p>
     <table><thead><tr><th>Producto</th><th>Cantidad</th><th>Valor</th><th>Total</th><th>Valor empleado</th></tr></thead><tbody>${rowsHtml}<tr class="total-row"><td></td><td></td><td></td><td></td><td>${formatMoneyPlain(total)}</td></tr></tbody></table>
     <div class="total"><span>TOTAL A DESCONTAR</span><span>${fmtMoney(total)}</span></div>
-    <p>Declaro que los bienes, productos, servicios o conceptos anteriormente relacionados fueron recibidos a satisfacción o aceptados expresamente por mí, y reconozco que los valores aquí indicados corresponden al precio informado y aceptado.</p>
-    <p>En consecuencia, autorizo expresa e irrevocablemente a BATUTCO S.A.S. para efectuar el descuento del valor anteriormente señalado sobre mi salario, prestaciones sociales, liquidación definitiva o cualquier otra suma que legalmente me corresponda recibir, siempre que dicho descuento resulte procedente conforme a la legislación laboral colombiana y respete los límites establecidos en los artículos 149 y siguientes del Código Sustantivo del Trabajo y demás normas aplicables.</p>
-    <p>Declaro igualmente que la presente autorización se suscribe de manera libre, consciente y voluntaria, sin existir error, fuerza, dolo, intimidación, presión o cualquier otra circunstancia que afecte mi consentimiento.</p>
-    <div class="sep"></div><section class="firma"><h3>Firma del trabajador</h3><div class="firma-linea"></div><p>Nombre: ___________________________</p><p>C.C.: ___________________________</p></section>
-    <div class="sep"></div><section class="firma firma-empleador"><h3>Firma del empleador</h3><img src="${escapeHtml(PDF_SIGNATURE_ASSET)}" alt="Firma empleador"><p>BATUTCO S.A.S.</p><p>Fecha: ${escapeHtml(fecha)}</p></section>
+    <p>Declaro que los bienes, productos, servicios o conceptos anteriormente relacionados fueron recibidos a satisfaccion o aceptados expresamente por mi, y reconozco que los valores aqui indicados corresponden al precio informado y aceptado.</p>
+    <p>En consecuencia, autorizo expresa e irrevocablemente a BATUTCO S.A.S. para efectuar el descuento del valor anteriormente senalado sobre mi salario, prestaciones sociales, liquidacion definitiva o cualquier otra suma que legalmente me corresponda recibir, siempre que dicho descuento resulte procedente conforme a la legislacion laboral colombiana y respete los limites establecidos en los articulos 149 y siguientes del Codigo Sustantivo del Trabajo y demas normas aplicables.</p>
+    <p>Declaro igualmente que la presente autorizacion se suscribe de manera libre, consciente y voluntaria, sin existir error, fuerza, dolo, intimidacion, presion o cualquier otra circunstancia que afecte mi consentimiento.</p>
+    <section class="firmas"><div class="firma"><h3>Firma del trabajador</h3><div class="firma-linea"></div><p>Nombre: ___________________________</p><p>C.C.: ___________________________</p></div><div class="firma firma-empleador"><h3>Firma del empleador</h3><div class="firma-linea"></div><img src="${escapeHtml(PDF_SIGNATURE_ASSET)}" alt="Firma empleador"><p>BATUTCO S.A.S.</p><p>Fecha: ${escapeHtml(fecha)}</p></div></section>
   </main></body></html>`;
 };
 
@@ -2205,7 +2208,7 @@ const enviarDeduccionesNomina = async () => {
   if (!empleadoId) return setStatus("Selecciona un empleado antes de enviar deducciones.");
   const rows = buildDeduccionesRows();
   if (!rows.length) return setStatus("No hay deducciones para enviar en este comprobante.");
-  setStatus("Generando PDF de autorización de descuentos...");
+  setStatus("Generando PDF de autorizacion de descuentos...");
   try {
     const fecha = formatDateCo(new Date());
     const contacto = await findEmpleadoContacto(empleadoId);
@@ -2232,12 +2235,12 @@ const enviarDeduccionesNomina = async () => {
     };
     const formData = new FormData();
     formData.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }), "metadata.json");
-    formData.append("pdf", pdfBlob, "Autorización Deducciones.pdf");
+    formData.append("pdf", pdfBlob, "Autorizacion Deducciones.pdf");
 
     const authHeaders = await buildRequestHeaders({ includeTenant: true });
     const response = await fetch(WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR, { method: "POST", headers: authHeaders, body: formData });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    setStatus("PDF de autorización de descuentos enviado al webhook para procesamiento seguro.");
+    setStatus("PDF de autorizacion de descuentos enviado al webhook para procesamiento seguro.");
   } catch (error) {
     nominaWarn("deducciones.enviar.error", error?.message || error);
     setStatus(`No fue posible enviar deducciones (${error.message || "sin detalle"}).`);
