@@ -27,7 +27,7 @@ import { buildRequestHeaders, getUserContext, listAvailableLocalContexts } from 
 import { fetchResponsablesActivos } from "./responsables.js";
 import { getActiveEnvironment } from "./environment.js";
 import { supabase } from "./supabase.js";
-import { WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO, WEBHOOK_NOMINA_HISTORICO_GUARDAR, WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR } from "./webhooks.js"; // MANTENIMIENTO: URLs centralizadas; cambiar endpoints solo en js/webhooks.js.
+import { WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO, WEBHOOK_NOMINA_HISTORICO_GUARDAR, WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR, WEBHOOK_NOMINA_PARAMETROS_REGISTRAR } from "./webhooks.js"; // MANTENIMIENTO: URLs centralizadas; cambiar endpoints solo en js/webhooks.js.
 import { drawPngBrandWatermark } from "./png_branding.js";
 import { nominaLog, nominaWarn } from "./nomina.debug.js";
 
@@ -39,6 +39,7 @@ const consultarBtn = document.getElementById("consultarNomina");
 const descargarBtn = document.getElementById("descargarComprobanteNomina");
 const descargarExcelEmpleadoBtn = document.getElementById("descargarExcelEmpleadoNomina");
 const enviarDeduccionesBtn = document.getElementById("enviarDeduccionesNomina");
+const actualizarParametrosBtn = document.getElementById("actualizarParametrosNomina");
 
 const totalDevengadoEl = document.getElementById("nominaTotalDevengado");
 const totalDeduccionesEl = document.getElementById("nominaTotalDeducciones");
@@ -84,6 +85,10 @@ const state = {
   parametrosCalculo: {},
   ingresosAuxiliares: [],
   deduccionesAuxiliares: [],
+  deduccionesLey: [
+    { key: "salud", tipo: "Salud", porcentaje: 4, activo: true },
+    { key: "pension", tipo: "Pensión", porcentaje: 4, activo: true }
+  ],
   payrollOverrides: {
     diurnas: { source: "diurnas", multiplier: 1 },
     nocturnas: { source: "nocturnas", multiplier: 1 },
@@ -310,7 +315,7 @@ const dateToDayName = (value) => {
   return new Intl.DateTimeFormat("es-CO", { weekday: "long" }).format(date);
 };
 
-const isWeekendPayrollDay = (dayName) => ["sábado", "sabado", "domingo"].includes(normalizeConcept(dayName));
+const isWeekendPayrollDay = (dayName) => ["domingo"].includes(normalizeConcept(dayName));
 
 const getTimeParam = (key, fallback) => state.parametrosTiempo.find((item) => item.key === key) || fallback;
 
@@ -477,18 +482,18 @@ const getSelectedLocalesNomina = () => {
 };
 
 const buildApoyoDetailRows = () => (state.apoyosDetalle || [])
-  .filter((row) => row.incluido !== false)
   .map((row, index) => ({
+    ...row,
     row_id: `apoyo-${row.row_id || index}`,
-    fecha: row.fecha_turno,
-    dia: dateToDayName(row.fecha_turno),
+    fecha: row.fecha_turno || row.fecha || "",
+    dia: row.dia || dateToDayName(row.fecha_turno || row.fecha),
     hora_inicio: row.hora_inicio || "",
     hora_fin: row.hora_fin || "",
-    hora_inicio_valida: row.hora_inicio || "",
-    hora_fin_valida: row.hora_fin || "",
+    hora_inicio_valida: normalizeFinalTimeInput(row.hora_inicio_valida || row.hora_inicio || ""),
+    hora_fin_valida: normalizeFinalTimeInput(row.hora_fin_valida || row.hora_fin || ""),
     propina: getDetallePropina(row),
-    incluido: true,
-    incluidoTransporte: true,
+    incluido: row.incluido !== false,
+    incluidoTransporte: row.incluidoTransporte,
     es_apoyo: true
   }));
 
@@ -504,11 +509,14 @@ const normalizeTimeInput = (value) => {
   const digits = text.replace(/\D/g, "").slice(0, 4);
   if (!digits) return "";
   if (digits.length <= 2) return digits;
-  const minutesDigits = digits.slice(0, 2);
-  const hourDigits = digits.slice(2);
-  const hours = Math.min(23, Number(hourDigits));
-  const minutes = Math.min(59, Number(minutesDigits));
-  return `${hours}:${String(minutes).padStart(2, "0")}`;
+  for (let hourLength = Math.min(2, digits.length - 2); hourLength >= 1; hourLength -= 1) {
+    const hourDigits = digits.slice(0, hourLength);
+    const minuteDigits = digits.slice(hourLength);
+    const hours = Number(hourDigits);
+    const minutes = Number(minuteDigits);
+    if (hours <= 23 && minutes <= 59) return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  }
+  return digits;
 };
 
 const normalizeFinalTimeInput = (value, fallback = "") => {
@@ -804,7 +812,6 @@ const renderMovimientos = () => {
     deduccionesBody.innerHTML = "<tr><td>Sin deducciones</td><td>0</td><td>$0</td></tr>";
     renderResumen();
     renderParametrosYDetalle();
-    renderApoyos();
     return;
   }
 
@@ -814,11 +821,10 @@ const renderMovimientos = () => {
   ingresosBody.innerHTML = (ingresos.length ? ingresos : [{ tipo: "Sin ingresos", valor: 0, cantidad: 0, unidad: "" }])
     .map((item) => `<tr><td>${item.tipo || "-"}</td><td>${fmtHours(item.cantidad ?? 0)} ${item.unidad || ""}</td><td>${fmtMoney(item.valor || 0)}</td></tr>`).join("");
   deduccionesBody.innerHTML = (deducciones.length ? deducciones : [{ tipo: "Sin deducciones", valor: 0, cantidad: 0, unidad: "" }])
-    .map((item) => `<tr><td>${item.tipo || "-"}</td><td>${fmtHours(item.cantidad ?? 0)} ${item.unidad || ""}</td><td>${fmtMoney(item.valor || 0)}</td></tr>`).join("");
+    .map((item) => `<tr class="${item.fuente === "ley" ? "nomina-deduccion-ley-row" : ""}"><td>${item.tipo || "-"}</td><td>${fmtHours(item.cantidad ?? 0)} ${item.unidad || ""}</td><td>${fmtMoney(item.valor || 0)}</td></tr>`).join("");
 
   renderResumen();
   renderParametrosYDetalle();
-  renderApoyos();
 };
 
 
@@ -872,7 +878,7 @@ const buildExcelWebhookPayload = async (empleadoId) => {
 
 const calculateMoneyByDetail = () => {
   ensureParametroCalculo();
-  const calculationSourceRows = sortByDateDesc([...(state.detalleCalculo || []), ...buildApoyoDetailRows()].filter((row) => row.incluido !== false), "fecha");
+  const calculationSourceRows = sortByDateDesc([...(state.detalleCalculo || [])].filter((row) => row.incluido !== false), "fecha");
   const parametros = state.parametrosDetalle || [];
   const transporteRows = calculationSourceRows.filter((row) => row.incluido !== false && row.incluidoTransporte !== false);
   const uniqueDays = new Set(transporteRows.map((row) => String(row.fecha || "").trim()).filter(Boolean));
@@ -917,11 +923,31 @@ const calculateMoneyByDetail = () => {
   return { rows: detailRows, totals, diasTrabajados, transporteCantidad, transporteCalculado, auxMatch };
 };
 
+
+const getHorasPayrollBase = (calculation = null) => {
+  const totals = calculation?.totals || calculateMoneyByDetail().totals || {};
+  return toNumeric(totals.valor_diurnas) + toNumeric(totals.valor_nocturnas) + toNumeric(totals.valor_dominical_diurnas) + toNumeric(totals.valor_dominical_nocturnas);
+};
+
+const buildDeduccionesLeyRows = (calculation = null) => {
+  const baseHoras = getHorasPayrollBase(calculation);
+  return (state.deduccionesLey || [])
+    .filter((item) => item.activo !== false)
+    .map((item) => ({
+      tipo: item.tipo,
+      naturaleza: "Deducción",
+      valor: baseHoras * (Math.max(0, toNumeric(item.porcentaje)) / 100),
+      cantidad: Math.max(0, toNumeric(item.porcentaje)),
+      unidad: "%",
+      fuente: "ley",
+      base_calculo: baseHoras
+    }));
+};
+
 const buildPayrollRowsFromEditableDetail = () => {
   const calculation = calculateMoneyByDetail();
-  const apoyosIncluidos = (state.apoyosDetalle || []).filter((row) => row.incluido !== false);
-  const totalPropinasDetalle = (state.detalleCalculo || []).filter((row) => row.incluido !== false && !row.es_apoyo).reduce((acc, row) => acc + toNumeric(row.propina), 0);
-  const totalApoyoPropinas = apoyosIncluidos.reduce((acc, row) => acc + toNumeric(row.propina), 0);
+  const detalleIncluido = (state.detalleCalculo || []).filter((row) => row.incluido !== false);
+  const totalPropinasDetalle = detalleIncluido.reduce((acc, row) => acc + toNumeric(row.propina), 0);
 
   state.horasDetalle = {
     diurnas: calculation.totals.horas_diurnas,
@@ -936,8 +962,9 @@ const buildPayrollRowsFromEditableDetail = () => {
     { tipo: "Horas nocturnas", naturaleza: "Devengo", valor: calculation.totals.valor_nocturnas, cantidad: calculation.totals.horas_nocturnas, unidad: "h", fuente: "web" },
     { tipo: "Dominicales diurnas", naturaleza: "Devengo", valor: calculation.totals.valor_dominical_diurnas, cantidad: calculation.totals.horas_dominicales_diurnas, unidad: "h", fuente: "web" },
     { tipo: "Dominicales nocturnas", naturaleza: "Devengo", valor: calculation.totals.valor_dominical_nocturnas, cantidad: calculation.totals.horas_dominicales_nocturnas, unidad: "h", fuente: "web" },
-    { tipo: "Propinas", naturaleza: "Devengo", valor: totalPropinasDetalle + totalApoyoPropinas, cantidad: (state.detalleCalculo || []).filter((row) => row.incluido !== false && !row.es_apoyo && toNumeric(row.propina) > 0).length + apoyosIncluidos.filter((row) => toNumeric(row.propina) > 0).length, unidad: "registro(s)", fuente: "web" },
+    { tipo: "Propinas", naturaleza: "Devengo", valor: totalPropinasDetalle, cantidad: detalleIncluido.filter((row) => toNumeric(row.propina) > 0).length, unidad: "registro(s)", fuente: "web" },
     { tipo: "Auxilio de transporte", naturaleza: "Devengo", valor: calculation.transporteCalculado, cantidad: calculation.transporteCantidad, unidad: calculation.auxMatch, fuente: "web" },
+    ...buildDeduccionesLeyRows(calculation),
     ...state.ingresosAuxiliares.map((item) => ({ ...item, valor: toNumeric(item.valor) * (toNumeric(item.cantidad) || 1), naturaleza: "Devengo", fuente: "auxiliar" })),
     ...state.deduccionesAuxiliares.map((item) => ({ ...item, valor: toNumeric(item.valor) * (toNumeric(item.cantidad) || 1), naturaleza: "Deducción", fuente: "auxiliar" }))
   ];
@@ -984,7 +1011,7 @@ const normalizeExcelPayrollForUi = (data, empleadoSeleccionado = null) => {
     horas_dominicales_diurnas: row.horas_dominicales_diurnas ?? row.horas_dom_diurnas ?? "00:00",
     horas_dominicales_nocturnas: row.horas_dominicales_nocturnas ?? row.horas_dom_nocturnas ?? "00:00"
   }));
-  state.detalleCalculo = sortByDateDesc(detalleNormal, "fecha");
+  state.detalleCalculo = sortByDateDesc([...detalleNormal, ...buildApoyoDetailRows()], "fecha");
   markDuplicateDetailRows();
   ensureParametroCalculo();
 
@@ -1038,6 +1065,12 @@ const renderApoyos = () => {
 
 const renderAuxiliaresPanel = () => {
   if (!auxiliaresPanel) return;
+  const renderLeyRows = () => (state.deduccionesLey || []).map((row, index) => `
+    <tr class="nomina-deduccion-ley-config" data-law-index="${index}">
+      <td><label class="nomina-law-switch"><input class="nomina-law-activa" type="checkbox" ${row.activo !== false ? "checked" : ""}><span>${escapeHtml(row.tipo)}</span></label></td>
+      <td><input class="nomina-law-porcentaje" type="number" min="0" step="0.01" value="${toNumeric(row.porcentaje)}"></td>
+      <td colspan="3">Deducción legal sobre horas, sin auxilio de transporte ni propinas.</td>
+    </tr>`).join("");
   const renderRows = (rows, type) => rows.length ? rows.map((row, index) => `
     <tr data-aux-type="${type}" data-aux-index="${index}">
       <td><input class="nomina-aux-concepto" placeholder="Concepto" value="${escapeHtml(row.tipo || "")}"></td>
@@ -1049,7 +1082,7 @@ const renderAuxiliaresPanel = () => {
   auxiliaresPanel.innerHTML = `
     <div class="nomina-aux-grid">
       <div><h3>Ingresos auxiliares</h3><p>No se guardan; afectan el comprobante actual.</p><table><thead><tr><th>Concepto</th><th>Cantidad</th><th>Unidad</th><th>Valor</th><th></th></tr></thead><tbody>${renderRows(state.ingresosAuxiliares, "ingreso")}</tbody></table><button type="button" data-add-aux="ingreso">Añadir ingreso auxiliar</button></div>
-      <div><h3>Deducciones auxiliares</h3><p>No se guardan; descuentan del neto actual.</p><table><thead><tr><th>Concepto</th><th>Cantidad</th><th>Unidad</th><th>Valor</th><th></th></tr></thead><tbody>${renderRows(state.deduccionesAuxiliares, "deduccion")}</tbody></table><button type="button" data-add-aux="deduccion">Añadir deducción auxiliar</button></div>
+      <div><h3>Deducciones</h3><p>Las deducciones de ley se calculan sobre horas; las auxiliares se envían para autorización.</p><table><thead><tr><th>Concepto</th><th>Cantidad/%</th><th>Unidad</th><th>Valor</th><th></th></tr></thead><tbody>${renderLeyRows()}${renderRows(state.deduccionesAuxiliares, "deduccion")}</tbody></table><button type="button" data-add-aux="deduccion">Añadir deducción auxiliar</button></div>
     </div>`;
 };
 
@@ -1081,13 +1114,14 @@ const renderParametrosYDetalle = () => {
       .map((row, index) => {
         const calculated = calculateDetalleTimes(row);
         const disabled = state.detalleCalculo.length ? "" : "disabled";
-        const rowClasses = [row.incluido === false ? "nomina-row-descartada" : "", row.duplicado ? (row.incluidoTransporte === false ? "nomina-row-duplicada" : "nomina-row-validada") : "", row.es_apoyo ? "nomina-row-apoyo" : ""].filter(Boolean).join(" ");
+        const rowClasses = [row.incluido === false ? "nomina-row-descartada" : "", row.duplicado ? (row.incluidoTransporte === false ? "nomina-row-duplicada" : "nomina-row-validada") : "", row.es_apoyo ? "nomina-row-apoyo" : "nomina-row-turno"].filter(Boolean).join(" ");
         return `<tr data-detail-index="${index}" data-detail-id="${escapeHtml(row.row_id || "")}" class="${rowClasses}">
-          <td><input type="checkbox" class="nomina-detalle-validar" ${row.incluidoTransporte !== false ? "checked" : ""} ${disabled} aria-label="Validar transporte ${row.fecha || index + 1}"></td>
-          <td>${escapeHtml(resolveSedeName(row.sede || row.tenant_id || row.empresa_id))}</td><td>${row.fecha || "-"}</td><td>${calculated.dia}</td><td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}${row.es_apoyo ? "<br><small>Apoyo</small>" : ""}</td><td>${fmtMoney(row.propina || 0)}</td>
+          <td><input type="checkbox" class="nomina-detalle-validar" ${row.incluido !== false ? "checked" : ""} ${disabled} aria-label="Turno válido ${row.fecha || index + 1}"></td>
+          <td><strong>${row.es_apoyo ? "Apoyo" : "Turno normal"}</strong></td><td>${escapeHtml(resolveSedeName(row.sede || row.tenant_id || row.empresa_id))}</td><td>${row.fecha || "-"}</td><td>${calculated.dia}</td><td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}</td>
           <td data-calc-field="horas_diurnas">${calculated.horas_diurnas}</td><td data-calc-field="horas_nocturnas">${calculated.horas_nocturnas}</td><td data-calc-field="horas_dominicales_diurnas">${calculated.horas_dominicales_diurnas}</td><td data-calc-field="horas_dominicales_nocturnas">${calculated.horas_dominicales_nocturnas}</td>
           <td><input class="nomina-detalle-hora-valida" data-field="hora_inicio_valida" value="${escapeHtml(getValidShiftTime(row, "hora_inicio_valida"))}" ${disabled} aria-label="Inicio válido ${row.fecha || index + 1}"></td>
           <td><input class="nomina-detalle-hora-valida" data-field="hora_fin_valida" value="${escapeHtml(getValidShiftTime(row, "hora_fin_valida"))}" ${disabled} aria-label="Fin válido ${row.fecha || index + 1}"></td>
+          <td>${fmtMoney(row.propina || 0)}</td>
         </tr>`;
       }).join("");
   }
@@ -1385,12 +1419,19 @@ const descargarComprobante = () => {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = "#f7f3ff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "#111827";
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(48, 38, canvas.width - 96, canvas.height - 76);
+  ctx.strokeStyle = "#9b80c7";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(48, 38, canvas.width - 96, canvas.height - 76);
+  ctx.fillStyle = "#6f4bb1";
+  ctx.fillRect(48, 38, canvas.width - 96, 84);
+  ctx.fillStyle = "#ffffff";
   ctx.font = "bold 54px Arial";
   ctx.textAlign = "center";
-  ctx.fillText("Comprobante de Nómina", canvas.width / 2, 76);
+  ctx.fillText("Comprobante de Nómina", canvas.width / 2, 94);
   ctx.textAlign = "left";
 
   const leftX = 70;
@@ -1451,8 +1492,11 @@ const descargarComprobante = () => {
   drawTable(70, "Ingresos", ingresos, totalIngresos);
   drawTable(980, "Deducciones", deducciones, totalDeducciones);
 
-  ctx.fillStyle = "#f3f4f6";
+  ctx.fillStyle = "#ede9fe";
+  ctx.strokeStyle = "#9b80c7";
+  ctx.lineWidth = 3;
   ctx.fillRect(1180, 910, 670, 82);
+  ctx.strokeRect(1180, 910, 670, 82);
   ctx.fillStyle = "#111827";
   ctx.font = "bold 30px Arial";
   ctx.fillText("NETO A PAGAR", 1210, 962);
@@ -1778,9 +1822,9 @@ const descargarExcelEmpleado = async () => {
 const renderDetallesCalculos = () => {
   if (!detallesCalculosBody) return;
   const calculation = calculateMoneyByDetail();
-  const rows = calculation.rows.map((row) => `<tr><td>${row.fecha || "-"}</td><td>${row.dia || "-"}</td><td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}</td><td>${fmtMoney(row.calculos.horas_diurnas)}</td><td>${fmtMoney(row.calculos.horas_nocturnas)}</td><td>${fmtMoney(row.calculos.horas_dominicales_diurnas)}</td><td>${fmtMoney(row.calculos.horas_dominicales_nocturnas)}</td><td>${fmtMoney(row.calculos.total)}</td></tr>`);
+  const rows = calculation.rows.map((row) => `<tr class="${row.es_apoyo ? "nomina-row-apoyo" : "nomina-row-turno"}"><td>${row.fecha || "-"}</td><td>${row.dia || "-"}</td><td>${row.es_apoyo ? "Apoyo" : "Turno normal"}</td><td>${escapeHtml(resolveSedeName(row.sede || row.tenant_id || row.empresa_id))}</td><td>${escapeHtml(getValidShiftTime(row, "hora_inicio_valida") || row.hora_inicio || "-")} - ${escapeHtml(getValidShiftTime(row, "hora_fin_valida") || row.hora_fin || "-")}</td><td>${fmtMoney(row.calculos.horas_diurnas)}</td><td>${fmtMoney(row.calculos.horas_nocturnas)}</td><td>${fmtMoney(row.calculos.horas_dominicales_diurnas)}</td><td>${fmtMoney(row.calculos.horas_dominicales_nocturnas)}</td><td>${fmtMoney(row.propina || 0)}</td><td>${fmtMoney(row.calculos.total)}</td></tr>`);
   const total = calculation.rows.reduce((acc, row) => acc + row.calculos.total, 0);
-  rows.push(`<tr class="nomina-total-row"><td colspan="7">Total</td><td>${fmtMoney(total)}</td></tr>`);
+  rows.push(`<tr class="nomina-total-row"><td colspan="10">Total</td><td>${fmtMoney(total)}</td></tr>`);
   detallesCalculosBody.innerHTML = rows.join("");
 };
 
@@ -1790,7 +1834,7 @@ const renderMovimientosSinDetalle = () => {
   ingresosBody.innerHTML = (ingresos.length ? ingresos : [{ tipo: "Sin ingresos", valor: 0, cantidad: 0, unidad: "" }])
     .map((item) => `<tr><td>${item.tipo || "-"}</td><td>${fmtHours(item.cantidad ?? 0)} ${item.unidad || ""}</td><td>${fmtMoney(item.valor || 0)}</td></tr>`).join("");
   deduccionesBody.innerHTML = (deducciones.length ? deducciones : [{ tipo: "Sin deducciones", valor: 0, cantidad: 0, unidad: "" }])
-    .map((item) => `<tr><td>${item.tipo || "-"}</td><td>${fmtHours(item.cantidad ?? 0)} ${item.unidad || ""}</td><td>${fmtMoney(item.valor || 0)}</td></tr>`).join("");
+    .map((item) => `<tr class="${item.fuente === "ley" ? "nomina-deduccion-ley-row" : ""}"><td>${item.tipo || "-"}</td><td>${fmtHours(item.cantidad ?? 0)} ${item.unidad || ""}</td><td>${fmtMoney(item.valor || 0)}</td></tr>`).join("");
   renderResumen();
   renderDetallesCalculos();
 };
@@ -1808,6 +1852,49 @@ const recalculatePayrollInline = (row, rowEl) => {
     estado: "Liquidable"
   }));
   renderMovimientosSinDetalle();
+};
+
+const buildParametrosNominaUpdatePayload = () => ({
+  tenant_id: state.context?.empresa_id || "",
+  empresa_id: state.context?.empresa_id || "",
+  usuario_id: state.context?.user?.id || state.context?.user?.user_id || state.context?.usuario_id || "",
+  registrado_por: state.context?.user?.id || state.context?.user?.user_id || state.context?.usuario_id || "",
+  origen: "nomina_actualizacion_inline",
+  timestamp: new Date().toISOString(),
+  parametros: (state.parametrosDetalle || []).filter((param) => param.auxiliar !== true).map((param) => ({
+    tiempo_id: param.tiempo_id || param.tiempo || param.tiempo_nombre || state.parametrosCalculo[param.row_id] || "",
+    tiempo: param.tiempo || param.tiempo_nombre || state.parametrosCalculo[param.row_id] || "",
+    tiempo_nombre: param.tiempo_nombre || param.tiempo || state.parametrosCalculo[param.row_id] || "",
+    concepto_id: param.concepto_id || param.id || param.row_id || "",
+    concepto: param.concepto || param.nombre || "",
+    concepto_nombre: param.concepto || param.nombre || "",
+    valor: toNumeric(param.valor),
+    match_calculo: state.parametrosCalculo[param.row_id] || defaultParametroCalculo(param.concepto || param.nombre),
+    unidad: param.unidad || ""
+  })),
+  parametros_tiempo: state.parametrosTiempo,
+  parametros_calculo: state.parametrosCalculo
+});
+
+const actualizarParametrosNomina = async () => {
+  if (!state.parametrosDetalle.length) return setStatus("Consulta una nómina antes de actualizar parámetros.");
+  const payload = buildParametrosNominaUpdatePayload();
+  if (!payload.empresa_id) return setStatus("No se pudo validar la empresa activa para actualizar parámetros.");
+  setStatus("Actualizando parámetros de nómina...");
+  try {
+    const authHeaders = await buildRequestHeaders({ includeTenant: true });
+    const response = await fetch(WEBHOOK_NOMINA_PARAMETROS_REGISTRAR, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data?.success === false || data?.ok === false) throw new Error(data?.message || `HTTP ${response.status}`);
+    setStatus(data?.message || "Parámetros de nómina actualizados. Se usarán en la próxima consulta.");
+  } catch (error) {
+    nominaWarn("parametros.actualizar.error", error?.message || error);
+    setStatus(`No fue posible actualizar parámetros (${error.message || "sin detalle"}).`);
+  }
 };
 
 const init = async () => {
@@ -1840,6 +1927,7 @@ consultarBtn?.addEventListener("click", consultarNomina);
 descargarBtn?.addEventListener("click", () => { descargarComprobante(); guardarHistoricoNomina(); });
 descargarExcelEmpleadoBtn?.addEventListener("click", descargarExcelEmpleado);
 enviarDeduccionesBtn?.addEventListener("click", () => enviarDeduccionesNomina());
+actualizarParametrosBtn?.addEventListener("click", () => actualizarParametrosNomina());
 corteSelect?.addEventListener("change", updateDatesByCut);
 fechaInicioInput?.addEventListener("change", clampDatesToToday);
 fechaFinInput?.addEventListener("change", clampDatesToToday);
@@ -1865,7 +1953,7 @@ detalleCalculoBody?.addEventListener("change", (event) => {
   if (!row) return;
 
   if (event.target.classList.contains("nomina-detalle-validar")) {
-    row.incluidoTransporte = event.target.checked;
+    row.incluido = event.target.checked;
   }
 
   if (event.target.classList.contains("nomina-detalle-hora-valida")) {
@@ -1960,6 +2048,16 @@ auxiliaresPanel?.addEventListener("change", (event) => {
   recalculatePayrollFromEditableDetail();
 });
 
+auxiliaresPanel?.addEventListener("change", (event) => {
+  const rowEl = event.target?.closest?.("tr[data-law-index]");
+  if (!rowEl) return;
+  const row = state.deduccionesLey[Number(rowEl.dataset.lawIndex)];
+  if (!row) return;
+  if (event.target.classList.contains("nomina-law-activa")) row.activo = event.target.checked;
+  if (event.target.classList.contains("nomina-law-porcentaje")) row.porcentaje = Math.max(0, toNumeric(event.target.value));
+  recalculatePayrollFromEditableDetail();
+});
+
 
 // MANTENIMIENTO HISTÓRICO: arma un único JSON con todas las tablas renderizadas para WEBHOOK_NOMINA_HISTORICO_GUARDAR.
 const buildHistoricoNominaPayload = async () => {
@@ -1975,11 +2073,14 @@ const buildHistoricoNominaPayload = async () => {
       resumen: { movimientos: state.movimientos, horas: state.horasDetalle, totales: calculation.totals, neto: netoPagarEl?.textContent || "" },
       ingresos: state.movimientos.filter((item) => String(item.naturaleza || "").toLowerCase().includes("devengo")),
       deducciones: state.movimientos.filter((item) => String(item.naturaleza || "").toLowerCase().includes("dedu")),
-      detalle: calculation.rows.map((row) => ({ ...row, sede_nombre: resolveSedeName(row.sede || row.tenant_id || row.empresa_id) })),
+      detalle: calculation.rows.map((row) => ({ ...row, tipo_turno: row.es_apoyo ? "Apoyo" : "Turno normal", sede_nombre: resolveSedeName(row.sede || row.tenant_id || row.empresa_id) })),
       apoyos: state.apoyosDetalle,
       parametros: state.parametrosDetalle,
       parametros_tiempo: state.parametrosTiempo,
       parametros_calculo: state.parametrosCalculo,
+      locales: getSelectedLocalesNomina(),
+      tipo_filas: calculation.rows.map((row) => ({ row_id: row.row_id, fecha: row.fecha, tipo_turno: row.es_apoyo ? "Apoyo" : "Turno normal", sede: row.sede || row.tenant_id || row.empresa_id || "", sede_nombre: resolveSedeName(row.sede || row.tenant_id || row.empresa_id) })),
+      deducciones_ley: buildDeduccionesLeyRows(calculation),
       auxiliares: { ingresos: state.ingresosAuxiliares, deducciones: state.deduccionesAuxiliares }
     }
   };
@@ -2145,7 +2246,7 @@ const createSimplePdf = async ({ empleado, rows, fecha }) => {
 };
 
 const buildDeduccionesRows = () => {
-  const deducciones = state.movimientos.filter((item) => String(item.naturaleza || "").toLowerCase().includes("dedu"));
+  const deducciones = state.movimientos.filter((item) => String(item.naturaleza || "").toLowerCase().includes("dedu") && item.fuente !== "ley");
   return deducciones.map((item) => {
     const cantidad = toNumeric(item.cantidad ?? 1) || 1;
     const valorEmpleado = toNumeric(item.valor);
@@ -2231,6 +2332,9 @@ const enviarDeduccionesNomina = async () => {
       firma_empleador_asset: PDF_SIGNATURE_ASSET,
       firma_empleador_dimensiones_px: { width: 400, height: 63 },
       deducciones: rows,
+      empleado_id: empleadoId,
+      empleado_usuario_id: empleadoId,
+      usuario_empleado_id: empleadoId,
       total_a_descontar: rows.reduce((acc, row) => acc + toNumeric(row.valor_empleado), 0)
     };
     const formData = new FormData();

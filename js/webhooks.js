@@ -157,6 +157,10 @@ export const WEBHOOK_NOMINA_HISTORICO_GUARDAR =
 export const WEBHOOK_NOMINA_HISTORICO_RENDERIZAR =
   "https://n8n.enkrato.com/webhook/nomina_historico_consultar";
 
+// nomina/historico.html (botón: "Borrar"; solicita borrado lógico/físico de una nómina histórica)
+export const WEBHOOK_NOMINA_HISTORICO_BORRAR =
+  "https://n8n.enkrato.com/webhook/nomina_historico_borrar";
+
 // nomina/index.html (botón: "Enviar deducciones"; genera y envía autorización de descuento al correo del empleado)
 export const WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR =
   "https://n8n.enkrato.com/webhook/nomina_deducciones_enviar";
@@ -270,6 +274,13 @@ WEBHOOKS.NOMINA_HISTORICO_RENDERIZAR = {
   descripcion: "Consulta nóminas históricas guardadas con token y empresa_id para listar fecha/empleado y abrir detalle"
 };
 
+WEBHOOKS.NOMINA_HISTORICO_BORRAR = {
+  url: WEBHOOK_NOMINA_HISTORICO_BORRAR,
+  archivos_que_usan: ["js/nomina_historico.js", "nomina/historico.html"],
+  metodo: "POST",
+  descripcion: "Solicita borrado de una nómina histórica por ID y permite ocultarla en frontend durante la sesión"
+};
+
 WEBHOOKS.NOMINA_DEDUCCIONES_ENVIAR = {
   url: WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR,
   archivos_que_usan: ["js/nomina.js"],
@@ -293,9 +304,9 @@ WEBHOOKS.NOMINA_TIEMPOS_CONSULTAR = {
 
 WEBHOOKS.NOMINA_PARAMETROS_REGISTRAR = {
   url: WEBHOOK_NOMINA_PARAMETROS_REGISTRAR,
-  archivos_que_usan: ["js/parametros_nomina.js"],
+  archivos_que_usan: ["js/parametros_nomina.js", "js/nomina.js"],
   metodo: "POST",
-  descripcion: "Registra el valor de una combinación de tiempo y concepto para parámetros de nómina por tenant"
+  descripcion: "Registra o actualiza el valor de una combinación de tiempo y concepto para parámetros de nómina por tenant"
 };
 
 

@@ -383,3 +383,68 @@
   background: #eef2ff;
   color: #3730a3;
 }
+
+.nomina-row-turno td {
+  background: #f0fdf4 !important;
+  border-top-color: rgba(34, 197, 94, 0.35) !important;
+  border-bottom-color: rgba(34, 197, 94, 0.35) !important;
+}
+
+.nomina-row-apoyo td {
+  background: #eef2ff !important;
+  border-top: 2px solid rgba(99, 102, 241, 0.45) !important;
+  border-bottom: 2px solid rgba(99, 102, 241, 0.45) !important;
+}
+
+.nomina-row-apoyo strong { color: #4f46e5; }
+.nomina-row-turno strong { color: #15803d; }
+
+.comprobante {
+  border: 2px solid #c4b5fd;
+  box-shadow: 0 16px 38px rgba(88, 28, 135, 0.12);
+}
+
+.comprobante-top {
+  padding: 14px;
+  border: 1px solid #c4b5fd;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 68%);
+}
+
+.empresa-logo {
+  border-color: #9b80c7;
+  background: #6f4bb1;
+  color: #fff;
+  font-weight: 800;
+}
+
+.comprobante-col h3 {
+  padding: 8px 10px;
+  border-radius: 10px 10px 0 0;
+  background: #ede9fe;
+  color: #4c1d95;
+}
+
+.nomina-deduccion-ley-row td,
+.nomina-deduccion-ley-config td {
+  background: #fff7ed !important;
+  border-top: 2px solid rgba(249, 115, 22, 0.36) !important;
+  border-bottom: 2px solid rgba(249, 115, 22, 0.36) !important;
+}
+
+.nomina-law-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: #9a3412;
+}
+
+.nomina-historico-delete {
+  border: 1px solid #fecaca;
+  background: #fee2e2;
+  color: #991b1b;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}

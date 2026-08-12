@@ -45,6 +45,7 @@
         <button type="button" id="descargarComprobanteNomina">Descargar comprobante</button>
         <button type="button" id="descargarExcelEmpleadoNomina">Descargar Excel empleado</button>
         <button type="button" id="enviarDeduccionesNomina">Enviar deducciones</button>
+        <button type="button" id="actualizarParametrosNomina">Actualizar parámetros de nómina</button>
       </div>
     </section>
 
@@ -102,7 +103,7 @@
           <div class="comprobante-col">
             <h3>Detalles</h3>
             <table>
-              <thead><tr><th>Validar transporte</th><th>Sede</th><th>Fecha</th><th>Día</th><th>Horario</th><th>Propinas</th><th>Diurnas</th><th>Nocturnas</th><th>Dom. diurnas</th><th>Dom. nocturnas</th><th>Inicio válido <span class="nomina-format-note" title="Usa hora en formato 24H, por ejemplo 02:00 o 14:00">ⓘ 24H</span></th><th>Fin válido <span class="nomina-format-note" title="Usa hora en formato 24H, por ejemplo 02:00 o 14:00">ⓘ 24H</span></th></tr></thead>
+              <thead><tr><th>Turno válido</th><th>Tipo</th><th>Sede</th><th>Fecha</th><th>Día</th><th>Horario</th><th>Diurnas</th><th>Nocturnas</th><th>Dom. diurnas</th><th>Dom. nocturnas</th><th>Inicio válido <span class="nomina-format-note" title="Puedes escribir 455 para 04:55 o 1435 para 14:35">ⓘ 24H</span></th><th>Fin válido <span class="nomina-format-note" title="Puedes escribir 455 para 04:55 o 1435 para 14:35">ⓘ 24H</span></th><th>Propinas</th></tr></thead>
               <tbody id="nominaDetalleCalculoBody"></tbody>
             </table>
           </div>
@@ -112,21 +113,12 @@
           <div class="comprobante-col">
             <h3>Detalles cálculos</h3>
             <table>
-              <thead><tr><th>Fecha</th><th>Día</th><th>Horario</th><th>Diurnas</th><th>Nocturnas</th><th>Dom. diurnas</th><th>Dom. nocturnas</th><th>Total</th></tr></thead>
+              <thead><tr><th>Fecha</th><th>Día</th><th>Tipo</th><th>Local</th><th>Horario</th><th>Diurnas</th><th>Nocturnas</th><th>Dom. diurnas</th><th>Dom. nocturnas</th><th>Propinas</th><th>Total</th></tr></thead>
               <tbody id="nominaDetallesCalculosBody"></tbody>
             </table>
           </div>
         </div>
 
-        <div class="comprobante-table nomina-apoyos-panel nomina-wide-panel">
-          <div class="comprobante-col">
-            <h3>Apoyos</h3>
-            <table>
-              <thead><tr><th>Validar</th><th>fecha turno</th><th>responsable turno</th><th>apoyo</th><th>tiempo</th><th>hora inicio</th><th>hora fin</th><th>propina</th></tr></thead>
-              <tbody id="nominaApoyosBody"></tbody>
-            </table>
-          </div>
-        </div>
 
         <div class="comprobante-table nomina-web-panel">
           <div class="comprobante-col">
