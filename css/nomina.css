@@ -383,3 +383,18 @@
   background: #eef2ff;
   color: #3730a3;
 }
+
+.nomina-row-turno td {
+  background: #f0fdf4 !important;
+  border-top-color: rgba(34, 197, 94, 0.35) !important;
+  border-bottom-color: rgba(34, 197, 94, 0.35) !important;
+}
+
+.nomina-row-apoyo td {
+  background: #eef2ff !important;
+  border-top: 2px solid rgba(99, 102, 241, 0.45) !important;
+  border-bottom: 2px solid rgba(99, 102, 241, 0.45) !important;
+}
+
+.nomina-row-apoyo strong { color: #4f46e5; }
+.nomina-row-turno strong { color: #15803d; }
