@@ -310,7 +310,7 @@ const dateToDayName = (value) => {
   return new Intl.DateTimeFormat("es-CO", { weekday: "long" }).format(date);
 };
 
-const isWeekendPayrollDay = (dayName) => ["sábado", "sabado", "domingo"].includes(normalizeConcept(dayName));
+const isWeekendPayrollDay = (dayName) => ["domingo"].includes(normalizeConcept(dayName));
 
 const getTimeParam = (key, fallback) => state.parametrosTiempo.find((item) => item.key === key) || fallback;
 
@@ -477,18 +477,18 @@ const getSelectedLocalesNomina = () => {
 };
 
 const buildApoyoDetailRows = () => (state.apoyosDetalle || [])
-  .filter((row) => row.incluido !== false)
   .map((row, index) => ({
+    ...row,
     row_id: `apoyo-${row.row_id || index}`,
-    fecha: row.fecha_turno,
-    dia: dateToDayName(row.fecha_turno),
+    fecha: row.fecha_turno || row.fecha || "",
+    dia: row.dia || dateToDayName(row.fecha_turno || row.fecha),
     hora_inicio: row.hora_inicio || "",
     hora_fin: row.hora_fin || "",
-    hora_inicio_valida: row.hora_inicio || "",
-    hora_fin_valida: row.hora_fin || "",
+    hora_inicio_valida: normalizeFinalTimeInput(row.hora_inicio_valida || row.hora_inicio || ""),
+    hora_fin_valida: normalizeFinalTimeInput(row.hora_fin_valida || row.hora_fin || ""),
     propina: getDetallePropina(row),
-    incluido: true,
-    incluidoTransporte: true,
+    incluido: row.incluido !== false,
+    incluidoTransporte: row.incluidoTransporte,
     es_apoyo: true
   }));
 
@@ -504,11 +504,14 @@ const normalizeTimeInput = (value) => {
   const digits = text.replace(/\D/g, "").slice(0, 4);
   if (!digits) return "";
   if (digits.length <= 2) return digits;
-  const minutesDigits = digits.slice(0, 2);
-  const hourDigits = digits.slice(2);
-  const hours = Math.min(23, Number(hourDigits));
-  const minutes = Math.min(59, Number(minutesDigits));
-  return `${hours}:${String(minutes).padStart(2, "0")}`;
+  for (let hourLength = Math.min(2, digits.length - 2); hourLength >= 1; hourLength -= 1) {
+    const hourDigits = digits.slice(0, hourLength);
+    const minuteDigits = digits.slice(hourLength);
+    const hours = Number(hourDigits);
+    const minutes = Number(minuteDigits);
+    if (hours <= 23 && minutes <= 59) return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  }
+  return digits;
 };
 
 const normalizeFinalTimeInput = (value, fallback = "") => {
@@ -804,7 +807,6 @@ const renderMovimientos = () => {
     deduccionesBody.innerHTML = "<tr><td>Sin deducciones</td><td>0</td><td>$0</td></tr>";
     renderResumen();
     renderParametrosYDetalle();
-    renderApoyos();
     return;
   }
 
@@ -818,7 +820,6 @@ const renderMovimientos = () => {
 
   renderResumen();
   renderParametrosYDetalle();
-  renderApoyos();
 };
 
 
@@ -872,7 +873,7 @@ const buildExcelWebhookPayload = async (empleadoId) => {
 
 const calculateMoneyByDetail = () => {
   ensureParametroCalculo();
-  const calculationSourceRows = sortByDateDesc([...(state.detalleCalculo || []), ...buildApoyoDetailRows()].filter((row) => row.incluido !== false), "fecha");
+  const calculationSourceRows = sortByDateDesc([...(state.detalleCalculo || [])].filter((row) => row.incluido !== false), "fecha");
   const parametros = state.parametrosDetalle || [];
   const transporteRows = calculationSourceRows.filter((row) => row.incluido !== false && row.incluidoTransporte !== false);
   const uniqueDays = new Set(transporteRows.map((row) => String(row.fecha || "").trim()).filter(Boolean));
@@ -919,9 +920,8 @@ const calculateMoneyByDetail = () => {
 
 const buildPayrollRowsFromEditableDetail = () => {
   const calculation = calculateMoneyByDetail();
-  const apoyosIncluidos = (state.apoyosDetalle || []).filter((row) => row.incluido !== false);
-  const totalPropinasDetalle = (state.detalleCalculo || []).filter((row) => row.incluido !== false && !row.es_apoyo).reduce((acc, row) => acc + toNumeric(row.propina), 0);
-  const totalApoyoPropinas = apoyosIncluidos.reduce((acc, row) => acc + toNumeric(row.propina), 0);
+  const detalleIncluido = (state.detalleCalculo || []).filter((row) => row.incluido !== false);
+  const totalPropinasDetalle = detalleIncluido.reduce((acc, row) => acc + toNumeric(row.propina), 0);
 
   state.horasDetalle = {
     diurnas: calculation.totals.horas_diurnas,
@@ -936,7 +936,7 @@ const buildPayrollRowsFromEditableDetail = () => {
     { tipo: "Horas nocturnas", naturaleza: "Devengo", valor: calculation.totals.valor_nocturnas, cantidad: calculation.totals.horas_nocturnas, unidad: "h", fuente: "web" },
     { tipo: "Dominicales diurnas", naturaleza: "Devengo", valor: calculation.totals.valor_dominical_diurnas, cantidad: calculation.totals.horas_dominicales_diurnas, unidad: "h", fuente: "web" },
     { tipo: "Dominicales nocturnas", naturaleza: "Devengo", valor: calculation.totals.valor_dominical_nocturnas, cantidad: calculation.totals.horas_dominicales_nocturnas, unidad: "h", fuente: "web" },
-    { tipo: "Propinas", naturaleza: "Devengo", valor: totalPropinasDetalle + totalApoyoPropinas, cantidad: (state.detalleCalculo || []).filter((row) => row.incluido !== false && !row.es_apoyo && toNumeric(row.propina) > 0).length + apoyosIncluidos.filter((row) => toNumeric(row.propina) > 0).length, unidad: "registro(s)", fuente: "web" },
+    { tipo: "Propinas", naturaleza: "Devengo", valor: totalPropinasDetalle, cantidad: detalleIncluido.filter((row) => toNumeric(row.propina) > 0).length, unidad: "registro(s)", fuente: "web" },
     { tipo: "Auxilio de transporte", naturaleza: "Devengo", valor: calculation.transporteCalculado, cantidad: calculation.transporteCantidad, unidad: calculation.auxMatch, fuente: "web" },
     ...state.ingresosAuxiliares.map((item) => ({ ...item, valor: toNumeric(item.valor) * (toNumeric(item.cantidad) || 1), naturaleza: "Devengo", fuente: "auxiliar" })),
     ...state.deduccionesAuxiliares.map((item) => ({ ...item, valor: toNumeric(item.valor) * (toNumeric(item.cantidad) || 1), naturaleza: "Deducción", fuente: "auxiliar" }))
@@ -984,7 +984,7 @@ const normalizeExcelPayrollForUi = (data, empleadoSeleccionado = null) => {
     horas_dominicales_diurnas: row.horas_dominicales_diurnas ?? row.horas_dom_diurnas ?? "00:00",
     horas_dominicales_nocturnas: row.horas_dominicales_nocturnas ?? row.horas_dom_nocturnas ?? "00:00"
   }));
-  state.detalleCalculo = sortByDateDesc(detalleNormal, "fecha");
+  state.detalleCalculo = sortByDateDesc([...detalleNormal, ...buildApoyoDetailRows()], "fecha");
   markDuplicateDetailRows();
   ensureParametroCalculo();
 
@@ -1081,13 +1081,14 @@ const renderParametrosYDetalle = () => {
       .map((row, index) => {
         const calculated = calculateDetalleTimes(row);
         const disabled = state.detalleCalculo.length ? "" : "disabled";
-        const rowClasses = [row.incluido === false ? "nomina-row-descartada" : "", row.duplicado ? (row.incluidoTransporte === false ? "nomina-row-duplicada" : "nomina-row-validada") : "", row.es_apoyo ? "nomina-row-apoyo" : ""].filter(Boolean).join(" ");
+        const rowClasses = [row.incluido === false ? "nomina-row-descartada" : "", row.duplicado ? (row.incluidoTransporte === false ? "nomina-row-duplicada" : "nomina-row-validada") : "", row.es_apoyo ? "nomina-row-apoyo" : "nomina-row-turno"].filter(Boolean).join(" ");
         return `<tr data-detail-index="${index}" data-detail-id="${escapeHtml(row.row_id || "")}" class="${rowClasses}">
-          <td><input type="checkbox" class="nomina-detalle-validar" ${row.incluidoTransporte !== false ? "checked" : ""} ${disabled} aria-label="Validar transporte ${row.fecha || index + 1}"></td>
-          <td>${escapeHtml(resolveSedeName(row.sede || row.tenant_id || row.empresa_id))}</td><td>${row.fecha || "-"}</td><td>${calculated.dia}</td><td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}${row.es_apoyo ? "<br><small>Apoyo</small>" : ""}</td><td>${fmtMoney(row.propina || 0)}</td>
+          <td><input type="checkbox" class="nomina-detalle-validar" ${row.incluido !== false ? "checked" : ""} ${disabled} aria-label="Turno válido ${row.fecha || index + 1}"></td>
+          <td><strong>${row.es_apoyo ? "Apoyo" : "Turno normal"}</strong></td><td>${escapeHtml(resolveSedeName(row.sede || row.tenant_id || row.empresa_id))}</td><td>${row.fecha || "-"}</td><td>${calculated.dia}</td><td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}</td>
           <td data-calc-field="horas_diurnas">${calculated.horas_diurnas}</td><td data-calc-field="horas_nocturnas">${calculated.horas_nocturnas}</td><td data-calc-field="horas_dominicales_diurnas">${calculated.horas_dominicales_diurnas}</td><td data-calc-field="horas_dominicales_nocturnas">${calculated.horas_dominicales_nocturnas}</td>
           <td><input class="nomina-detalle-hora-valida" data-field="hora_inicio_valida" value="${escapeHtml(getValidShiftTime(row, "hora_inicio_valida"))}" ${disabled} aria-label="Inicio válido ${row.fecha || index + 1}"></td>
           <td><input class="nomina-detalle-hora-valida" data-field="hora_fin_valida" value="${escapeHtml(getValidShiftTime(row, "hora_fin_valida"))}" ${disabled} aria-label="Fin válido ${row.fecha || index + 1}"></td>
+          <td>${fmtMoney(row.propina || 0)}</td>
         </tr>`;
       }).join("");
   }
@@ -1778,9 +1779,9 @@ const descargarExcelEmpleado = async () => {
 const renderDetallesCalculos = () => {
   if (!detallesCalculosBody) return;
   const calculation = calculateMoneyByDetail();
-  const rows = calculation.rows.map((row) => `<tr><td>${row.fecha || "-"}</td><td>${row.dia || "-"}</td><td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}</td><td>${fmtMoney(row.calculos.horas_diurnas)}</td><td>${fmtMoney(row.calculos.horas_nocturnas)}</td><td>${fmtMoney(row.calculos.horas_dominicales_diurnas)}</td><td>${fmtMoney(row.calculos.horas_dominicales_nocturnas)}</td><td>${fmtMoney(row.calculos.total)}</td></tr>`);
+  const rows = calculation.rows.map((row) => `<tr class="${row.es_apoyo ? "nomina-row-apoyo" : "nomina-row-turno"}"><td>${row.fecha || "-"}</td><td>${row.dia || "-"}</td><td>${row.es_apoyo ? "Apoyo" : "Turno normal"}</td><td>${escapeHtml(resolveSedeName(row.sede || row.tenant_id || row.empresa_id))}</td><td>${escapeHtml(getValidShiftTime(row, "hora_inicio_valida") || row.hora_inicio || "-")} - ${escapeHtml(getValidShiftTime(row, "hora_fin_valida") || row.hora_fin || "-")}</td><td>${fmtMoney(row.calculos.horas_diurnas)}</td><td>${fmtMoney(row.calculos.horas_nocturnas)}</td><td>${fmtMoney(row.calculos.horas_dominicales_diurnas)}</td><td>${fmtMoney(row.calculos.horas_dominicales_nocturnas)}</td><td>${fmtMoney(row.propina || 0)}</td><td>${fmtMoney(row.calculos.total)}</td></tr>`);
   const total = calculation.rows.reduce((acc, row) => acc + row.calculos.total, 0);
-  rows.push(`<tr class="nomina-total-row"><td colspan="7">Total</td><td>${fmtMoney(total)}</td></tr>`);
+  rows.push(`<tr class="nomina-total-row"><td colspan="10">Total</td><td>${fmtMoney(total)}</td></tr>`);
   detallesCalculosBody.innerHTML = rows.join("");
 };
 
@@ -1865,7 +1866,7 @@ detalleCalculoBody?.addEventListener("change", (event) => {
   if (!row) return;
 
   if (event.target.classList.contains("nomina-detalle-validar")) {
-    row.incluidoTransporte = event.target.checked;
+    row.incluido = event.target.checked;
   }
 
   if (event.target.classList.contains("nomina-detalle-hora-valida")) {
