@@ -7,7 +7,7 @@
  */
 import { buildRequestHeaders, getUserContext } from "./session.js";
 import { fetchResponsablesActivos } from "./responsables.js";
-import { WEBHOOK_NOMINA_HISTORICO_RENDERIZAR } from "./webhooks.js";
+import { WEBHOOK_NOMINA_HISTORICO_RENDERIZAR, WEBHOOK_NOMINA_HISTORICO_BORRAR } from "./webhooks.js";
 
 const empleadoInput = document.getElementById("historicoNominaEmpleado");
 const desdeInput = document.getElementById("historicoNominaDesde");
@@ -22,7 +22,7 @@ const detallePanel = document.getElementById("historicoNominaDetallePanel");
 const detalleTitulo = document.getElementById("historicoNominaDetalleTitulo");
 const detalleResumen = document.getElementById("historicoNominaDetalleResumen");
 
-const state = { context: null, responsables: [], nominas: [] };
+const state = { context: null, responsables: [], nominas: [], ocultasSesion: new Set() };
 
 const setStatus = (message) => { if (statusEl) statusEl.textContent = message || ""; };
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
@@ -43,7 +43,8 @@ const setDefaultDates = () => {
 };
 
 const getResponsableNombre = (id) => state.responsables.find((item) => String(item.id || "") === String(id || ""))?.nombre_completo || "";
-const getEmpleadoNombre = (row) => row?.empleado?.nombre || row?.empleado?.nombre_completo || row?.resumen?.empleado || row?.resumen?.empleado_nombre || row?.empleado_nombre || row?.nombre_empleado || row?.responsable_nombre || getResponsableNombre(row?.responsable_id) || row?.ingresos?.find?.((item) => item.empleado_nombre)?.empleado_nombre || "Empleado sin resolver";
+const getEmpleadoId = (row = {}) => row?.empleado_id || row?.usuario_id || row?.responsable_id || row?.responsable || row?.empleado?.id || row?.empleado?.usuario_id || row?.resumen?.empleado_id || row?.resumen?.usuario_id || row?.detalles?.find?.((item) => item?.responsable)?.responsable || row?.ingresos?.find?.((item) => item?.empleado_id)?.empleado_id || "";
+const getEmpleadoNombre = (row) => row?.empleado?.nombre || row?.empleado?.nombre_completo || row?.resumen?.empleado || row?.resumen?.empleado_nombre || row?.empleado_nombre || row?.nombre_empleado || row?.responsable_nombre || getResponsableNombre(getEmpleadoId(row)) || row?.ingresos?.find?.((item) => item.empleado_nombre)?.empleado_nombre || "Empleado sin resolver";
 const getRowDate = (row) => row?.fecha || row?.fecha_nomina || row?.resumen?.fecha || row?.resumen?.fecha_fin || row?.created_at || row?.updated_at || row?.fecha_fin || row?.fin || row?.detalles?.[0]?.fecha || "";
 
 const parseJsonLike = (value) => {
@@ -93,8 +94,11 @@ const normalizeHistoricoRow = (raw) => {
     apoyos: getTablaRows(row, "apoyos"),
     parametros: getTablaRows(row, "parametros"),
     parametros_tiempo: getTablaRows(row, "parametros_tiempo"),
-    parametros_calculo: getTablaRows(row, "parametros_calculo"),
-    auxiliares: parseJsonLike(row.auxiliares) || parseJsonLike(tablas.auxiliares) || {}
+    parametros_calculo: getTablaRows(row, "parametros_calculo").length ? getTablaRows(row, "parametros_calculo") : (parseJsonLike(row.parametros_calculo) || parseJsonLike(tablas.parametros_calculo) || {}),
+    auxiliares: parseJsonLike(row.auxiliares) || parseJsonLike(tablas.auxiliares) || {},
+    locales: getTablaRows(row, "locales"),
+    tipo_filas: getTablaRows(row, "tipo_filas"),
+    deducciones_ley: getTablaRows(row, "deducciones_ley")
   };
 };
 
@@ -123,6 +127,8 @@ const buildHistoricoRequestPayload = () => ({
   empresa_id: state.context?.empresa_id || "",
   tenant_id: state.context?.empresa_id || "",
   responsable_id: empleadoInput?.value || "",
+  empleado_id: empleadoInput?.value || "",
+  usuario_id: empleadoInput?.value || "",
   empleado: empleadoInput?.value || "",
   fecha_inicio: desdeInput?.value || "",
   fecha_fin: hastaInput?.value || "",
@@ -131,7 +137,7 @@ const buildHistoricoRequestPayload = () => ({
 
 const filterHistoricoRows = (rows) => rows.filter((row) => {
   const rowDate = getRowDate(row).slice(0, 10);
-  const responsable = String(row?.responsable_id || row?.responsable || "");
+  const responsable = String(getEmpleadoId(row) || "");
   if (desdeInput?.value && rowDate && rowDate < desdeInput.value) return false;
   if (hastaInput?.value && rowDate && rowDate > hastaInput.value) return false;
   if (empleadoInput?.value && responsable && responsable !== empleadoInput.value) return false;
@@ -140,21 +146,21 @@ const filterHistoricoRows = (rows) => rows.filter((row) => {
 
 const renderHistoricoRows = (rows) => {
   if (!tbody) return;
-  const filtered = filterHistoricoRows(rows);
+  const filtered = filterHistoricoRows(rows).filter((row) => !state.ocultasSesion.has(String(row.id || "")));
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="2">Sin nóminas históricas para los filtros seleccionados.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3">Sin nóminas históricas para los filtros seleccionados.</td></tr>';
     return;
   }
-  tbody.innerHTML = filtered.map((row) => { const originalIndex = state.nominas.indexOf(row); return `<tr class="nomina-historico-row" data-nomina-index="${originalIndex}" data-nomina-id="${escapeHtml(row.id || "")}"><td>${escapeHtml(formatDateLong(getRowDate(row)))}</td><td>${escapeHtml(getEmpleadoNombre(row))}</td></tr>`; }).join("");
+  tbody.innerHTML = filtered.map((row) => { const originalIndex = state.nominas.indexOf(row); return `<tr class="nomina-historico-row" data-nomina-index="${originalIndex}" data-nomina-id="${escapeHtml(row.id || "")}"><td>${escapeHtml(formatDateLong(getRowDate(row)))}</td><td>${escapeHtml(getEmpleadoNombre(row))}</td><td><button type="button" class="nomina-historico-delete" data-delete-id="${escapeHtml(row.id || "")}">Borrar</button></td></tr>`; }).join("");
 };
 
 
 const renderGenericTable = (title, rows) => {
   if (!Array.isArray(rows) || !rows.length) return "";
   const keys = Array.from(rows.reduce((set, item) => {
-    Object.keys(item || {}).slice(0, 8).forEach((key) => set.add(key));
+    Object.keys(item || {}).forEach((key) => set.add(key));
     return set;
-  }, new Set())).slice(0, 8);
+  }, new Set()));
   const cell = (value) => {
     if (value && typeof value === "object") return escapeHtml(JSON.stringify(value));
     return escapeHtml(value ?? "-");
@@ -181,13 +187,32 @@ const renderDetalle = (row) => {
       ${renderGenericTable("Ingresos", ingresos)}
       ${renderGenericTable("Deducciones", deducciones)}
       ${renderGenericTable("Detalles recibidos", detalles)}
+      ${renderGenericTable("Locales", row.locales)}
+      ${renderGenericTable("Tipos de filas", row.tipo_filas)}
       ${renderGenericTable("Apoyos", row.apoyos)}
       ${renderGenericTable("Parametros", row.parametros)}
       ${renderGenericTable("Parametros tiempo", row.parametros_tiempo)}
-      ${renderGenericTable("Parametros calculo", row.parametros_calculo)}
+      ${renderGenericTable("Parametros calculo", Array.isArray(row.parametros_calculo) ? row.parametros_calculo : Object.entries(row.parametros_calculo || {}).map(([parametro, match]) => ({ parametro, match })))}
+      ${renderGenericTable("Deducciones de ley", row.deducciones_ley)}
     </div>`;
   listadoPanel.hidden = true;
   detallePanel.hidden = false;
+};
+
+const borrarNominaHistorica = async (row) => {
+  if (!row?.id) return setStatus("La nómina seleccionada no tiene ID para borrar.");
+  setStatus("Solicitando borrado de nómina histórica...");
+  try {
+    const authHeaders = await buildRequestHeaders({ includeTenant: true });
+    const payload = { empresa_id: state.context?.empresa_id || "", tenant_id: state.context?.empresa_id || "", nomina_id: row.id, id: row.id, empleado_id: getEmpleadoId(row), fecha: getRowDate(row) };
+    const response = await fetch(WEBHOOK_NOMINA_HISTORICO_BORRAR, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders }, body: JSON.stringify(payload) });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    state.ocultasSesion.add(String(row.id));
+    renderHistoricoRows(state.nominas);
+    setStatus("Nómina ocultada en esta sesión y solicitud de borrado enviada al webhook.");
+  } catch (error) {
+    setStatus(`No fue posible solicitar el borrado (${error.message || "sin detalle"}). Verifica ${WEBHOOK_NOMINA_HISTORICO_BORRAR}.`);
+  }
 };
 
 const consultarHistoricoNomina = async () => {
@@ -215,6 +240,7 @@ const init = async () => {
     const rowEl = event.target.closest("tr[data-nomina-id]");
     if (!rowEl) return;
     const row = state.nominas[Number(rowEl.dataset.nominaIndex)] || state.nominas.find((item) => String(item.id || "") === rowEl.dataset.nominaId);
+    if (event.target.closest(".nomina-historico-delete")) { borrarNominaHistorica(row); return; }
     renderDetalle(row);
   });
   volverBtn?.addEventListener("click", () => { detallePanel.hidden = true; listadoPanel.hidden = false; });

@@ -27,7 +27,7 @@ import { buildRequestHeaders, getUserContext, listAvailableLocalContexts } from 
 import { fetchResponsablesActivos } from "./responsables.js";
 import { getActiveEnvironment } from "./environment.js";
 import { supabase } from "./supabase.js";
-import { WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO, WEBHOOK_NOMINA_HISTORICO_GUARDAR, WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR } from "./webhooks.js"; // MANTENIMIENTO: URLs centralizadas; cambiar endpoints solo en js/webhooks.js.
+import { WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO, WEBHOOK_NOMINA_HISTORICO_GUARDAR, WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR, WEBHOOK_NOMINA_PARAMETROS_REGISTRAR } from "./webhooks.js"; // MANTENIMIENTO: URLs centralizadas; cambiar endpoints solo en js/webhooks.js.
 import { drawPngBrandWatermark } from "./png_branding.js";
 import { nominaLog, nominaWarn } from "./nomina.debug.js";
 
@@ -39,6 +39,7 @@ const consultarBtn = document.getElementById("consultarNomina");
 const descargarBtn = document.getElementById("descargarComprobanteNomina");
 const descargarExcelEmpleadoBtn = document.getElementById("descargarExcelEmpleadoNomina");
 const enviarDeduccionesBtn = document.getElementById("enviarDeduccionesNomina");
+const actualizarParametrosBtn = document.getElementById("actualizarParametrosNomina");
 
 const totalDevengadoEl = document.getElementById("nominaTotalDevengado");
 const totalDeduccionesEl = document.getElementById("nominaTotalDeducciones");
@@ -84,6 +85,10 @@ const state = {
   parametrosCalculo: {},
   ingresosAuxiliares: [],
   deduccionesAuxiliares: [],
+  deduccionesLey: [
+    { key: "salud", tipo: "Salud", porcentaje: 4, activo: true },
+    { key: "pension", tipo: "Pensión", porcentaje: 4, activo: true }
+  ],
   payrollOverrides: {
     diurnas: { source: "diurnas", multiplier: 1 },
     nocturnas: { source: "nocturnas", multiplier: 1 },
@@ -816,7 +821,7 @@ const renderMovimientos = () => {
   ingresosBody.innerHTML = (ingresos.length ? ingresos : [{ tipo: "Sin ingresos", valor: 0, cantidad: 0, unidad: "" }])
     .map((item) => `<tr><td>${item.tipo || "-"}</td><td>${fmtHours(item.cantidad ?? 0)} ${item.unidad || ""}</td><td>${fmtMoney(item.valor || 0)}</td></tr>`).join("");
   deduccionesBody.innerHTML = (deducciones.length ? deducciones : [{ tipo: "Sin deducciones", valor: 0, cantidad: 0, unidad: "" }])
-    .map((item) => `<tr><td>${item.tipo || "-"}</td><td>${fmtHours(item.cantidad ?? 0)} ${item.unidad || ""}</td><td>${fmtMoney(item.valor || 0)}</td></tr>`).join("");
+    .map((item) => `<tr class="${item.fuente === "ley" ? "nomina-deduccion-ley-row" : ""}"><td>${item.tipo || "-"}</td><td>${fmtHours(item.cantidad ?? 0)} ${item.unidad || ""}</td><td>${fmtMoney(item.valor || 0)}</td></tr>`).join("");
 
   renderResumen();
   renderParametrosYDetalle();
@@ -918,6 +923,27 @@ const calculateMoneyByDetail = () => {
   return { rows: detailRows, totals, diasTrabajados, transporteCantidad, transporteCalculado, auxMatch };
 };
 
+
+const getHorasPayrollBase = (calculation = null) => {
+  const totals = calculation?.totals || calculateMoneyByDetail().totals || {};
+  return toNumeric(totals.valor_diurnas) + toNumeric(totals.valor_nocturnas) + toNumeric(totals.valor_dominical_diurnas) + toNumeric(totals.valor_dominical_nocturnas);
+};
+
+const buildDeduccionesLeyRows = (calculation = null) => {
+  const baseHoras = getHorasPayrollBase(calculation);
+  return (state.deduccionesLey || [])
+    .filter((item) => item.activo !== false)
+    .map((item) => ({
+      tipo: item.tipo,
+      naturaleza: "Deducción",
+      valor: baseHoras * (Math.max(0, toNumeric(item.porcentaje)) / 100),
+      cantidad: Math.max(0, toNumeric(item.porcentaje)),
+      unidad: "%",
+      fuente: "ley",
+      base_calculo: baseHoras
+    }));
+};
+
 const buildPayrollRowsFromEditableDetail = () => {
   const calculation = calculateMoneyByDetail();
   const detalleIncluido = (state.detalleCalculo || []).filter((row) => row.incluido !== false);
@@ -938,6 +964,7 @@ const buildPayrollRowsFromEditableDetail = () => {
     { tipo: "Dominicales nocturnas", naturaleza: "Devengo", valor: calculation.totals.valor_dominical_nocturnas, cantidad: calculation.totals.horas_dominicales_nocturnas, unidad: "h", fuente: "web" },
     { tipo: "Propinas", naturaleza: "Devengo", valor: totalPropinasDetalle, cantidad: detalleIncluido.filter((row) => toNumeric(row.propina) > 0).length, unidad: "registro(s)", fuente: "web" },
     { tipo: "Auxilio de transporte", naturaleza: "Devengo", valor: calculation.transporteCalculado, cantidad: calculation.transporteCantidad, unidad: calculation.auxMatch, fuente: "web" },
+    ...buildDeduccionesLeyRows(calculation),
     ...state.ingresosAuxiliares.map((item) => ({ ...item, valor: toNumeric(item.valor) * (toNumeric(item.cantidad) || 1), naturaleza: "Devengo", fuente: "auxiliar" })),
     ...state.deduccionesAuxiliares.map((item) => ({ ...item, valor: toNumeric(item.valor) * (toNumeric(item.cantidad) || 1), naturaleza: "Deducción", fuente: "auxiliar" }))
   ];
@@ -1038,6 +1065,12 @@ const renderApoyos = () => {
 
 const renderAuxiliaresPanel = () => {
   if (!auxiliaresPanel) return;
+  const renderLeyRows = () => (state.deduccionesLey || []).map((row, index) => `
+    <tr class="nomina-deduccion-ley-config" data-law-index="${index}">
+      <td><label class="nomina-law-switch"><input class="nomina-law-activa" type="checkbox" ${row.activo !== false ? "checked" : ""}><span>${escapeHtml(row.tipo)}</span></label></td>
+      <td><input class="nomina-law-porcentaje" type="number" min="0" step="0.01" value="${toNumeric(row.porcentaje)}"></td>
+      <td colspan="3">Deducción legal sobre horas, sin auxilio de transporte ni propinas.</td>
+    </tr>`).join("");
   const renderRows = (rows, type) => rows.length ? rows.map((row, index) => `
     <tr data-aux-type="${type}" data-aux-index="${index}">
       <td><input class="nomina-aux-concepto" placeholder="Concepto" value="${escapeHtml(row.tipo || "")}"></td>
@@ -1049,7 +1082,7 @@ const renderAuxiliaresPanel = () => {
   auxiliaresPanel.innerHTML = `
     <div class="nomina-aux-grid">
       <div><h3>Ingresos auxiliares</h3><p>No se guardan; afectan el comprobante actual.</p><table><thead><tr><th>Concepto</th><th>Cantidad</th><th>Unidad</th><th>Valor</th><th></th></tr></thead><tbody>${renderRows(state.ingresosAuxiliares, "ingreso")}</tbody></table><button type="button" data-add-aux="ingreso">Añadir ingreso auxiliar</button></div>
-      <div><h3>Deducciones auxiliares</h3><p>No se guardan; descuentan del neto actual.</p><table><thead><tr><th>Concepto</th><th>Cantidad</th><th>Unidad</th><th>Valor</th><th></th></tr></thead><tbody>${renderRows(state.deduccionesAuxiliares, "deduccion")}</tbody></table><button type="button" data-add-aux="deduccion">Añadir deducción auxiliar</button></div>
+      <div><h3>Deducciones</h3><p>Las deducciones de ley se calculan sobre horas; las auxiliares se envían para autorización.</p><table><thead><tr><th>Concepto</th><th>Cantidad/%</th><th>Unidad</th><th>Valor</th><th></th></tr></thead><tbody>${renderLeyRows()}${renderRows(state.deduccionesAuxiliares, "deduccion")}</tbody></table><button type="button" data-add-aux="deduccion">Añadir deducción auxiliar</button></div>
     </div>`;
 };
 
@@ -1386,12 +1419,19 @@ const descargarComprobante = () => {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = "#f7f3ff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "#111827";
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(48, 38, canvas.width - 96, canvas.height - 76);
+  ctx.strokeStyle = "#9b80c7";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(48, 38, canvas.width - 96, canvas.height - 76);
+  ctx.fillStyle = "#6f4bb1";
+  ctx.fillRect(48, 38, canvas.width - 96, 84);
+  ctx.fillStyle = "#ffffff";
   ctx.font = "bold 54px Arial";
   ctx.textAlign = "center";
-  ctx.fillText("Comprobante de Nómina", canvas.width / 2, 76);
+  ctx.fillText("Comprobante de Nómina", canvas.width / 2, 94);
   ctx.textAlign = "left";
 
   const leftX = 70;
@@ -1452,8 +1492,11 @@ const descargarComprobante = () => {
   drawTable(70, "Ingresos", ingresos, totalIngresos);
   drawTable(980, "Deducciones", deducciones, totalDeducciones);
 
-  ctx.fillStyle = "#f3f4f6";
+  ctx.fillStyle = "#ede9fe";
+  ctx.strokeStyle = "#9b80c7";
+  ctx.lineWidth = 3;
   ctx.fillRect(1180, 910, 670, 82);
+  ctx.strokeRect(1180, 910, 670, 82);
   ctx.fillStyle = "#111827";
   ctx.font = "bold 30px Arial";
   ctx.fillText("NETO A PAGAR", 1210, 962);
@@ -1791,7 +1834,7 @@ const renderMovimientosSinDetalle = () => {
   ingresosBody.innerHTML = (ingresos.length ? ingresos : [{ tipo: "Sin ingresos", valor: 0, cantidad: 0, unidad: "" }])
     .map((item) => `<tr><td>${item.tipo || "-"}</td><td>${fmtHours(item.cantidad ?? 0)} ${item.unidad || ""}</td><td>${fmtMoney(item.valor || 0)}</td></tr>`).join("");
   deduccionesBody.innerHTML = (deducciones.length ? deducciones : [{ tipo: "Sin deducciones", valor: 0, cantidad: 0, unidad: "" }])
-    .map((item) => `<tr><td>${item.tipo || "-"}</td><td>${fmtHours(item.cantidad ?? 0)} ${item.unidad || ""}</td><td>${fmtMoney(item.valor || 0)}</td></tr>`).join("");
+    .map((item) => `<tr class="${item.fuente === "ley" ? "nomina-deduccion-ley-row" : ""}"><td>${item.tipo || "-"}</td><td>${fmtHours(item.cantidad ?? 0)} ${item.unidad || ""}</td><td>${fmtMoney(item.valor || 0)}</td></tr>`).join("");
   renderResumen();
   renderDetallesCalculos();
 };
@@ -1809,6 +1852,49 @@ const recalculatePayrollInline = (row, rowEl) => {
     estado: "Liquidable"
   }));
   renderMovimientosSinDetalle();
+};
+
+const buildParametrosNominaUpdatePayload = () => ({
+  tenant_id: state.context?.empresa_id || "",
+  empresa_id: state.context?.empresa_id || "",
+  usuario_id: state.context?.user?.id || state.context?.user?.user_id || state.context?.usuario_id || "",
+  registrado_por: state.context?.user?.id || state.context?.user?.user_id || state.context?.usuario_id || "",
+  origen: "nomina_actualizacion_inline",
+  timestamp: new Date().toISOString(),
+  parametros: (state.parametrosDetalle || []).filter((param) => param.auxiliar !== true).map((param) => ({
+    tiempo_id: param.tiempo_id || param.tiempo || param.tiempo_nombre || state.parametrosCalculo[param.row_id] || "",
+    tiempo: param.tiempo || param.tiempo_nombre || state.parametrosCalculo[param.row_id] || "",
+    tiempo_nombre: param.tiempo_nombre || param.tiempo || state.parametrosCalculo[param.row_id] || "",
+    concepto_id: param.concepto_id || param.id || param.row_id || "",
+    concepto: param.concepto || param.nombre || "",
+    concepto_nombre: param.concepto || param.nombre || "",
+    valor: toNumeric(param.valor),
+    match_calculo: state.parametrosCalculo[param.row_id] || defaultParametroCalculo(param.concepto || param.nombre),
+    unidad: param.unidad || ""
+  })),
+  parametros_tiempo: state.parametrosTiempo,
+  parametros_calculo: state.parametrosCalculo
+});
+
+const actualizarParametrosNomina = async () => {
+  if (!state.parametrosDetalle.length) return setStatus("Consulta una nómina antes de actualizar parámetros.");
+  const payload = buildParametrosNominaUpdatePayload();
+  if (!payload.empresa_id) return setStatus("No se pudo validar la empresa activa para actualizar parámetros.");
+  setStatus("Actualizando parámetros de nómina...");
+  try {
+    const authHeaders = await buildRequestHeaders({ includeTenant: true });
+    const response = await fetch(WEBHOOK_NOMINA_PARAMETROS_REGISTRAR, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data?.success === false || data?.ok === false) throw new Error(data?.message || `HTTP ${response.status}`);
+    setStatus(data?.message || "Parámetros de nómina actualizados. Se usarán en la próxima consulta.");
+  } catch (error) {
+    nominaWarn("parametros.actualizar.error", error?.message || error);
+    setStatus(`No fue posible actualizar parámetros (${error.message || "sin detalle"}).`);
+  }
 };
 
 const init = async () => {
@@ -1841,6 +1927,7 @@ consultarBtn?.addEventListener("click", consultarNomina);
 descargarBtn?.addEventListener("click", () => { descargarComprobante(); guardarHistoricoNomina(); });
 descargarExcelEmpleadoBtn?.addEventListener("click", descargarExcelEmpleado);
 enviarDeduccionesBtn?.addEventListener("click", () => enviarDeduccionesNomina());
+actualizarParametrosBtn?.addEventListener("click", () => actualizarParametrosNomina());
 corteSelect?.addEventListener("change", updateDatesByCut);
 fechaInicioInput?.addEventListener("change", clampDatesToToday);
 fechaFinInput?.addEventListener("change", clampDatesToToday);
@@ -1961,6 +2048,16 @@ auxiliaresPanel?.addEventListener("change", (event) => {
   recalculatePayrollFromEditableDetail();
 });
 
+auxiliaresPanel?.addEventListener("change", (event) => {
+  const rowEl = event.target?.closest?.("tr[data-law-index]");
+  if (!rowEl) return;
+  const row = state.deduccionesLey[Number(rowEl.dataset.lawIndex)];
+  if (!row) return;
+  if (event.target.classList.contains("nomina-law-activa")) row.activo = event.target.checked;
+  if (event.target.classList.contains("nomina-law-porcentaje")) row.porcentaje = Math.max(0, toNumeric(event.target.value));
+  recalculatePayrollFromEditableDetail();
+});
+
 
 // MANTENIMIENTO HISTÓRICO: arma un único JSON con todas las tablas renderizadas para WEBHOOK_NOMINA_HISTORICO_GUARDAR.
 const buildHistoricoNominaPayload = async () => {
@@ -1976,11 +2073,14 @@ const buildHistoricoNominaPayload = async () => {
       resumen: { movimientos: state.movimientos, horas: state.horasDetalle, totales: calculation.totals, neto: netoPagarEl?.textContent || "" },
       ingresos: state.movimientos.filter((item) => String(item.naturaleza || "").toLowerCase().includes("devengo")),
       deducciones: state.movimientos.filter((item) => String(item.naturaleza || "").toLowerCase().includes("dedu")),
-      detalle: calculation.rows.map((row) => ({ ...row, sede_nombre: resolveSedeName(row.sede || row.tenant_id || row.empresa_id) })),
+      detalle: calculation.rows.map((row) => ({ ...row, tipo_turno: row.es_apoyo ? "Apoyo" : "Turno normal", sede_nombre: resolveSedeName(row.sede || row.tenant_id || row.empresa_id) })),
       apoyos: state.apoyosDetalle,
       parametros: state.parametrosDetalle,
       parametros_tiempo: state.parametrosTiempo,
       parametros_calculo: state.parametrosCalculo,
+      locales: getSelectedLocalesNomina(),
+      tipo_filas: calculation.rows.map((row) => ({ row_id: row.row_id, fecha: row.fecha, tipo_turno: row.es_apoyo ? "Apoyo" : "Turno normal", sede: row.sede || row.tenant_id || row.empresa_id || "", sede_nombre: resolveSedeName(row.sede || row.tenant_id || row.empresa_id) })),
+      deducciones_ley: buildDeduccionesLeyRows(calculation),
       auxiliares: { ingresos: state.ingresosAuxiliares, deducciones: state.deduccionesAuxiliares }
     }
   };
@@ -2146,7 +2246,7 @@ const createSimplePdf = async ({ empleado, rows, fecha }) => {
 };
 
 const buildDeduccionesRows = () => {
-  const deducciones = state.movimientos.filter((item) => String(item.naturaleza || "").toLowerCase().includes("dedu"));
+  const deducciones = state.movimientos.filter((item) => String(item.naturaleza || "").toLowerCase().includes("dedu") && item.fuente !== "ley");
   return deducciones.map((item) => {
     const cantidad = toNumeric(item.cantidad ?? 1) || 1;
     const valorEmpleado = toNumeric(item.valor);
@@ -2232,6 +2332,9 @@ const enviarDeduccionesNomina = async () => {
       firma_empleador_asset: PDF_SIGNATURE_ASSET,
       firma_empleador_dimensiones_px: { width: 400, height: 63 },
       deducciones: rows,
+      empleado_id: empleadoId,
+      empleado_usuario_id: empleadoId,
+      usuario_empleado_id: empleadoId,
       total_a_descontar: rows.reduce((acc, row) => acc + toNumeric(row.valor_empleado), 0)
     };
     const formData = new FormData();
