@@ -29,18 +29,18 @@
           <input id="historicoNominaHasta" type="date">
         </label>
         <label>Sede
-          <input id="historicoNominaSede" type="search" placeholder="Todas las sedes">
+          <select id="historicoNominaSede"><option value="">Todas las sedes</option></select>
         </label>
       </div>
       <div class="nomina-actions">
-        <button type="button" id="consultarHistoricoNomina">Consultar histórico</button>
+        <button type="button" id="consultarHistoricoNomina">Aplicar filtros</button>
       </div>
       <div id="historicoNominaListadoPanel" class="comprobante-table nomina-web-panel nomina-wide-panel">
         <div class="comprobante-col">
           <h3>Nóminas guardadas</h3>
           <table>
-            <thead><tr><th>Fecha</th><th>Empleado</th><th>Acciones</th></tr></thead>
-            <tbody id="historicoNominaBody"><tr><td colspan="3">Consultando histórico...</td></tr></tbody>
+            <thead><tr><th>Fecha</th><th>Responsable</th><th>Empresa / sede</th><th>Periodo</th><th>Acciones</th></tr></thead>
+            <tbody id="historicoNominaBody"><tr><td colspan="5">Consultando histórico...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -49,7 +49,7 @@
         <h3 id="historicoNominaDetalleTitulo">Detalle de nómina</h3>
         <div id="historicoNominaDetalleResumen" class="nomina-detail-grid"></div>
       </div>
-      <div id="historicoNominaStatus" class="status">El listado se carga desde el webhook https://n8n.enkrato.com/webhook/nomina_historico_consultar.</div>
+      <div id="historicoNominaStatus" class="status">El listado se carga desde el webhook https://n8n.enkrato.com/webhook/nomina_historico_consultar_vista; el detalle se consulta al seleccionar una nómina.</div>
     </section>
   </main>
 

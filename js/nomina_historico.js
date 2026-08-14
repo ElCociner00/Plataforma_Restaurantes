@@ -5,9 +5,9 @@
  * `js/session.js` aporta headers/tenant. Si el backend cambia la estructura,
  * ajustar únicamente los normalizadores de este archivo.
  */
-import { buildRequestHeaders, getUserContext } from "./session.js";
+import { buildRequestHeaders, getUserContext, listAvailableLocalContexts } from "./session.js";
 import { fetchResponsablesActivos } from "./responsables.js";
-import { WEBHOOK_NOMINA_HISTORICO_RENDERIZAR, WEBHOOK_NOMINA_HISTORICO_BORRAR } from "./webhooks.js";
+import { WEBHOOK_NOMINA_HISTORICO_VISTA, WEBHOOK_NOMINA_HISTORICO_RENDERIZAR, WEBHOOK_NOMINA_HISTORICO_BORRAR } from "./webhooks.js";
 
 const empleadoInput = document.getElementById("historicoNominaEmpleado");
 const desdeInput = document.getElementById("historicoNominaDesde");
@@ -22,7 +22,7 @@ const detallePanel = document.getElementById("historicoNominaDetallePanel");
 const detalleTitulo = document.getElementById("historicoNominaDetalleTitulo");
 const detalleResumen = document.getElementById("historicoNominaDetalleResumen");
 
-const state = { context: null, responsables: [], nominas: [], ocultasSesion: new Set() };
+const state = { context: null, responsables: [], locales: [], nominas: [], detalles: new Map(), ocultasSesion: new Set() };
 
 const setStatus = (message) => { if (statusEl) statusEl.textContent = message || ""; };
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
@@ -42,10 +42,16 @@ const setDefaultDates = () => {
   if (hastaInput && !hastaInput.value) hastaInput.value = toIsoDate(today);
 };
 
-const getResponsableNombre = (id) => state.responsables.find((item) => String(item.id || "") === String(id || ""))?.nombre_completo || "";
+const getResponsableNombre = (id) => {
+  const safeId = String(id || "");
+  return state.responsables.find((item) => [item.id, item.usuario_id, item.user_id, item.responsable_id, item.id_principal, item.usuario_principal_id].some((value) => String(value || "") === safeId))?.nombre_completo || "";
+};
 const getEmpleadoId = (row = {}) => row?.empleado_id || row?.usuario_id || row?.responsable_id || row?.responsable || row?.empleado?.id || row?.empleado?.usuario_id || row?.resumen?.empleado_id || row?.resumen?.usuario_id || row?.detalles?.find?.((item) => item?.responsable)?.responsable || row?.ingresos?.find?.((item) => item?.empleado_id)?.empleado_id || "";
-const getEmpleadoNombre = (row) => row?.empleado?.nombre || row?.empleado?.nombre_completo || row?.resumen?.empleado || row?.resumen?.empleado_nombre || row?.empleado_nombre || row?.nombre_empleado || row?.responsable_nombre || getResponsableNombre(getEmpleadoId(row)) || row?.ingresos?.find?.((item) => item.empleado_nombre)?.empleado_nombre || "Empleado sin resolver";
+const getEmpleadoNombre = (row) => row?.empleado?.nombre || row?.empleado?.nombre_completo || row?.resumen?.empleado || row?.resumen?.empleado_nombre || row?.empleado_nombre || row?.nombre_empleado || row?.responsable_nombre || getResponsableNombre(getEmpleadoId(row)) || row?.ingresos?.find?.((item) => item.empleado_nombre)?.empleado_nombre || "Responsable sin resolver";
 const getRowDate = (row) => row?.fecha || row?.fecha_nomina || row?.resumen?.fecha || row?.resumen?.fecha_fin || row?.created_at || row?.updated_at || row?.fecha_fin || row?.fin || row?.detalles?.[0]?.fecha || "";
+
+const getSedeHistorico = (row = {}) => row?.empresa_nombre || row?.sede_nombre || row?.local_nombre || row?.empresa?.nombre_comercial || row?.empresa?.razon_social || row?.resumen?.sede || row?.locales?.[0]?.nombre || row?.consultado?.[0] || row?.empresa_id || "Sede sin resolver";
+const getPeriodoHistorico = (row = {}) => row?.periodo || row?.resumen?.periodo || [row?.periodo_inicio, row?.periodo_fin].filter(Boolean).join(" - ") || "Sin periodo";
 
 const parseJsonLike = (value) => {
   if (typeof value !== "string") return value;
@@ -123,16 +129,47 @@ const cargarResponsables = async () => {
   });
 };
 
-const buildHistoricoRequestPayload = () => ({
+const normalizeSedeOption = (local = {}) => {
+  const id = String(local.empresa_id || local.tenant_id || local.id || "").trim();
+  const nombre = String(local.nombre || local.nombre_comercial || local.razon_social || id || "Sede").trim();
+  return id ? { id, nombre } : null;
+};
+
+const cargarSedes = async () => {
+  state.locales = (await listAvailableLocalContexts().catch(() => []))
+    .map(normalizeSedeOption)
+    .filter(Boolean);
+  if (!state.locales.length && state.context?.empresa_id) {
+    state.locales = [{ id: state.context.empresa_id, nombre: "Sede actual" }];
+  }
+  if (!sedeInput || sedeInput.tagName !== "SELECT") return;
+  sedeInput.innerHTML = '<option value="">Todas las sedes</option>';
+  state.locales.forEach((local) => {
+    const option = document.createElement("option");
+    option.value = local.id;
+    option.textContent = local.nombre;
+    sedeInput.appendChild(option);
+  });
+};
+
+const buildHistoricoVistaPayload = () => ({
   empresa_id: state.context?.empresa_id || "",
   tenant_id: state.context?.empresa_id || "",
+  entorno: state.context?.entorno || state.context?.environment || "",
+  origen: "nomina_historico_vista"
+});
+
+const buildHistoricoRequestPayload = () => ({
+  ...buildHistoricoVistaPayload(),
   responsable_id: empleadoInput?.value || "",
   empleado_id: empleadoInput?.value || "",
   usuario_id: empleadoInput?.value || "",
   empleado: empleadoInput?.value || "",
   fecha_inicio: desdeInput?.value || "",
   fecha_fin: hastaInput?.value || "",
-  sede: sedeInput?.value?.trim() || ""
+  sede: sedeInput?.value || "",
+  sede_id: sedeInput?.value || "",
+  local_id: sedeInput?.value || ""
 });
 
 const filterHistoricoRows = (rows) => rows.filter((row) => {
@@ -141,6 +178,11 @@ const filterHistoricoRows = (rows) => rows.filter((row) => {
   if (desdeInput?.value && rowDate && rowDate < desdeInput.value) return false;
   if (hastaInput?.value && rowDate && rowDate > hastaInput.value) return false;
   if (empleadoInput?.value && responsable && responsable !== empleadoInput.value) return false;
+  if (sedeInput?.value) {
+    const selected = String(sedeInput.value);
+    const sedeValues = [row?.empresa_id, row?.sede, row?.sede_id, row?.local_id, row?.tenant_id, row?.locales?.[0]?.empresa_id, row?.locales?.[0]?.tenant_id].map((value) => String(value || ""));
+    if (!sedeValues.includes(selected)) return false;
+  }
   return true;
 });
 
@@ -148,10 +190,10 @@ const renderHistoricoRows = (rows) => {
   if (!tbody) return;
   const filtered = filterHistoricoRows(rows).filter((row) => !state.ocultasSesion.has(String(row.id || "")));
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="3">Sin nóminas históricas para los filtros seleccionados.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5">Sin nóminas históricas para los filtros seleccionados.</td></tr>';
     return;
   }
-  tbody.innerHTML = filtered.map((row) => { const originalIndex = state.nominas.indexOf(row); return `<tr class="nomina-historico-row" data-nomina-index="${originalIndex}" data-nomina-id="${escapeHtml(row.id || "")}"><td>${escapeHtml(formatDateLong(getRowDate(row)))}</td><td>${escapeHtml(getEmpleadoNombre(row))}</td><td><button type="button" class="nomina-historico-delete" data-delete-id="${escapeHtml(row.id || "")}">Borrar</button></td></tr>`; }).join("");
+  tbody.innerHTML = filtered.map((row) => { const originalIndex = state.nominas.indexOf(row); return `<tr class="nomina-historico-row" data-nomina-index="${originalIndex}" data-nomina-id="${escapeHtml(row.id || "")}"><td>${escapeHtml(formatDateLong(getRowDate(row)))}</td><td>${escapeHtml(getEmpleadoNombre(row))}</td><td>${escapeHtml(getSedeHistorico(row))}</td><td>${escapeHtml(getPeriodoHistorico(row))}</td><td><button type="button" class="nomina-historico-delete" data-delete-id="${escapeHtml(row.id || "")}">Borrar</button></td></tr>`; }).join("");
 };
 
 
@@ -168,8 +210,9 @@ const renderGenericTable = (title, rows) => {
   return `<div class="comprobante-col"><h3>${escapeHtml(title)}</h3><table><thead><tr>${keys.map((key) => `<th>${escapeHtml(key)}</th>`).join("")}</tr></thead><tbody>${rows.map((item) => `<tr>${keys.map((key) => `<td>${cell(item?.[key])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
 };
 
-const renderDetalle = (row) => {
+const renderDetalle = async (row) => {
   if (!row || !listadoPanel || !detallePanel) return;
+  row = await consultarDetalleHistorico(row);
   const detalles = Array.isArray(row.detalles) ? row.detalles : [];
   const ingresos = Array.isArray(row.ingresos) ? row.ingresos : [];
   const deducciones = Array.isArray(row.deducciones) ? row.deducciones : [];
@@ -179,7 +222,7 @@ const renderDetalle = (row) => {
   detalleResumen.innerHTML = `
     <div class="nomina-detail-card"><span>Fecha</span><strong>${escapeHtml(formatDateLong(getRowDate(row)))}</strong></div>
     <div class="nomina-detail-card"><span>Responsable</span><strong>${escapeHtml(getEmpleadoNombre(row))}</strong></div>
-    <div class="nomina-detail-card"><span>Periodo</span><strong>${escapeHtml(row.periodo || row.resumen?.periodo || "Sin periodo")}</strong></div>
+    <div class="nomina-detail-card"><span>Periodo</span><strong>${escapeHtml(getPeriodoHistorico(row))}</strong></div>
     <div class="nomina-detail-card"><span>Ingresos</span><strong>${escapeHtml(money(totalIngresos))}</strong></div>
     <div class="nomina-detail-card"><span>Deducciones</span><strong>${escapeHtml(money(totalDeducciones))}</strong></div>
     <div class="nomina-detail-card"><span>Neto</span><strong>${escapeHtml(money(row.resumen?.neto || row.neto || (totalIngresos - totalDeducciones)))}</strong></div>
@@ -215,11 +258,32 @@ const borrarNominaHistorica = async (row) => {
   }
 };
 
+const consultarDetalleHistorico = async (row) => {
+  const id = String(row?.id || "");
+  if (!id) return row;
+  if (state.detalles.has(id)) return state.detalles.get(id);
+  setStatus("Consultando detalle completo de nómina histórica...");
+  try {
+    const authHeaders = await buildRequestHeaders({ includeTenant: true });
+    const payload = { ...buildHistoricoRequestPayload(), id, nomina_id: id, row_id: id };
+    const response = await fetch(WEBHOOK_NOMINA_HISTORICO_RENDERIZAR, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders }, body: JSON.stringify(payload) });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const [detalle] = normalizeHistoricoRows(await response.json().catch(() => null));
+    const merged = normalizeHistoricoRow({ ...row, ...(detalle || {}) });
+    state.detalles.set(id, merged);
+    setStatus("Detalle histórico consultado correctamente.");
+    return merged;
+  } catch (error) {
+    setStatus(`No fue posible consultar el detalle (${error.message || "sin detalle"}). Se muestra la vista resumida.`);
+    return row;
+  }
+};
+
 const consultarHistoricoNomina = async () => {
   setStatus("Consultando histórico de nómina...");
   try {
     const authHeaders = await buildRequestHeaders({ includeTenant: true });
-    const response = await fetch(WEBHOOK_NOMINA_HISTORICO_RENDERIZAR, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders }, body: JSON.stringify(buildHistoricoRequestPayload()) });
+    const response = await fetch(WEBHOOK_NOMINA_HISTORICO_VISTA, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders }, body: JSON.stringify(buildHistoricoVistaPayload()) });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     state.nominas = normalizeHistoricoRows(await response.json().catch(() => null));
     renderHistoricoRows(state.nominas);
@@ -227,7 +291,7 @@ const consultarHistoricoNomina = async () => {
   } catch (error) {
     state.nominas = [];
     renderHistoricoRows([]);
-    setStatus(`No fue posible consultar el histórico (${error.message || "sin detalle"}). Verifica el webhook ${WEBHOOK_NOMINA_HISTORICO_RENDERIZAR}.`);
+    setStatus(`No fue posible consultar el histórico (${error.message || "sin detalle"}). Verifica el webhook ${WEBHOOK_NOMINA_HISTORICO_VISTA}.`);
   }
 };
 
@@ -235,7 +299,8 @@ const init = async () => {
   setDefaultDates();
   state.context = await getUserContext().catch(() => null);
   await cargarResponsables();
-  consultarBtn?.addEventListener("click", consultarHistoricoNomina);
+  await cargarSedes();
+  consultarBtn?.addEventListener("click", () => { renderHistoricoRows(state.nominas); setStatus(`Filtros aplicados. ${filterHistoricoRows(state.nominas).length} nómina(s) visibles.`); });
   tbody?.addEventListener("click", (event) => {
     const rowEl = event.target.closest("tr[data-nomina-id]");
     if (!rowEl) return;

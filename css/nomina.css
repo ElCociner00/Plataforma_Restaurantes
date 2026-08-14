@@ -448,3 +448,57 @@
   padding: 6px 10px;
   cursor: pointer;
 }
+
+/* Parche Nómina 2026-08-14: feedback de consulta, parámetros y legibilidad de deducciones. */
+#consultarNomina.is-loading {
+  position: relative;
+  opacity: 0.86;
+  cursor: wait;
+}
+#consultarNomina.is-loading::after {
+  content: "";
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin-left: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  border-top-color: transparent;
+  border-radius: 50%;
+  vertical-align: -0.15em;
+  animation: nomina-spin 0.8s linear infinite;
+}
+.status.is-loading {
+  border-color: #9b80c7;
+  background: #f5f3ff;
+  color: #4c1d95;
+  font-weight: 700;
+}
+@keyframes nomina-spin { to { transform: rotate(360deg); } }
+
+.nomina-param-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.nomina-deduccion-ley-config td:first-child {
+  min-width: 120px;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+.nomina-law-switch span {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+.nomina-col-identidad {
+  font-weight: 800;
+  color: #15803d;
+  white-space: nowrap;
+}

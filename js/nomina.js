@@ -591,6 +591,16 @@ const setStatus = (message) => {
   nominaLog("status", message || "");
 };
 
+const setNominaLoading = (isLoading, message = "Consultando...") => {
+  if (consultarBtn) {
+    consultarBtn.disabled = Boolean(isLoading);
+    consultarBtn.classList.toggle("is-loading", Boolean(isLoading));
+    consultarBtn.setAttribute("aria-busy", isLoading ? "true" : "false");
+    consultarBtn.textContent = isLoading ? message : "Consultar nómina";
+  }
+  statusEl?.classList.toggle("is-loading", Boolean(isLoading));
+};
+
 const parseWebhookResponseSafe = async (response) => {
   try {
     const rawText = await response.text();
@@ -1004,6 +1014,10 @@ const normalizeExcelPayrollForUi = (data, empleadoSeleccionado = null) => {
     row_id: row.row_id || `${row.fecha || "fila"}-${row.hora_inicio || "inicio"}-${row.hora_fin || "fin"}-${index}`,
     incluido: row.incluido !== false,
     incluidoTransporte: row.incluidoTransporte,
+    es_apoyo: row.es_apoyo === true || String(row.tipo_turno || row.tipo || "").toLowerCase().includes("apoyo"),
+    tipo_turno: row.tipo_turno || (row.es_apoyo ? "Apoyo" : "Turno normal"),
+    sede: row.sede || row.tenant_id || row.empresa_id || row.local_id || "",
+    sede_nombre: row.sede_nombre || row.local_nombre || row.nombre_sede || resolveSedeName(row.sede || row.tenant_id || row.empresa_id || row.local_id),
     dia: row.dia || dateToDayName(row.fecha),
     propina: getDetallePropina(row),
     hora_inicio_valida: normalizeFinalTimeInput(row.hora_inicio_valida || row.hora_inicio || ""),
@@ -1015,7 +1029,7 @@ const normalizeExcelPayrollForUi = (data, empleadoSeleccionado = null) => {
   markDuplicateDetailRows();
   ensureParametroCalculo();
 
-  state.empleadoDetalle = { nombre: empleadoSeleccionado?.nombre_completo || data?.empleado?.nombre || "-", cargo: empleadoSeleccionado?.rol || data?.empleado?.cargo || "-" };
+  state.empleadoDetalle = { nombre: empleadoSeleccionado?.nombre_completo || data?.empleado?.nombre || "-", cedula: empleadoSeleccionado?.cedula || empleadoSeleccionado?.documento || data?.empleado?.cedula || data?.empleado?.documento || "-", cargo: empleadoSeleccionado?.rol || data?.empleado?.cargo || "-" };
   state.periodoDetalle = { inicio: data?.periodo?.inicio || fechaInicioInput.value, fin: data?.periodo?.fin || fechaFinInput.value };
   return buildPayrollRowsFromEditableDetail();
 };
@@ -1117,7 +1131,7 @@ const renderParametrosYDetalle = () => {
         const rowClasses = [row.incluido === false ? "nomina-row-descartada" : "", row.duplicado ? (row.incluidoTransporte === false ? "nomina-row-duplicada" : "nomina-row-validada") : "", row.es_apoyo ? "nomina-row-apoyo" : "nomina-row-turno"].filter(Boolean).join(" ");
         return `<tr data-detail-index="${index}" data-detail-id="${escapeHtml(row.row_id || "")}" class="${rowClasses}">
           <td><input type="checkbox" class="nomina-detalle-validar" ${row.incluido !== false ? "checked" : ""} ${disabled} aria-label="Turno válido ${row.fecha || index + 1}"></td>
-          <td><strong>${row.es_apoyo ? "Apoyo" : "Turno normal"}</strong></td><td>${escapeHtml(resolveSedeName(row.sede || row.tenant_id || row.empresa_id))}</td><td>${row.fecha || "-"}</td><td>${calculated.dia}</td><td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}</td>
+          <td><strong>${row.es_apoyo ? "Apoyo" : "Turno normal"}</strong></td><td class="nomina-col-identidad"><strong>${escapeHtml(row.sede_nombre || resolveSedeName(row.sede || row.tenant_id || row.empresa_id))}</strong></td><td>${row.fecha || "-"}</td><td>${calculated.dia}</td><td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}</td>
           <td data-calc-field="horas_diurnas">${calculated.horas_diurnas}</td><td data-calc-field="horas_nocturnas">${calculated.horas_nocturnas}</td><td data-calc-field="horas_dominicales_diurnas">${calculated.horas_dominicales_diurnas}</td><td data-calc-field="horas_dominicales_nocturnas">${calculated.horas_dominicales_nocturnas}</td>
           <td><input class="nomina-detalle-hora-valida" data-field="hora_inicio_valida" value="${escapeHtml(getValidShiftTime(row, "hora_inicio_valida"))}" ${disabled} aria-label="Inicio válido ${row.fecha || index + 1}"></td>
           <td><input class="nomina-detalle-hora-valida" data-field="hora_fin_valida" value="${escapeHtml(getValidShiftTime(row, "hora_fin_valida"))}" ${disabled} aria-label="Fin válido ${row.fecha || index + 1}"></td>
@@ -1141,13 +1155,15 @@ const renderParametrosYDetalle = () => {
 const renderComprobanteHeader = (empleado) => {
   const empleadoNombre = state.empleadoDetalle?.nombre || empleado?.nombre_completo || "-";
   const empleadoCargo = state.empleadoDetalle?.cargo || empleado?.rol || "-";
+  const empleadoCedula = state.empleadoDetalle?.cedula || empleado?.cedula || empleado?.documento || empleado?.numero_documento || "-";
   const periodoInicio = state.periodoDetalle?.inicio || fechaInicioInput.value || "-";
   const periodoFin = state.periodoDetalle?.fin || fechaFinInput.value || "-";
   empleadoDataEl.innerHTML = `
     <div><strong>${empleadoNombre}</strong></div>
+    <div>Cédula: ${empleadoCedula}</div>
     <div>Cargo: ${empleadoCargo}</div>
     <div>Periodo: ${periodoInicio} - ${periodoFin}</div>
-    <div>Fecha: ${periodoFin}</div>
+    <div>Fecha exportación: ${new Date().toISOString().slice(0, 10)}</div>
   `;
 };
 
@@ -1331,8 +1347,9 @@ const consultarNomina = async () => {
 
   state.periodoDetalle = { inicio: fechaInicioInput.value || "-", fin: fechaFinInput.value || "-" };
   const empleadoSeleccionado = state.responsables.find((item) => item.id === empleadoId);
-  state.empleadoDetalle = { nombre: empleadoSeleccionado?.nombre_completo || "-", cargo: empleadoSeleccionado?.rol || "-" };
-  setStatus("Consultando movimientos de nómina...");
+  state.empleadoDetalle = { nombre: empleadoSeleccionado?.nombre_completo || "-", cedula: empleadoSeleccionado?.cedula || empleadoSeleccionado?.documento || empleadoSeleccionado?.numero_documento || "-", cargo: empleadoSeleccionado?.rol || "-" };
+  setStatus("Consultando movimientos de nómina... Espera mientras llegan los datos.");
+  setNominaLoading(true, "Consultando...");
   const loadingStart = Date.now();
   const payload = await buildExcelWebhookPayload(empleadoId);
 
@@ -1371,6 +1388,7 @@ const consultarNomina = async () => {
       state.movimientos = [];
       renderMovimientos();
       setStatus(`Error consultando nómina: ${error.message || "sin detalle"}`);
+      setNominaLoading(false);
       return;
     }
 
@@ -1398,6 +1416,7 @@ const consultarNomina = async () => {
   renderMovimientos();
   renderComprobanteHeader(empleado);
   setStatus(`Consulta completada. ${state.movimientos.length} movimientos encontrados.`);
+  setNominaLoading(false);
 };
 
 const descargarComprobante = () => {
@@ -1445,13 +1464,15 @@ const descargarComprobante = () => {
   let ry = 140;
   const empleadoNombre = state.empleadoDetalle?.nombre || empleado.nombre_completo || "-";
   const empleadoCargo = state.empleadoDetalle?.cargo || empleado.rol || "-";
+  const empleadoCedula = state.empleadoDetalle?.cedula || empleado.cedula || empleado.documento || empleado.numero_documento || "-";
   const periodoInicio = state.periodoDetalle?.inicio || fechaInicioInput.value || "-";
   const periodoFin = state.periodoDetalle?.fin || fechaFinInput.value || "-";
   const lines = [
     `Nombre: ${empleadoNombre}`,
+    `Cédula: ${empleadoCedula}`,
     `Cargo: ${empleadoCargo}`,
     `Periodo: ${periodoInicio} - ${periodoFin}`,
-    `Fecha: ${periodoFin}`
+    `Fecha exportación: ${new Date().toISOString().slice(0, 10)}`
   ];
   ctx.textAlign = "right";
   lines.forEach((line, index) => {
@@ -1822,7 +1843,7 @@ const descargarExcelEmpleado = async () => {
 const renderDetallesCalculos = () => {
   if (!detallesCalculosBody) return;
   const calculation = calculateMoneyByDetail();
-  const rows = calculation.rows.map((row) => `<tr class="${row.es_apoyo ? "nomina-row-apoyo" : "nomina-row-turno"}"><td>${row.fecha || "-"}</td><td>${row.dia || "-"}</td><td>${row.es_apoyo ? "Apoyo" : "Turno normal"}</td><td>${escapeHtml(resolveSedeName(row.sede || row.tenant_id || row.empresa_id))}</td><td>${escapeHtml(getValidShiftTime(row, "hora_inicio_valida") || row.hora_inicio || "-")} - ${escapeHtml(getValidShiftTime(row, "hora_fin_valida") || row.hora_fin || "-")}</td><td>${fmtMoney(row.calculos.horas_diurnas)}</td><td>${fmtMoney(row.calculos.horas_nocturnas)}</td><td>${fmtMoney(row.calculos.horas_dominicales_diurnas)}</td><td>${fmtMoney(row.calculos.horas_dominicales_nocturnas)}</td><td>${fmtMoney(row.propina || 0)}</td><td>${fmtMoney(row.calculos.total)}</td></tr>`);
+  const rows = calculation.rows.map((row) => `<tr class="${row.es_apoyo ? "nomina-row-apoyo" : "nomina-row-turno"}"><td>${row.fecha || "-"}</td><td>${row.dia || "-"}</td><td class="nomina-col-identidad"><strong>${row.es_apoyo ? "Apoyo" : "Turno normal"}</strong></td><td class="nomina-col-identidad"><strong>${escapeHtml(row.sede_nombre || resolveSedeName(row.sede || row.tenant_id || row.empresa_id))}</strong></td><td>${escapeHtml(getValidShiftTime(row, "hora_inicio_valida") || row.hora_inicio || "-")} - ${escapeHtml(getValidShiftTime(row, "hora_fin_valida") || row.hora_fin || "-")}</td><td>${fmtMoney(row.calculos.horas_diurnas)}</td><td>${fmtMoney(row.calculos.horas_nocturnas)}</td><td>${fmtMoney(row.calculos.horas_dominicales_diurnas)}</td><td>${fmtMoney(row.calculos.horas_dominicales_nocturnas)}</td><td>${fmtMoney(row.propina || 0)}</td><td>${fmtMoney(row.calculos.total)}</td></tr>`);
   const total = calculation.rows.reduce((acc, row) => acc + row.calculos.total, 0);
   rows.push(`<tr class="nomina-total-row"><td colspan="10">Total</td><td>${fmtMoney(total)}</td></tr>`);
   detallesCalculosBody.innerHTML = rows.join("");
@@ -1854,43 +1875,59 @@ const recalculatePayrollInline = (row, rowEl) => {
   renderMovimientosSinDetalle();
 };
 
-const buildParametrosNominaUpdatePayload = () => ({
-  tenant_id: state.context?.empresa_id || "",
-  empresa_id: state.context?.empresa_id || "",
-  usuario_id: state.context?.user?.id || state.context?.user?.user_id || state.context?.usuario_id || "",
-  registrado_por: state.context?.user?.id || state.context?.user?.user_id || state.context?.usuario_id || "",
-  origen: "nomina_actualizacion_inline",
-  timestamp: new Date().toISOString(),
-  parametros: (state.parametrosDetalle || []).filter((param) => param.auxiliar !== true).map((param) => ({
-    tiempo_id: param.tiempo_id || param.tiempo || param.tiempo_nombre || state.parametrosCalculo[param.row_id] || "",
-    tiempo: param.tiempo || param.tiempo_nombre || state.parametrosCalculo[param.row_id] || "",
-    tiempo_nombre: param.tiempo_nombre || param.tiempo || state.parametrosCalculo[param.row_id] || "",
-    concepto_id: param.concepto_id || param.id || param.row_id || "",
-    concepto: param.concepto || param.nombre || "",
-    concepto_nombre: param.concepto || param.nombre || "",
-    valor: toNumeric(param.valor),
-    match_calculo: state.parametrosCalculo[param.row_id] || defaultParametroCalculo(param.concepto || param.nombre),
-    unidad: param.unidad || ""
-  })),
-  parametros_tiempo: state.parametrosTiempo,
-  parametros_calculo: state.parametrosCalculo
-});
+const buildParametroNominaInlinePayloads = () => {
+  const userId = state.context?.user?.id || state.context?.user?.user_id || state.context?.usuario_id || null;
+  const timestamp = new Date().toISOString();
+  return (state.parametrosDetalle || [])
+    .filter((param) => param.auxiliar !== true)
+    .map((param) => ({
+      tenant_id: state.context?.empresa_id || "",
+      empresa_id: state.context?.empresa_id || "",
+      tiempo_id: param.tiempo_id || param.tiempo || param.tiempo_nombre || state.parametrosCalculo[param.row_id] || "",
+      tiempo: param.tiempo || param.tiempo_nombre || state.parametrosCalculo[param.row_id] || "",
+      tiempo_nombre: param.tiempo_nombre || param.tiempo || state.parametrosCalculo[param.row_id] || "",
+      tiempo_factor_conversion: param.tiempo_factor_conversion ?? param.factor_conversion ?? null,
+      concepto_id: param.concepto_id || param.id || param.row_id || "",
+      concepto: param.concepto || param.nombre || "",
+      concepto_nombre: param.concepto || param.nombre || "",
+      valor: toNumeric(param.valor),
+      usuario_id: userId,
+      registrado_por: userId,
+      origen: "configuracion_parametros_nomina",
+      timestamp
+    }));
+};
+
+const validateParametroNominaInlinePayload = (payload) => {
+  if (!payload.tenant_id) return "No se pudo validar la empresa activa.";
+  if (!payload.tiempo_id) return `El parámetro ${payload.concepto || "sin concepto"} no tiene tiempo asociado.`;
+  if (!payload.concepto_id) return `El parámetro ${payload.concepto || "sin concepto"} no tiene concepto asociado.`;
+  if (!Number.isFinite(payload.valor) || payload.valor < 0) return `El parámetro ${payload.concepto || "sin concepto"} no tiene valor numérico válido.`;
+  return "";
+};
 
 const actualizarParametrosNomina = async () => {
   if (!state.parametrosDetalle.length) return setStatus("Consulta una nómina antes de actualizar parámetros.");
-  const payload = buildParametrosNominaUpdatePayload();
-  if (!payload.empresa_id) return setStatus("No se pudo validar la empresa activa para actualizar parámetros.");
-  setStatus("Actualizando parámetros de nómina...");
+  const payloads = buildParametroNominaInlinePayloads();
+  if (!payloads.length) return setStatus("No hay parámetros base para actualizar.");
+  const invalid = payloads.map((payload) => validateParametroNominaInlinePayload(payload)).find(Boolean);
+  if (invalid) return setStatus(invalid);
+
+  setStatus(`Actualizando ${payloads.length} parámetro(s) de nómina...`);
   try {
     const authHeaders = await buildRequestHeaders({ includeTenant: true });
-    const response = await fetch(WEBHOOK_NOMINA_PARAMETROS_REGISTRAR, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders },
-      body: JSON.stringify(payload)
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || data?.success === false || data?.ok === false) throw new Error(data?.message || `HTTP ${response.status}`);
-    setStatus(data?.message || "Parámetros de nómina actualizados. Se usarán en la próxima consulta.");
+    const results = await Promise.all(payloads.map(async (payload) => {
+      const response = await fetch(WEBHOOK_NOMINA_PARAMETROS_REGISTRAR, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.success === false || data?.ok === false) throw new Error(data?.message || `HTTP ${response.status}`);
+      return data;
+    }));
+    const message = results.find((item) => item?.message)?.message;
+    setStatus(message || `${payloads.length} parámetro(s) de nómina actualizados con el mismo formato del módulo Parámetros de nómina.`);
   } catch (error) {
     nominaWarn("parametros.actualizar.error", error?.message || error);
     setStatus(`No fue posible actualizar parámetros (${error.message || "sin detalle"}).`);
@@ -2073,7 +2110,7 @@ const buildHistoricoNominaPayload = async () => {
       resumen: { movimientos: state.movimientos, horas: state.horasDetalle, totales: calculation.totals, neto: netoPagarEl?.textContent || "" },
       ingresos: state.movimientos.filter((item) => String(item.naturaleza || "").toLowerCase().includes("devengo")),
       deducciones: state.movimientos.filter((item) => String(item.naturaleza || "").toLowerCase().includes("dedu")),
-      detalle: calculation.rows.map((row) => ({ ...row, tipo_turno: row.es_apoyo ? "Apoyo" : "Turno normal", sede_nombre: resolveSedeName(row.sede || row.tenant_id || row.empresa_id) })),
+      detalle: calculation.rows.map((row) => ({ ...row, detalle_original: row.detalle_original || null, tipo_turno: row.tipo_turno || (row.es_apoyo ? "Apoyo" : "Turno normal"), es_apoyo: row.es_apoyo === true, sede: row.sede || row.tenant_id || row.empresa_id || "", sede_nombre: row.sede_nombre || resolveSedeName(row.sede || row.tenant_id || row.empresa_id) })),
       apoyos: state.apoyosDetalle,
       parametros: state.parametrosDetalle,
       parametros_tiempo: state.parametrosTiempo,
