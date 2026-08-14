@@ -153,7 +153,11 @@ export const WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO =
 export const WEBHOOK_NOMINA_HISTORICO_GUARDAR =
   "https://n8n.enkrato.com/webhook/nomina_historico_guardar";
 
-// nomina/historico.html (auto-carga histórico de nóminas guardadas; endpoint vacío para estructurar en BD)
+// nomina/historico.html (auto-carga vista resumida de nóminas guardadas)
+export const WEBHOOK_NOMINA_HISTORICO_VISTA =
+  "https://n8n.enkrato.com/webhook/nomina_historico_consultar_vista";
+
+// nomina/historico.html (click en una nómina; consulta detalle completo por id de row)
 export const WEBHOOK_NOMINA_HISTORICO_RENDERIZAR =
   "https://n8n.enkrato.com/webhook/nomina_historico_consultar";
 
