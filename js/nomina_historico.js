@@ -5,7 +5,7 @@
  * `js/session.js` aporta headers/tenant. Si el backend cambia la estructura,
  * ajustar únicamente los normalizadores de este archivo.
  */
-import { buildRequestHeaders, getUserContext } from "./session.js";
+import { buildRequestHeaders, getUserContext, listAvailableLocalContexts } from "./session.js";
 import { fetchResponsablesActivos } from "./responsables.js";
 import { WEBHOOK_NOMINA_HISTORICO_VISTA, WEBHOOK_NOMINA_HISTORICO_RENDERIZAR, WEBHOOK_NOMINA_HISTORICO_BORRAR } from "./webhooks.js";
 
@@ -22,7 +22,7 @@ const detallePanel = document.getElementById("historicoNominaDetallePanel");
 const detalleTitulo = document.getElementById("historicoNominaDetalleTitulo");
 const detalleResumen = document.getElementById("historicoNominaDetalleResumen");
 
-const state = { context: null, responsables: [], nominas: [], detalles: new Map(), ocultasSesion: new Set() };
+const state = { context: null, responsables: [], locales: [], nominas: [], detalles: new Map(), ocultasSesion: new Set() };
 
 const setStatus = (message) => { if (statusEl) statusEl.textContent = message || ""; };
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
@@ -129,16 +129,47 @@ const cargarResponsables = async () => {
   });
 };
 
-const buildHistoricoRequestPayload = () => ({
+const normalizeSedeOption = (local = {}) => {
+  const id = String(local.empresa_id || local.tenant_id || local.id || "").trim();
+  const nombre = String(local.nombre || local.nombre_comercial || local.razon_social || id || "Sede").trim();
+  return id ? { id, nombre } : null;
+};
+
+const cargarSedes = async () => {
+  state.locales = (await listAvailableLocalContexts().catch(() => []))
+    .map(normalizeSedeOption)
+    .filter(Boolean);
+  if (!state.locales.length && state.context?.empresa_id) {
+    state.locales = [{ id: state.context.empresa_id, nombre: "Sede actual" }];
+  }
+  if (!sedeInput || sedeInput.tagName !== "SELECT") return;
+  sedeInput.innerHTML = '<option value="">Todas las sedes</option>';
+  state.locales.forEach((local) => {
+    const option = document.createElement("option");
+    option.value = local.id;
+    option.textContent = local.nombre;
+    sedeInput.appendChild(option);
+  });
+};
+
+const buildHistoricoVistaPayload = () => ({
   empresa_id: state.context?.empresa_id || "",
   tenant_id: state.context?.empresa_id || "",
+  entorno: state.context?.entorno || state.context?.environment || "",
+  origen: "nomina_historico_vista"
+});
+
+const buildHistoricoRequestPayload = () => ({
+  ...buildHistoricoVistaPayload(),
   responsable_id: empleadoInput?.value || "",
   empleado_id: empleadoInput?.value || "",
   usuario_id: empleadoInput?.value || "",
   empleado: empleadoInput?.value || "",
   fecha_inicio: desdeInput?.value || "",
   fecha_fin: hastaInput?.value || "",
-  sede: sedeInput?.value?.trim() || ""
+  sede: sedeInput?.value || "",
+  sede_id: sedeInput?.value || "",
+  local_id: sedeInput?.value || ""
 });
 
 const filterHistoricoRows = (rows) => rows.filter((row) => {
@@ -147,6 +178,11 @@ const filterHistoricoRows = (rows) => rows.filter((row) => {
   if (desdeInput?.value && rowDate && rowDate < desdeInput.value) return false;
   if (hastaInput?.value && rowDate && rowDate > hastaInput.value) return false;
   if (empleadoInput?.value && responsable && responsable !== empleadoInput.value) return false;
+  if (sedeInput?.value) {
+    const selected = String(sedeInput.value);
+    const sedeValues = [row?.empresa_id, row?.sede, row?.sede_id, row?.local_id, row?.tenant_id, row?.locales?.[0]?.empresa_id, row?.locales?.[0]?.tenant_id].map((value) => String(value || ""));
+    if (!sedeValues.includes(selected)) return false;
+  }
   return true;
 });
 
@@ -247,7 +283,7 @@ const consultarHistoricoNomina = async () => {
   setStatus("Consultando histórico de nómina...");
   try {
     const authHeaders = await buildRequestHeaders({ includeTenant: true });
-    const response = await fetch(WEBHOOK_NOMINA_HISTORICO_VISTA, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders }, body: JSON.stringify(buildHistoricoRequestPayload()) });
+    const response = await fetch(WEBHOOK_NOMINA_HISTORICO_VISTA, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders }, body: JSON.stringify(buildHistoricoVistaPayload()) });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     state.nominas = normalizeHistoricoRows(await response.json().catch(() => null));
     renderHistoricoRows(state.nominas);
@@ -263,7 +299,8 @@ const init = async () => {
   setDefaultDates();
   state.context = await getUserContext().catch(() => null);
   await cargarResponsables();
-  consultarBtn?.addEventListener("click", consultarHistoricoNomina);
+  await cargarSedes();
+  consultarBtn?.addEventListener("click", () => { renderHistoricoRows(state.nominas); setStatus(`Filtros aplicados. ${filterHistoricoRows(state.nominas).length} nómina(s) visibles.`); });
   tbody?.addEventListener("click", (event) => {
     const rowEl = event.target.closest("tr[data-nomina-id]");
     if (!rowEl) return;

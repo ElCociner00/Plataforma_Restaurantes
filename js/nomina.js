@@ -1131,7 +1131,7 @@ const renderParametrosYDetalle = () => {
         const rowClasses = [row.incluido === false ? "nomina-row-descartada" : "", row.duplicado ? (row.incluidoTransporte === false ? "nomina-row-duplicada" : "nomina-row-validada") : "", row.es_apoyo ? "nomina-row-apoyo" : "nomina-row-turno"].filter(Boolean).join(" ");
         return `<tr data-detail-index="${index}" data-detail-id="${escapeHtml(row.row_id || "")}" class="${rowClasses}">
           <td><input type="checkbox" class="nomina-detalle-validar" ${row.incluido !== false ? "checked" : ""} ${disabled} aria-label="Turno válido ${row.fecha || index + 1}"></td>
-          <td><strong>${row.es_apoyo ? "Apoyo" : "Turno normal"}</strong></td><td>${escapeHtml(resolveSedeName(row.sede || row.tenant_id || row.empresa_id))}</td><td>${row.fecha || "-"}</td><td>${calculated.dia}</td><td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}</td>
+          <td><strong>${row.es_apoyo ? "Apoyo" : "Turno normal"}</strong></td><td class="nomina-col-identidad"><strong>${escapeHtml(row.sede_nombre || resolveSedeName(row.sede || row.tenant_id || row.empresa_id))}</strong></td><td>${row.fecha || "-"}</td><td>${calculated.dia}</td><td>${row.hora_inicio || "-"} - ${row.hora_fin || "-"}</td>
           <td data-calc-field="horas_diurnas">${calculated.horas_diurnas}</td><td data-calc-field="horas_nocturnas">${calculated.horas_nocturnas}</td><td data-calc-field="horas_dominicales_diurnas">${calculated.horas_dominicales_diurnas}</td><td data-calc-field="horas_dominicales_nocturnas">${calculated.horas_dominicales_nocturnas}</td>
           <td><input class="nomina-detalle-hora-valida" data-field="hora_inicio_valida" value="${escapeHtml(getValidShiftTime(row, "hora_inicio_valida"))}" ${disabled} aria-label="Inicio válido ${row.fecha || index + 1}"></td>
           <td><input class="nomina-detalle-hora-valida" data-field="hora_fin_valida" value="${escapeHtml(getValidShiftTime(row, "hora_fin_valida"))}" ${disabled} aria-label="Fin válido ${row.fecha || index + 1}"></td>
@@ -1875,43 +1875,59 @@ const recalculatePayrollInline = (row, rowEl) => {
   renderMovimientosSinDetalle();
 };
 
-const buildParametrosNominaUpdatePayload = () => ({
-  tenant_id: state.context?.empresa_id || "",
-  empresa_id: state.context?.empresa_id || "",
-  usuario_id: state.context?.user?.id || state.context?.user?.user_id || state.context?.usuario_id || "",
-  registrado_por: state.context?.user?.id || state.context?.user?.user_id || state.context?.usuario_id || "",
-  origen: "nomina_actualizacion_inline",
-  timestamp: new Date().toISOString(),
-  parametros: (state.parametrosDetalle || []).filter((param) => param.auxiliar !== true).map((param) => ({
-    tiempo_id: param.tiempo_id || param.tiempo || param.tiempo_nombre || state.parametrosCalculo[param.row_id] || "",
-    tiempo: param.tiempo || param.tiempo_nombre || state.parametrosCalculo[param.row_id] || "",
-    tiempo_nombre: param.tiempo_nombre || param.tiempo || state.parametrosCalculo[param.row_id] || "",
-    concepto_id: param.concepto_id || param.id || param.row_id || "",
-    concepto: param.concepto || param.nombre || "",
-    concepto_nombre: param.concepto || param.nombre || "",
-    valor: toNumeric(param.valor),
-    match_calculo: state.parametrosCalculo[param.row_id] || defaultParametroCalculo(param.concepto || param.nombre),
-    unidad: param.unidad || ""
-  })),
-  parametros_tiempo: state.parametrosTiempo,
-  parametros_calculo: state.parametrosCalculo
-});
+const buildParametroNominaInlinePayloads = () => {
+  const userId = state.context?.user?.id || state.context?.user?.user_id || state.context?.usuario_id || null;
+  const timestamp = new Date().toISOString();
+  return (state.parametrosDetalle || [])
+    .filter((param) => param.auxiliar !== true)
+    .map((param) => ({
+      tenant_id: state.context?.empresa_id || "",
+      empresa_id: state.context?.empresa_id || "",
+      tiempo_id: param.tiempo_id || param.tiempo || param.tiempo_nombre || state.parametrosCalculo[param.row_id] || "",
+      tiempo: param.tiempo || param.tiempo_nombre || state.parametrosCalculo[param.row_id] || "",
+      tiempo_nombre: param.tiempo_nombre || param.tiempo || state.parametrosCalculo[param.row_id] || "",
+      tiempo_factor_conversion: param.tiempo_factor_conversion ?? param.factor_conversion ?? null,
+      concepto_id: param.concepto_id || param.id || param.row_id || "",
+      concepto: param.concepto || param.nombre || "",
+      concepto_nombre: param.concepto || param.nombre || "",
+      valor: toNumeric(param.valor),
+      usuario_id: userId,
+      registrado_por: userId,
+      origen: "configuracion_parametros_nomina",
+      timestamp
+    }));
+};
+
+const validateParametroNominaInlinePayload = (payload) => {
+  if (!payload.tenant_id) return "No se pudo validar la empresa activa.";
+  if (!payload.tiempo_id) return `El parámetro ${payload.concepto || "sin concepto"} no tiene tiempo asociado.`;
+  if (!payload.concepto_id) return `El parámetro ${payload.concepto || "sin concepto"} no tiene concepto asociado.`;
+  if (!Number.isFinite(payload.valor) || payload.valor < 0) return `El parámetro ${payload.concepto || "sin concepto"} no tiene valor numérico válido.`;
+  return "";
+};
 
 const actualizarParametrosNomina = async () => {
   if (!state.parametrosDetalle.length) return setStatus("Consulta una nómina antes de actualizar parámetros.");
-  const payload = buildParametrosNominaUpdatePayload();
-  if (!payload.empresa_id) return setStatus("No se pudo validar la empresa activa para actualizar parámetros.");
-  setStatus("Actualizando parámetros de nómina...");
+  const payloads = buildParametroNominaInlinePayloads();
+  if (!payloads.length) return setStatus("No hay parámetros base para actualizar.");
+  const invalid = payloads.map((payload) => validateParametroNominaInlinePayload(payload)).find(Boolean);
+  if (invalid) return setStatus(invalid);
+
+  setStatus(`Actualizando ${payloads.length} parámetro(s) de nómina...`);
   try {
     const authHeaders = await buildRequestHeaders({ includeTenant: true });
-    const response = await fetch(WEBHOOK_NOMINA_PARAMETROS_REGISTRAR, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders },
-      body: JSON.stringify(payload)
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || data?.success === false || data?.ok === false) throw new Error(data?.message || `HTTP ${response.status}`);
-    setStatus(data?.message || "Parámetros de nómina actualizados. Se usarán en la próxima consulta.");
+    const results = await Promise.all(payloads.map(async (payload) => {
+      const response = await fetch(WEBHOOK_NOMINA_PARAMETROS_REGISTRAR, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.success === false || data?.ok === false) throw new Error(data?.message || `HTTP ${response.status}`);
+      return data;
+    }));
+    const message = results.find((item) => item?.message)?.message;
+    setStatus(message || `${payloads.length} parámetro(s) de nómina actualizados con el mismo formato del módulo Parámetros de nómina.`);
   } catch (error) {
     nominaWarn("parametros.actualizar.error", error?.message || error);
     setStatus(`No fue posible actualizar parámetros (${error.message || "sin detalle"}).`);
