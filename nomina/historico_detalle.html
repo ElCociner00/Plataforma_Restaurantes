@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Enkrato | Detalle Histórico Nómina</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/nomina.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../js/router.js"></script>
+  <script type="module" src="../js/header.js"></script>
+  <script type="module" src="../js/local_context_navigation_guard.js"></script>
+
+  <main class="main nomina-main">
+    <h1>Detalle Histórico Nómina</h1>
+    <p class="intro">Submódulo aislado para consultar y renderizar una nómina histórica completa por ID.</p>
+    <!-- MANTENIMIENTO HISTÓRICO DETALLE: no toca login/sesión/header; recibe ?id= y consulta el webhook centralizado de detalle. -->
+    <section class="bloque nomina-detail-panel">
+      <div class="nomina-actions">
+        <a class="nomina-secondary-btn" href="historico.html">← Volver al histórico</a>
+      </div>
+      <h2 id="historicoNominaDetalleTitulo">Detalle de nómina</h2>
+      <div id="historicoNominaDetalleResumen" class="nomina-detail-grid"></div>
+      <div id="historicoNominaDetalleTablas" class="comprobante-table nomina-wide-panel"></div>
+      <div id="historicoNominaDetalleStatus" class="status">Consultando detalle histórico...</div>
+    </section>
+  </main>
+
+  <script type="module" src="../js/nomina_historico_detalle.js"></script>
+  <script type="module" src="../js/footer.js"></script>
+  <script type="module" src="../js/module_fix/init.js"></script>
+</body>
+</html>
