@@ -108,11 +108,26 @@ const normalizeHistoricoRow = (raw) => {
   };
 };
 
-const normalizeHistoricoRows = (payload) => {
+const extractHistoricoRows = (payload) => {
   const parsed = parseJsonLike(payload);
-  const rows = Array.isArray(parsed) ? parsed : firstArrayFromObject(parsed) || [];
-  return rows.map(normalizeHistoricoRow).filter((row) => row && typeof row === "object");
+  if (!parsed) return [];
+  if (Array.isArray(parsed)) {
+    return parsed.flatMap((item) => {
+      const parsedItem = parseJsonLike(item);
+      if (parsedItem && typeof parsedItem === "object" && !Array.isArray(parsedItem)) {
+        const nestedRows = firstArrayFromObject(parsedItem);
+        if (nestedRows) return extractHistoricoRows(nestedRows);
+      }
+      return [parsedItem];
+    });
+  }
+  const nestedRows = firstArrayFromObject(parsed);
+  return nestedRows ? extractHistoricoRows(nestedRows) : [parsed];
 };
+
+const normalizeHistoricoRows = (payload) => extractHistoricoRows(payload)
+  .map(normalizeHistoricoRow)
+  .filter((row) => row && typeof row === "object" && (row.id || getRowDate(row) || getPeriodoHistorico(row) !== "Sin periodo"));
 
 const normalizeResponsablesPayload = (rows) => rows.map((item) => ({ id: String(item?.id || ""), nombre_completo: item?.nombre_completo || item?.nombre || item?.empleado_nombre || item?.id || "Responsable" })).filter((item) => item.id);
 
