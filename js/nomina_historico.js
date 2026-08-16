@@ -7,22 +7,17 @@
  */
 import { buildRequestHeaders, getUserContext, listAvailableLocalContexts } from "./session.js";
 import { fetchResponsablesActivos } from "./responsables.js";
-import { WEBHOOK_NOMINA_HISTORICO_VISTA, WEBHOOK_NOMINA_HISTORICO_RENDERIZAR, WEBHOOK_NOMINA_HISTORICO_BORRAR } from "./webhooks.js";
+import { WEBHOOK_NOMINA_HISTORICO_VISTA, WEBHOOK_NOMINA_HISTORICO_BORRAR } from "./webhooks.js";
 
 const empleadoInput = document.getElementById("historicoNominaEmpleado");
 const desdeInput = document.getElementById("historicoNominaDesde");
 const hastaInput = document.getElementById("historicoNominaHasta");
 const sedeInput = document.getElementById("historicoNominaSede");
 const consultarBtn = document.getElementById("consultarHistoricoNomina");
-const volverBtn = document.getElementById("historicoNominaVolver");
 const tbody = document.getElementById("historicoNominaBody");
 const statusEl = document.getElementById("historicoNominaStatus");
-const listadoPanel = document.getElementById("historicoNominaListadoPanel");
-const detallePanel = document.getElementById("historicoNominaDetallePanel");
-const detalleTitulo = document.getElementById("historicoNominaDetalleTitulo");
-const detalleResumen = document.getElementById("historicoNominaDetalleResumen");
 
-const state = { context: null, responsables: [], locales: [], nominas: [], detalles: new Map(), ocultasSesion: new Set() };
+const state = { context: null, responsables: [], locales: [], nominas: [], ocultasSesion: new Set() };
 
 const setStatus = (message) => { if (statusEl) statusEl.textContent = message || ""; };
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
@@ -50,7 +45,31 @@ const getEmpleadoId = (row = {}) => row?.empleado_id || row?.usuario_id || row?.
 const getEmpleadoNombre = (row) => row?.empleado?.nombre || row?.empleado?.nombre_completo || row?.resumen?.empleado || row?.resumen?.empleado_nombre || row?.empleado_nombre || row?.nombre_empleado || row?.responsable_nombre || getResponsableNombre(getEmpleadoId(row)) || row?.ingresos?.find?.((item) => item.empleado_nombre)?.empleado_nombre || "Responsable sin resolver";
 const getRowDate = (row) => row?.fecha || row?.fecha_nomina || row?.resumen?.fecha || row?.resumen?.fecha_fin || row?.created_at || row?.updated_at || row?.fecha_fin || row?.fin || row?.detalles?.[0]?.fecha || "";
 
-const getSedeHistorico = (row = {}) => row?.empresa_nombre || row?.sede_nombre || row?.local_nombre || row?.empresa?.nombre_comercial || row?.empresa?.razon_social || row?.resumen?.sede || row?.locales?.[0]?.nombre || row?.consultado?.[0] || row?.empresa_id || "Sede sin resolver";
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const isUuidLike = (value) => uuidPattern.test(String(value || "").trim());
+const resolveLocalName = (id) => {
+  const safeId = String(id || "").trim();
+  if (!safeId) return "";
+  return state.locales.find((local) => String(local.id || "") === safeId)?.nombre || "";
+};
+const cleanSedeName = (value) => {
+  const text = String(value || "").trim();
+  return text && !isUuidLike(text) ? text : "";
+};
+const getSedeHistorico = (row = {}) => {
+  const directName = cleanSedeName(row?.empresa_nombre)
+    || cleanSedeName(row?.sede_nombre)
+    || cleanSedeName(row?.local_nombre)
+    || cleanSedeName(row?.empresa?.nombre_comercial)
+    || cleanSedeName(row?.empresa?.razon_social)
+    || cleanSedeName(row?.resumen?.sede)
+    || cleanSedeName(row?.locales?.[0]?.nombre);
+  if (directName) return directName;
+  const possibleIds = [row?.empresa_id, row?.sede, row?.sede_id, row?.local_id, row?.tenant_id, row?.locales?.[0]?.empresa_id, row?.locales?.[0]?.tenant_id, ...(Array.isArray(row?.consultado) ? row.consultado : [])];
+  const resolvedNames = possibleIds.map(resolveLocalName).filter(Boolean);
+  if (resolvedNames.length) return Array.from(new Set(resolvedNames)).join(", ");
+  return "Sede sin resolver";
+};
 const getPeriodoHistorico = (row = {}) => row?.periodo || row?.resumen?.periodo || [row?.periodo_inicio, row?.periodo_fin].filter(Boolean).join(" - ") || "Sin periodo";
 
 const parseJsonLike = (value) => {
@@ -212,51 +231,6 @@ const renderHistoricoRows = (rows) => {
 };
 
 
-const renderGenericTable = (title, rows) => {
-  if (!Array.isArray(rows) || !rows.length) return "";
-  const keys = Array.from(rows.reduce((set, item) => {
-    Object.keys(item || {}).forEach((key) => set.add(key));
-    return set;
-  }, new Set()));
-  const cell = (value) => {
-    if (value && typeof value === "object") return escapeHtml(JSON.stringify(value));
-    return escapeHtml(value ?? "-");
-  };
-  return `<div class="comprobante-col"><h3>${escapeHtml(title)}</h3><table><thead><tr>${keys.map((key) => `<th>${escapeHtml(key)}</th>`).join("")}</tr></thead><tbody>${rows.map((item) => `<tr>${keys.map((key) => `<td>${cell(item?.[key])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
-};
-
-const renderDetalle = async (row) => {
-  if (!row || !listadoPanel || !detallePanel) return;
-  row = await consultarDetalleHistorico(row);
-  const detalles = Array.isArray(row.detalles) ? row.detalles : [];
-  const ingresos = Array.isArray(row.ingresos) ? row.ingresos : [];
-  const deducciones = Array.isArray(row.deducciones) ? row.deducciones : [];
-  detalleTitulo.textContent = `Nómina de ${getEmpleadoNombre(row)}`;
-  const totalIngresos = ingresos.reduce((acc, item) => acc + Number(item.valor || item.total || item.valor_empleado || 0), 0);
-  const totalDeducciones = deducciones.reduce((acc, item) => acc + Number(item.valor || item.total || item.valor_empleado || 0), 0);
-  detalleResumen.innerHTML = `
-    <div class="nomina-detail-card"><span>Fecha</span><strong>${escapeHtml(formatDateLong(getRowDate(row)))}</strong></div>
-    <div class="nomina-detail-card"><span>Responsable</span><strong>${escapeHtml(getEmpleadoNombre(row))}</strong></div>
-    <div class="nomina-detail-card"><span>Periodo</span><strong>${escapeHtml(getPeriodoHistorico(row))}</strong></div>
-    <div class="nomina-detail-card"><span>Ingresos</span><strong>${escapeHtml(money(totalIngresos))}</strong></div>
-    <div class="nomina-detail-card"><span>Deducciones</span><strong>${escapeHtml(money(totalDeducciones))}</strong></div>
-    <div class="nomina-detail-card"><span>Neto</span><strong>${escapeHtml(money(row.resumen?.neto || row.neto || (totalIngresos - totalDeducciones)))}</strong></div>
-    <div class="comprobante-table nomina-wide-panel">
-      ${renderGenericTable("Ingresos", ingresos)}
-      ${renderGenericTable("Deducciones", deducciones)}
-      ${renderGenericTable("Detalles recibidos", detalles)}
-      ${renderGenericTable("Locales", row.locales)}
-      ${renderGenericTable("Tipos de filas", row.tipo_filas)}
-      ${renderGenericTable("Apoyos", row.apoyos)}
-      ${renderGenericTable("Parametros", row.parametros)}
-      ${renderGenericTable("Parametros tiempo", row.parametros_tiempo)}
-      ${renderGenericTable("Parametros calculo", Array.isArray(row.parametros_calculo) ? row.parametros_calculo : Object.entries(row.parametros_calculo || {}).map(([parametro, match]) => ({ parametro, match })))}
-      ${renderGenericTable("Deducciones de ley", row.deducciones_ley)}
-    </div>`;
-  listadoPanel.hidden = true;
-  detallePanel.hidden = false;
-};
-
 const borrarNominaHistorica = async (row) => {
   if (!row?.id) return setStatus("La nómina seleccionada no tiene ID para borrar.");
   setStatus("Solicitando borrado de nómina histórica...");
@@ -270,27 +244,6 @@ const borrarNominaHistorica = async (row) => {
     setStatus("Nómina ocultada en esta sesión y solicitud de borrado enviada al webhook.");
   } catch (error) {
     setStatus(`No fue posible solicitar el borrado (${error.message || "sin detalle"}). Verifica ${WEBHOOK_NOMINA_HISTORICO_BORRAR}.`);
-  }
-};
-
-const consultarDetalleHistorico = async (row) => {
-  const id = String(row?.id || "");
-  if (!id) return row;
-  if (state.detalles.has(id)) return state.detalles.get(id);
-  setStatus("Consultando detalle completo de nómina histórica...");
-  try {
-    const authHeaders = await buildRequestHeaders({ includeTenant: true });
-    const payload = { ...buildHistoricoRequestPayload(), id, nomina_id: id, row_id: id };
-    const response = await fetch(WEBHOOK_NOMINA_HISTORICO_RENDERIZAR, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders }, body: JSON.stringify(payload) });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const [detalle] = normalizeHistoricoRows(await response.json().catch(() => null));
-    const merged = normalizeHistoricoRow({ ...row, ...(detalle || {}) });
-    state.detalles.set(id, merged);
-    setStatus("Detalle histórico consultado correctamente.");
-    return merged;
-  } catch (error) {
-    setStatus(`No fue posible consultar el detalle (${error.message || "sin detalle"}). Se muestra la vista resumida.`);
-    return row;
   }
 };
 
@@ -321,9 +274,9 @@ const init = async () => {
     if (!rowEl) return;
     const row = state.nominas[Number(rowEl.dataset.nominaIndex)] || state.nominas.find((item) => String(item.id || "") === rowEl.dataset.nominaId);
     if (event.target.closest(".nomina-historico-delete")) { borrarNominaHistorica(row); return; }
-    renderDetalle(row);
+    if (!row?.id) { setStatus("La nómina seleccionada no tiene ID para abrir detalle."); return; }
+    window.location.href = `historico_detalle.html?id=${encodeURIComponent(row.id)}`;
   });
-  volverBtn?.addEventListener("click", () => { detallePanel.hidden = true; listadoPanel.hidden = false; });
   consultarHistoricoNomina();
 };
 
