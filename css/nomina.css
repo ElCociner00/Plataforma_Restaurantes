@@ -502,3 +502,27 @@
   color: #15803d;
   white-space: nowrap;
 }
+
+/* Parche histórico nómina 2026-08-16: detalle legible, ancho y sin IDs visibles. */
+.nomina-historico-detail-table {
+  overflow-x: auto;
+}
+.nomina-historico-detail-table table {
+  min-width: 980px;
+  table-layout: auto;
+}
+.nomina-historico-detail-table th,
+.nomina-historico-detail-table td {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+  vertical-align: middle;
+}
+.nomina-summary-comparison th:nth-child(1),
+.nomina-summary-comparison th:nth-child(3),
+.nomina-summary-comparison td:nth-child(1),
+.nomina-summary-comparison td:nth-child(3) {
+  background: #f8fafc;
+  font-weight: 700;
+}
