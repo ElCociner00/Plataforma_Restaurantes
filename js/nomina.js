@@ -40,6 +40,7 @@ const descargarBtn = document.getElementById("descargarComprobanteNomina");
 const descargarExcelEmpleadoBtn = document.getElementById("descargarExcelEmpleadoNomina");
 const enviarDeduccionesBtn = document.getElementById("enviarDeduccionesNomina");
 const actualizarParametrosBtn = document.getElementById("actualizarParametrosNomina");
+const guardarParametrosTiempoBtn = document.getElementById("guardarParametrosTiempoNomina");
 
 const totalDevengadoEl = document.getElementById("nominaTotalDevengado");
 const totalDeduccionesEl = document.getElementById("nominaTotalDeducciones");
@@ -64,6 +65,8 @@ const detallesCalculosBody = document.getElementById("nominaDetallesCalculosBody
 const auxiliaresPanel = document.getElementById("nominaAuxiliaresPanel");
 const apoyosBody = document.getElementById("nominaApoyosBody");
 const localesPanel = document.getElementById("nominaLocalesPanel");
+
+const PARAMETROS_TIEMPO_STORAGE_KEY = "nomina_parametros_tiempo_predeterminados_v1";
 
 const state = {
   context: null,
@@ -316,6 +319,27 @@ const dateToDayName = (value) => {
 };
 
 const isWeekendPayrollDay = (dayName) => ["domingo"].includes(normalizeConcept(dayName));
+
+const loadParametrosTiempoDefaults = () => {
+  try {
+    const rows = JSON.parse(localStorage.getItem(PARAMETROS_TIEMPO_STORAGE_KEY) || "[]");
+    if (!Array.isArray(rows) || !rows.length) return;
+    state.parametrosTiempo = state.parametrosTiempo.map((row) => {
+      const saved = rows.find((item) => item?.key === row.key);
+      return saved?.inicio && saved?.fin ? { ...row, inicio: saved.inicio, fin: saved.fin } : row;
+    });
+  } catch (_error) {}
+};
+
+const guardarParametrosTiempoNomina = () => {
+  const payload = state.parametrosTiempo.map((row) => ({ key: row.key, momento: row.momento, inicio: row.inicio, fin: row.fin }));
+  try {
+    localStorage.setItem(PARAMETROS_TIEMPO_STORAGE_KEY, JSON.stringify(payload));
+    setStatus("Parámetros de tiempo guardados como predeterminados.");
+  } catch (_error) {
+    setStatus("No fue posible guardar parámetros de tiempo en este navegador.");
+  }
+};
 
 const getTimeParam = (key, fallback) => state.parametrosTiempo.find((item) => item.key === key) || fallback;
 
@@ -1945,6 +1969,7 @@ const init = async () => {
   state.responsables = await fetchResponsablesActivos(state.context.empresa_id).catch(() => []);
   state.localesNomina = await listAvailableLocalContexts().catch(() => []);
   state.localesNomina = (state.localesNomina.length ? state.localesNomina : [{ empresa_id: state.context.empresa_id, nombre: "Sede actual", activo: true }]).map((local) => ({ ...local, seleccionado: local.activo !== false }));
+  loadParametrosTiempoDefaults();
   renderEmpleadoOptions();
   renderLocalesNomina();
 
@@ -1965,6 +1990,7 @@ descargarBtn?.addEventListener("click", () => { descargarComprobante(); guardarH
 descargarExcelEmpleadoBtn?.addEventListener("click", descargarExcelEmpleado);
 enviarDeduccionesBtn?.addEventListener("click", () => enviarDeduccionesNomina());
 actualizarParametrosBtn?.addEventListener("click", () => actualizarParametrosNomina());
+guardarParametrosTiempoBtn?.addEventListener("click", () => guardarParametrosTiempoNomina());
 corteSelect?.addEventListener("change", updateDatesByCut);
 fechaInicioInput?.addEventListener("change", clampDatesToToday);
 fechaFinInput?.addEventListener("change", clampDatesToToday);
@@ -2100,6 +2126,10 @@ auxiliaresPanel?.addEventListener("change", (event) => {
 const buildHistoricoNominaPayload = async () => {
   const calculation = calculateMoneyByDetail();
   const base = await buildExcelWebhookPayload(empleadoSelect.value);
+  const deduccionesMovimientos = state.movimientos.filter((item) => String(item.naturaleza || "").toLowerCase().includes("dedu"));
+  const deduccionesLey = buildDeduccionesLeyRows(calculation);
+  const deduccionesFallback = [...deduccionesLey, ...state.deduccionesAuxiliares.map((item) => ({ ...item, valor: toNumeric(item.valor) * (toNumeric(item.cantidad) || 1), naturaleza: "Deducción", fuente: "auxiliar" }))];
+  const deduccionesHistorico = deduccionesMovimientos.length ? deduccionesMovimientos : deduccionesFallback;
   return {
     ...base,
     empresa: state.empresa,
@@ -2109,7 +2139,7 @@ const buildHistoricoNominaPayload = async () => {
     tablas: {
       resumen: { movimientos: state.movimientos, horas: state.horasDetalle, totales: calculation.totals, neto: netoPagarEl?.textContent || "" },
       ingresos: state.movimientos.filter((item) => String(item.naturaleza || "").toLowerCase().includes("devengo")),
-      deducciones: state.movimientos.filter((item) => String(item.naturaleza || "").toLowerCase().includes("dedu")),
+      deducciones: deduccionesHistorico,
       detalle: calculation.rows.map((row) => ({ ...row, detalle_original: row.detalle_original || null, tipo_turno: row.tipo_turno || (row.es_apoyo ? "Apoyo" : "Turno normal"), es_apoyo: row.es_apoyo === true, sede: row.sede || row.tenant_id || row.empresa_id || "", sede_nombre: row.sede_nombre || resolveSedeName(row.sede || row.tenant_id || row.empresa_id) })),
       apoyos: state.apoyosDetalle,
       parametros: state.parametrosDetalle,
@@ -2117,7 +2147,7 @@ const buildHistoricoNominaPayload = async () => {
       parametros_calculo: state.parametrosCalculo,
       locales: getSelectedLocalesNomina(),
       tipo_filas: calculation.rows.map((row) => ({ row_id: row.row_id, fecha: row.fecha, tipo_turno: row.es_apoyo ? "Apoyo" : "Turno normal", sede: row.sede || row.tenant_id || row.empresa_id || "", sede_nombre: resolveSedeName(row.sede || row.tenant_id || row.empresa_id) })),
-      deducciones_ley: buildDeduccionesLeyRows(calculation),
+      deducciones_ley: deduccionesLey,
       auxiliares: { ingresos: state.ingresosAuxiliares, deducciones: state.deduccionesAuxiliares }
     }
   };

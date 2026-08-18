@@ -40,6 +40,7 @@ const labelize = (value) => String(value || "")
   .replace(/_/g, " ")
   .replace(/\s+/g, " ")
   .trim()
+  .toLocaleLowerCase("es-CO")
   .replace(/\b\p{L}/gu, (char) => char.toLocaleUpperCase("es-CO"));
 const cleanName = (value) => {
   const text = String(value || "").trim();
@@ -96,12 +97,14 @@ const normalizeNomina = (raw) => {
   const row = parseJsonLike(raw) || {};
   const tablas = parseJsonLike(row.tablas) || {};
   const deducciones = getTablaRows(row, "deducciones");
+  const auxiliares = parseJsonLike(row.auxiliares) || parseJsonLike(tablas.auxiliares) || {};
+  const deduccionesAuxiliares = arrayFromAny(auxiliares.deducciones);
   return {
     ...row,
     totales: parseJsonLike(row.totales) || parseJsonLike(tablas.totales) || {},
     detalles: getTablaRows(row, "detalles").length ? getTablaRows(row, "detalles") : getTablaRows(row, "detalle"),
     ingresos: getTablaRows(row, "ingresos"),
-    deducciones: deducciones.length ? deducciones : getTablaRows(row, "deducciones_ley"),
+    deducciones: deducciones.length ? deducciones : [...getTablaRows(row, "deducciones_ley"), ...deduccionesAuxiliares],
     parametros: getTablaRows(row, "parametros")
   };
 };
@@ -129,6 +132,7 @@ const turnTotal = (item) => calcValue(item, "total") || ["horas_diurnas", "horas
 const renderCard = (label, value) => `<div class="nomina-detail-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
 const table = (title, headers, rows, className = "") => `<div class="comprobante-col nomina-historico-detail-table"><h3>${escapeHtml(title)}</h3><table class="${escapeHtml(className)}"><thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead><tbody>${rows.length ? rows.join("") : `<tr><td colspan="${headers.length}">Sin datos recibidos para esta tabla.</td></tr>`}</tbody></table></div>`;
 const td = (value) => `<td>${escapeHtml(value)}</td>`;
+const tdStrong = (value) => `<td><strong>${escapeHtml(value)}</strong></td>`;
 
 const renderResumenTotales = (totales = {}) => {
   const rows = HOUR_VALUE_PAIRS.map(([hoursKey, valueKey]) => `<tr>${td(labelize(hoursKey))}${td(numberText(totales[hoursKey]))}${td(labelize(valueKey))}${td(money(totales[valueKey]))}</tr>`);
@@ -148,7 +152,7 @@ const renderDetalles = (nomina, locales) => {
     item.hora_inicio_valida || item.hora_inicio || "-",
     item.hora_fin_valida || item.hora_fin || "-",
     money(item.propina || 0)
-  ].map(td).join("")}</tr>`);
+  ].map((value, cellIndex) => cellIndex < 2 ? tdStrong(value) : td(value)).join("")}</tr>`);
   return table("Detalles", ["Tipo", "Sede", "Fecha", "Día", "Horario", "Diurnas", "Nocturnas", "Dom. diurnas", "Dom. nocturnas", "Inicio válido", "Fin válido", "Propinas"], rows);
 };
 const renderCalculos = (nomina, locales) => {
@@ -164,7 +168,7 @@ const renderCalculos = (nomina, locales) => {
     money(calcValue(item, "horas_dominicales_nocturnas")),
     money(item.propina || 0),
     money(turnTotal(item) + Number(item.propina || 0))
-  ].map(td).join("")}</tr>`);
+  ].map((value, cellIndex) => [2, 3].includes(cellIndex) ? tdStrong(value) : td(value)).join("")}</tr>`);
   return table("Detalles cálculos", ["Fecha", "Día", "Tipo", "Sede", "Horario", "Diurnas", "Nocturnas", "Dom. diurnas", "Dom. nocturnas", "Propinas", "Total"], rows);
 };
 const renderConceptos = (title, rows) => table(title, ["Concepto", "Cantidad", "Unidad", "Valor", "Responsable"], rows.map((item) => `<tr>${[

@@ -241,9 +241,9 @@ const borrarNominaHistorica = async (row) => {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     state.ocultasSesion.add(String(row.id));
     renderHistoricoRows(state.nominas);
-    setStatus("Nómina ocultada en esta sesión y solicitud de borrado enviada al webhook.");
+    setStatus("Borrado exitosamente.");
   } catch (error) {
-    setStatus(`No fue posible solicitar el borrado (${error.message || "sin detalle"}). Verifica ${WEBHOOK_NOMINA_HISTORICO_BORRAR}.`);
+    setStatus("Falló la conexión al intentar borrar la nómina.");
   }
 };
 
