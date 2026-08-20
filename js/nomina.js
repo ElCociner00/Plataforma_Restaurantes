@@ -515,6 +515,8 @@ const buildApoyoDetailRows = () => (state.apoyosDetalle || [])
     hora_fin: row.hora_fin || "",
     hora_inicio_valida: normalizeFinalTimeInput(row.hora_inicio_valida || row.hora_inicio || ""),
     hora_fin_valida: normalizeFinalTimeInput(row.hora_fin_valida || row.hora_fin || ""),
+    sede: row.sede || row.tenant_id || row.empresa_id || row.local_id || "",
+    sede_nombre: row.sede_nombre || row.local_nombre || row.nombre_sede || resolveSedeName(row.sede || row.tenant_id || row.empresa_id || row.local_id),
     propina: getDetallePropina(row),
     incluido: row.incluido !== false,
     incluidoTransporte: row.incluidoTransporte,
@@ -1031,6 +1033,8 @@ const normalizeExcelPayrollForUi = (data, empleadoSeleccionado = null) => {
     row_id: row.row_id || `${row.fecha_turno || "apoyo"}-${row.hora_inicio || "inicio"}-${row.hora_fin || "fin"}-${index}`,
     incluido: row.incluido !== false,
     tiempo_minutos: toNumeric(row.tiempo_minutos) || hoursToMinutes(row.tiempo_horas),
+    sede: row.sede || row.tenant_id || row.empresa_id || row.local_id || "",
+    sede_nombre: row.sede_nombre || row.local_nombre || row.nombre_sede || resolveSedeName(row.sede || row.tenant_id || row.empresa_id || row.local_id),
     propina: getDetallePropina(row)
   }));
   const detalleNormal = detalle.map((row, index) => ({
@@ -1092,6 +1096,7 @@ const renderApoyos = () => {
         <td>${row.fecha_turno || "-"}</td>
         <td>${responsableNombre}</td>
         <td>${apoyoNombre}</td>
+        <td>${escapeHtml(row.sede_nombre || resolveSedeName(row.sede || row.tenant_id || row.empresa_id || row.local_id))}</td>
         <td>${minutesToHourText(row.tiempo_minutos)}</td>
         <td>${row.hora_inicio || "-"}</td>
         <td>${row.hora_fin || "-"}</td>
@@ -1724,13 +1729,13 @@ const descargarExcelEmpleado = async () => {
     </table>`;
 
 
-    const apoyosHeaders = ["fecha turno", "responsable turno", "apoyo", "tiempo", "hora inicio", "hora fin", "propina"];
+    const apoyosHeaders = ["fecha turno", "responsable turno", "apoyo", "sede", "tiempo", "hora inicio", "hora fin", "propina"];
     const apoyosRows = apoyos.map((row) => `<tr>
-      ${textCell(row.fecha_turno)}${textCell(resolveResponsableName(row.responsable_turno_id, row.responsable_turno_id))}${textCell(resolveResponsableName(row.apoyo_responsable_id, empleadoSeleccionado?.nombre_completo || row.apoyo_responsable_id))}${textCell(minutesToHourText(row.tiempo_minutos || hoursToMinutes(row.tiempo_horas)))}${textCell(row.hora_inicio)}${textCell(row.hora_fin)}${moneyCell(row.propina)}
+      ${textCell(row.fecha_turno)}${textCell(resolveResponsableName(row.responsable_turno_id, row.responsable_turno_id))}${textCell(resolveResponsableName(row.apoyo_responsable_id, empleadoSeleccionado?.nombre_completo || row.apoyo_responsable_id))}${textCell(row.sede_nombre || resolveSedeName(row.sede || row.tenant_id || row.empresa_id || row.local_id))}${textCell(minutesToHourText(row.tiempo_minutos || hoursToMinutes(row.tiempo_horas)))}${textCell(row.hora_inicio)}${textCell(row.hora_fin)}${moneyCell(row.propina)}
     </tr>`);
     const apoyosTable = `<table>
       <thead>${renderHeaderRow(apoyosHeaders)}</thead>
-      <tbody>${tableRows(apoyosRows.length ? apoyosRows : [`<tr>${textCell("Sin apoyos")}${textCell("")}${textCell("")}${textCell("00:00")}${textCell("")}${textCell("")}${moneyCell(0)}</tr>`])}</tbody>
+      <tbody>${tableRows(apoyosRows.length ? apoyosRows : [`<tr>${textCell("Sin apoyos")}${textCell("")}${textCell("")}${textCell("")}${textCell("00:00")}${textCell("")}${textCell("")}${moneyCell(0)}</tr>`])}</tbody>
     </table>`;
 
     const sheetNames = ["Parámetros", "Detalle Nómina", "Resumen", "Totales Generales", "Apoyos"];

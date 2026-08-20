@@ -92,6 +92,21 @@ const extractWebhookTotals = (webhookPayload) => {
   return { totalDia, totalDistribuida };
 };
 
+const rebalanceIfExceedsTotal = (items, totalDia) => {
+  const total = asInt(totalDia);
+  const suma = items.reduce((acc, item) => acc + asInt(item.propina), 0);
+  if (!total || suma <= total) return items.map((item) => ({ ...item, propina: asInt(item.propina) }));
+
+  let remaining = total;
+  return items.map((item, index) => {
+    const value = index === items.length - 1
+      ? remaining
+      : Math.floor((asInt(item.propina) * total) / suma);
+    remaining -= value;
+    return { ...item, propina: Math.max(0, value) };
+  });
+};
+
 export function initApoyosPropinaManager({
   apoyoHubo,
   apoyoCantidad,
@@ -125,6 +140,7 @@ export function initApoyosPropinaManager({
 
   const reset = () => {
     repartoActivo = false;
+    delete propinaInput.dataset.propinaResponsable;
     ensureReadonlyApoyoPropinas();
   };
 
@@ -149,36 +165,39 @@ export function initApoyosPropinaManager({
     const detalleRows = parseWebhookDetalleRows(webhookPayload);
     const { totalDia, totalDistribuida } = extractWebhookTotals(webhookPayload);
 
-    const tipsById = new Map(detalleRows.map((row) => [row.id, row.propina]));
+    const apoyoRows = getApoyoRows();
     const responsableRow = detalleRows.find((row) => row.tipo === "responsable" && (!responsableId || row.id === responsableId));
+    const items = [
+      { id: responsableId, tipo: "responsable", propina: responsableRow?.propina ?? detalleRows.find((row) => row.id === responsableId)?.propina ?? 0 },
+      ...apoyoRows.map((row) => ({
+        id: String(row.querySelector('[data-field="responsable"]')?.value || ""),
+        tipo: "apoyo",
+        propina: detalleRows.find((detalle) => detalle.id === String(row.querySelector('[data-field="responsable"]')?.value || ""))?.propina ?? 0
+      }))
+    ];
+    const adjustedItems = rebalanceIfExceedsTotal(items, totalDia || totalDistribuida);
+    const tipsById = new Map(adjustedItems.map((row) => [row.id, row.propina]));
 
-    getApoyoRows().forEach((row) => {
+    apoyoRows.forEach((row) => {
       const apoyoId = String(row.querySelector('[data-field="responsable"]')?.value || "");
       const input = row.querySelector('[data-field="propina"]');
       if (!input) return;
       input.value = String(asInt(tipsById.get(apoyoId) || 0));
     });
 
-    const responsableTip = asInt(responsableRow?.propina ?? tipsById.get(responsableId) ?? 0);
-    propinaInput.value = String(responsableTip);
+    const responsableTip = asInt(tipsById.get(responsableId) || 0);
+    const totalTurno = asInt(totalDia || totalDistribuida || propinaInput.value || responsableTip);
+    propinaInput.value = String(totalTurno);
+    propinaInput.dataset.propinaResponsable = String(responsableTip);
 
     ensureReadonlyApoyoPropinas();
     repartoActivo = true;
     marcarComoNoVerificado();
 
-    const supportTotal = getApoyoRows().reduce((acc, row) => {
-      const input = row.querySelector('[data-field="propina"]');
-      return acc + asInt(input?.value || 0);
-    }, 0);
+    const supportTotal = apoyoRows.reduce((acc, row) => acc + asInt(row.querySelector('[data-field="propina"]')?.value || 0), 0);
     const sumaRepartida = responsableTip + supportTotal;
-    const totalComparacion = totalDistribuida || totalDia;
-    const coherente = totalComparacion > 0 ? sumaRepartida === totalComparacion : true;
 
-    setStatus(
-      `Propina aplicada desde BD/webhook. Responsable: ${responsableTip}. Apoyos: ${supportTotal}. `
-      + `Suma reparto: ${sumaRepartida}${totalComparacion > 0 ? ` / Total referencia: ${totalComparacion}` : ""}. `
-      + `${coherente ? "Coherencia OK." : "Advertencia: la suma no coincide con el total de referencia."}`
-    );
+    setStatus(`Propina aplicada desde BD/webhook. Total turno: ${totalTurno}. Responsable: ${responsableTip}. Apoyos: ${supportTotal}. Suma reparto: ${sumaRepartida}.`);
   };
 
   btnConsultarPropina.addEventListener("click", async () => {

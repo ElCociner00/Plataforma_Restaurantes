@@ -560,3 +560,23 @@ input:not([readonly]) {
   background: #fee2e2;
   color: #7f1d1d;
 }
+
+/* Parche 2026-08-20: mini carga aislada para evitar doble consulta del turno. */
+#consultarDatos.is-loading {
+  position: relative;
+  opacity: 0.86;
+  cursor: wait;
+}
+#consultarDatos.is-loading::after {
+  content: "";
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin-left: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  border-top-color: transparent;
+  border-radius: 50%;
+  vertical-align: -0.15em;
+  animation: cierre-turno-spin 0.8s linear infinite;
+}
+@keyframes cierre-turno-spin { to { transform: rotate(360deg); } }
