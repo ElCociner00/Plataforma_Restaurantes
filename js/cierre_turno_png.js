@@ -126,7 +126,7 @@ export const descargarImagenResumenCierreTurno = ({
   const fechaNombre = (meta.fecha || new Date().toISOString().slice(0, 10));
 
   // Obtener propina del responsable (primer apoyo o valor separado)
-  const propinaResponsable = snapshotContext.inputsSoloVista?.propina?.value || "0";
+  const propinaResponsable = snapshotContext.inputsSoloVista?.propina?.dataset?.propinaResponsable || snapshotContext.inputsSoloVista?.propina?.value || "0";
   const comentarioUsuario = String(meta.comentarioUsuario || "").trim() || "Sin comentario del usuario.";
   
   // Agregar responsable a la lista de apoyos con su propina

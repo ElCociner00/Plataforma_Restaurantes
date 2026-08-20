@@ -1340,17 +1340,31 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
 
+  const setConsultarLoading = (isLoading, message = "Consultando...") => {
+    if (!btnConsultar) return;
+    btnConsultar.disabled = Boolean(isLoading);
+    btnConsultar.classList.toggle("is-loading", Boolean(isLoading));
+    btnConsultar.setAttribute("aria-busy", isLoading ? "true" : "false");
+    btnConsultar.textContent = isLoading ? message : "Consultar Loggro";
+  };
+
   btnConsultar.addEventListener("click", async () => {
+    if (btnConsultar.disabled) return;
+    setConsultarLoading(true, "Consultando turno...");
     setStatus("Consultando Loggro...");
 
     const requiereHoraFin = !fechaEsPasada(fecha.value);
     if (!fecha.value || !responsable.value || !getHoraLlegadaCompleta() || !horaInicio.value || (requiereHoraFin && !horaFin.value) || !efectivoApertura?.value) {
       setStatus("Atención: Completa fecha, responsable, hora de llegada, hora inicio/fin y efectivo de apertura.");
+      setConsultarLoading(false);
       return;
     }
 
     const payload = await buildTurnoPayload();
-    if (!payload) return;
+    if (!payload) {
+      setConsultarLoading(false);
+      return;
+    }
 
     try {
       const res = await fetchWithTimeout(WEBHOOK_CONSULTAR_DATOS_CIERRE, {
@@ -1415,6 +1429,8 @@ document.addEventListener("DOMContentLoaded", () => {
       setStatus(err?.name === "AbortError"
         ? "La consulta tardó más de 8 segundos."
         : "Error de conexión al consultar datos.");
+    } finally {
+      setConsultarLoading(false);
     }
   });
 
