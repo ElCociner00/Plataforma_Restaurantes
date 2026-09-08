@@ -20,8 +20,12 @@ assert(
   previousCashBlock.includes('.eq("empresa_id", contextPayload.empresa_id)'),
   "La caja anterior no queda filtrada por la sede activa",
 );
+// La tabla ya no se escribe a mano en el bloque: la elige `tablaSegunSede` a
+// partir de la sede que resolvio `app_es_local()`. Se comprueba el mecanismo y
+// que el mapa de tablas siga incluyendo la de sedes.
 assert(
-  previousCashBlock.includes('"cierres_turno_final_locales"'),
+  previousCashBlock.includes("tablaSegunSede(CIERRE_TABLES, esLocal)")
+    && source.includes('local: "cierres_turno_final_locales"'),
   "La caja anterior no distingue la tabla de sedes locales",
 );
 assert(

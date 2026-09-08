@@ -41,8 +41,13 @@ import {
   WEBHOOK_LISTAR_RESPONSABLES,
   WEBHOOK_CONSULTAR_GASTOS_CATALOGO
 } from "./webhooks.js";
+import { resolverEsLocal, tablaSegunSede } from "./local_scope.js";
 
 // ../js/cierre_turno.js
+
+// Tabla de cierres segun la sede. La decision de cual usar NO se deduce aqui:
+// la resuelve `app_es_local()` en la base a traves de js/local_scope.js.
+const CIERRE_TABLES = { principal: "cierres_turno_final", local: "cierres_turno_final_locales" };
 
 document.addEventListener("DOMContentLoaded", () => {
   const fecha = document.getElementById("fecha");
@@ -365,12 +370,32 @@ document.addEventListener("DOMContentLoaded", () => {
     if (efectivoAperturaNota) efectivoAperturaNota.textContent = "Cuadra";
   };
 
-  const resolverEmpresaEsLocal = async (empresaId) => {
-    const { data, error } = await supabase.rpc("app_es_local", {
-      p_empresa_id: empresaId
-    });
-    if (error) throw error;
-    return data === true;
+  const resolverEmpresaEsLocal = async (empresaId) => resolverEsLocal(empresaId);
+
+  // La constancia se firma contra la base, no contra el formulario.
+  // El RPC devuelve la identidad del turno que guardó; aquí se vuelve a leer
+  // esa fila antes de dibujar nada. Si no está, no se descarga PDF: un soporte
+  // de un cierre que no entró es peor que no tener soporte.
+  const confirmarCierreGuardado = async ({ empresaId, fechaTurno, numero, esLocal }) => {
+    const tabla = tablaSegunSede(CIERRE_TABLES, esLocal);
+    const { data, error } = await supabase
+      .from(tabla)
+      .select("id, empresa_id, fecha_turno, numero_turno, created_at")
+      .eq("empresa_id", empresaId)
+      .eq("fecha_turno", fechaTurno)
+      .eq("numero_turno", numero)
+      .limit(1);
+
+    if (error) {
+      console.error("[cierre_turno] no se pudo confirmar el cierre en la base", { tabla, error });
+      throw new Error(`El cierre se envió, pero no se pudo confirmar en la base (${error.message}). No se descarga constancia.`);
+    }
+
+    const fila = Array.isArray(data) ? data[0] : null;
+    if (!fila) {
+      throw new Error(`El cierre no quedó registrado en ${tabla}. No se descarga constancia: vuelve a intentar el envío.`);
+    }
+    return fila;
   };
 
   // Carga la caja con la que cerró el turno anterior. Se llama desde el botón
@@ -398,9 +423,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const tablaCierres = esLocal === true
-      ? "cierres_turno_final_locales"
-      : "cierres_turno_final";
+    const tablaCierres = tablaSegunSede(CIERRE_TABLES, esLocal);
     // Una caja de semanas atrás no debe presentarse como si fuera la recibida
     // ayer. Para el primer turno sólo se admite el último cierre del día
     // inmediatamente anterior; para turnos posteriores se prioriza un turno
@@ -2116,12 +2139,31 @@ La versión anterior quedará guardada en el histórico, con tu nombre y la fech
         return;
       }
 
+      // El destino ya viene de `app_es_local()`, la misma fuente que usa el
+      // servidor, así que esto es una red de seguridad. Ojo con el enunciado:
+      // si salta, el cierre YA está escrito — lo que falla es la coherencia
+      // entre lo que se creía y lo que resolvió el servidor, y hay que mirarlo.
+      // Cuidado: en el reenvío idempotente el RPC corta antes y no incluye
+      // `es_local`. Comparar contra un undefined marcaría destino equivocado en
+      // una sede local cada vez que se reintenta un envío ya procesado.
       const esperabaLocal = payload?.global?.es_local_contexto === true;
-      if (Boolean(data?.es_local) !== Boolean(esperabaLocal)) {
-        throw new Error("El servidor resolvió un destino distinto al contexto seleccionado. El cierre no se marcará como completado.");
+      const esReenvio = data?.reenvio_ignorado === true;
+      if (!esReenvio && Boolean(data?.es_local) !== Boolean(esperabaLocal)) {
+        throw new Error("El cierre se guardó, pero el servidor lo mandó a una sede distinta de la seleccionada. Revisa el turno antes de darlo por bueno.");
       }
+      const esLocalConfirmado = esReenvio ? esperabaLocal : data?.es_local === true;
 
       console.info("subir_cierre_turno OK", data);
+
+      // Antes de dibujar nada: comprobar que la fila existe de verdad. Si esto
+      // lanza, se va al catch y NO se descarga constancia.
+      const filaConfirmada = await confirmarCierreGuardado({
+        empresaId: data?.empresa_id || payload?.global?.empresa_id,
+        fechaTurno: data?.fecha_turno || payload?.global?.fecha,
+        numero: data?.numero_turno ?? payload?.global?.numero_turno,
+        esLocal: esLocalConfirmado
+      });
+      console.info("[cierre_turno] cierre confirmado en base", filaConfirmada);
 
       // Token nuevo: este cierre ya entró y el siguiente envío es otro turno.
       tokenEnvio = (crypto?.randomUUID?.() || `envio-${Date.now()}-${Math.random().toString(16).slice(2)}`);
@@ -2131,10 +2173,16 @@ La versión anterior quedará guardada en el histórico, con tu nombre y la fech
       const avisoApertura = apertura && Number(apertura.diferencia) !== 0
         ? ` Atención: el efectivo de apertura difiere en ${apertura.diferencia} respecto a ${apertura.origen || "el cierre anterior"}.`
         : "";
+      // Un reenvío del mismo token no escribe nada nuevo. Decirlo, para que la
+      // constancia no se lea como prueba de un guardado que no ocurrió ahora.
+      const avisoReenvio = data?.reenvio_ignorado === true
+        ? " Este turno ya estaba guardado: la constancia corresponde al cierre que ya existía."
+        : "";
 
       setStatus(
         (data?.message || "Cierre enviado correctamente.")
         + (descargaOk ? " Constancia en PDF descargada automáticamente." : " No se pudo descargar la constancia en PDF.")
+        + avisoReenvio
         + avisoApertura
       );
       confirmacionEnvio.classList.add("is-hidden");
