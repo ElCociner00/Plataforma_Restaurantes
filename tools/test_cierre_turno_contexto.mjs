@@ -25,7 +25,7 @@ assert(
   "La caja anterior no distingue la tabla de sedes locales",
 );
 assert(
-  previousCashBlock.includes("app_es_local"),
+  source.includes('const resolverEmpresaEsLocal = async (empresaId)'),
   "La caja anterior no valida si la empresa activa es una sede local",
 );
 assert(
@@ -63,8 +63,21 @@ assert(
   source.includes("Boolean(data?.es_local) !== Boolean(esperabaLocal)"),
   "Falta la guarda que confirma el destino local del cierre",
 );
+const payloadBlock = between(
+  source,
+  "const construirPayloadEnvio",
+  'btnEnviar.addEventListener("click"',
+);
 assert(
-  html.includes("../js/cierre_turno.js?v=20260908viva2"),
+  payloadBlock.includes("esLocalContexto = await resolverEmpresaEsLocal(contextPayload.empresa_id)"),
+  "El payload no resuelve el tipo real de la sede antes de guardar",
+);
+assert(
+  payloadBlock.includes("es_local_contexto: esLocalContexto"),
+  "El payload sigue infiriendo incorrectamente si la empresa es local",
+);
+assert(
+  html.includes("../js/cierre_turno.js?v=20260908viva3"),
   "El HTML no fuerza la carga del hotfix de Viva",
 );
 

@@ -12,8 +12,10 @@ verificar aunque exista un faltante o sobrante.
   local según `app_es_local`, filtrando siempre por el UUID exacto de la sede.
   Se rechaza cualquier fila cuyo `empresa_id` sea distinto. El botón se habilita
   al completar la verificación y los medios monetarios vacíos se interpretan
-  como cero, igual que al construir el payload.
-- `cierre_turno/index.html`: cachebuster `20260908viva2`.
+  como cero, igual que al construir el payload. El payload también obtiene de
+  `app_es_local` el tipo real de la empresa, incluso cuando el usuario pertenece
+  directamente a VIVA y no entró mediante el selector de locales.
+- `cierre_turno/index.html`: cachebuster `20260908viva3`.
 - `tools/test_cierre_turno_contexto.mjs`: regresiones para sede exacta, tabla
   local, eliminación del fallback ambiguo y habilitación del botón.
 

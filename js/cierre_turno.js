@@ -364,6 +364,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (efectivoAperturaNota) efectivoAperturaNota.textContent = "Cuadra";
   };
 
+  const resolverEmpresaEsLocal = async (empresaId) => {
+    const { data, error } = await supabase.rpc("app_es_local", {
+      p_empresa_id: empresaId
+    });
+    if (error) throw error;
+    return data === true;
+  };
+
   // Carga la caja con la que cerró el turno anterior. Se llama desde el botón
   // "Consultar Loggro", nunca al abrir: la persona declara primero lo que
   // contó y solo después ve cuánto debería haber. Al revés, bastaría con
@@ -380,10 +388,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // El RPC historico sustituia silenciosamente una sede no resuelta por la
     // empresa principal. Eso podia mostrar una caja real, pero de otro local.
     // Se consulta la tabla correcta y se conserva el UUID exacto como filtro.
-    const { data: esLocal, error: tipoError } = await supabase.rpc("app_es_local", {
-      p_empresa_id: contextPayload.empresa_id
-    });
-    if (tipoError) {
+    let esLocal = false;
+    try {
+      esLocal = await resolverEmpresaEsLocal(contextPayload.empresa_id);
+    } catch (tipoError) {
       console.error("[cierre_turno] no se pudo resolver el tipo de sede", tipoError);
       if (efectivoAperturaOrigen) efectivoAperturaOrigen.textContent = "No se pudo cargar la caja anterior";
       return;
@@ -1862,6 +1870,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const contextPayload = await getContextPayload();
     if (!contextPayload) return null;
 
+    let esLocalContexto = false;
+    try {
+      esLocalContexto = await resolverEmpresaEsLocal(contextPayload.empresa_id);
+    } catch (error) {
+      console.error("[cierre_turno] no se pudo validar el destino del cierre", error);
+      setStatus("No se pudo validar la sede del cierre. Recarga e intenta nuevamente.");
+      return null;
+    }
+
     if (!numeroTurno) {
       setStatus("Selecciona la jornada del turno (Turno 1, 2 o 3) antes de enviar.");
       return null;
@@ -1957,9 +1974,7 @@ document.addEventListener("DOMContentLoaded", () => {
         sobrescribir: false,
         empresa_id: contextPayload.empresa_id,
         tenant_id: contextPayload.tenant_id,
-        es_local_contexto: contextPayload.local_context === true
-          || Boolean(contextPayload.empresa_principal_id
-            && contextPayload.empresa_id !== contextPayload.empresa_principal_id),
+        es_local_contexto: esLocalContexto,
         usuario_id: contextPayload.usuario_id,
         responsable_id: responsable.value,
         registrado_por: contextPayload.registrado_por,
