@@ -16,6 +16,10 @@
   <link rel="stylesheet" href="../css/cierre_turno.css?v=20260823d">
   <link rel="stylesheet" href="../css/cierre_turno_contabilidad.css?v=20260823d">
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <!-- Librerias de terceros (PDF de la constancia de cierre).
+       Version fijada a proposito: js/cierre_turno_pdf.js depende del global
+       window.jspdf.jsPDF que expone esta compilacion UMD. -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 </head>
 
 <body style="display:none">
@@ -309,7 +313,7 @@
     </section>
   </div>
 
-  <script type="module" src="../js/cierre_turno.js?v=20260908viva4"></script>
+  <script type="module" src="../js/cierre_turno.js?v=20260908pdf1"></script>
   <script type="module" src="../js/cierre_turno_contabilidad_visual.js?v=20260823d"></script>
 
   <script type="module" src="../js/footer.js"></script>

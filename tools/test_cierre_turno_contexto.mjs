@@ -84,9 +84,17 @@ assert(
   payloadBlock.includes("es_local_contexto: esLocalContexto"),
   "El payload sigue infiriendo incorrectamente si la empresa es local",
 );
+// Lo que importa es que el HTML fuerce una carga fresca del modulo, no un token
+// concreto: fijar el literal obligaba a tocar el test en cada bump legitimo del
+// cachebuster, que es justo lo que hay que hacer al cambiar el JS.
 assert(
-  html.includes("../js/cierre_turno.js?v=20260908viva4"),
-  "El HTML no fuerza la carga del hotfix de Viva",
+  /\.\.\/js\/cierre_turno\.js\?v=[0-9a-z]+/.test(html),
+  "El HTML carga cierre_turno.js sin cachebuster: los cambios no llegarian al navegador",
+);
+// La constancia se entrega en PDF y el modulo depende del global window.jspdf.
+assert(
+  html.includes("jspdf.umd.min.js"),
+  "El HTML no carga jsPDF: la constancia en PDF no se podria generar",
 );
 
 if (failures.length) {

@@ -36,7 +36,7 @@ import { supabase } from "./supabase.js";
 import { fetchResponsablesActivos, fetchUsuariosEmpresa } from "./responsables.js";
 import { getEmpresaPolicy, puedeEnviarDatos } from "./permisos.core.js";
 import { initApoyosPropinaManager } from "./apoyos.js";
-import { descargarImagenResumenCierreTurno } from "./cierre_turno_png.js?v=20260828b";
+import { descargarResumenCierreTurno } from "./cierre_turno_pdf.js?v=20260908pdf1";
 import {
   WEBHOOK_LISTAR_RESPONSABLES,
   WEBHOOK_CONSULTAR_GASTOS_CATALOGO
@@ -1515,7 +1515,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
 
-  const descargarImagenResumen = ({ bloquearDespues = false } = {}) => {
+  const descargarResumen = ({ bloquearDespues = false } = {}) => {
     const snapshotContext = {
       inputsFinanzas,
       inputsDiferencias,
@@ -1545,7 +1545,7 @@ document.addEventListener("DOMContentLoaded", () => {
       comentarioUsuario: comentarios?.value || ""
     };
 
-    const ok = descargarImagenResumenCierreTurno({
+    const ok = descargarResumenCierreTurno({
       snapshotContext,
       meta,
       formatCOP,
@@ -2126,7 +2126,7 @@ La versión anterior quedará guardada en el histórico, con tu nombre y la fech
       // Token nuevo: este cierre ya entró y el siguiente envío es otro turno.
       tokenEnvio = (crypto?.randomUUID?.() || `envio-${Date.now()}-${Math.random().toString(16).slice(2)}`);
 
-      const descargaOk = descargarImagenResumen({ bloquearDespues: false });
+      const descargaOk = descargarResumen({ bloquearDespues: false });
       const apertura = data?.efectivo_apertura;
       const avisoApertura = apertura && Number(apertura.diferencia) !== 0
         ? ` Atención: el efectivo de apertura difiere en ${apertura.diferencia} respecto a ${apertura.origen || "el cierre anterior"}.`
@@ -2134,7 +2134,7 @@ La versión anterior quedará guardada en el histórico, con tu nombre y la fech
 
       setStatus(
         (data?.message || "Cierre enviado correctamente.")
-        + (descargaOk ? " Constancia descargada automáticamente." : " No se pudo descargar constancia automática.")
+        + (descargaOk ? " Constancia en PDF descargada automáticamente." : " No se pudo descargar la constancia en PDF.")
         + avisoApertura
       );
       confirmacionEnvio.classList.add("is-hidden");

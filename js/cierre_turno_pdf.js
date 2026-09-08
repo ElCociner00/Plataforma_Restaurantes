@@ -113,7 +113,7 @@ const getSnapshotRows = ({
   return { finanzas, gastos, totales, apoyos, totalVentasSinApertura };
 };
 
-export const descargarImagenResumenCierreTurno = ({
+export const descargarResumenCierreTurno = ({
   snapshotContext,
   meta,
   formatCOP,
@@ -492,17 +492,45 @@ export const descargarImagenResumenCierreTurno = ({
 
   const canvases = pagesApoyos.map((slice, idx) => buildCanvas(slice, idx + 1, pagesApoyos.length, idx > 0)).filter(Boolean);
   if (!canvases.length) {
-    setStatus("No se pudo generar la imagen del resumen.");
+    setStatus("No se pudo generar el resumen del cierre.");
     return false;
   }
 
-  canvases.forEach((canvas, idx) => {
-    const link = document.createElement("a");
-    const suffix = canvases.length > 1 ? `_p${idx + 1}` : "";
-    link.download = `cierre_turno_${fechaNombre}${suffix}.png`;
-    link.href = canvas.toDataURL("image/png");
-    link.click();
-  });
+  // El dibujo del resumen no cambia: cada página se sigue componiendo en un
+  // <canvas>. Lo único que cambia es el envase. Antes cada canvas se descargaba
+  // como un PNG suelto, así que un turno con muchos apoyos dejaba dos o tres
+  // archivos separados; ahora todos son páginas de un mismo PDF.
+  const ConstructorPDF = globalThis.jspdf?.jsPDF || globalThis.jsPDF;
+  if (typeof ConstructorPDF !== "function") {
+    // Sin la librería no se entrega media constancia ni se cae de vuelta al
+    // PNG en silencio: la persona tiene que saber que no se llevó el soporte.
+    console.error("[cierre_turno_pdf] jsPDF no está disponible en la página.");
+    setStatus("No se pudo generar el PDF de la constancia: no cargó la librería de PDF. Recarga la página e intenta de nuevo.");
+    return false;
+  }
 
-  return true;
+  const orientacionDe = (canvas) => (canvas.width >= canvas.height ? "landscape" : "portrait");
+
+  try {
+    // Cada página conserva el tamaño real de su canvas: las de continuación no
+    // miden lo mismo que la primera cuando hay muchos apoyos.
+    const pdf = new ConstructorPDF({
+      unit: "px",
+      format: [canvases[0].width, canvases[0].height],
+      orientation: orientacionDe(canvases[0]),
+      compress: true
+    });
+
+    canvases.forEach((canvas, idx) => {
+      if (idx > 0) pdf.addPage([canvas.width, canvas.height], orientacionDe(canvas));
+      pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, canvas.width, canvas.height);
+    });
+
+    pdf.save(`cierre_turno_${fechaNombre}.pdf`);
+    return true;
+  } catch (error) {
+    console.error("[cierre_turno_pdf] no se pudo armar el PDF", error);
+    setStatus(`No se pudo generar el PDF de la constancia: ${error?.message || "sin detalle"}`);
+    return false;
+  }
 };
