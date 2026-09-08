@@ -20,7 +20,7 @@
 import { supabase } from "./supabase.js";
 import { esSuperAdmin } from "./permisos.core.js";
 import { getUserContext } from "./session.js";
-import { WEBHOOKS } from "./webhooks.js";
+import { WEBHOOKS, motivoObsoleto, webhookVigente } from "./webhooks.js";
 import { APP_URLS } from "./urls.js";
 
 const bodyEl = document.getElementById("revisionBody");
@@ -100,88 +100,46 @@ async function loadRows() {
   setStatus(`${rows.length} pago(s) pendiente(s).`);
 }
 
-async function insertEvent({ empresaId, cycleId, tipo, actor, payload }) {
-  await supabase.from("billing_events").insert({
-    empresa_id: empresaId,
-    billing_cycle_id: cycleId,
-    tipo_evento: tipo,
-    actor,
-    payload_json: payload || {}
-  });
-}
-
-async function resolver(tryRpcName, payload, fallback) {
-  const { error } = await supabase.rpc(tryRpcName, payload);
-  if (!error) return true;
-  await fallback();
-  return false;
-}
-
-async function aprobar({ attemptId, revisadoPor, observaciones }) {
-  return resolver("aprobar_pago", {
+/**
+ * Aprobar y rechazar comprobantes.
+ *
+ * Antes esto tenía un "resolver" que intentaba el RPC y, si fallaba, caía a un
+ * fallback que escribía a mano en las tablas. El RPC no existía en la base y el
+ * fallback escribía el CORREO del revisor en revisado_por, que es uuid: el
+ * UPDATE fallaba, nadie comprobaba el error, y las sentencias siguientes daban
+ * la empresa por pagada igualmente (§3.5 del plan de facturación).
+ *
+ * Ahora el RPC existe, es transaccional, deduce el revisor de la sesión y
+ * registra el pago también contra el modelo de cuentas moviendo la vigencia.
+ * Si falla, se ve: se lanza el error en vez de tragárselo.
+ */
+async function aprobar({ attemptId, observaciones }) {
+  const { data, error } = await supabase.rpc("aprobar_pago", {
     p_attempt_id: attemptId,
-    p_revisado_por: revisadoPor,
     p_observaciones: observaciones || null
-  }, async () => {
-    const { data: attempt } = await supabase
-      .from("payment_attempts")
-      .select("id, empresa_id, billing_cycle_id")
-      .eq("id", attemptId)
-      .maybeSingle();
-
-    await supabase.from("payment_attempts")
-      .update({ estado: "aprobado", revisado_por: revisadoPor, observaciones: observaciones || null, updated_at: new Date().toISOString() })
-      .eq("id", attemptId);
-
-    if (attempt?.billing_cycle_id) {
-      await supabase.from("billing_cycles")
-        .update({ estado: "paid_verified", banner_activo: false, suspension_aplicada: false, updated_at: new Date().toISOString() })
-        .eq("id", attempt.billing_cycle_id);
-    }
-
-    if (attempt?.empresa_id) {
-      await supabase.from("empresas").update({ mostrar_anuncio_impago: false, activa: true, activo: true }).eq("id", attempt.empresa_id);
-    }
-
-    await insertEvent({
-      empresaId: attempt?.empresa_id,
-      cycleId: attempt?.billing_cycle_id,
-      tipo: "pago_aprobado",
-      actor: revisadoPor,
-      payload: { attempt_id: attemptId, observaciones }
-    });
   });
+  if (error) throw error;
+  return data;
 }
 
-async function rechazar({ attemptId, revisadoPor, observaciones }) {
-  return resolver("rechazar_pago", {
+async function rechazar({ attemptId, observaciones }) {
+  const { data, error } = await supabase.rpc("rechazar_pago", {
     p_attempt_id: attemptId,
-    p_revisado_por: revisadoPor,
     p_observaciones: observaciones || null
-  }, async () => {
-    const { data: attempt } = await supabase
-      .from("payment_attempts")
-      .select("id, empresa_id, billing_cycle_id")
-      .eq("id", attemptId)
-      .maybeSingle();
-
-    await supabase.from("payment_attempts")
-      .update({ estado: "rechazado", revisado_por: revisadoPor, observaciones: observaciones || null, updated_at: new Date().toISOString() })
-      .eq("id", attemptId);
-
-    await insertEvent({
-      empresaId: attempt?.empresa_id,
-      cycleId: attempt?.billing_cycle_id,
-      tipo: "pago_rechazado",
-      actor: revisadoPor,
-      payload: { attempt_id: attemptId, observaciones }
-    });
   });
+  if (error) throw error;
+  return data;
 }
 
 async function notificarWebhook({ tipo, attemptId, observaciones }) {
   const webhook = WEBHOOKS?.BILLING_NOTIFICACIONES_PAGOS;
-  if (!webhook?.url || webhook.url.includes("tu-n8n-instancia.com")) return;
+  // El webhook de n8n ya no existe. No se sustituye por nada: la aprobación o
+  // el rechazo quedan registrados en payment_attempts y en la tabla de eventos
+  // unas líneas más arriba, que es lo que consulta la pantalla de facturación.
+  if (!webhookVigente(webhook?.url)) {
+    console.info("[revision_pagos] Notificación omitida:", motivoObsoleto(webhook?.url));
+    return;
+  }
   await fetch(webhook.url, {
     method: webhook.metodo || "POST",
     headers: { "Content-Type": "application/json" },
@@ -209,16 +167,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     const observaciones = String(obsInput?.value || "").trim();
 
     btn.disabled = true;
-    const ctx = await getUserContext().catch(() => null);
-    const revisadoPor = ctx?.user?.email || ctx?.user?.id || "superadmin";
 
     try {
+      // El revisor NO se envía desde el navegador: el RPC lo toma de auth.uid().
       if (action === "aprobar") {
-        await aprobar({ attemptId: id, revisadoPor, observaciones });
+        await aprobar({ attemptId: id, observaciones });
         await notificarWebhook({ tipo: "pago_aprobado", attemptId: id, observaciones });
       }
       if (action === "rechazar") {
-        await rechazar({ attemptId: id, revisadoPor, observaciones });
+        await rechazar({ attemptId: id, observaciones });
         await notificarWebhook({ tipo: "pago_rechazado", attemptId: id, observaciones });
       }
 

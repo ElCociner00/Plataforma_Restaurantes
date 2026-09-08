@@ -25,7 +25,13 @@
  * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
  */
 import { getUserContext } from "./session.js";
-import { WEBHOOK_SIIGO_PROVEEDORES_LISTAR, WEBHOOK_SIIGO_PROVEEDORES_REGISTRAR } from "./webhooks.js";
+import {
+  WEBHOOK_SIIGO_PROVEEDORES_LISTAR,
+  WEBHOOK_SIIGO_PROVEEDORES_REGISTRAR,
+  motivoObsoleto,
+  webhookVigente,
+} from "./webhooks.js";
+import { avisarModuloDescontinuado } from "./modulo_descontinuado.js";
 import { enforceNumericInput } from "./input_utils.js";
 
 const proveedoresBody = document.getElementById("proveedoresBody");
@@ -118,6 +124,7 @@ const cargarProveedores = async ({ silent = false } = {}) => {
   if (!silent) setStatus("Consultando proveedores...");
 
   try {
+    if (!webhookVigente(WEBHOOK_SIIGO_PROVEEDORES_LISTAR)) throw new Error(motivoObsoleto(WEBHOOK_SIIGO_PROVEEDORES_LISTAR));
     const res = await fetch(WEBHOOK_SIIGO_PROVEEDORES_LISTAR, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -195,6 +202,7 @@ const registrarNuevoProveedor = async () => {
   setStatus("Registrando proveedor...");
 
   try {
+    if (!webhookVigente(WEBHOOK_SIIGO_PROVEEDORES_REGISTRAR)) throw new Error(motivoObsoleto(WEBHOOK_SIIGO_PROVEEDORES_REGISTRAR));
     const res = await fetch(WEBHOOK_SIIGO_PROVEEDORES_REGISTRAR, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -220,12 +228,26 @@ const registrarNuevoProveedor = async () => {
 };
 
 enforceNumericInput([nitProveedor, codigoContable]);
-recargarProveedores?.addEventListener("click", () => cargarProveedores());
-registrarProveedor?.addEventListener("click", registrarNuevoProveedor);
+// Módulo Siigo descontinuado: ni se listan proveedores al abrir la pantalla ni
+// se registra ninguno. Sin este corte, ambos botones se quedaban colgados
+// esperando a un host que ya no responde.
+const SIIGO_PROVEEDORES_ACTIVO = webhookVigente(WEBHOOK_SIIGO_PROVEEDORES_LISTAR)
+  && webhookVigente(WEBHOOK_SIIGO_PROVEEDORES_REGISTRAR);
+
+if (!SIIGO_PROVEEDORES_ACTIVO) {
+  avisarModuloDescontinuado({
+    motivo: motivoObsoleto(WEBHOOK_SIIGO_PROVEEDORES_LISTAR),
+    status,
+    controles: [recargarProveedores, registrarProveedor],
+  });
+} else {
+  recargarProveedores?.addEventListener("click", () => cargarProveedores());
+  registrarProveedor?.addEventListener("click", registrarNuevoProveedor);
+}
 codigoEspecial?.addEventListener("change", applyDefaultsByCodigoEspecial);
 tipoProveedor?.addEventListener("input", () => {
   tipoProveedor.value = String(tipoProveedor.value || "").toUpperCase();
 });
 
 applyDefaultsByCodigoEspecial();
-cargarProveedores();
+if (SIIGO_PROVEEDORES_ACTIVO) cargarProveedores();

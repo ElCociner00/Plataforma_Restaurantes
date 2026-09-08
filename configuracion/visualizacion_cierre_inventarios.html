@@ -2,10 +2,13 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>AXIOMA | Visualización cierre inventarios</title>
 
+  <link rel="stylesheet" href="../css/variables.css">
   <link rel="stylesheet" href="../css/main.css">
   <link rel="stylesheet" href="../css/visualizacion_cierre_inventarios.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
 </head>
 
 <body style="display:none">
@@ -18,6 +21,10 @@
       Define qué productos se mostrarán en cierre inventarios. Los ocultos se enviarán con valor 0.
     </p>
 
+    <div class="bulk-actions" data-target="productosPanel">
+      <button type="button" class="btn-bulk-activar">Activar todas</button>
+      <button type="button" class="btn-bulk-desactivar">Desactivar todas</button>
+    </div>
     <div id="productosPanel" class="panel"></div>
     <div id="status" class="status"></div>
   </div>

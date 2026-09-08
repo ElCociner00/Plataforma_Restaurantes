@@ -25,7 +25,8 @@
  * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
  */
 import { getUserContext } from "./session.js";
-import { WEBHOOK_HISTORICO_CIERRE_INVENTARIOS_DATOS } from "./webhooks.js";
+import { supabase } from "./supabase.js";
+import { initBulkActions } from "./bulk_actions.js";
 
 const panelGeneral = document.getElementById("columnasGeneralesPanel");
 const panelDetalle = document.getElementById("columnasDetallePanel");
@@ -124,13 +125,13 @@ const loadSettingsPanels = async () => {
   status.textContent = "Cargando estructura histórica...";
 
   try {
-    const res = await fetch(WEBHOOK_HISTORICO_CIERRE_INVENTARIOS_DATOS, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    const { data: raw, error } = await supabase
+      .from('cierres_inventario')
+      .select('*')
+      .eq('empresa_id', context.empresa_id);
 
-    const rows = normalizeRows(await res.json());
+    if (error) throw new Error(error.message);
+    const rows = normalizeRows(raw || []);
     const products = new Map();
     const detailRows = [];
 
@@ -184,3 +185,4 @@ const loadSettingsPanels = async () => {
 };
 
 loadSettingsPanels();
+initBulkActions();

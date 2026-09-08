@@ -1,4 +1,4 @@
-import { buildRequestHeaders, getUserContext } from "./session.js";
+import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 import { fetchUsuariosEmpresa } from "./responsables.js";
 import { WEBHOOK_REGISTRAR_EMPLEADO, WEBHOOK_REGISTRO_OTROS_USUARIOS } from "./webhooks.js";
@@ -21,20 +21,13 @@ const setRegistroEstado = (m) => { if (registroInlineEstado) registroInlineEstad
 
 const state = { context: null, rows: [] };
 
-const SUPABASE_AUTH_ADMIN_URL = "https://ivgzwgyjyqfunheaesxx.supabase.co/auth/v1/admin/users";
-const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2Z3p3Z3lqeXFmdW5oZWFlc3h4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTg2MDEwNSwiZXhwIjoyMDg1NDM2MTA1fQ.9z5NrjmIiPoopEAxDb47ic6eTYDfP-iWL63ObZQnNIs";
-
-const fetchAuthEmailsById = async () => {
-  const res = await fetch(SUPABASE_AUTH_ADMIN_URL, {
-    method: "GET",
-    headers: {
-      apikey: SUPABASE_SERVICE_KEY,
-      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-      "Content-Type": "application/json"
-    }
+const fetchAuthEmailsById = async (empresaId) => {
+  const { data, error } = await supabase.functions.invoke("usuarios-admin", {
+    body: { action: "listar_emails", empresa_id: empresaId }
   });
-  const data = await res.json().catch(() => ({}));
-  const users = Array.isArray(data?.users) ? data.users : [];
+  if (error) throw error;
+  if (!data?.ok) throw new Error(data?.message || "No se pudieron consultar los correos.");
+  const users = Array.isArray(data?.usuarios) ? data.usuarios : [];
   return new Map(users.map((u) => [normalize(u.id), normalize(u.email)]));
 };
 
@@ -48,7 +41,7 @@ const renderAlta = () => {
 const cargarData = async () => {
   const empresaId = state.context?.empresa_id;
   const usuarios = await fetchUsuariosEmpresa(empresaId);
-  const emailById = await fetchAuthEmailsById().catch(() => new Map());
+  const emailById = await fetchAuthEmailsById(empresaId).catch(() => new Map());
   return usuarios.filter((u) => normalize(u.rol).toLowerCase() !== "admin_root").map((u) => ({
     id: normalize(u.id),
     nombre_persona: normalize(u.nombre_completo),
@@ -86,6 +79,14 @@ const ensurePasswordHelpers = async () => import("./contrasena.js");
 const init = async () => {
   state.context = await getUserContext().catch(() => null);
   if (!state.context?.empresa_id) return setEstado("No se pudo validar la empresa actual.");
+
+  const rol = String(state.context?.rol || "").toLowerCase();
+  const isAdmin = ["admin_root", "admin", "administrador", "master"].includes(rol);
+  if (!isAdmin) {
+    alert("Acceso denegado: No tienes permisos para gestionar usuarios.");
+    window.location.href = "../dashboard/";
+    return;
+  }
 
   await refreshData();
 
@@ -185,21 +186,48 @@ const init = async () => {
   formRegistroEmpleado?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const c = state.context;
-    const payload = { nombre: emp_nombre.value.trim(), cedula: emp_cedula.value.trim(), fecha_ingreso: emp_fecha_ingreso.value, email: emp_email.value.trim(), password: emp_password.value, empresa_id: c.empresa_id, tenant_id: c.empresa_id, usuario_id: c.user?.id || c.user?.user_id, registrado_por: c.user?.id || c.user?.user_id, timestamp: new Date().toISOString() };
-    const headers = await buildRequestHeaders({ includeTenant: true });
-    const res = await fetch(WEBHOOK_REGISTRAR_EMPLEADO, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(payload) });
-    setRegistroEstado(res.ok ? "Empleado registrado correctamente." : "Error registrando empleado.");
-    if (res.ok) { formRegistroEmpleado.reset(); await refreshData(); }
+    const payload = { 
+      nombre: emp_nombre.value.trim(), 
+      cedula: emp_cedula.value.trim(), 
+      fecha_ingreso: emp_fecha_ingreso.value, 
+      email: emp_email.value.trim(), 
+      password: emp_password.value, 
+      empresa_id: c.empresa_id, 
+      usuario_principal_id: c.empresa_principal_id, // Para soporte de locales
+      rol: "operativo" 
+    };
+    setRegistroEstado("Registrando empleado...");
+    const { data, error } = await supabase.functions.invoke("registro-empleados", { body: payload });
+    if (error || !data || !data.ok) {
+      setRegistroEstado(data?.message || error?.message || "Error registrando empleado.");
+    } else {
+      setRegistroEstado(data?.message || "Empleado registrado correctamente.");
+      formRegistroEmpleado.reset(); 
+      await refreshData(); 
+    }
   });
 
   formRegistroOtro?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const c = state.context;
-    const payload = { nombre: otro_nombre.value.trim(), cedula: otro_cedula.value.trim(), email: otro_email.value.trim(), password: otro_password.value, rol: otro_rol.value, empresa_id: c.empresa_id, tenant_id: c.empresa_id, usuario_id: c.user?.id || c.user?.user_id, registrado_por: c.user?.id || c.user?.user_id, timestamp: new Date().toISOString() };
-    const headers = await buildRequestHeaders({ includeTenant: true });
-    const res = await fetch(WEBHOOK_REGISTRO_OTROS_USUARIOS, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(payload) });
-    setRegistroEstado(res.ok ? "Usuario registrado correctamente." : "Error registrando usuario.");
-    if (res.ok) { formRegistroOtro.reset(); await refreshData(); }
+    const payload = { 
+      nombre: otro_nombre.value.trim(), 
+      cedula: otro_cedula.value.trim(), 
+      email: otro_email.value.trim(), 
+      password: otro_password.value, 
+      rol: otro_rol.value, 
+      empresa_id: c.empresa_id, 
+      usuario_principal_id: c.empresa_principal_id // Para soporte de locales
+    };
+    setRegistroEstado("Registrando usuario...");
+    const { data, error } = await supabase.functions.invoke("registro-empleados", { body: payload });
+    if (error || !data || !data.ok) {
+      setRegistroEstado(data?.message || error?.message || "Error registrando usuario.");
+    } else {
+      setRegistroEstado(data?.message || "Usuario registrado correctamente.");
+      formRegistroOtro.reset(); 
+      await refreshData(); 
+    }
   });
 };
 

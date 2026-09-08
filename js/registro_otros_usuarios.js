@@ -16,8 +16,8 @@
  * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
  */
 import { enforceNumericInput } from "./input_utils.js";
-import { buildRequestHeaders, getUserContext } from "./session.js";
-import { WEBHOOK_REGISTRO_OTROS_USUARIOS } from "./webhooks.js";
+import { supabase } from "./supabase.js";
+import { getUserContext } from "./session.js";
 
 const form = document.getElementById("registroOtrosUsuariosForm");
 const btnRegistrar = document.getElementById("btnRegistrar");
@@ -82,28 +82,18 @@ form?.addEventListener("submit", async (e) => {
 
   setSubmitting(true);
   statusDiv.textContent = "Enviando registro...";
-
   try {
-    const authHeaders = await buildRequestHeaders({ includeTenant: true });
-    const res = await fetch(WEBHOOK_REGISTRO_OTROS_USUARIOS, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...authHeaders
-      },
-      body: JSON.stringify(payload)
+    const { data, error } = await supabase.functions.invoke("registro-otros-usuarios", {
+      body: payload
     });
 
-    const data = await readResponseBody(res);
-    const isSuccess = res.ok && (data?.success === true || data?.ok === true || /registrad/i.test(String(data?.message || "")));
-
-    if (isSuccess) {
-      statusDiv.textContent = data?.message || "Usuario registrado correctamente.";
-      form.reset();
+    if (error || !data || data.ok === false) {
+      statusDiv.textContent = data?.message || data?.error || error?.message || "Error registrando usuario.";
     } else {
-      statusDiv.textContent = data?.message || `Error registrando usuario (HTTP ${res.status}).`;
+      statusDiv.textContent = data.message || "Usuario registrado correctamente.";
+      form.reset();
     }
-  } catch {
+  } catch (error) {
     statusDiv.textContent = "Error de conexión. Intenta nuevamente.";
   } finally {
     setSubmitting(false);

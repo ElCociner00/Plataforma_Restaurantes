@@ -35,8 +35,11 @@ import { supabase } from "./supabase.js";
 import {
   WEBHOOK_SUBIR_SIIGO,
   WEBHOOK_CORREGIR_FACTURA_INCONVENIENTE,
-  WEBHOOK_CARGAR_FACTURAS_CORREO
+  WEBHOOK_CARGAR_FACTURAS_CORREO,
+  motivoObsoleto,
+  webhookVigente
 } from "./webhooks.js";
+import { avisarModuloDescontinuado } from "./modulo_descontinuado.js";
 
 const head = document.getElementById("facturasHead");
 const body = document.getElementById("facturasBody");
@@ -302,7 +305,13 @@ const parseWebhookResponse = async (res) => {
   }
 };
 
+const SIIGO_FACTURAS_ACTIVO = webhookVigente(WEBHOOK_CARGAR_FACTURAS_CORREO)
+  && webhookVigente(WEBHOOK_SUBIR_SIIGO)
+  && webhookVigente(WEBHOOK_CORREGIR_FACTURA_INCONVENIENTE);
+
 const fetchJson = async (url, payload, method = "POST") => {
+  if (!webhookVigente(url)) throw new Error(motivoObsoleto(url));
+
   const requestUrl = method === "GET" && payload
     ? `${url}?${new URLSearchParams(payload).toString()}`
     : url;
@@ -318,6 +327,8 @@ const fetchJson = async (url, payload, method = "POST") => {
 };
 
 const fetchWebhookSignal = async (url, payload) => {
+  if (!webhookVigente(url)) throw new Error(motivoObsoleto(url));
+
   const asStringEntries = Object.entries(payload).map(([k, v]) => [k, typeof v === "boolean" ? String(v) : String(v ?? "")]);
   const query = new URLSearchParams(asStringEntries);
 
@@ -1509,3 +1520,13 @@ body?.addEventListener("input", (event) => {
 });
 
 init();
+
+// Aviso de cierre del módulo. Va al final para que las referencias del DOM y
+// los controles ya estén resueltos cuando se deshabilitan.
+if (!SIIGO_FACTURAS_ACTIVO) {
+  avisarModuloDescontinuado({
+    motivo: motivoObsoleto(WEBHOOK_CARGAR_FACTURAS_CORREO),
+    status,
+    controles: [tabFacturasListas, tabFacturasRevision, tabFacturasCorregidas],
+  });
+}

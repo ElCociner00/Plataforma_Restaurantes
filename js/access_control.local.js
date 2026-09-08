@@ -27,6 +27,7 @@ export const LOCAL_ROLE_ACCESS = {
   operativo: {
     cierre_turno: true,
     historico_cierre_turno: true,
+    auditoria_turnos: false,
     cierre_inventarios: true,
     historico_cierre_inventarios: true,
     inventarios: true,
@@ -36,7 +37,9 @@ export const LOCAL_ROLE_ACCESS = {
     gestion_usuarios: false,
     permisos: false,
     registro_empleados: false,
-    registro_otros_usuarios: false
+    registro_otros_usuarios: false,
+    nomina: false,
+    nomina_historico: false
   }
 };
 
@@ -44,6 +47,7 @@ export const MODULE_ROUTE_MAP = {
   dashboard: APP_URLS.dashboard,
   cierre_turno: APP_URLS.cierreTurno,
   historico_cierre_turno: APP_URLS.historicoCierreTurno,
+  auditoria_turnos: APP_URLS.auditoriaTurnos,
   cierre_inventarios: APP_URLS.cierreInventarios,
   historico_cierre_inventarios: APP_URLS.historicoCierreInventarios,
   inventarios: APP_URLS.inventarios,
@@ -74,6 +78,7 @@ const LOGGRO_PRIORITY = [
   "cierre_turno",
   "cierre_inventarios",
   "historico_cierre_turno",
+  "auditoria_turnos",
   "historico_cierre_inventarios",
   "inventarios",
   "configuracion",
@@ -84,7 +89,8 @@ const LOGGRO_PRIORITY = [
   "visualizacion_cierre_turno",
   "visualizacion_cierre_turno_historico",
   "visualizacion_cierre_inventarios",
-  "visualizacion_cierre_inventarios_historico"
+  "visualizacion_cierre_inventarios_historico",
+  "facturacion"
 ];
 
 const SIIGO_PRIORITY = [
@@ -100,6 +106,7 @@ export const MODULE_ENV_MAP = {
   dashboard: ENV_LOGGRO,
   cierre_turno: ENV_LOGGRO,
   historico_cierre_turno: ENV_LOGGRO,
+  auditoria_turnos: ENV_LOGGRO,
   cierre_inventarios: ENV_LOGGRO,
   historico_cierre_inventarios: ENV_LOGGRO,
   configuracion: ENV_LOGGRO,
@@ -113,7 +120,10 @@ export const MODULE_ENV_MAP = {
   subir_facturas_siigo: ENV_SIIGO,
   configuracion_siigo: ENV_SIIGO,
   historico_facturas_siigo: ENV_SIIGO,
-  facturacion: ENV_SIIGO,
+  // Facturación estaba clasificada solo en ENV_SIIGO, el entorno del módulo
+  // Siigo ya descontinuado: un cliente de Loggro no veía su propia factura
+  // y por tanto no podía pagarla. Va en los dos entornos, como nómina.
+  facturacion: [ENV_SIIGO, ENV_LOGGRO],
   nomina: [ENV_SIIGO, ENV_LOGGRO]
 };
 

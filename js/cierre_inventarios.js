@@ -35,12 +35,6 @@ import { getUserContext } from "../js/session.js";
 import { supabase } from "../js/supabase.js";
 import { fetchResponsablesActivos } from "../js/responsables.js";
 import { getEmpresaPolicy, puedeEnviarDatos } from "../js/permisos.core.js";
-import {
-  WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS,
-  WEBHOOK_CIERRE_INVENTARIOS_CONSULTAR,
-  WEBHOOK_CIERRE_INVENTARIOS_SUBIR,
-  WEBHOOK_ALERTA_MANIPULACION_CIERRE
-} from "../js/webhooks.js";
 
 const fecha = document.getElementById("fecha");
 const responsable = document.getElementById("responsable");
@@ -551,18 +545,9 @@ const enviarAlertaManipulacion = (motivo) => {
   };
 
   try {
-    const body = JSON.stringify(payload);
-    if (navigator.sendBeacon) {
-      const blob = new Blob([body], { type: "application/json" });
-      navigator.sendBeacon(WEBHOOK_ALERTA_MANIPULACION_CIERRE, blob);
-      return;
-    }
-    fetch(WEBHOOK_ALERTA_MANIPULACION_CIERRE, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-      keepalive: true
-    }).catch(() => {});
+    supabase.functions.invoke("alerta-manipulacion", {
+      body: payload
+    }).catch(err => console.error("Error enviando alerta:", err));
   } catch (_error) {
     // no-op
   }
@@ -673,14 +658,13 @@ const loadResponsables = async () => {
 };
 
 const fetchProductosConfigurados = async (contextPayload) => {
-  const res = await fetchWithTimeout(WEBHOOK_CIERRE_INVENTARIOS_CARGAR_PRODUCTOS, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(contextPayload)
+  const { data, error } = await supabase.functions.invoke("consultar-inventarios", {
+    body: { ...contextPayload, modo: "ingredientes" }
   });
 
-  const data = await readResponseBody(res);
-  if (!res.ok) throw new Error(data?.message || `Error cargando productos (HTTP ${res.status}).`);
+  if (error) throw new Error(error.message || "Error cargando productos.");
+  if (!data || data.ok === false) throw new Error(data?.message || "Error cargando productos.");
+  
   return normalizeList(data, ["productos", "items"]);
 };
 
@@ -847,21 +831,23 @@ btnConsultar.addEventListener("click", async () => {
   setStatus("Consultando stock...");
 
   try {
-    const res = await fetch(WEBHOOK_CIERRE_INVENTARIOS_CONSULTAR, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke("consultar-inventarios", {
+      body: {
         ...payload,
         detalles_adicionales: isDetallesAdicionalesEnabled(),
         cantidad_inconsistencias: Number(cantidadInconsistencias?.value || 0),
         inconsistencias: collectInconsistencias(),
         items: readRowsForWebhook()
-      })
+      }
     });
 
-    const data = await readResponseBody(res);
-    if (!res.ok) {
-      setStatus(data?.message || `Error consultando stock (HTTP ${res.status}).`);
+    if (error) {
+      setStatus(error.message || "Error consultando stock.");
+      return;
+    }
+    
+    if (!data || data.ok === false) {
+      setStatus(data?.message || "Error consultando stock.");
       return;
     }
     const stocks = normalizeList(data, ["stocks", "productos", "items"]);
@@ -960,29 +946,24 @@ btnSubir.addEventListener("click", async () => {
   setStatus("Subiendo cierre de inventarios...");
 
   try {
-    const res = await fetch(WEBHOOK_CIERRE_INVENTARIOS_SUBIR, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke("cierre-inventarios-subir", {
+      body: {
         ...payload,
         detalles_adicionales: isDetallesAdicionalesEnabled(),
         cantidad_inconsistencias: Number(cantidadInconsistencias?.value || 0),
         inconsistencias: collectInconsistencias(),
         items: readRowsForWebhook()
-      })
+      }
     });
 
-    const raw = await res.text();
-    let data = {};
-    try {
-      data = raw ? JSON.parse(raw) : {};
-    } catch (_parseError) {
-      data = { message: raw };
+    if (error) {
+      console.error("Error edge function cierre-inventarios-subir", error);
+      setStatus(error.message || "Error subiendo datos.");
+      return;
     }
 
-    if (!res.ok) {
-      console.error("Error webhook cierre_inventarios_subir", { status: res.status, data });
-      setStatus(data?.message || `Error subiendo datos (HTTP ${res.status}).`);
+    if (!data) {
+      setStatus("Error subiendo datos (sin respuesta).");
       return;
     }
 

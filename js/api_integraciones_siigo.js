@@ -16,7 +16,8 @@
  * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
  */
 import { getUserContext } from "./session.js";
-import { WEBHOOK_REGISTRO_CREDENCIALES } from "./webhooks.js";
+import { WEBHOOK_REGISTRO_CREDENCIALES, MODULOS_DESCONTINUADOS } from "./webhooks.js";
+import { avisarModuloDescontinuado } from "./modulo_descontinuado.js";
 
 const form = document.getElementById("siigoApiForm");
 const status = document.getElementById("status");
@@ -26,8 +27,25 @@ const setStatus = (message) => { status.textContent = message; };
 
 const getValue = (id) => document.getElementById(id)?.value?.trim() || "";
 
+// La ruta registro_credenciales sigue viva (la usa Loggro), pero el módulo
+// Siigo está descontinuado: no tiene sentido seguir guardando sus credenciales.
+const SIIGO_API_ACTIVO = false;
+if (!SIIGO_API_ACTIVO) {
+  avisarModuloDescontinuado({
+    motivo: MODULOS_DESCONTINUADOS.siigo,
+    status,
+    formularios: [form],
+  });
+}
+
 form?.addEventListener("submit", async (event) => {
   event.preventDefault();
+
+  if (!SIIGO_API_ACTIVO) {
+    setStatus(MODULOS_DESCONTINUADOS.siigo);
+    return;
+  }
+
   setStatus("Guardando configuración de API Siigo...");
 
   const context = await getUserContext();

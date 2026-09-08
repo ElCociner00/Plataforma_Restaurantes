@@ -4,9 +4,20 @@
   width: 100%;
 }
 
+/* El numero que se lee en pantalla no es el del <input>: es el del <span> que
+   lo cubre, con el valor ya formateado en pesos. El campo guarda el valor
+   crudo y no debe pintarse NUNCA, en ningun estado.
+
+   Por que ademas -webkit-text-fill-color: el navegador pinta el texto de un
+   <input> con esa propiedad, que por defecto sigue a `color`. Fijandola aqui,
+   ninguna regla de estado (un veredicto, un bloqueo, lo que venga) puede
+   resucitar el numero crudo aunque le gane a `color` en la cascada con
+   !important. Sin esto, cualquier `color` visible sobre el campo hacia que las
+   dos cifras se pintaran una encima de otra. */
 .cierre-money-visual-wrap > input {
   color: transparent;
-  caret-color: #111827;
+  -webkit-text-fill-color: transparent;
+  caret-color: var(--ek-ink, #0f172a);
 }
 
 .cierre-money-visual-wrap > input::placeholder {
@@ -24,7 +35,7 @@
   display: flex;
   align-items: center;
   padding: 0 12px;
-  color: #111827;
+  color: var(--ek-ink, #0f172a);
   font: inherit;
   line-height: normal;
   pointer-events: none;
@@ -34,10 +45,10 @@
 }
 
 .cierre-money-visual-wrap > input:focus + .cierre-money-visual-value {
-  color: #111827;
+  color: var(--ek-ink, #0f172a);
 }
 
 .cierre-money-visual-wrap > input[readonly] + .cierre-money-visual-value,
 .cierre-money-visual-wrap > input:disabled + .cierre-money-visual-value {
-  color: #374151;
+  color: var(--ek-ink-2, #334155);
 }

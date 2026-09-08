@@ -4,9 +4,9 @@
 
 .bloque {
   margin-bottom: 20px;
-  border: 1px solid #e2ddff;
+  border: 1px solid var(--ek-plum-100, #efe9fb);
   border-radius: 12px;
-  background: #fff;
+  background: var(--ek-surface-2, #f1f5f9);
   padding: 14px;
 }
 
@@ -35,7 +35,7 @@
 .descarga-subtitulo {
   margin: 2px 0 10px;
   font-size: 0.95rem;
-  color: #374151;
+  color: var(--ek-ink-2, #334155);
 }
 
 .descarga-grid {
@@ -66,15 +66,15 @@
   height: 18px;
   border-radius: 999px;
   font-size: 0.72rem;
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
+  background: var(--ek-plum-100, #efe9fb);
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
 }
 
 
 .hint {
   text-align: left;
   margin: 0 0 8px;
-  color: #6b7280;
+  color: var(--ek-muted, #5d6b7e);
 }
 
 .vis-grid-2 {
@@ -90,10 +90,10 @@
 }
 
 .columnas-desplegable {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--ek-line, #e8edf3);
   border-radius: 10px;
   padding: 12px 14px;
-  background: #fff;
+  background: var(--ek-surface, #ffffff);
 }
 
 .columnas-desplegable summary {
@@ -132,7 +132,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  background: #f9fafb;
+  background: var(--ek-surface-2, #f1f5f9);
   border-radius: 8px;
   font-size: 0.9rem;
 }
@@ -154,7 +154,7 @@
   position: absolute;
   cursor: pointer;
   inset: 0;
-  background-color: #d1d5db;
+  background-color: var(--ek-line, #e8edf3);
   transition: 0.4s;
   border-radius: 34px;
 }
@@ -172,7 +172,7 @@
 }
 
 .switch input:checked + .slider {
-  background-color: #2563eb;
+  background-color: var(--ek-info-600, #2563eb);
 }
 
 .switch input:checked + .slider::before {
@@ -181,7 +181,7 @@
 
 .tabla-wrap {
   overflow-x: auto;
-  border: 1px solid #ddd6fe;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
   border-radius: 10px;
 }
 
@@ -193,20 +193,20 @@ table {
 
 th,
 td {
-  border-bottom: 1px solid #ece9ff;
+  border-bottom: 1px solid var(--ek-plum-100, #efe9fb);
   padding: 10px;
   text-align: left;
   font-size: 0.9rem;
 }
 
 th {
-  background: #f7f5ff;
+  background: var(--ek-plum-050, #f9f6fe);
   cursor: grab;
   user-select: none;
 }
 
 tr.selected {
-  background: #eef2ff;
+  background: var(--ek-plum-050, #f9f6fe);
 }
 
 th.dragging {
@@ -226,13 +226,13 @@ th.dragging {
 }
 
 .paginacion button.active {
-  background: #312e81;
+  background: var(--ek-plum-800, #3b2a5e);
 }
 
 .detalle-turno {
-  border: 1px solid #ddd6fe;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
   border-radius: 10px;
-  background: #f9f8ff;
+  background: var(--ek-plum-100, #efe9fb);
   padding: 12px;
 }
 
@@ -249,9 +249,9 @@ th.dragging {
 }
 
 .icon-download-btn {
-  border: 1px solid #4f46e5;
-  background: #4f46e5;
-  color: #fff;
+  border: 1px solid var(--ek-plum-600, #5b3a8f);
+  background: var(--ek-plum-600, #5b3a8f);
+  color: var(--ek-surface, #ffffff);
   border-radius: 999px;
   width: 36px;
   height: 36px;
@@ -268,7 +268,7 @@ th.dragging {
 }
 
 .kv {
-  background: #f9fafb;
+  background: var(--ek-surface-2, #f1f5f9);
   padding: 8px;
   border-radius: 8px;
   display: flex;
@@ -282,7 +282,7 @@ th.dragging {
 
 .drag-col {
   width: 40px;
-  color: #6b7280;
+  color: var(--ek-muted, #5d6b7e);
   text-align: center;
   cursor: grab;
 }
@@ -299,7 +299,7 @@ th.dragging {
   position: fixed;
   inset: 0;
   background: rgba(17, 24, 39, 0.35);
-  color: #fff;
+  color: var(--ek-surface, #ffffff);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -333,8 +333,8 @@ th.dragging {
 
 .coincidencias-similares {
   margin-top: 14px;
-  border: 1px dashed #c7d2fe;
-  background: #f8faff;
+  border: 1px dashed var(--ek-plum-200, #ddd0f5);
+  background: var(--ek-plum-100, #efe9fb);
   border-radius: 10px;
   padding: 10px 12px;
 }
@@ -361,7 +361,7 @@ th.dragging {
 }
 
 .detalle-resumen-table thead th {
-  background: #ede9fe;
+  background: var(--ek-plum-100, #efe9fb);
   font-size: 0.95rem;
 }
 
@@ -385,11 +385,11 @@ th.dragging {
 }
 
 .detalle-comparativo-wrap .is-positive {
-  color: #166534;
+  color: var(--ek-ok-700, #065f46);
 }
 
 .detalle-comparativo-wrap .is-negative {
-  color: #b91c1c;
+  color: var(--ek-bad-700, #991b1b);
 }
 
 .resumen-kv-grid {
@@ -400,8 +400,8 @@ th.dragging {
 }
 
 .resumen-kv-item {
-  background: #fff;
-  border: 1px solid #ddd6fe;
+  background: var(--ek-surface-2, #f1f5f9);
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
   border-radius: 8px;
   padding: 8px 10px;
   display: grid;
@@ -409,7 +409,7 @@ th.dragging {
 }
 
 .resumen-kv-item span {
-  color: #6b7280;
+  color: var(--ek-muted, #5d6b7e);
   font-size: 0.82rem;
   overflow-wrap: normal;
   word-break: normal;
@@ -428,9 +428,9 @@ th.dragging {
 }
 
 .fin-kpi {
-  border: 1px solid #c7d2fe;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
   border-radius: 8px;
-  background: #eef2ff;
+  background: var(--ek-plum-100, #efe9fb);
   padding: 8px 10px;
   display: grid;
   gap: 3px;
@@ -438,7 +438,7 @@ th.dragging {
 
 .fin-kpi span {
   font-size: 0.8rem;
-  color: #4338ca;
+  color: var(--ek-plum-700, #4a3474);
   overflow-wrap: normal;
   word-break: normal;
 }
@@ -457,37 +457,46 @@ th.dragging {
 /* Parche histórico 2026-07-23: tabla más legible, colorida y sin quiebres verticales en números/fechas. */
 .filtros select,
 .filtros input {
-  border: 1px solid #c7d2fe;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
   border-radius: 10px;
   padding: 9px 10px;
-  background: #ffffff;
-  color: #1f2937;
+  background: var(--ek-surface, #ffffff);
+  color: var(--ek-ink, #0f172a);
 }
 
 .tabla-wrap {
-  background: linear-gradient(180deg, #ffffff 0%, #fbfaff 100%);
-  box-shadow: 0 10px 24px rgba(49, 46, 129, 0.08);
+  background: var(--ek-surface, #ffffff);
+  box-shadow: var(--ek-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.05));
 }
 
 table {
   table-layout: auto;
 }
 
+/* Era una banda de marca en degradado con texto blanco: la
+   cabecera pesaba más que los datos que encabeza. Ahora es
+   superficie clara con rótulo en minúscula alta; al quedar fija,
+   la sombra sutil marca el borde cuando las filas pasan debajo. */
 thead th {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: linear-gradient(135deg, #312e81 0%, #4f46e5 100%);
-  color: #ffffff;
-  border-bottom: 0;
+  background: var(--ek-ground, #f8fafc);
+  color: var(--ek-muted, #5d6b7e);
+  font-size: var(--ek-text-label, 0.75rem);
+  font-weight: var(--ek-weight-semibold, 600);
+  letter-spacing: var(--ek-tracking-label, 0.04em);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--ek-line, #e8edf3);
+  box-shadow: var(--ek-shadow-sticky, 0 1px 0 #e8edf3);
 }
 
 tbody tr:nth-child(even) {
-  background: #f8f7ff;
+  background: var(--ek-plum-050, #f9f6fe);
 }
 
 tbody tr:hover {
-  background: #eef2ff;
+  background: var(--ek-plum-050, #f9f6fe);
 }
 
 .tabla-wrap td,
@@ -497,7 +506,7 @@ tbody tr:hover {
 }
 
 .tabla-wrap td {
-  color: #1f2937;
+  color: var(--ek-ink, #0f172a);
   line-height: 1.35;
 }
 

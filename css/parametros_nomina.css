@@ -4,11 +4,11 @@
 
 .parametros-nomina-main .intro,
 .parametros-nomina-card .ayuda {
-  color: #4b5563;
+  color: var(--ek-ink-2, #334155);
 }
 
 .parametros-nomina-card {
-  background: #fff;
+  background: var(--ek-surface-2, #f1f5f9);
 }
 
 .parametros-nomina-form {
@@ -21,7 +21,7 @@
 
 .parametros-nomina-form label {
   font-weight: 700;
-  color: #111827;
+  color: var(--ek-ink, #0f172a);
 }
 
 .parametros-nomina-form select,
@@ -38,9 +38,9 @@
 .status {
   margin-top: 14px;
   padding: 10px;
-  border: 1px solid #c7d2fe;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
   border-radius: 8px;
-  background: #eef2ff;
+  background: var(--ek-plum-050, #f9f6fe);
   min-height: 20px;
 }
 

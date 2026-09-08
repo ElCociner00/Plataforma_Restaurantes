@@ -7,7 +7,7 @@
  */
 import { buildRequestHeaders, getUserContext, listAvailableLocalContexts } from "./session.js";
 import { fetchResponsablesActivos } from "./responsables.js";
-import { WEBHOOK_NOMINA_HISTORICO_VISTA, WEBHOOK_NOMINA_HISTORICO_BORRAR } from "./webhooks.js";
+import { supabase } from "./supabase.js";
 
 const empleadoInput = document.getElementById("historicoNominaEmpleado");
 const desdeInput = document.getElementById("historicoNominaDesde");
@@ -235,10 +235,13 @@ const borrarNominaHistorica = async (row) => {
   if (!row?.id) return setStatus("La nómina seleccionada no tiene ID para borrar.");
   setStatus("Solicitando borrado de nómina histórica...");
   try {
-    const authHeaders = await buildRequestHeaders({ includeTenant: true });
-    const payload = { empresa_id: state.context?.empresa_id || "", tenant_id: state.context?.empresa_id || "", nomina_id: row.id, id: row.id, empleado_id: getEmpleadoId(row), fecha: getRowDate(row) };
-    const response = await fetch(WEBHOOK_NOMINA_HISTORICO_BORRAR, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders }, body: JSON.stringify(payload) });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const { error } = await supabase
+      .from("historico_nomina")
+      .delete()
+      .eq("id", row.id);
+
+    if (error) throw new Error(error.message);
+
     state.ocultasSesion.add(String(row.id));
     renderHistoricoRows(state.nominas);
     setStatus("Borrado exitosamente.");
@@ -250,16 +253,21 @@ const borrarNominaHistorica = async (row) => {
 const consultarHistoricoNomina = async () => {
   setStatus("Consultando histórico de nómina...");
   try {
-    const authHeaders = await buildRequestHeaders({ includeTenant: true });
-    const response = await fetch(WEBHOOK_NOMINA_HISTORICO_VISTA, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders }, body: JSON.stringify(buildHistoricoVistaPayload()) });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    state.nominas = normalizeHistoricoRows(await response.json().catch(() => null));
+    const { data, error } = await supabase
+      .from("historico_nomina")
+      .select("*")
+      .eq("empresa_id", state.context?.empresa_id || "")
+      .order("created_at", { ascending: false });
+
+    if (error) throw new Error(error.message);
+
+    state.nominas = normalizeHistoricoRows(data || []);
     renderHistoricoRows(state.nominas);
     setStatus(`Histórico consultado. ${state.nominas.length} nómina(s) recibida(s).`);
   } catch (error) {
     state.nominas = [];
     renderHistoricoRows([]);
-    setStatus(`No fue posible consultar el histórico (${error.message || "sin detalle"}). Verifica el webhook ${WEBHOOK_NOMINA_HISTORICO_VISTA}.`);
+    setStatus(`No fue posible consultar el histórico (${error.message || "sin detalle"}).`);
   }
 };
 

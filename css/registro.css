@@ -1,18 +1,337 @@
-.main {
-  max-width: 420px;
+/* =========================================================
+   REGISTRO · alta self-service de empresa
+   Fase 2
+   ---------------------------------------------------------
+   Dos pasos en una sola vista: identificarse con Google y
+   luego describir el negocio. Comparte el lenguaje visual del
+   login y consume los tokens de la fase 0.
+========================================================= */
+
+.main.registro-container {
+  max-width: var(--ek-w-auth, 440px);
+  margin: clamp(32px, 8vh, 72px) auto;
+  padding: clamp(26px, 5vw, 36px) clamp(22px, 5vw, 32px);
+
+  background: var(--ek-surface, #ffffff);
+  border: 1px solid var(--ek-line, #e8edf3);
+  border-radius: var(--ek-radius-xl, 18px);
+  box-shadow: var(--ek-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.05));
 }
 
+.registro-paso {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ek-sp-3, 12px);
+}
+
+/* El paso de cuenta se centra porque es una sola decisión.
+   El de empresa se alinea a la izquierda: son campos que se leen. */
+#pasoCuenta {
+  align-items: center;
+  text-align: center;
+}
+
+.registro-logo {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+}
+
+.registro-container .registro-title {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: var(--ek-weight-bold, 700);
+  letter-spacing: -0.015em;
+  color: var(--ek-ink, #0f172a);
+  text-align: inherit;
+}
+
+.registro-container .registro-subtitle {
+  margin: 0;
+  font-size: var(--ek-text-body, 0.9375rem);
+  line-height: var(--ek-leading-normal, 1.5);
+  color: var(--ek-muted, #5d6b7e);
+  text-align: inherit;
+}
+
+.registro-container .registro-subtitle strong {
+  color: var(--ek-ink-2, #334155);
+  font-weight: var(--ek-weight-semibold, 600);
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------
+   BOTÓN GOOGLE
+   Mismo componente que el login: superficie blanca con
+   contorno, el color lo pone el logotipo.
+--------------------------------------------------------- */
+.google-btn {
+  width: 100%;
+  min-height: 48px;
+  margin-top: var(--ek-sp-2, 8px);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ek-sp-3, 12px);
+  padding: 12px 18px;
+
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: var(--ek-weight-semibold, 600);
+  color: var(--ek-ink, #0f172a);
+
+  background: var(--ek-surface, #ffffff);
+  border: 1px solid var(--ek-line-strong, #86939f);
+  border-radius: var(--ek-radius-md, 10px);
+  cursor: pointer;
+
+  transition:
+    background-color var(--ek-duration-fast, 120ms) var(--ek-ease, ease),
+    border-color var(--ek-duration-fast, 120ms) var(--ek-ease, ease);
+}
+
+.google-btn:hover:not(:disabled) {
+  background: var(--ek-surface-2, #f1f5f9);
+  border-color: var(--ek-muted, #5d6b7e);
+}
+
+.google-btn:focus-visible {
+  outline: 2px solid var(--ek-violet-500, #8b5cf6);
+  outline-offset: 2px;
+  box-shadow: var(--ek-focus-ring, 0 0 0 3px rgba(139, 92, 246, 0.30));
+}
+
+.google-btn:disabled {
+  cursor: progress;
+  color: var(--ek-muted, #5d6b7e);
+  background: var(--ek-surface-2, #f1f5f9);
+  border-color: var(--ek-line, #e8edf3);
+}
+
+.google-btn-icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+.google-btn:disabled .google-btn-icon {
+  opacity: 0.45;
+}
+
+/* ---------------------------------------------------------
+   FORMULARIO
+   Etiqueta persistente sobre cada campo, nunca placeholder
+   como etiqueta: el placeholder desaparece al escribir y
+   deja al usuario sin saber qué está llenando.
+--------------------------------------------------------- */
+.registro-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ek-sp-4, 16px);
+  margin-top: var(--ek-sp-2, 8px);
+}
+
+.registro-field {
+  display: grid;
+  gap: var(--ek-sp-1, 4px);
+}
+
+.registro-field > span {
+  font-size: var(--ek-text-label, 0.75rem);
+  font-weight: var(--ek-weight-semibold, 600);
+  letter-spacing: var(--ek-tracking-label, 0.04em);
+  text-transform: uppercase;
+  color: var(--ek-muted, #5d6b7e);
+}
+
+.registro-field input {
+  width: 100%;
+  min-height: var(--ek-touch-min, 44px);
+  padding: 10px 12px;
+
+  /* 16px es el umbral por debajo del cual iOS hace zoom al enfocar
+     y descoloca el formulario entero. */
+  font-family: inherit;
+  font-size: var(--ek-input-font-min, 16px);
+  color: var(--ek-ink, #0f172a);
+
+  background: var(--ek-surface, #ffffff);
+  border: 1px solid var(--ek-line-strong, #86939f);
+  border-radius: var(--ek-radius-sm, 6px);
+}
+
+.registro-field input:focus {
+  outline: none;
+  border-color: var(--ek-violet-500, #8b5cf6);
+  box-shadow: var(--ek-focus-ring, 0 0 0 3px rgba(139, 92, 246, 0.30));
+}
+
+.registro-field input:disabled {
+  color: var(--ek-muted, #5d6b7e);
+  background: var(--ek-surface-2, #f1f5f9);
+}
+
+/* ---------------------------------------------------------
+   CONSENTIMIENTO LEGAL
+   Se conserva como requisito de la interfaz aunque no se
+   persista: la tabla `empresas` no tiene columnas para ello.
+--------------------------------------------------------- */
 .consentimiento-legal {
-  font-size: 0.85rem;
-  color: #374151;
-  line-height: 1.45;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--ek-sp-2, 8px);
+  align-items: start;
+
+  font-size: var(--ek-text-note, 0.78125rem);
+  line-height: var(--ek-leading-normal, 1.5);
+  color: var(--ek-muted, #5d6b7e);
 }
 
 .consentimiento-legal input {
-  margin-right: 6px;
-  vertical-align: middle;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--ek-plum-600, #5b3a8f);
+  flex: none;
 }
 
 .consentimiento-legal a {
-  color: #4338ca;
+  color: var(--ek-plum-600, #5b3a8f);
+  text-decoration: none;
+  border-bottom: 1px solid var(--ek-plum-200, #ddd0f5);
+}
+
+.consentimiento-legal a:hover {
+  border-bottom-color: var(--ek-plum-600, #5b3a8f);
+}
+
+/* ---------------------------------------------------------
+   ACCIÓN PRIMARIA
+   Único relleno de marca de la vista.
+--------------------------------------------------------- */
+.registro-submit {
+  width: 100%;
+  min-height: 48px;
+  margin-top: var(--ek-sp-1, 4px);
+
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: var(--ek-weight-semibold, 600);
+  color: var(--ek-on-brand, #ffffff);
+
+  background: var(--ek-plum-600, #5b3a8f);
+  border: 1px solid transparent;
+  border-radius: var(--ek-radius-md, 10px);
+  cursor: pointer;
+
+  transition: background-color var(--ek-duration-fast, 120ms) var(--ek-ease, ease);
+}
+
+.registro-submit:hover:not(:disabled) {
+  background: var(--ek-plum-700, #4a3474);
+}
+
+.registro-submit:focus-visible {
+  outline: 2px solid var(--ek-violet-500, #8b5cf6);
+  outline-offset: 2px;
+}
+
+.registro-submit:disabled {
+  cursor: progress;
+  color: var(--ek-muted, #5d6b7e);
+  background: var(--ek-surface-2, #f1f5f9);
+  border-color: var(--ek-line, #e8edf3);
+}
+
+/* ---------------------------------------------------------
+   ESTADO Y ENLACES
+--------------------------------------------------------- */
+.registro-status {
+  min-height: 20px;
+  margin: var(--ek-sp-4, 16px) 0 0;
+  font-size: var(--ek-text-note, 0.78125rem);
+  line-height: var(--ek-leading-normal, 1.5);
+  color: var(--ek-muted, #5d6b7e);
+  text-align: center;
+}
+
+.registro-status[data-tone="error"] {
+  color: var(--ek-bad-700, #991b1b);
+}
+
+.registro-extra {
+  margin-top: var(--ek-sp-3, 12px);
+  text-align: center;
+}
+
+.registro-container .registro-link {
+  font-size: var(--ek-text-note, 0.78125rem);
+  color: var(--ek-muted, #5d6b7e);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.registro-container .registro-link:hover {
+  color: var(--ek-plum-600, #5b3a8f);
+  border-bottom-color: var(--ek-plum-200, #ddd0f5);
+}
+
+.registro-container .registro-link:focus-visible {
+  outline: 2px solid var(--ek-violet-500, #8b5cf6);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+@media (max-width: 640px) {
+  .main.registro-container {
+    margin: var(--ek-sp-5, 20px) var(--ek-sp-4, 16px);
+    padding: var(--ek-sp-6, 24px) var(--ek-sp-5, 20px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .google-btn,
+  .registro-submit {
+    transition: none;
+  }
+}
+
+/* ── Resumen del plan en el alta ────────────────────────────────────────────
+   El registro no decía qué costaba el servicio. Este bloque lo dice antes de
+   que el usuario rellene nada. */
+.registro-plan {
+  border: 1px solid var(--color-border, #e3e0ec);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-bottom: 22px;
+  background: var(--color-surface-alt, #faf9fd);
+}
+.registro-plan-title {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: var(--color-text-muted, #6b6580);
+}
+.registro-plan-precio {
+  margin: 4px 0 12px;
+  font-size: 1.9rem;
+  line-height: 1.1;
+}
+.registro-plan-precio span {
+  font-size: 1rem;
+  color: var(--color-text-muted, #6b6580);
+}
+.registro-plan-lista {
+  margin: 0 0 12px;
+  padding-left: 18px;
+  display: grid;
+  gap: 5px;
+  font-size: .93rem;
+}
+.registro-plan-nota {
+  margin: 0;
+  font-size: .85rem;
+  color: var(--color-text-muted, #6b6580);
 }

@@ -1,0 +1,140 @@
+# ============================================================================
+# Edge Functions de Enkrato
+#
+# verify_jwt = true  → el gateway rechaza la petición sin JWT ANTES de ejecutar
+#                      código. Es la primera barrera; resolverContexto() y el
+#                      RLS son la segunda y la tercera.
+#
+# La única excepción es el cron, que no tiene usuario detrás: se autentica con
+# la cabecera x-cron-secret contra la variable CRON_SECRET.
+# ============================================================================
+
+# ── Credenciales · de estas dos depende todo lo demás ────────────────────────
+[functions.guardar-credenciales]
+enabled = true
+verify_jwt = true
+
+[functions.consultar-credenciales]
+enabled = true
+verify_jwt = true
+
+# ── Loggro · lectura ─────────────────────────────────────────────────────────
+[functions.consultar-ventas]
+enabled = true
+verify_jwt = true
+
+[functions.consultar-gastos]
+enabled = true
+verify_jwt = true
+
+[functions.consultar-inventarios]
+enabled = true
+verify_jwt = true
+
+[functions.consultar-propina-apoyos]
+enabled = true
+verify_jwt = true
+
+# ── Loggro · escritura ───────────────────────────────────────────────────────
+[functions.cierre-inventarios-subir]
+enabled = true
+verify_jwt = true
+
+[functions.compras-subir]
+enabled = true
+verify_jwt = true
+
+[functions.compras-importar]
+enabled = true
+verify_jwt = true
+
+# ── Registro ─────────────────────────────────────────────────────────────────
+# registro-empleados estaba en verify_jwt = false: cualquiera con la URL podía
+# crear cuentas de usuario. Corregido.
+[functions.registro-empleados]
+enabled = true
+verify_jwt = true
+
+[functions.registro-otros-usuarios]
+enabled = true
+verify_jwt = true
+
+# Lectura acotada de correos de Auth para el panel de administracion. Sustituye
+# la antigua llamada del navegador a /auth/v1/admin/users con service_role.
+[functions.usuarios-admin]
+enabled = true
+verify_jwt = true
+
+[functions.registro-local]
+enabled = true
+verify_jwt = true
+
+# Segundo paso del alta de local. Reemplaza el webhook locales/duplicar_usuarios,
+# que en n8n estaba abierto: cualquiera con la URL podía crear administradores.
+[functions.local-usuarios-duplicar]
+enabled = true
+verify_jwt = true
+
+# ── Nómina ───────────────────────────────────────────────────────────────────
+[functions.nomina-enviar-correo]
+enabled = true
+verify_jwt = true
+
+# ── Tareas programadas ───────────────────────────────────────────────────────
+# Sin JWT de usuario a propósito: la dispara pg_cron. Se protege con CRON_SECRET.
+[functions.cron-refrescar-token-loggro]
+enabled = true
+verify_jwt = false
+
+# ── Facturación · cobro en línea con Wompi ───────────────────────────────────
+# Prepara el cobro: resuelve la factura del cliente, la firma y devuelve la URL
+# del Checkout. Sí lleva JWT: hay usuario detrás y hay que saber quién es.
+[functions.pago-iniciar]
+enabled = true
+verify_jwt = true
+
+# Receptor de notificaciones de Wompi. Sin JWT a propósito: lo llama el servidor
+# de Wompi, no un navegador con sesión. Lo protege el checksum SHA256 firmado
+# con WOMPI_EVENTS_SECRET, que se valida en el primer paso de la función.
+#
+# URL a registrar en el panel de Wompi (Mi cuenta → URL de eventos):
+#   https://tgkvcvnwwnrlyhbqmhaf.supabase.co/functions/v1/wompi-eventos
+[functions.wompi-eventos]
+enabled = true
+verify_jwt = false
+
+# Ciclo diario de facturación (emitir el 25, recordar el 1 y el 4, vencer el 6).
+# Sin JWT: la dispara pg_cron. Se protege con CRON_SECRET, igual que la de Loggro.
+[functions.cron-facturacion]
+enabled = true
+verify_jwt = false
+
+# Descarga de datos del cliente (RGPD-style / Ley 1581). Lleva JWT: solo puede
+# exportar quien tiene sesión, y solo el alcance de su propia cuenta.
+[functions.exportar-datos]
+enabled = true
+verify_jwt = true
+
+# ── Rappi V1 · lectura, sincronización y webhooks ────────────────────────────
+# Administracion y consultas siempre requieren una sesión válida.
+[functions.rappi-admin]
+enabled = true
+verify_jwt = true
+
+[functions.rappi-data]
+enabled = true
+verify_jwt = true
+
+# Rappi y pg_cron no envían JWT de usuario. Estas funciones validan dentro del
+# código la firma HMAC del proveedor o CRON_SECRET antes de procesar datos.
+[functions.rappi-webhook]
+enabled = true
+verify_jwt = false
+
+[functions.rappi-worker]
+enabled = true
+verify_jwt = false
+
+[functions.rappi-sync]
+enabled = true
+verify_jwt = false

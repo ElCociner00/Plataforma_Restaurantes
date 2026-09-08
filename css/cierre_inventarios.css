@@ -59,7 +59,7 @@
 .inconsistencias-hint {
   margin: 0 0 10px;
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--ek-muted, #5d6b7e);
 }
 
 table {
@@ -70,13 +70,13 @@ table {
 
 th,
 td {
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--ek-line, #e8edf3);
   padding: 10px;
   text-align: left;
 }
 
 th {
-  color: #374151;
+  color: var(--ek-ink-2, #334155);
   font-size: 0.9rem;
 }
 
@@ -85,14 +85,15 @@ td input {
 }
 
 input[readonly] {
-  background: #f1efff;
-  border-color: #d8d2ff;
+  background: var(--ek-plum-050, #f9f6fe);
+  border-color: var(--ek-plum-200, #ddd0f5);
 }
 
 .acciones-cierre {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  align-items: center;
   margin-top: 10px;
 }
 
@@ -100,8 +101,8 @@ input[readonly] {
   position: sticky;
   top: 74px;
   z-index: 40;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--ek-surface-2, #f1f5f9);
+  border: 1px solid var(--ek-line, #e8edf3);
   border-radius: 12px;
   padding: 12px;
 }
@@ -112,27 +113,27 @@ input[readonly] {
 }
 
 .acciones-cierre button:disabled {
-  background: #e5e7eb;
-  color: #9ca3af;
+  background: var(--ek-surface-2, #f1f5f9);
+  color: var(--ek-muted, #5d6b7e);
+  border-color: var(--ek-line, #e8edf3);
   cursor: not-allowed;
 }
 
 #status {
   flex-basis: 100%;
-  color: #374151;
+  color: var(--ek-ink-2, #334155);
   font-size: 0.9rem;
   margin-top: 2px;
 }
 
-.is-hidden {
-  display: none;
-}
+/* .is-hidden se define ahora en css/main.css (capa global de estado).
+   Duplicarla aqui reintroduce el conflicto que la fase 0 elimino. */
 
 .loading-overlay {
   position: fixed;
   inset: 0;
   background: rgba(17, 24, 39, 0.35);
-  color: #fff;
+  color: var(--ek-surface, #ffffff);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -158,9 +159,9 @@ input[readonly] {
 .snapshot-locked select:disabled,
 .snapshot-locked textarea:disabled,
 .snapshot-locked button:disabled {
-  background: #ede9fe !important;
-  border-color: #d8b4fe !important;
-  color: #6b21a8 !important;
+  background: var(--ek-plum-100, #efe9fb) !important;
+  border-color: var(--ek-plum-200, #ddd0f5) !important;
+  color: var(--ek-plum-700, #4a3474) !important;
   opacity: 1;
 }
 
@@ -172,7 +173,7 @@ input[readonly] {
 
 .btn-correccion {
   width: min(440px, 100%);
-  background: #7c3aed;
+  background: var(--ek-violet-600, #7c3aed);
 }
 
 .modal-alerta {
@@ -186,20 +187,19 @@ input[readonly] {
 
 .modal-alerta-card {
   width: min(680px, 92vw);
-  background: #fff;
+  background: var(--ek-surface, #ffffff);
   border-radius: 12px;
-  border: 1px solid #ddd6fe;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
   padding: 18px;
   text-align: center;
 }
 
 .modal-alerta-card p {
   margin: 0 0 14px;
-  color: #312e81;
+  color: var(--ek-plum-800, #3b2a5e);
   line-height: 1.4;
 }
 
 
-.is-hidden {
-  display: none !important;
-}
+/* .is-hidden se define ahora en css/main.css (capa global de estado).
+   Duplicarla aqui reintroduce el conflicto que la fase 0 elimino. */

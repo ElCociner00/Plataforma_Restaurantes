@@ -2,98 +2,203 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Enkrato | Software para restaurantes y negocios operativos</title>
-  <meta name="description" content="Enkrato ayuda a restaurantes, tiendas y distribuidoras a medir, controlar, analizar y mejorar su operación con menos tareas manuales y más decisiones confiables.">
+  <meta name="description" content="Enkrato concilia lo que registra tu sistema con lo que reporta tu equipo: turnos, caja e inventario cuadrados en el momento, no al final del mes.">
+  <meta name="theme-color" content="#ffffff">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/variables.css">
   <link rel="stylesheet" href="css/landing.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
 </head>
 <body>
-  <main class="landing-page">
-    <section class="hero-section" id="heroSection" aria-labelledby="heroTitle">
-      <canvas id="automaton-canvas" aria-hidden="true"></canvas>
-      <div class="hero-overlay" aria-hidden="true"></div>
+  <!-- Los lavados de color viven en su propia capa fija: asi el degradado no
+       se corta al hacer scroll ni obliga a repintarlo en cada seccion. -->
+  <div class="ambient" aria-hidden="true"></div>
 
-      <header class="landing-header" aria-label="Navegación principal">
-        <a class="brand-pill" href="./" aria-label="Enkrato inicio">
-          <img src="images/Logo.webp" alt="Logo Enkrato" class="brand-logo" onerror="this.style.display='none'">
-          <span>Enkrato</span>
-        </a>
-        <a class="login-link" href="./inicio/">Iniciar sesión</a>
-      </header>
+  <a class="skip-link" href="#contenido">Saltar al contenido</a>
 
-      <div class="hero-content" id="hero-content">
-        <p class="eyebrow">Medir, Controlar, Analizar y Mejorar</p>
-        <h1 class="hero-title" id="heroTitle">Enkrato</h1>
-        <p class="hero-subtitle">
-          Convierte la operación diaria de restaurantes, tiendas y distribuidoras en decisiones claras:
-          módulos prácticos creados con negocios del sector para ordenar tu gestión administrativa,
-          validar tu información y liberar tiempo para crecer.
-        </p>
-        <div class="hero-actions">
-          <a class="primary-cta" href="./registro/index.html">Empodérate de tu negocio</a>
-          <a class="secondary-cta" href="./inicio/">Ya tengo cuenta</a>
-        </div>
-      </div>
-
-      <a class="scroll-indicator" href="#por-que-nosotros" aria-label="Ver por qué elegir Enkrato">
-        <span aria-hidden="true">⌄</span>
+  <header class="site-header">
+    <div class="shell site-header-inner">
+      <a class="brand" href="./" aria-label="Enkrato, inicio">
+        <img src="images/Logo.webp" alt="" class="brand-logo" onerror="this.style.display='none'">
+        <span class="brand-name">Enkrato</span>
       </a>
+      <nav class="site-nav" aria-label="Accesos de cuenta">
+        <a class="nav-link" href="./inicio/">Iniciar sesión</a>
+        <a class="nav-cta" href="./registro/index.html">Crear cuenta</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="landing-page" id="contenido">
+
+    <!-- ============================================================
+         HERO
+         La tesis a la izquierda; a la derecha, la conciliacion real
+         del producto en miniatura. Los colores rojo/ambar/verde de
+         ese panel son los mismos semanticos de cierre_turno.css: ahi
+         significan algo, no decoran.
+    ============================================================ -->
+    <section class="hero" aria-labelledby="heroTitle">
+      <div class="shell hero-grid">
+
+        <div class="hero-copy">
+          <p class="eyebrow">Medir · Controlar · Analizar · Mejorar</p>
+
+          <h1 class="hero-title" id="heroTitle">Cuadra el día antes de cerrarlo.</h1>
+
+          <p class="hero-subtitle">
+            Enkrato compara lo que registra tu sistema con lo que reporta tu equipo
+            —turnos, caja e inventario— y te muestra la diferencia en el momento,
+            no cuando ya no puedes hacer nada al respecto.
+          </p>
+
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="./registro/index.html">
+              Registra tu negocio
+              <i class="ph ph-arrow-right" aria-hidden="true"></i>
+            </a>
+            <a class="btn btn-ghost" href="./inicio/">Ya tengo cuenta</a>
+          </div>
+
+          <ul class="hero-trust">
+            <li><i class="ph ph-storefront" aria-hidden="true"></i>Restaurantes, tiendas y distribuidoras</li>
+            <li><i class="ph ph-arrows-left-right" aria-hidden="true"></i>Integración con Loggro</li>
+          </ul>
+        </div>
+
+        <aside class="hero-panel" aria-label="Ejemplo de cierre de turno">
+          <div class="panel-head">
+            <span class="panel-title"><i class="ph ph-cash-register" aria-hidden="true"></i>Cierre de turno</span>
+            <span class="panel-meta">Sede Centro · 21:40</span>
+          </div>
+
+          <dl class="panel-rows">
+            <div class="panel-row">
+              <dt>Según el sistema</dt>
+              <dd>$ 1.842.500</dd>
+            </div>
+            <div class="panel-row">
+              <dt>Contado por el turno</dt>
+              <dd>$ 1.836.000</dd>
+            </div>
+            <div class="panel-row panel-row-total">
+              <dt>Diferencia</dt>
+              <dd class="diff-value diff-alert">−$ 6.500</dd>
+            </div>
+          </dl>
+
+          <p class="panel-verdict panel-verdict-alert">
+            <i class="ph ph-warning-circle" aria-hidden="true"></i>
+            Faltante detectado en caja
+          </p>
+
+          <ul class="panel-checks">
+            <li><i class="ph ph-check-circle" aria-hidden="true"></i>Inventario conciliado</li>
+            <li><i class="ph ph-check-circle" aria-hidden="true"></i>Facturación al día</li>
+          </ul>
+        </aside>
+
+      </div>
     </section>
 
-    <section class="problem-solution" id="por-que-nosotros" aria-labelledby="whyTitle">
-      <div class="section-shell two-column">
+    <!-- ============================================================
+         PROBLEMA → SOLUCION
+    ============================================================ -->
+    <section class="band band-story" id="por-que-nosotros" aria-labelledby="whyTitle">
+      <div class="shell story-grid">
         <div>
-          <p class="section-kicker">Problema → solución</p>
-          <h2 id="whyTitle">¿Por qué elegir Enkrato?</h2>
+          <p class="kicker">Problema → solución</p>
+          <h2 id="whyTitle">El registro es fácil. La verificación es el trabajo real.</h2>
         </div>
-        <div class="story-card">
+        <div class="story-body">
           <p>
-            Muchos sistemas registran turnos, ventas o inventarios consumidos; el verdadero reto aparece
-            cuando necesitas comparar lo que el sistema dice con lo que tu equipo reporta en la operación real.
+            Muchos sistemas registran turnos, ventas o inventarios consumidos. El verdadero reto
+            aparece cuando necesitas comparar lo que el sistema dice con lo que tu equipo reporta
+            en la operación real.
           </p>
           <p>
-            En demasiados negocios esa verificación todavía depende de formatos manuales, revisión fila por fila
-            y cierres que consumen energía. Enkrato automatiza esa conciliación y, para usuarios que operan con
-            Loggro, conecta ambas plataformas para ahorrar tiempo, aumentar eficiencia y detectar diferencias con
-            mayor confianza.
+            En demasiados negocios esa verificación todavía depende de formatos manuales, revisión
+            fila por fila y cierres que consumen energía. Enkrato automatiza esa conciliación y,
+            para quienes operan con Loggro, conecta ambas plataformas para ahorrar tiempo, aumentar
+            eficiencia y detectar diferencias con mayor confianza.
           </p>
         </div>
       </div>
     </section>
 
-    <section class="benefits-section" aria-labelledby="benefitsTitle">
-      <div class="section-shell">
-        <p class="section-kicker">Beneficios para tu operación</p>
+    <!-- ============================================================
+         BENEFICIOS
+    ============================================================ -->
+    <section class="band" aria-labelledby="benefitsTitle">
+      <div class="shell">
+        <p class="kicker">Beneficios para tu operación</p>
         <h2 id="benefitsTitle">Menos fricción diaria. Más control para escalar.</h2>
+
         <div class="benefits-grid">
-          <article class="benefit-card">
-            <span class="benefit-icon" aria-hidden="true">⏱</span>
+          <article class="benefit">
+            <span class="benefit-icon"><i class="ph ph-clock-countdown" aria-hidden="true"></i></span>
             <h3>Ahorro de tiempo</h3>
-            <p>Centraliza verificaciones y reduce horas invertidas en revisar cierres, turnos e inventario de forma manual.</p>
+            <p>Centraliza verificaciones y reduce las horas invertidas en revisar cierres, turnos e inventario a mano.</p>
           </article>
-          <article class="benefit-card">
-            <span class="benefit-icon" aria-hidden="true">✓</span>
+
+          <article class="benefit">
+            <span class="benefit-icon"><i class="ph ph-shield-check" aria-hidden="true"></i></span>
             <h3>Menos errores operativos</h3>
-            <p>Disminuye reprocesos causados por digitación, formatos físicos o diferencias no detectadas a tiempo.</p>
+            <p>Disminuye reprocesos causados por digitación, formatos físicos o diferencias que nadie detectó a tiempo.</p>
           </article>
-          <article class="benefit-card">
-            <span class="benefit-icon" aria-hidden="true">↗</span>
+
+          <article class="benefit">
+            <span class="benefit-icon"><i class="ph ph-chart-line-up" aria-hidden="true"></i></span>
             <h3>Decisiones con evidencia</h3>
-            <p>Compara información registrada contra datos reales para entender qué pasó y actuar con mayor seguridad.</p>
+            <p>Compara la información registrada contra los datos reales para entender qué pasó y actuar con seguridad.</p>
           </article>
-          <article class="benefit-card">
-            <span class="benefit-icon" aria-hidden="true">☕</span>
+
+          <article class="benefit">
+            <span class="benefit-icon"><i class="ph ph-smiley" aria-hidden="true"></i></span>
             <h3>Menos estrés para el equipo</h3>
-            <p>Simplifica cierres y controles repetitivos para que tus colaboradores se enfoquen en atender y producir mejor.</p>
+            <p>Simplifica cierres y controles repetitivos para que tus colaboradores se enfoquen en atender y producir.</p>
           </article>
         </div>
       </div>
     </section>
+
+    <!-- ============================================================
+         CIERRE
+    ============================================================ -->
+    <section class="band band-close" aria-labelledby="closeTitle">
+      <div class="shell">
+        <div class="close-card">
+          <h2 id="closeTitle">Empieza con el cierre de esta noche.</h2>
+          <p>Crea tu cuenta con Google y registra tu negocio en un par de minutos.</p>
+          <a class="btn btn-primary" href="./registro/index.html">
+            Registra tu negocio
+            <i class="ph ph-arrow-right" aria-hidden="true"></i>
+          </a>
+        </div>
+      </div>
+    </section>
+
   </main>
 
-  <script type="module" src="js/landing.js"></script>
+  <footer class="site-footer">
+    <div class="shell site-footer-inner">
+      <p class="footer-copy">© 2026 Enkrato</p>
+      <nav class="footer-links" aria-label="Legal">
+        <a href="legal/terminos.html">Términos y Condiciones</a>
+        <a href="legal/privacidad.html">Política de Privacidad</a>
+        <a href="legal/cookies.html">Política de Cookies</a>
+        <a href="legal/datos.html">Tratamiento de Datos</a>
+        <a href="legal/responsabilidad.html">Responsabilidad Legal</a>
+        <a href="legal/seguridad.html">Política de Seguridad</a>
+        <a href="legal/consentimientos.html">Consentimientos</a>
+      </nav>
+    </div>
+  </footer>
 </body>
 </html>

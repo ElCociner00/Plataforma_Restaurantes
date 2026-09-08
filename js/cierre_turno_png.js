@@ -66,7 +66,7 @@ const getSnapshotRows = ({
     ["Nequi", inputsFinanzas.nequi.sistema.value, inputsFinanzas.nequi.real.value, inputsDiferencias.nequi.input.value],
     ["Transferencias", inputsFinanzas.transferencias.sistema.value, inputsFinanzas.transferencias.real.value, inputsDiferencias.transferencias.input.value],
     ["Bono regalo", inputsFinanzas.bono_regalo.sistema.value, inputsFinanzas.bono_regalo.real.value, inputsDiferencias.bono_regalo.input.value],
-    ["Propina", inputsSoloVista.propina.value, "-", "-"],
+    ["Propina general", inputsSoloVista.propina.value, "-", "-"],
     ["Domicilios", inputsSoloVista.domicilios.value, "-", "-"],
     ["Bolsa", "-", bolsa?.value || "0", "-"],
     ["Caja", "-", caja?.value || "0", "-"]
@@ -178,8 +178,14 @@ export const descargarImagenResumenCierreTurno = ({
 
     ctx.textAlign = "right";
     ctx.fillStyle = "#312e81";
-    ctx.font = "bold 34px Arial";
-    ctx.fillText(meta.empresaNombre, cardX + cardW - 36, y);
+    const empresaNombre = String(meta.empresaNombre || "Empresa");
+    let empresaFontSize = 34;
+    ctx.font = `bold ${empresaFontSize}px Arial`;
+    while (empresaFontSize > 20 && ctx.measureText(empresaNombre).width > 500) {
+      empresaFontSize -= 1;
+      ctx.font = `bold ${empresaFontSize}px Arial`;
+    }
+    ctx.fillText(empresaNombre, cardX + cardW - 36, y, 500);
     ctx.font = "bold 20px Arial";
     ctx.fillStyle = "#6d28d9";
     ctx.fillText(marcaAxioma, cardX + cardW - 36, y + 34);

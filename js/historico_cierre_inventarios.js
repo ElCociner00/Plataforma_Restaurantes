@@ -32,7 +32,7 @@
  */
 import { buildRequestHeaders, getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
-import { WEBHOOK_HISTORICO_CIERRE_INVENTARIOS_DATOS } from "./webhooks.js";
+
 
 const head = document.getElementById("historicoHead");
 const body = document.getElementById("historicoBody");
@@ -143,20 +143,6 @@ const fetchAllInventoryRows = async (tableName, empresaId) => {
   }
 };
 
-const fetchWebhookInventoryRows = async (payload) => {
-  try {
-    const headers = await buildRequestHeaders({ includeTenant: true });
-    const response = await fetchWithTimeout(WEBHOOK_HISTORICO_CIERRE_INVENTARIOS_DATOS, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...headers },
-      body: JSON.stringify(payload)
-    });
-    if (!response.ok) return [];
-    return normalizeRows(await response.json());
-  } catch (_error) {
-    return [];
-  }
-};
 
 const getInventoryRowKey = (row, index) => String(row?.id || `${row?.fecha_cierre || row?.fecha || "sin_fecha"}-${row?.hora_inicio || ""}-${row?.hora_fin || ""}-${index}`);
 const mergeInventoryRows = (...groups) => {
@@ -410,14 +396,11 @@ const loadData = async () => {
 
   try {
     const tableName = getScopedInventoryTable();
-    const [directResult, webhookRows] = await Promise.all([
-      fetchAllInventoryRows(tableName, state.context.empresa_id),
-      fetchWebhookInventoryRows(state.context)
-    ]);
+    const directResult = await fetchAllInventoryRows(tableName, state.context.empresa_id);
 
-    if (directResult.error && !webhookRows.length) throw directResult.error;
+    if (directResult.error) throw directResult.error;
 
-    const rows = mergeInventoryRows(directResult.data, webhookRows).map((item, idx) => ({ id: item.id || item._id || `inv-${idx}`, ...item }));
+    const rows = (directResult.data || []).map((item, idx) => ({ id: item.id || item._id || `inv-${idx}`, ...item }));
     state.allRows = rows;
 
     const savedGeneralOrder = loadJson(getGeneralOrderKey(state.context.tenant_id), null);

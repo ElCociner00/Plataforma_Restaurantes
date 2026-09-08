@@ -24,7 +24,7 @@ input[type="email"] {
   padding: 10px;
   margin-bottom: 12px;
   border-radius: 6px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--ek-line, #e8edf3);
 }
 
 button[type="submit"] {
@@ -38,10 +38,10 @@ button[type="submit"] {
 
 .usuarios-gestion-box {
   margin-top: 26px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--ek-line, #e8edf3);
   border-radius: 10px;
   padding: 14px;
-  background: #fff;
+  background: var(--ek-surface-2, #f1f5f9);
 }
 
 .usuarios-gestion-box h2 {
@@ -50,7 +50,7 @@ button[type="submit"] {
 
 .usuarios-help {
   margin: 0 0 10px;
-  color: #4b5563;
+  color: var(--ek-ink-2, #334155);
   font-size: 0.92rem;
 }
 
@@ -69,7 +69,7 @@ button[type="submit"] {
 .usuarios-tabla th,
 .usuarios-tabla td {
   padding: 10px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--ek-line, #e8edf3);
   text-align: center;
 }
 
@@ -96,7 +96,7 @@ button[type="submit"] {
   position: absolute;
   inset: 0;
   cursor: pointer;
-  background: #d1d5db;
+  background: var(--ek-line, #e8edf3);
   border-radius: 999px;
   transition: .2s ease;
 }
@@ -109,12 +109,12 @@ button[type="submit"] {
   left: 3px;
   top: 3px;
   border-radius: 999px;
-  background: #fff;
+  background: var(--ek-surface, #ffffff);
   transition: .2s ease;
 }
 
 .switch-cell input:checked + .switch-slider {
-  background: #2563eb;
+  background: var(--ek-info-600, #2563eb);
 }
 
 .switch-cell input:checked + .switch-slider::before {

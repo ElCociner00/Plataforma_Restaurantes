@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>AXIOMA | Auditoría de turnos</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/auditoria_turnos.css?v=20260823">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../js/router.js"></script>
+  <script type="module" src="../js/header.js"></script>
+
+  <div id="loadingOverlay" class="loading-overlay is-hidden">Cargando auditoría...</div>
+
+  <div class="main">
+    <h1>Auditoría de turnos</h1>
+    <p class="intro">
+      Cierres de turno que salieron de la base de trabajo: reemplazos hechos desde
+      el formulario, duplicados depurados y registros descartados. Cada movimiento
+      conserva sus datos íntegros y la razón por la que se archivó.
+    </p>
+
+    <!-- Aviso que sustituye a todo lo demás si quien entra no es administrador -->
+    <div id="sinAcceso" class="sin-acceso is-hidden">
+      <h2>Esta pantalla es solo para administradores</h2>
+      <p>Tu cuenta no tiene permiso para gestionar el histórico de turnos.</p>
+    </div>
+
+    <div id="contenido">
+      <section class="bloque">
+        <h2>Resumen</h2>
+        <div id="resumenTarjetas" class="resumen-grid"></div>
+      </section>
+
+      <section class="bloque filtros">
+        <h2>Filtros</h2>
+        <div class="filtros-grid">
+          <label>
+            Sede
+            <select id="filtroSede">
+              <option value="">Todas</option>
+            </select>
+          </label>
+          <label>
+            Responsable
+            <select id="filtroResponsable">
+              <option value="">Todos</option>
+            </select>
+          </label>
+          <label>
+            Motivo
+            <select id="filtroMotivo">
+              <option value="">Todos</option>
+              <option value="DUP_EXACTO">Reenvío idéntico (doble clic)</option>
+              <option value="DUP_CORREGIDO">Reenvío con corrección</option>
+              <option value="DUP_JORNADA">Jornada repetida en el día</option>
+              <option value="SOBRESCRITO">Reemplazado desde el formulario</option>
+              <option value="DATOS_PRUEBA">Datos de prueba</option>
+              <option value="FILA_HUERFANA">Fila huérfana</option>
+              <option value="ENVIO_TRUNCADO">Envío cortado a medias</option>
+              <option value="MANUAL">Movimiento manual</option>
+            </select>
+          </label>
+          <label>
+            Estado
+            <select id="filtroEstado">
+              <option value="">Todos</option>
+              <option value="archivado">Solo archivados</option>
+              <option value="restaurado">Solo restaurados</option>
+              <option value="editado">Solo editados</option>
+            </select>
+          </label>
+          <label>
+            Jornada
+            <select id="filtroJornada">
+              <option value="">Todas</option>
+              <option value="1">Turno 1 &middot; Mañana</option>
+              <option value="2">Turno 2 &middot; Tarde</option>
+              <option value="3">Turno 3 &middot; Noche</option>
+            </select>
+          </label>
+          <label>
+            Fecha del turno desde
+            <input type="date" id="filtroFechaDesde">
+          </label>
+          <label>
+            Fecha del turno hasta
+            <input type="date" id="filtroFechaHasta">
+          </label>
+          <label>
+            Buscar en observaciones
+            <input type="search" id="filtroTexto" placeholder="Ej. doble clic, prueba...">
+          </label>
+        </div>
+        <div class="acciones-filtros">
+          <button id="limpiarFiltros" type="button">Limpiar filtros</button>
+          <span id="conteoFiltro" class="conteo-filtro"></span>
+        </div>
+      </section>
+
+      <section class="bloque">
+        <h2>Movimientos</h2>
+        <p class="hint">
+          Cada línea es un movimiento completo. Pulsa sobre una para ver sus datos
+          y compararlos con el turno que hay hoy en la base.
+        </p>
+        <div class="tabla-wrap">
+          <table class="tabla-lotes">
+            <thead>
+              <tr>
+                <th>Fecha turno</th>
+                <th>Jornada</th>
+                <th>Sede</th>
+                <th>Responsable</th>
+                <th>Motivo</th>
+                <th class="num">Filas</th>
+                <th class="num">Importe</th>
+                <th>Movido</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="lotesBody"></tbody>
+          </table>
+        </div>
+        <div id="paginacion" class="paginacion"></div>
+      </section>
+
+      <section class="bloque">
+        <h2>Detalle del movimiento</h2>
+        <div id="detalleLote" class="detalle-lote">
+          Selecciona un movimiento de la tabla para ver su detalle.
+        </div>
+      </section>
+    </div>
+
+    <div id="status" class="status" role="status"></div>
+  </div>
+
+  <script type="module" src="../js/auditoria_turnos.js?v=20260823"></script>
+  <script type="module" src="../js/footer.js"></script>
+  <!-- Parche de autenticación para módulos (aislado) -->
+  <script type="module" src="../js/module_fix/init.js"></script>
+</body>
+</html>

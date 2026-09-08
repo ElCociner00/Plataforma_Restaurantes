@@ -2,10 +2,13 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>AXIOMA | Visualización cierre turno</title>
 
+  <link rel="stylesheet" href="../css/variables.css">
   <link rel="stylesheet" href="../css/main.css">
   <link rel="stylesheet" href="../css/visualizacion_cierre_turno.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
 </head>
 
 <body style="display:none">
@@ -23,7 +26,11 @@
       Activa o desactiva los datos visibles en el cierre de turno. Los campos ocultos se mantendrán en cero.
     </p>
 
-    <div class="panel">
+    <div class="bulk-actions" data-target="panel-main">
+      <button type="button" class="btn-bulk-activar">Activar todas</button>
+      <button type="button" class="btn-bulk-desactivar">Desactivar todas</button>
+    </div>
+    <div class="panel" id="panel-main">
       <div class="vis-row">
         <span>Efectivo</span>
         <label class="switch">
@@ -92,6 +99,10 @@
 
     <h2 class="extras-title">Extras</h2>
     <p class="descripcion">Controla los gastos dinámicos que se muestran en el cierre de turno.</p>
+    <div class="bulk-actions" data-target="extrasPanel">
+      <button type="button" class="btn-bulk-activar">Activar todas</button>
+      <button type="button" class="btn-bulk-desactivar">Desactivar todas</button>
+    </div>
     <div id="extrasPanel" class="panel"></div>
 
     <div id="status" class="status"></div>

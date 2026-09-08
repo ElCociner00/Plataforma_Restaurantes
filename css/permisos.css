@@ -15,17 +15,17 @@
 
 .helper-text {
   margin-bottom: 12px;
-  color: #6b7280;
+  color: var(--ek-muted, #5d6b7e);
   font-size: 0.98rem;
 }
 
 .permisos-note {
   margin-bottom: 16px;
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
+  background: var(--ek-plum-100, #efe9fb);
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
   border-radius: 8px;
   padding: 12px 14px;
-  color: #312e81;
+  color: var(--ek-plum-800, #3b2a5e);
 }
 
 .permisos-note p {
@@ -47,15 +47,15 @@
 }
 
 .resumen-item {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--ek-surface-2, #f1f5f9);
+  border: 1px solid var(--ek-line, #e8edf3);
   border-radius: 8px;
   padding: 10px 14px;
 }
 
 .resumen-label {
   display: block;
-  color: #6b7280;
+  color: var(--ek-muted, #5d6b7e);
   font-size: 0.84rem;
   margin-bottom: 4px;
 }
@@ -70,38 +70,38 @@
 .bulk-actions button {
   padding: 10px 12px;
   border-radius: 6px;
-  border: 1px solid #4338ca;
-  background: #4f46e5;
-  color: #ffffff;
+  border: 1px solid var(--ek-plum-700, #4a3474);
+  background: var(--ek-plum-600, #5b3a8f);
+  color: var(--ek-surface, #ffffff);
   cursor: pointer;
   font-size: 0.92rem;
   font-weight: 600;
 }
 
 .bulk-actions button:hover {
-  background: #4338ca;
+  background: var(--ek-plum-700, #4a3474);
 }
 
 .bulk-actions button[data-action="revoke"] {
-  background: #312e81;
-  border-color: #312e81;
+  background: var(--ek-plum-800, #3b2a5e);
+  border-color: var(--ek-plum-800, #3b2a5e);
 }
 
 .bulk-actions button[data-action="revoke"]:hover {
-  background: #1f1c63;
+  background: var(--ek-plum-900, #2c1f47);
 }
 
 .permisos-table {
   overflow: auto;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--ek-line, #e8edf3);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--ek-surface, #ffffff);
   max-height: 65vh;
 }
 
 .permisos-table .empty {
   padding: 12px;
-  color: #6b7280;
+  color: var(--ek-muted, #5d6b7e);
 }
 
 .permisos-table table {
@@ -113,14 +113,14 @@
 .permisos-table th,
 .permisos-table td {
   padding: 12px 14px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--ek-surface-2, #f1f5f9);
   text-align: left;
   font-size: 0.98rem;
 }
 
 .permisos-table th {
-  background: #eef2ff;
-  color: #312e81;
+  background: var(--ek-plum-050, #f9f6fe);
+  color: var(--ek-plum-800, #3b2a5e);
   font-weight: 700;
   position: sticky;
   top: 0;
@@ -149,7 +149,7 @@
 .switch-slider {
   width: 46px;
   height: 25px;
-  background: #c7d2fe;
+  background: var(--ek-plum-200, #ddd0f5);
   border-radius: 999px;
   position: relative;
   transition: all 0.2s ease;
@@ -163,13 +163,13 @@
   border-radius: 50%;
   top: 3px;
   left: 3px;
-  background: #ffffff;
+  background: var(--ek-surface, #ffffff);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   transition: transform 0.2s ease;
 }
 
 .permiso-switch input[type="checkbox"]:checked + .switch-slider {
-  background: #312e81;
+  background: var(--ek-plum-800, #3b2a5e);
 }
 
 .permiso-switch input[type="checkbox"]:checked + .switch-slider::before {
@@ -177,14 +177,14 @@
 }
 
 .permiso-switch input[type="checkbox"]:focus-visible + .switch-slider {
-  outline: 2px solid #4338ca;
+  outline: 2px solid var(--ek-plum-700, #4a3474);
   outline-offset: 2px;
 }
 
 .switch-state {
   font-size: 0.82rem;
   font-weight: 700;
-  color: #374151;
+  color: var(--ek-ink-2, #334155);
   min-width: 24px;
 }
 
@@ -203,7 +203,7 @@
 .status {
   margin-top: 12px;
   font-size: 0.88rem;
-  color: #312e81;
+  color: var(--ek-plum-800, #3b2a5e);
   text-align: left;
 }
 

@@ -2,10 +2,13 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>AXIOMA | Configuracion</title>
 
+  <link rel="stylesheet" href="../css/variables.css">
   <link rel="stylesheet" href="../css/main.css">
   <link rel="stylesheet" href="../css/configuracion.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
 </head>
 
 <body style="display:none">
@@ -21,14 +24,14 @@
       <button class="accordion-toggle">Usuarios</button>
       <div class="accordion-content">
         <ul class="config-list">
-          <li><a href="gestion_usuarios.html">Gestión de usuarios</a></li>
+          <li><a href="../configuracion/gestion_usuarios.html">Gestión de usuarios</a></li>
         </ul>
       </div>
 
       <button class="accordion-toggle">Seguridad y permisos</button>
       <div class="accordion-content">
         <ul class="config-list">
-          <li><a href="permisos.html">Permisos</a></li>
+          <li><a href="../configuracion/permisos.html">Permisos</a></li>
         </ul>
         <p class="coming-soon">Proximamente gestion de permisos y roles</p>
       </div>
@@ -36,29 +39,25 @@
       <button class="accordion-toggle">Visualizacion</button>
       <div class="accordion-content">
         <ul class="config-list">
-          <li><a href="visualizacion_cierre_turno.html">Visualizacion cierre turno</a></li>
-          <li><a href="visualizacion_cierre_inventarios.html">Visualizacion cierre inventario</a></li>
-          <li><a href="visualizacion_cierre_turno_historico.html">Visualizacion historico cierre turno</a></li>
-          <li><a href="visualizacion_cierre_inventarios_historico.html">Visualizacion historico cierre inventario</a></li>
+          <li><a href="../configuracion/visualizacion_cierre_turno.html">Visualizacion cierre turno</a></li>
+          <li><a href="../configuracion/visualizacion_cierre_inventarios.html">Visualizacion cierre inventario</a></li>
+          <li><a href="../configuracion/visualizacion_cierre_turno_historico.html">Visualizacion historico cierre turno</a></li>
+          <li><a href="../configuracion/visualizacion_cierre_inventarios_historico.html">Visualizacion historico cierre inventario</a></li>
         </ul>
       </div>
 
       <button class="accordion-toggle">Apis e integraciones</button>
       <div class="accordion-content">
         <ul class="config-list">
-          <li><a href="loggro.html">Loggro</a></li>
-          <li><a href="credibanco.html">Credibanco</a></li>
+          <li><a href="../configuracion/loggro.html">Loggro</a></li>
+          <li><a href="../rappi/operacion.html">Rappi</a></li>
+          <li><a href="../rappi/integracion.html">Integración Rappi</a></li>
+          <li><a href="../configuracion/credibanco.html">Credibanco</a></li>
           <li><a href="../nomina/">Nómina</a></li>
-          <li><a href="parametros_nomina.html">Parámetros de nómina</a></li>
+          <li><a href="../configuracion/parametros_nomina.html">Parámetros de nómina</a></li>
         </ul>
       </div>
     </div>
-    <details class="config-emergency-access">
-      <summary>Accesos de emergencia</summary>
-      <p>Herramientas de respaldo ocultas del acordeón principal para evitar uso accidental.</p>
-      <a href="../cierre_turno/auxiliar.html">Abrir cierre de turno auxiliar</a>
-    </details>
-
   </div>
 
   <script>

@@ -20,7 +20,8 @@
  * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
  */
 import { getUserContext } from "../js/session.js";
-import { WEBHOOK_CIERRE_INVENTARIOS_VISUALIZACION_PRODUCTOS } from "../js/webhooks.js";
+import { supabase } from "../js/supabase.js";
+import { initBulkActions } from "../js/bulk_actions.js";
 
 const status = document.getElementById("status");
 const panel = document.getElementById("productosPanel");
@@ -122,18 +123,18 @@ const loadProducts = async () => {
   setStatus("Cargando productos...");
 
   try {
-    const res = await fetch(WEBHOOK_CIERRE_INVENTARIOS_VISUALIZACION_PRODUCTOS, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke("consultar-inventarios", {
+      body: {
         tenant_id: context.empresa_id,
         empresa_id: context.empresa_id,
         usuario_id: context.user?.id || context.user?.user_id,
         rol: context.rol,
-        timestamp: getTimestamp()
-      })
+        timestamp: getTimestamp(),
+        modo: "ingredientes"
+      }
     });
-    const data = await res.json();
+    if (error) throw new Error(error.message);
+    if (!data || data.ok === false) throw new Error(data?.message || "Error");
 
     const tenantId = resolveTenantId(context);
     const settings = loadSettings(tenantId);
@@ -171,3 +172,4 @@ const loadProducts = async () => {
 };
 
 loadProducts();
+initBulkActions();

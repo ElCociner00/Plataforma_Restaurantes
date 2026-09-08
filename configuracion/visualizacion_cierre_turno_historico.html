@@ -2,9 +2,12 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>AXIOMA | Visualización histórico cierre turno</title>
+  <link rel="stylesheet" href="../css/variables.css">
   <link rel="stylesheet" href="../css/main.css">
   <link rel="stylesheet" href="../css/visualizacion_cierre_turno_historico.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
 </head>
 <body style="display:none">
   <script type="module" src="../js/router.js"></script>
@@ -16,17 +19,29 @@
 
     <section class="panel">
       <h2>Campos generales</h2>
+      <div class="bulk-actions" data-target="columnasGeneralesPanel">
+        <button type="button" class="btn-bulk-activar">Activar todas</button>
+        <button type="button" class="btn-bulk-desactivar">Desactivar todas</button>
+      </div>
       <div id="columnasGeneralesPanel" class="panel-grid"></div>
     </section>
 
     <section class="panel">
       <h2>Campos de detalle</h2>
+      <div class="bulk-actions" data-target="columnasDetallePanel">
+        <button type="button" class="btn-bulk-activar">Activar todas</button>
+        <button type="button" class="btn-bulk-desactivar">Desactivar todas</button>
+      </div>
       <div id="columnasDetallePanel" class="panel-grid"></div>
     </section>
 
     <section class="panel">
       <h2>Items de detalle (filas)</h2>
       <p class="descripcion">Por defecto se muestran categorías <strong>real</strong> y <strong>sistema</strong>; gastos vienen ocultos.</p>
+      <div class="bulk-actions" data-target="itemsDetallePanel">
+        <button type="button" class="btn-bulk-activar">Activar todas</button>
+        <button type="button" class="btn-bulk-desactivar">Desactivar todas</button>
+      </div>
       <div id="itemsDetallePanel" class="panel-grid"></div>
     </section>
 

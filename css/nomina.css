@@ -3,7 +3,7 @@
 }
 
 .intro {
-  color: #4b5563;
+  color: var(--ek-ink-2, #334155);
 }
 
 .nomina-grid {
@@ -36,10 +36,10 @@
 }
 
 .nomina-card {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--ek-line, #e8edf3);
   border-radius: 10px;
   padding: 10px;
-  background: #fff;
+  background: var(--ek-surface-2, #f1f5f9);
 }
 
 .tabla-wrap {
@@ -49,24 +49,24 @@
 .nomina-table {
   width: 100%;
   border-collapse: collapse;
-  background: #fff;
+  background: var(--ek-surface, #ffffff);
 }
 
 .nomina-table th,
 .nomina-table td {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--ek-line, #e8edf3);
   padding: 8px;
   font-size: 0.9rem;
 }
 
 .nomina-table th {
-  background: #f3f4f6;
+  background: var(--ek-surface-2, #f1f5f9);
 }
 
 .comprobante {
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--ek-line, #e8edf3);
   border-radius: 12px;
-  background: #fff;
+  background: var(--ek-surface, #ffffff);
   padding: 18px;
 }
 
@@ -87,7 +87,7 @@
 .empresa-logo {
   width: 80px;
   height: 40px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--ek-line, #e8edf3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -127,20 +127,20 @@
 
 .comprobante-col th,
 .comprobante-col td {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--ek-line, #e8edf3);
   padding: 6px;
   font-size: 0.86rem;
 }
 
 .comprobante-col th,
 .comprobante-col tfoot {
-  background: #f3f4f6;
+  background: var(--ek-surface-2, #f1f5f9);
 }
 
 .comprobante-neto {
   margin-top: 12px;
   padding: 10px;
-  background: #f3f4f6;
+  background: var(--ek-surface-2, #f1f5f9);
   display: flex;
   justify-content: flex-end;
   align-items: center;
@@ -151,9 +151,9 @@
 .status {
   margin-top: 10px;
   padding: 10px;
-  border: 1px solid #c7d2fe;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
   border-radius: 8px;
-  background: #eef2ff;
+  background: var(--ek-plum-050, #f9f6fe);
 }
 
 
@@ -169,7 +169,7 @@
 }
 
 .nomina-web-panel tbody tr:nth-child(even) {
-  background: #f8fafc;
+  background: var(--ek-ground, #f8fafc);
 }
 
 .nomina-web-panel input[type="text"],
@@ -178,7 +178,7 @@
   width: 72px;
   max-width: 100%;
   padding: 4px 6px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--ek-line, #e8edf3);
   border-radius: 6px;
   font: inherit;
 }
@@ -199,7 +199,7 @@
 .nomina-apoyos-panel input {
   max-width: 92px;
   padding: 4px 6px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--ek-line, #e8edf3);
   border-radius: 6px;
   font: inherit;
 }
@@ -208,16 +208,16 @@
 .nomina-payroll-overrides {
   margin: 14px 0;
   padding: 14px;
-  border: 1px solid #dbeafe;
+  border: 1px solid var(--ek-info-100, #eff6ff);
   border-radius: 12px;
-  background: #eff6ff;
+  background: var(--ek-info-100, #eff6ff);
 }
 .nomina-payroll-overrides h3 { margin: 0 0 6px; }
-.nomina-payroll-overrides p { margin: 0 0 12px; color: #475569; }
+.nomina-payroll-overrides p { margin: 0 0 12px; color: var(--ek-ink-2, #334155); }
 .nomina-overrides-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
 .nomina-overrides-grid label { display: grid; gap: 5px; font-weight: 700; }
-.nomina-overrides-grid span { font-size: 0.78rem; color: #64748b; font-weight: 600; }
-.nomina-overrides-grid select, .nomina-overrides-grid input { width: 100%; min-width: 0; padding: 7px 8px; border: 1px solid #bfdbfe; border-radius: 8px; box-sizing: border-box; }
+.nomina-overrides-grid span { font-size: 0.78rem; color: var(--ek-muted, #5d6b7e); font-weight: 600; }
+.nomina-overrides-grid select, .nomina-overrides-grid input { width: 100%; min-width: 0; padding: 7px 8px; border: 1px solid var(--ek-info-100, #eff6ff); border-radius: 8px; box-sizing: border-box; }
 .nomina-table th, .nomina-table td, .comprobante-col th, .comprobante-col td { overflow-wrap: anywhere; hyphens: auto; }
 @media (max-width: 760px) {
   .nomina-main { width: 100%; max-width: 100%; padding-inline: 12px; box-sizing: border-box; }
@@ -229,7 +229,7 @@
 }
 
 .nomina-wide-panel { grid-template-columns: 1fr; }
-.nomina-help { margin: 6px 0 10px; color: #64748b; font-size: 0.86rem; }
+.nomina-help { margin: 6px 0 10px; color: var(--ek-muted, #5d6b7e); font-size: 0.86rem; }
 .nomina-web-panel input,
 .nomina-web-panel select,
 .nomina-auxiliares-panel input,
@@ -238,36 +238,36 @@
   min-width: 0;
   box-sizing: border-box;
   padding: 5px 7px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--ek-line, #e8edf3);
   border-radius: 7px;
   font: inherit;
 }
-.nomina-web-panel input[readonly] { background: #f8fafc; color: #334155; }
+.nomina-web-panel input[readonly] { background: var(--ek-ground, #f8fafc); color: var(--ek-ink-2, #334155); }
 .nomina-parametro-auxiliar td,
 .nomina-parametro-aviso td {
   background: rgba(251, 146, 60, 0.16);
   border-color: rgba(249, 115, 22, 0.45);
 }
-.nomina-parametro-aviso td { color: #9a3412; font-weight: 700; font-size: 0.8rem; }
-.nomina-total-row td { background: #e0f2fe; font-weight: 800; }
+.nomina-parametro-aviso td { color: var(--ek-warn-700, #7c3f0a); font-weight: 700; font-size: 0.8rem; }
+.nomina-total-row td { background: var(--ek-info-100, #eff6ff); font-weight: 800; }
 .nomina-auxiliares-panel {
   margin: 14px 0;
   padding: 14px;
-  border: 1px solid #fed7aa;
+  border: 1px solid var(--ek-warn-100, #fffbeb);
   border-radius: 12px;
-  background: #fff7ed;
+  background: var(--ek-warn-100, #fffbeb);
 }
 .nomina-aux-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
 .nomina-aux-grid h3 { margin: 0 0 4px; }
-.nomina-aux-grid p { margin: 0 0 10px; color: #9a3412; }
+.nomina-aux-grid p { margin: 0 0 10px; color: var(--ek-warn-700, #7c3f0a); }
 .nomina-aux-grid table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
 .nomina-aux-grid th,
-.nomina-aux-grid td { border: 1px solid #fed7aa; padding: 6px; font-size: 0.84rem; }
-.nomina-aux-grid th { background: #ffedd5; }
+.nomina-aux-grid td { border: 1px solid var(--ek-warn-100, #fffbeb); padding: 6px; font-size: 0.84rem; }
+.nomina-aux-grid th { background: var(--ek-warn-100, #fffbeb); }
 @media (max-width: 760px) { .nomina-aux-grid { grid-template-columns: 1fr; } }
 
 .nomina-aux-empty {
-  color: #9a3412;
+  color: var(--ek-warn-700, #7c3f0a);
   text-align: center;
   font-weight: 700;
 }
@@ -278,16 +278,16 @@
   .comprobante-col {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--ek-line, #e8edf3);
     border-radius: 10px;
     padding: 8px;
-    background: #fff;
+    background: var(--ek-surface, #ffffff);
   }
   .comprobante-col::after {
     content: "Desliza horizontalmente para ver toda la tabla";
     display: block;
     margin-top: 6px;
-    color: #64748b;
+    color: var(--ek-muted, #5d6b7e);
     font-size: 0.72rem;
     font-weight: 700;
   }
@@ -312,33 +312,33 @@
   }
 }
 
-.nomina-format-note { color: #2563eb; font-size: 0.76rem; white-space: nowrap; cursor: help; }
+.nomina-format-note { color: var(--ek-info-600, #2563eb); font-size: 0.76rem; white-space: nowrap; cursor: help; }
 .nomina-row-duplicada td { background: rgba(239, 68, 68, 0.08) !important; box-shadow: inset 0 0 0 9999px rgba(239, 68, 68, 0.02); border-top: 2px solid rgba(239, 68, 68, 0.45); border-bottom: 2px solid rgba(239, 68, 68, 0.45); }
 .nomina-row-validada td { background: rgba(34, 197, 94, 0.1) !important; border-top: 2px solid rgba(34, 197, 94, 0.45); border-bottom: 2px solid rgba(34, 197, 94, 0.45); }
-.nomina-row-apoyo small { color: #2563eb; font-weight: 700; }
+.nomina-row-apoyo small { color: var(--ek-info-600, #2563eb); font-weight: 700; }
 @media (max-width: 760px) { .nomina-actions { flex-direction: column; } .nomina-actions button { width: min(100%, 320px); } }
 .nomina-locales-panel {
   margin-top: 14px;
   padding: 12px;
-  border: 1px solid #bfdbfe;
+  border: 1px solid var(--ek-info-100, #eff6ff);
   border-radius: 12px;
-  background: #eff6ff;
+  background: var(--ek-info-100, #eff6ff);
 }
 .nomina-locales-panel h3 { margin: 0 0 4px; }
-.nomina-locales-panel p { margin: 0 0 10px; color: #475569; font-size: 0.86rem; }
+.nomina-locales-panel p { margin: 0 0 10px; color: var(--ek-ink-2, #334155); font-size: 0.86rem; }
 .nomina-locales-list { display: flex; flex-wrap: wrap; gap: 10px; }
 .nomina-local-option {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border: 1px solid #93c5fd;
+  border: 1px solid var(--ek-info-100, #eff6ff);
   border-radius: 999px;
-  background: #fff;
+  background: var(--ek-surface, #ffffff);
   font-weight: 700;
 }
 .nomina-local-option span { display: inline-flex; flex-direction: column; gap: 2px; }
-.nomina-local-option small { color: #64748b; font-size: 0.72rem; font-weight: 600; }
+.nomina-local-option small { color: var(--ek-muted, #5d6b7e); font-size: 0.72rem; font-weight: 600; }
 @media (max-width: 760px) { .nomina-locales-list { flex-direction: column; } .nomina-local-option { width: min(100%, 320px); box-sizing: border-box; } }
 
 .nomina-historico-row {
@@ -346,15 +346,15 @@
 }
 
 .nomina-historico-row:hover {
-  background: #eef2ff;
+  background: var(--ek-plum-050, #f9f6fe);
 }
 
 .nomina-detail-panel {
   margin-top: 18px;
   padding: 16px;
-  border: 1px solid #dbeafe;
+  border: 1px solid var(--ek-info-100, #eff6ff);
   border-radius: 12px;
-  background: #fff;
+  background: var(--ek-surface, #ffffff);
 }
 
 .nomina-detail-grid {
@@ -365,69 +365,69 @@
 }
 
 .nomina-detail-card {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--ek-line, #e8edf3);
   border-radius: 10px;
   padding: 10px;
-  background: #f8fafc;
+  background: var(--ek-surface-2, #f1f5f9);
 }
 
 .nomina-detail-card span {
   display: block;
-  color: #64748b;
+  color: var(--ek-muted, #5d6b7e);
   font-size: 0.82rem;
   margin-bottom: 4px;
 }
 
 .nomina-secondary-btn {
-  border: 1px solid #c7d2fe;
-  background: #eef2ff;
-  color: #3730a3;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
+  background: var(--ek-plum-050, #f9f6fe);
+  color: var(--ek-plum-800, #3b2a5e);
 }
 
 .nomina-row-turno td {
-  background: #f0fdf4 !important;
+  background: var(--ek-ok-100, #ecfdf5) !important;
   border-top-color: rgba(34, 197, 94, 0.35) !important;
   border-bottom-color: rgba(34, 197, 94, 0.35) !important;
 }
 
 .nomina-row-apoyo td {
-  background: #eef2ff !important;
+  background: var(--ek-plum-050, #f9f6fe) !important;
   border-top: 2px solid rgba(99, 102, 241, 0.45) !important;
   border-bottom: 2px solid rgba(99, 102, 241, 0.45) !important;
 }
 
-.nomina-row-apoyo strong { color: #4f46e5; }
-.nomina-row-turno strong { color: #15803d; }
+.nomina-row-apoyo strong { color: var(--ek-plum-600, #5b3a8f); }
+.nomina-row-turno strong { color: var(--ek-ok-700, #065f46); }
 
 .comprobante {
-  border: 2px solid #c4b5fd;
-  box-shadow: 0 16px 38px rgba(88, 28, 135, 0.12);
+  border: 1px solid var(--ek-line, #e8edf3);
+  box-shadow: var(--ek-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.05));
 }
 
 .comprobante-top {
   padding: 14px;
-  border: 1px solid #c4b5fd;
+  border: 1px solid var(--ek-violet-300, #c4b5fd);
   border-radius: 14px;
-  background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 68%);
+  background: linear-gradient(135deg, var(--ek-plum-050, #f9f6fe) 0%, var(--ek-surface, #ffffff) 68%);
 }
 
 .empresa-logo {
-  border-color: #9b80c7;
-  background: #6f4bb1;
-  color: #fff;
+  border-color: var(--ek-plum-500, #7c53b8);
+  background: var(--ek-plum-700, #4a3474);
+  color: var(--ek-surface, #ffffff);
   font-weight: 800;
 }
 
 .comprobante-col h3 {
   padding: 8px 10px;
   border-radius: 10px 10px 0 0;
-  background: #ede9fe;
-  color: #4c1d95;
+  background: var(--ek-plum-100, #efe9fb);
+  color: var(--ek-plum-800, #3b2a5e);
 }
 
 .nomina-deduccion-ley-row td,
 .nomina-deduccion-ley-config td {
-  background: #fff7ed !important;
+  background: var(--ek-warn-100, #fffbeb) !important;
   border-top: 2px solid rgba(249, 115, 22, 0.36) !important;
   border-bottom: 2px solid rgba(249, 115, 22, 0.36) !important;
 }
@@ -437,13 +437,13 @@
   align-items: center;
   gap: 8px;
   font-weight: 700;
-  color: #9a3412;
+  color: var(--ek-warn-700, #7c3f0a);
 }
 
 .nomina-historico-delete {
-  border: 1px solid #fecaca;
-  background: #fee2e2;
-  color: #991b1b;
+  border: 1px solid var(--ek-bad-100, #fef2f2);
+  background: var(--ek-bad-100, #fef2f2);
+  color: var(--ek-bad-700, #991b1b);
   border-radius: 8px;
   padding: 6px 10px;
   cursor: pointer;
@@ -468,9 +468,9 @@
   animation: nomina-spin 0.8s linear infinite;
 }
 .status.is-loading {
-  border-color: #9b80c7;
-  background: #f5f3ff;
-  color: #4c1d95;
+  border-color: var(--ek-plum-500, #7c53b8);
+  background: var(--ek-plum-050, #f9f6fe);
+  color: var(--ek-plum-800, #3b2a5e);
   font-weight: 700;
 }
 @keyframes nomina-spin { to { transform: rotate(360deg); } }
@@ -499,7 +499,7 @@
 
 .nomina-col-identidad {
   font-weight: 800;
-  color: #15803d;
+  color: var(--ek-ok-700, #065f46);
   white-space: nowrap;
 }
 
@@ -523,6 +523,6 @@
 .nomina-summary-comparison th:nth-child(3),
 .nomina-summary-comparison td:nth-child(1),
 .nomina-summary-comparison td:nth-child(3) {
-  background: #f8fafc;
+  background: var(--ek-ground, #f8fafc);
   font-weight: 700;
 }

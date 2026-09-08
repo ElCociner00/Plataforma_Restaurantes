@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>AXIOMA | Cuentas de facturación</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <!-- Hoja propia del backoffice. Antes compartía css/facturacion.css con la
+       pantalla del cliente; al rediseñarse esa, se separaron. -->
+  <link rel="stylesheet" href="../css/cuentas_facturacion.css?v=20260827">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../js/router.js"></script>
+  <script type="module" src="../js/header.js"></script>
+  <script type="module" src="../js/cuentas_facturacion.js?v=20260825"></script>
+
+  <main class="main facturacion-main">
+    <h1>Cuentas de facturación</h1>
+    <p class="helper-text">
+      Módulo exclusivo de superadministrador. Aquí vive el botón «Iniciar prueba»:
+      el reloj de los 15 días arranca cuando tú lo dices, no al crear la empresa.
+    </p>
+    <div class="toolbar">
+      <button id="btnRecargar" type="button">Recargar</button>
+      <span id="estadoCuentas"></span>
+    </div>
+    <section id="metricasCuentas"></section>
+    <section id="listaCuentas"></section>
+  </main>
+
+  <script type="module" src="../js/footer.js"></script>
+  <!-- Parche de autenticación para módulos (aislado) -->
+  <script type="module" src="../js/module_fix/init.js"></script>
+</body>
+</html>

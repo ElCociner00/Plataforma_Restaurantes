@@ -1,64 +1,178 @@
+/* =========================================================
+   LOGIN · acceso con Google
+   Fase 1
+   ---------------------------------------------------------
+   Vista de una sola decisión: un botón. Todo lo demás
+   (superficie, tipografía, foco) sale de los tokens de la
+   fase 0, para que esta pantalla sea la primera prueba real
+   del sistema en producción.
+========================================================= */
+
 .main.login-container {
-  max-width: 460px;
-  margin: 72px auto;
-  padding: 34px 32px;
-  border-radius: 16px;
-  border: 1px solid #e9ddff;
-  box-shadow: 0 18px 36px rgba(91, 58, 143, 0.14);
+  max-width: var(--ek-w-auth, 440px);
+  margin: clamp(40px, 12vh, 96px) auto;
+  padding: clamp(28px, 6vw, 40px) clamp(22px, 5vw, 36px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--ek-sp-3, 12px);
+
+  background: var(--ek-surface, #ffffff);
+  border: 1px solid var(--ek-line, #e8edf3);
+  border-radius: var(--ek-radius-xl, 18px);
+  box-shadow: var(--ek-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.05));
 }
 
-.login-container h2 {
-  margin-bottom: 20px;
-  color: #2c1f47;
+.login-logo {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  margin-bottom: var(--ek-sp-1, 4px);
 }
 
-.login-container #loginForm {
-  gap: 16px;
-}
-
-.login-container .form-group {
-  display: grid;
-  gap: 8px;
-}
-
-.login-container .form-group label {
-  font-size: 0.9rem;
-  color: #4b5563;
-  font-weight: 600;
-}
-
-.login-container input {
-  width: 100%;
-  min-height: 44px;
-  border: 1px solid #d8c7ff;
-  background: #fcfaff;
-}
-
-.login-container input:focus {
-  border-color: #8b5cf6;
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18);
-}
-
-.login-container button {
-  margin-top: 4px;
-  min-height: 46px;
-  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-}
-
-.login-container button:hover {
-  background: linear-gradient(135deg, #7c3aed, #6d28d9);
-}
-
-#error-message {
-  min-height: 20px;
-  font-size: 0.9rem;
+.login-container .login-title {
   margin: 0;
-  text-align: left;
+  font-size: 1.5rem;
+  font-weight: var(--ek-weight-bold, 700);
+  letter-spacing: -0.015em;
+  color: var(--ek-ink, #0f172a);
 }
 
+.login-container .login-subtitle {
+  margin: 0;
+  max-width: 30ch;
+  font-size: var(--ek-text-body, 0.9375rem);
+  line-height: var(--ek-leading-normal, 1.5);
+  color: var(--ek-muted, #5d6b7e);
+}
+
+/* ---------------------------------------------------------
+   BOTÓN GOOGLE
+   Se mantiene sobre superficie blanca con contorno, que es la
+   presentación que las Google Identity Guidelines admiten y la
+   que mejor encaja con la dirección luminosa: el color de la
+   pantalla lo pone el logotipo de cuatro colores, no un relleno.
+
+   Altura mínima 48px, por encima del mínimo táctil de 44px:
+   es el único destino accionable de la vista.
+--------------------------------------------------------- */
+.google-btn {
+  width: 100%;
+  min-height: 48px;
+  margin-top: var(--ek-sp-3, 12px);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ek-sp-3, 12px);
+  padding: 12px 18px;
+
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: var(--ek-weight-semibold, 600);
+  color: var(--ek-ink, #0f172a);
+
+  background: var(--ek-surface, #ffffff);
+  border: 1px solid var(--ek-line-strong, #86939f);
+  border-radius: var(--ek-radius-md, 10px);
+  cursor: pointer;
+
+  transition:
+    background-color var(--ek-duration-fast, 120ms) var(--ek-ease, ease),
+    border-color var(--ek-duration-fast, 120ms) var(--ek-ease, ease),
+    box-shadow var(--ek-duration-fast, 120ms) var(--ek-ease, ease);
+}
+
+.google-btn:hover:not(:disabled) {
+  background: var(--ek-surface-2, #f1f5f9);
+  border-color: var(--ek-muted, #5d6b7e);
+}
+
+.google-btn:active:not(:disabled) {
+  background: var(--ek-surface-2, #f1f5f9);
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.google-btn:focus-visible {
+  outline: 2px solid var(--ek-violet-500, #8b5cf6);
+  outline-offset: 2px;
+  box-shadow: var(--ek-focus-ring, 0 0 0 3px rgba(139, 92, 246, 0.30));
+}
+
+.google-btn:disabled {
+  cursor: progress;
+  color: var(--ek-muted, #5d6b7e);
+  background: var(--ek-surface-2, #f1f5f9);
+  border-color: var(--ek-line, #e8edf3);
+}
+
+.google-btn-icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+.google-btn:disabled .google-btn-icon {
+  opacity: 0.45;
+}
+
+.google-btn-label {
+  line-height: 1.2;
+}
+
+/* ---------------------------------------------------------
+   ESTADO
+   Reserva altura para que el mensaje no desplace el botón al
+   aparecer. El tono lo fija el script con data-tone.
+--------------------------------------------------------- */
+.login-status {
+  min-height: 20px;
+  margin: var(--ek-sp-2, 8px) 0 0;
+  font-size: var(--ek-text-note, 0.78125rem);
+  line-height: var(--ek-leading-normal, 1.5);
+  color: var(--ek-muted, #5d6b7e);
+}
+
+.login-status[data-tone="error"] {
+  color: var(--ek-bad-700, #991b1b);
+}
+
+.login-container .login-extra {
+  margin-top: var(--ek-sp-2, 8px);
+}
+
+.login-container .registro-link {
+  font-size: var(--ek-text-note, 0.78125rem);
+  color: var(--ek-muted, #5d6b7e);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.login-container .registro-link:hover {
+  color: var(--ek-plum-600, #5b3a8f);
+  border-bottom-color: var(--ek-plum-200, #ddd0f5);
+  text-decoration: none;
+}
+
+.login-container .registro-link:focus-visible {
+  outline: 2px solid var(--ek-violet-500, #8b5cf6);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+/* ---------------------------------------------------------
+   MÓVIL
+--------------------------------------------------------- */
 @media (max-width: 640px) {
   .main.login-container {
-    margin: 24px 14px;
-    padding: 24px 20px;
+    margin: var(--ek-sp-6, 24px) var(--ek-sp-4, 16px);
+    padding: var(--ek-sp-6, 24px) var(--ek-sp-5, 20px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .google-btn {
+    transition: none;
   }
 }

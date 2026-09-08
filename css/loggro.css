@@ -4,7 +4,7 @@
 
 .descripcion {
   font-size: 0.95rem;
-  color: #4b5563;
+  color: var(--ek-ink-2, #334155);
   margin-bottom: 18px;
 }
 
@@ -12,7 +12,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  background: #ffffff;
+  background: var(--ek-surface-2, #f1f5f9);
   padding: 20px;
   border-radius: 10px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
@@ -33,7 +33,7 @@
 .ayuda {
   margin: 6px 0 8px;
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--ek-muted, #5d6b7e);
 }
 
 .info-icon {
@@ -43,8 +43,8 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #eef2ff;
-  color: #4338ca;
+  background: var(--ek-plum-050, #f9f6fe);
+  color: var(--ek-plum-700, #4a3474);
   font-size: 0.75rem;
   cursor: help;
   position: relative;
@@ -56,8 +56,8 @@
   bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
-  background: #111827;
-  color: #ffffff;
+  background: var(--ek-ink, #0f172a);
+  color: var(--ek-surface, #ffffff);
   padding: 8px 10px;
   border-radius: 6px;
   font-size: 0.75rem;
@@ -76,7 +76,7 @@
 .status {
   margin-top: 8px;
   font-size: 0.85rem;
-  color: #4b5563;
+  color: var(--ek-ink-2, #334155);
 }
 
 .password-wrap {

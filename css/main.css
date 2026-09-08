@@ -1,3 +1,29 @@
+/* =========================================================
+   MAIN · cromo compartido por las 48 vistas
+   ---------------------------------------------------------
+   Cabecera, pie legal, contenedor .main, formularios base,
+   botones y menús. Todo sobre los tokens de css/variables.css;
+   el literal que acompaña a cada var() es solo el respaldo por
+   si esa hoja no cargara.
+
+   El cambio de fondo de esta pasada: la cabecera y el pie eran
+   bloques macizos de #2c1f47 presentes en todas las pantallas.
+   Ahora son superficie blanca con filete de 1 px, y el color de
+   marca queda reservado para la acción principal, el icono
+   activo y el anillo de foco.
+
+   AVISO PARA QUIEN EDITE: al pasar la cabecera de oscura a clara,
+   TODO lo que vive dentro de ella y heredaba `color: white` tuvo
+   que reescribirse. Si añades un elemento nuevo al header, dale
+   color explícito desde --ek-header-ink / --ek-header-ink-muted;
+   no confíes en la herencia.
+
+   Tipografía: se usa --ek-font-ui, que resuelve a Inter si está
+   cargada y a Segoe UI si no. Las vistas de aplicación no cargan
+   Google Fonts a propósito: son pantallas de planta y cocina, y
+   no compensa una petición externa bloqueante por cada carga.
+========================================================= */
+
 /* =========================
    RESET + BASE
 ========================= */
@@ -5,49 +31,70 @@
   box-sizing: border-box;
 }
 
+html {
+  color-scheme: light;
+}
+
 body {
   margin: 0;
-  font-family: Tahoma, "Segoe UI", Arial, sans-serif;
-  background: linear-gradient(135deg, #f5f5f5, #eef2ff);
-  color: #111827;
+  font-family: var(--ek-font-ui, "Inter", "Segoe UI", Tahoma, Arial, sans-serif);
+  /* Mismo fondo luminoso de la landing: blanco arriba que se
+     asienta en el gris muy claro del sistema, con un lavado
+     violeta casi imperceptible que da profundidad. */
+  background:
+    radial-gradient(1200px 420px at 50% 0, rgba(124, 58, 237, 0.045), transparent 72%),
+    linear-gradient(180deg, #ffffff 0%, #fbfcfe 240px, var(--ek-ground, #f8fafc) 620px);
+  background-repeat: no-repeat;
+  color: var(--ek-ink, #0f172a);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Anillo de foco común. Especificidad mínima (0,1,0) para que
+   cualquier hoja de página pueda sustituirlo sin pelear. */
+:focus-visible {
+  outline: 2px solid var(--ek-violet-600, #7c3aed);
+  outline-offset: 2px;
 }
 
 /* =========================
    HEADER GLOBAL
 ========================= */
 .app-header {
-  background: #2c1f47;
-  color: white;
-  padding: 12px 20px;
+  background: var(--ek-header-bg, #ffffff);
+  color: var(--ek-header-ink, #0f172a);
+  border-bottom: 1px solid var(--ek-header-border, #e8edf3);
+  box-shadow: var(--ek-shadow-header, 0 1px 0 rgba(15, 23, 42, 0.06));
+  padding: 10px clamp(12px, 3vw, 24px);
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 16px;
+  gap: var(--ek-sp-4, 16px);
 }
 
 .app-header .logo {
-  font-weight: bold;
+  font-weight: var(--ek-weight-semibold, 600);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--ek-sp-2, 8px);
+  color: var(--ek-header-ink, #0f172a);
 }
 
 .logo-mark-wrap {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: #ffffff;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--ek-radius-md, 10px);
+  background: var(--ek-surface, #ffffff);
   display: grid;
   place-items: center;
 }
 
 .logo-mark {
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   object-fit: contain;
 }
 
@@ -57,45 +104,63 @@ body {
 }
 
 .app-header.public-header .public-logo {
-  font-size: 1.1rem;
-  font-weight: 800;
+  font-size: 1.0625rem;
+  font-weight: var(--ek-weight-semibold, 600);
+  letter-spacing: -0.015em;
 }
-
 
 .app-header .empresa-header-nombre {
   text-align: center;
-  color: #ffffff;
-  font-size: 1.1rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+  color: var(--ek-header-ink, #0f172a);
+  font-size: 1rem;
+  font-weight: var(--ek-weight-semibold, 600);
+  letter-spacing: -0.01em;
 }
 
 .app-header nav {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--ek-sp-2, 8px);
 }
 
 .app-header nav a {
-  color: white;
+  color: var(--ek-header-ink-muted, #5d6b7e);
   text-decoration: none;
-  font-size: 0.95rem;
+  font-size: var(--ek-text-body, 0.9375rem);
+  font-weight: var(--ek-weight-medium, 500);
 }
 
 .app-header nav a:hover {
-  text-decoration: underline;
+  color: var(--ek-header-active, #5b3a8f);
+  text-decoration: none;
 }
 
-.app-header .logout-btn {
-  padding: 6px 12px;
-  font-size: 0.9rem;
+/* Los controles de la cabecera son botones fantasma: contorno de
+   1 px sobre blanco. El relleno de marca se reserva para la
+   acción principal del contenido, no para el cromo. */
+.app-header .logout-btn,
+.app-header .nav-dropdown-toggle,
+.app-header nav > .nav-link-btn {
+  padding: 8px var(--ek-sp-3, 12px);
+  font-size: var(--ek-text-body, 0.9375rem);
+  font-weight: var(--ek-weight-medium, 500);
+  line-height: 1.2;
+  color: var(--ek-header-ink, #ffffff);
   background: transparent;
-  border: 1px solid #e5e7eb;
-  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: var(--ek-radius-md, 10px);
+  text-decoration: none;
+  transition: background-color var(--ek-duration-fast, 120ms) var(--ek-ease, ease),
+              border-color var(--ek-duration-fast, 120ms) var(--ek-ease, ease);
 }
 
-.app-header .logout-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+.app-header .logout-btn:hover,
+.app-header .nav-dropdown-toggle:hover,
+.app-header nav > .nav-link-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.50);
+  color: var(--ek-header-active, #ffffff);
+  text-decoration: none;
 }
 
 /* =========================
@@ -103,26 +168,30 @@ body {
 ========================= */
 .main {
   max-width: 420px;
-  margin: 60px auto;
-  background: white;
-  padding: 28px;
-  border-radius: 10px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+  margin: clamp(24px, 5vh, 48px) auto;
+  background: var(--ek-surface, #ffffff);
+  padding: clamp(20px, 4vw, 28px);
+  border: 1px solid var(--ek-line, #e8edf3);
+  border-radius: var(--ek-radius-xl, 18px);
+  box-shadow: var(--ek-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.05));
   flex: 1 0 auto;
 }
 
 .main h1,
 .main h2 {
   text-align: center;
-  margin-bottom: 12px;
-  font-weight: 600;
+  margin-bottom: var(--ek-sp-3, 12px);
+  font-weight: var(--ek-weight-semibold, 600);
+  letter-spacing: -0.02em;
+  color: var(--ek-ink, #0f172a);
 }
 
 .main p {
   text-align: center;
-  font-size: 0.9rem;
-  color: #6b7280;
-  margin-bottom: 20px;
+  font-size: var(--ek-text-body, 0.9375rem);
+  line-height: var(--ek-leading-normal, 1.5);
+  color: var(--ek-muted, #5d6b7e);
+  margin-bottom: var(--ek-sp-5, 20px);
 }
 
 /* =========================
@@ -131,57 +200,103 @@ body {
 form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--ek-sp-3, 12px);
 }
 
 input,
 select,
 textarea {
-  padding: 11px;
-  font-size: 0.95rem;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-  background-color: #f9fafb;
+  padding: 10px 12px;
+  /* 16px es el umbral por debajo del cual iOS hace zoom al
+     enfocar un campo y descoloca la pantalla entera. Antes eran
+     0.95rem (15.2 px), justo por debajo. */
+  font-family: inherit;
+  font-size: var(--ek-input-font-min, 16px);
+  color: var(--ek-ink, #0f172a);
+  border-radius: var(--ek-radius-sm, 6px);
+  border: 1px solid var(--ek-line-strong, #86939f);
+  background-color: var(--ek-surface, #ffffff);
+  transition: border-color var(--ek-duration-fast, 120ms) var(--ek-ease, ease),
+              box-shadow var(--ek-duration-fast, 120ms) var(--ek-ease, ease);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--ek-muted-2, #78889c);
 }
 
 input:focus,
 select:focus,
 textarea:focus {
   outline: none;
-  border-color: #4f46e5;
-  background-color: #ffffff;
+  border-color: var(--ek-violet-500, #8b5cf6);
+  background-color: var(--ek-surface, #ffffff);
+  box-shadow: var(--ek-focus-ring, 0 0 0 3px rgba(139, 92, 246, 0.30));
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  color: var(--ek-muted, #5d6b7e);
+  background-color: var(--ek-surface-2, #f1f5f9);
+  border-color: var(--ek-line, #e8edf3);
+  cursor: not-allowed;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  accent-color: var(--ek-plum-600, #5b3a8f);
+}
+
+label {
+  font-size: var(--ek-text-body, 0.9375rem);
+  color: var(--ek-ink-2, #334155);
 }
 
 /* =========================
    BOTONES
 ========================= */
 button {
-  padding: 12px;
-  font-size: 1rem;
-  font-weight: 600;
-  border-radius: 6px;
-  border: none;
+  padding: 11px var(--ek-sp-4, 16px);
+  font-family: inherit;
+  font-size: var(--ek-text-body, 0.9375rem);
+  font-weight: var(--ek-weight-semibold, 600);
+  line-height: 1.2;
+  border-radius: var(--ek-radius-md, 10px);
+  border: 1px solid transparent;
   cursor: pointer;
-  background: #5b3a8f;
-  color: white;
+  background: var(--ek-plum-600, #5b3a8f);
+  color: var(--ek-on-brand, #ffffff);
+  transition: background-color var(--ek-duration-fast, 120ms) var(--ek-ease, ease);
 }
 
 button:hover {
-  background: #2c1f47;
+  background: var(--ek-plum-700, #4a3474);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  color: var(--ek-muted, #5d6b7e);
+  background: var(--ek-surface-2, #f1f5f9);
+  border-color: var(--ek-line, #e8edf3);
 }
 
 /* =========================
    LOGIN / REGISTRO
 ========================= */
 .login-extra {
-  margin-top: 18px;
+  margin-top: var(--ek-sp-4, 16px);
   text-align: center;
 }
 
 .registro-link {
-  color: #4f46e5;
+  color: var(--ek-plum-600, #5b3a8f);
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: var(--ek-text-note, 0.78125rem);
+  font-weight: var(--ek-weight-medium, 500);
 }
 
 .registro-link:hover {
@@ -191,55 +306,56 @@ button:hover {
 /* =========================
    UTILIDADES
 ========================= */
+/*
+  #status es un selector de ID: especificidad (1,0,0). Cualquier
+  color declarado aquí ganaría a los `.login-status[data-tone]` y
+  `.registro-status[data-tone]` de las hojas de página, que son
+  (0,2,0), y dejaría todos los mensajes de error del mismo color.
+  Por eso esta regla es estructural y NO declara color.
+*/
 #status {
-  margin-top: 14px;
-  font-size: 0.9rem;
+  margin-top: var(--ek-sp-3, 12px);
+  font-size: var(--ek-text-note, 0.78125rem);
+  line-height: var(--ek-leading-normal, 1.5);
   text-align: center;
 }
 
-
+/* =========================
+   MENÚS DE LA CABECERA
+========================= */
 .app-header .nav-dropdown {
   position: relative;
-}
-
-.app-header .nav-dropdown-toggle {
-  background: transparent;
-  border: 1px solid #4b5563;
-  color: white;
-  padding: 6px 10px;
-  font-size: 0.9rem;
-}
-
-.app-header .nav-dropdown-toggle:hover {
-  background: rgba(255, 255, 255, 0.12);
 }
 
 .app-header .nav-dropdown-menu {
   display: none;
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 8px);
   right: 0;
   min-width: 220px;
-  background: #2c1f47;
-  border: 1px solid #374151;
-  border-radius: 8px;
-  padding: 8px;
+  background: var(--ek-surface, #ffffff);
+  border: 1px solid var(--ek-line, #e8edf3);
+  border-radius: var(--ek-radius-lg, 14px);
+  box-shadow: var(--ek-shadow-raised, 0 4px 16px -6px rgba(15, 23, 42, 0.10));
+  padding: var(--ek-sp-2, 8px);
   z-index: 1000;
 }
 
 .app-header .nav-dropdown.open .nav-dropdown-menu {
   display: grid;
-  gap: 6px;
+  gap: 2px;
 }
 
 .app-header .nav-dropdown-menu a {
   display: block;
-  padding: 8px;
-  border-radius: 6px;
+  padding: 9px var(--ek-sp-2, 8px);
+  border-radius: var(--ek-radius-sm, 6px);
+  color: var(--ek-ink-2, #334155);
 }
 
 .app-header .nav-dropdown-menu a:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--ek-plum-050, #f9f6fe);
+  color: var(--ek-plum-600, #5b3a8f);
   text-decoration: none;
 }
 
@@ -253,18 +369,18 @@ button:hover {
 .app-header .user-avatar {
   width: 30px;
   height: 30px;
-  border-radius: 999px;
-  background: #c4b5fd;
-  color: #312e81;
+  border-radius: var(--ek-radius-pill, 999px);
+  background: var(--ek-plum-100, #efe9fb);
+  color: var(--ek-plum-700, #4a3474);
   display: grid;
   place-items: center;
-  font-weight: 700;
-  font-size: 0.95rem;
+  font-weight: var(--ek-weight-bold, 700);
+  font-size: 0.9375rem;
 }
 
 .app-header .user-name {
-  font-size: 0.72rem;
-  color: #ddd6fe;
+  font-size: var(--ek-text-note, 0.78125rem);
+  color: var(--ek-header-ink-muted, #5d6b7e);
   max-width: 96px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -276,13 +392,64 @@ button:hover {
 }
 
 .app-header .menu-group-title {
-  font-size: 0.72rem;
-  color: #9ca3af;
-  padding: 6px 8px 0;
+  font-size: var(--ek-text-label, 0.75rem);
+  font-weight: var(--ek-weight-semibold, 600);
+  color: var(--ek-muted, #5d6b7e);
+  padding: var(--ek-sp-2, 8px) var(--ek-sp-2, 8px) 2px;
   text-transform: uppercase;
-  letter-spacing: .04em;
+  letter-spacing: var(--ek-tracking-label, 0.04em);
 }
 
+/* `a.` en el selector no es adorno: sube la especificidad a
+   (0,2,1) para empatar con `.app-header .nav-dropdown-menu a`,
+   que declara `display: block`. Sin eso el bloque gana y la
+   etiqueta ACTIVO no se alinea a la derecha. */
+.app-header a.local-switch-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.app-header a.local-switch-option span:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.app-header a.local-switch-option strong {
+  font-size: var(--ek-text-body, 0.9375rem);
+  font-weight: var(--ek-weight-semibold, 600);
+  color: var(--ek-ink, #0f172a);
+}
+
+.app-header a.local-switch-option small {
+  color: var(--ek-muted, #5d6b7e);
+  font-size: var(--ek-text-label, 0.75rem);
+  text-transform: uppercase;
+  letter-spacing: var(--ek-tracking-label, 0.04em);
+}
+
+.app-header a.local-switch-option.active {
+  background: var(--ek-plum-050, #f9f6fe);
+  cursor: default;
+}
+
+.app-header .local-switch-active-label {
+  color: var(--ek-ok-700, #065f46);
+  font-size: var(--ek-text-label, 0.75rem);
+  font-weight: var(--ek-weight-bold, 700);
+  text-transform: uppercase;
+  letter-spacing: var(--ek-tracking-label, 0.04em);
+}
+
+.app-header .local-switch-empty {
+  padding: var(--ek-sp-2, 8px);
+  border-radius: var(--ek-radius-sm, 6px);
+  color: var(--ek-muted, #5d6b7e);
+  background: var(--ek-surface-2, #f1f5f9);
+  font-size: var(--ek-text-note, 0.78125rem);
+  line-height: var(--ek-leading-normal, 1.5);
+}
 
 /* =========================
    TABLAS: CONTROL DE DESBORDE DE TEXTO
@@ -292,9 +459,8 @@ button:hover {
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
-  line-height: 1.3;
+  line-height: 1.35;
 }
-
 
 /* =========================
    FOOTER LEGAL GLOBAL
@@ -303,11 +469,22 @@ body.has-legal-footer {
   padding-bottom: var(--legal-footer-offset, 120px);
 }
 
+/*
+  Sigue siendo `position: fixed`: js/footer.js mide su altura y la
+  publica en --legal-footer-offset para reservar el hueco. Cambiar
+  el posicionamiento aquí desajustaría ese cálculo.
+
+  Al ser claro y estar fijo sobre contenido claro, necesita algo
+  más que un filete para separarse: la sombra hacia arriba marca
+  el borde cuando el contenido pasa por debajo.
+*/
 .legal-footer {
   margin-top: 0;
-  background: #2c1f47;
-  color: #e5e7eb;
-  padding: 16px 20px;
+  background: var(--ek-surface, #ffffff);
+  color: var(--ek-footer-ink, #5d6b7e);
+  border-top: 1px solid var(--ek-footer-border, #e8edf3);
+  box-shadow: 0 -2px 12px -6px rgba(15, 23, 42, 0.12);
+  padding: var(--ek-sp-3, 12px) var(--ek-sp-5, 20px);
   position: fixed;
   left: 0;
   right: 0;
@@ -321,57 +498,93 @@ body.has-legal-footer {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
   text-align: center;
 }
 
 .legal-copy {
   margin: 0;
-  font-size: 0.9rem;
-  color: #d1d5db;
+  font-size: var(--ek-text-note, 0.78125rem);
+  color: var(--ek-footer-ink, #5d6b7e);
 }
 
 .legal-links {
   display: flex;
-  gap: 6px;
+  gap: 4px 6px;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  font-size: 0.88rem;
+  font-size: var(--ek-text-note, 0.78125rem);
 }
 
 .legal-links a {
-  color: #c7d2fe;
+  color: var(--ek-footer-ink, #5d6b7e);
   text-decoration: none;
 }
 
 .legal-links a:hover {
+  color: var(--ek-plum-600, #5b3a8f);
   text-decoration: underline;
 }
 
 .legal-links .sep {
-  color: #6b7280;
+  color: var(--ek-line-strong, #86939f);
 }
 
-.app-header nav > .nav-link-btn {
-  border: 1px solid #4b5563;
-  border-radius: 6px;
-  padding: 6px 10px;
-  text-decoration: none;
-  line-height: 1.2;
+/* =========================
+   OVERLAY DE CARGA DE CONTEXTO
+========================= */
+.local-context-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: var(--ek-sp-6, 24px);
+  background: rgba(248, 250, 252, 0.78);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
-.app-header nav > .nav-link-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  text-decoration: none;
+.local-context-loading-card {
+  display: grid;
+  justify-items: center;
+  gap: var(--ek-sp-3, 12px);
+  max-width: 340px;
+  padding: var(--ek-sp-6, 24px);
+  border-radius: var(--ek-radius-xl, 18px);
+  color: var(--ek-ink, #0f172a);
+  text-align: center;
+  background: var(--ek-surface, #ffffff);
+  border: 1px solid var(--ek-line, #e8edf3);
+  box-shadow: var(--ek-shadow-raised, 0 4px 16px -6px rgba(15, 23, 42, 0.10));
 }
 
+.local-context-loading-card span {
+  color: var(--ek-muted, #5d6b7e);
+  font-size: var(--ek-text-body, 0.9375rem);
+  line-height: var(--ek-leading-normal, 1.5);
+}
 
+.local-context-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--ek-plum-100, #efe9fb);
+  border-top-color: var(--ek-plum-600, #5b3a8f);
+  border-radius: var(--ek-radius-pill, 999px);
+  animation: local-context-spin 0.8s linear infinite;
+}
 
+@keyframes local-context-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
-
-
+/* =========================
+   RESPONSIVO
+========================= */
 @media (max-width: 900px) {
   .app-header {
     grid-template-columns: 1fr;
@@ -381,28 +594,42 @@ body.has-legal-footer {
   }
 
   .app-header .empresa-header-nombre {
-    font-size: 0.95rem;
+    font-size: 0.9375rem;
   }
 
   .app-header nav {
     width: 100%;
     justify-content: center;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--ek-sp-2, 8px);
+  }
+
+  /* En planta se toca con el pulgar y a veces con guante: por
+     debajo de 44 px el objetivo deja de ser fiable. */
+  button,
+  .app-header .logout-btn,
+  .app-header .nav-dropdown-toggle,
+  .app-header nav > .nav-link-btn {
+    min-height: var(--ek-touch-min, 44px);
+  }
+
+  input,
+  select,
+  textarea {
+    min-height: var(--ek-touch-min, 44px);
   }
 
   .main {
     width: min(100%, 100vw - 16px);
-    margin: 16px auto;
-    padding: 16px;
-    border-radius: 8px;
+    margin: var(--ek-sp-4, 16px) auto;
+    padding: var(--ek-sp-4, 16px);
+    border-radius: var(--ek-radius-lg, 14px);
   }
 }
 
-
 @media (min-width: 1200px) {
   .main {
-    box-shadow: 0 14px 30px rgba(59, 40, 99, 0.18);
+    box-shadow: var(--ek-shadow-raised, 0 4px 16px -6px rgba(15, 23, 42, 0.10));
   }
 
   .app-header nav {
@@ -410,91 +637,177 @@ body.has-legal-footer {
   }
 }
 
-.app-header .local-switch-option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.app-header .local-switch-option span:first-child {
-  display: grid;
-  gap: 2px;
-}
-
-.app-header .local-switch-option strong {
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
-.app-header .local-switch-option small,
-.app-header .local-switch-active-label {
-  color: #c4b5fd;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.app-header .local-switch-option.active {
-  background: rgba(196, 181, 253, 0.18);
-  cursor: default;
-}
-
-.app-header .local-switch-active-label {
-  color: #bbf7d0;
-  font-weight: 700;
-}
-
-.app-header .local-switch-empty {
-  padding: 8px;
-  border-radius: 6px;
-  color: #d1d5db;
-  background: rgba(255, 255, 255, 0.06);
-  font-size: 0.78rem;
-  line-height: 1.35;
-}
-
-.local-context-loading-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: rgba(15, 23, 42, 0.72);
-  backdrop-filter: blur(4px);
-}
-
-.local-context-loading-card {
-  display: grid;
-  justify-items: center;
-  gap: 10px;
-  max-width: 340px;
-  padding: 22px;
-  border-radius: 16px;
-  color: #f8fafc;
-  text-align: center;
-  background: #312e81;
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.35);
-}
-
-.local-context-loading-card span {
-  color: #ddd6fe;
-  font-size: 0.9rem;
-  line-height: 1.4;
-}
-
-.local-context-loading-spinner {
-  width: 34px;
-  height: 34px;
-  border: 4px solid rgba(255, 255, 255, 0.28);
-  border-top-color: #ffffff;
-  border-radius: 999px;
-  animation: local-context-spin 0.8s linear infinite;
-}
-
-@keyframes local-context-spin {
-  to {
-    transform: rotate(360deg);
+@media (prefers-reduced-motion: reduce) {
+  button,
+  input,
+  select,
+  textarea,
+  .app-header .logout-btn,
+  .app-header .nav-dropdown-toggle,
+  .app-header nav > .nav-link-btn {
+    transition: none;
   }
+
+  .local-context-loading-spinner {
+    animation: none;
+  }
+}
+
+/* =========================================================
+   CAPA DE COMPONENTES COMPARTIDOS
+   ---------------------------------------------------------
+   Estas reglas son VALORES POR DEFECTO, no imposiciones. Viven
+   en main.css, que carga antes que cualquier hoja de página, y
+   usan la especificidad mínima posible (0,1,0 / 0,0,2). Cualquier
+   hoja de página que ya defina .bloque, .panel o sus tablas gana
+   por orden de cascada sin necesidad de !important.
+
+   Lo que resuelven: `.bloque` aparece en 31 sitios del HTML pero
+   solo estaba definido en 5 hojas; en el resto de vistas no tenía
+   ningún estilo. Igual `.panel`, usado en 10 y definido en 3.
+========================================================= */
+
+.bloque,
+.panel {
+  background: var(--ek-surface-2, #f1f5f9);
+  border: 1px solid var(--ek-line, #e8edf3);
+  border-radius: var(--ek-radius-lg, 14px);
+  padding: var(--ek-sp-5, 20px);
+  box-shadow: var(--ek-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.05));
+}
+
+.bloque > h2,
+.bloque > h3,
+.panel > h2,
+.panel > h3 {
+  margin: 0 0 var(--ek-sp-4, 16px);
+  font-size: var(--ek-text-section, 1.1875rem);
+  font-weight: var(--ek-weight-semibold, 600);
+  letter-spacing: -0.015em;
+  color: var(--ek-ink, #0f172a);
+  text-align: left;
+}
+
+/* Textos de apoyo: siempre en el gris de acompañamiento, nunca
+   compitiendo con el dato. */
+.descripcion,
+.helper-text,
+.hint-text,
+.ayuda,
+.intro {
+  font-size: var(--ek-text-note, 0.78125rem);
+  line-height: var(--ek-leading-normal, 1.5);
+  color: var(--ek-muted, #5d6b7e);
+}
+
+/* ---------------------------------------------------------
+   TABLAS
+   El encargo original era salir de la estética de hoja de
+   cálculo. Lo que la producía no era el color sino la rejilla:
+   un borde en los cuatro lados de cada celda. Aquí solo queda el
+   filete horizontal, que es el que ayuda a seguir la fila; las
+   líneas verticales desaparecen y las separa el espaciado.
+--------------------------------------------------------- */
+.tabla-wrap,
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--ek-surface, #ffffff);
+  border: 1px solid var(--ek-line, #e8edf3);
+  border-radius: var(--ek-radius-lg, 14px);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ek-text-body, 0.9375rem);
+}
+
+thead th {
+  text-align: left;
+  padding: 11px 12px;
+  font-size: var(--ek-text-label, 0.75rem);
+  font-weight: var(--ek-weight-semibold, 600);
+  letter-spacing: var(--ek-tracking-label, 0.04em);
+  color: var(--ek-muted, #5d6b7e);
+  background: var(--ek-ground, #f8fafc);
+  border-bottom: 1px solid var(--ek-line, #e8edf3);
+}
+
+tbody td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--ek-line, #e8edf3);
+  color: var(--ek-ink-2, #334155);
+  vertical-align: middle;
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Las cifras se leen comparándolas en vertical: alineadas a la
+   derecha y con numeración tabular, los dígitos caen en columna. */
+td.is-num,
+th.is-num,
+td[data-num],
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* =========================================================
+   CAPA GLOBAL DE ESTADO  ·  Fase 0
+   ---------------------------------------------------------
+   Estas clases NO son apariencia: son estado funcional que el
+   JavaScript añade y quita en tiempo de ejecución. Se pueden
+   restilizar, pero jamás renombrar ni eliminar.
+
+     .is-hidden  → 47 usos en js/ (modales, tablas, bloques)
+     .hidden     → 7 usos en js/subir_facturas_siigo.js
+
+   Antes de la fase 0 vivían duplicadas en 5 hojas de página y
+   NO estaban declaradas aquí, de modo que cualquier limpieza de
+   esas hojas dejaba modales visibles al cargar. Esta es ahora su
+   única definición.
+
+   El selector se repite (.is-hidden.is-hidden) a propósito, para
+   subir la especificidad a (0,2,0). Sin eso, la regla
+   `body.mobile-native form { display: grid !important }` de
+   mobile_native.css — especificidad (0,1,2) — ganaría sobre un
+   `.is-hidden` plano (0,1,0) y dejaría visible en móvil cualquier
+   <form> oculto. Es un empate que hoy no se da, pero que costaría
+   caro descubrir en producción.
+========================================================= */
+.is-hidden,
+.is-hidden.is-hidden {
+  display: none !important;
+}
+
+.hidden,
+.hidden.hidden {
+  display: none !important;
+}
+
+/* =========================
+   BULK ACTIONS (VISUALIZACIONES)
+========================= */
+.bulk-actions {
+  display: flex;
+  gap: var(--ek-sp-2, 8px);
+  justify-content: flex-end;
+  margin-bottom: var(--ek-sp-3, 12px);
+}
+
+.bulk-actions button {
+  padding: 6px 12px;
+  font-size: var(--ek-text-note, 0.78125rem);
+  background: var(--ek-surface, #ffffff);
+  color: var(--ek-plum-600, #5b3a8f);
+  border: 1px solid var(--ek-line, #e8edf3);
+  border-radius: var(--ek-radius-sm, 6px);
+}
+
+.bulk-actions button:hover {
+  background: var(--ek-plum-050, #f9f6fe);
+  border-color: var(--ek-plum-200, #e9d5ff);
 }

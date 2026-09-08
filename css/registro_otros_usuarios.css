@@ -15,8 +15,8 @@ select {
   padding: 10px;
   margin-bottom: 12px;
   border-radius: 6px;
-  border: 1px solid #d1d5db;
-  background: #fff;
+  border: 1px solid var(--ek-line, #e8edf3);
+  background: var(--ek-surface, #ffffff);
 }
 
 select {

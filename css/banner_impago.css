@@ -10,21 +10,21 @@
 
 .impago-modal-card {
   width: min(720px, 100%);
-  background: #ffffff;
-  border: 1px solid #d8ccff;
+  background: var(--ek-surface, #ffffff);
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
   border-radius: 14px;
   padding: 24px;
-  box-shadow: 0 24px 50px rgba(15, 23, 42, 0.3);
+  box-shadow: var(--ek-shadow-modal, 0 24px 48px -12px rgba(15, 23, 42, 0.18));
 }
 
 .impago-modal-card h3 {
   margin: 0 0 12px;
-  color: #312e81;
+  color: var(--ek-plum-800, #3b2a5e);
 }
 
 .impago-modal-card p {
   margin: 0;
-  color: #1f2937;
+  color: var(--ek-ink, #0f172a);
   line-height: 1.55;
 }
 
@@ -50,9 +50,9 @@
   text-decoration: none;
   padding: 10px 14px;
   border-radius: 8px;
-  border: 1px solid #c7d2fe;
-  background: #eef2ff;
-  color: #312e81;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
+  background: var(--ek-plum-050, #f9f6fe);
+  color: var(--ek-plum-800, #3b2a5e);
   font-weight: 600;
 }
 
@@ -67,20 +67,20 @@ body.has-impago-banner {
 
 .impago-msg-title {
   font-weight: 800;
-  color: #312e81;
+  color: var(--ek-plum-800, #3b2a5e);
   margin-bottom: 6px;
 }
 
 .impago-msg-days {
   font-size: clamp(1.3rem, 4vw, 1.9rem);
   font-weight: 900;
-  color: #7c3aed;
+  color: var(--ek-violet-600, #7c3aed);
   margin-bottom: 8px;
 }
 
 .impago-msg-body {
   font-size: 0.95rem;
-  color: #1f2937;
+  color: var(--ek-ink, #0f172a);
 }
 
 @media (max-width: 700px) {
@@ -110,30 +110,30 @@ body.has-impago-banner {
   display: inline-block;
   padding: 0 10px;
   border-radius: 999px;
-  background: #fee2e2;
-  color: #b91c1c;
+  background: var(--ek-bad-100, #fef2f2);
+  color: var(--ek-bad-700, #991b1b);
   font-weight: 900;
 }
 
 
 
 .impago-msg--warning .impago-msg-title {
-  color: #7c2d12;
+  color: var(--ek-warn-700, #7c3f0a);
 }
 
 .impago-msg--warning .impago-msg-days {
-  color: #c2410c;
+  color: var(--ek-warn-700, #7c3f0a);
 }
 
 .impago-msg--danger .impago-msg-title {
-  color: #991b1b;
+  color: var(--ek-bad-700, #991b1b);
 }
 
 .impago-msg--danger .impago-msg-days {
-  color: #b91c1c;
+  color: var(--ek-bad-700, #991b1b);
 }
 
 .impago-msg--danger .impago-number {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--ek-bad-100, #fef2f2);
+  color: var(--ek-bad-700, #991b1b);
 }

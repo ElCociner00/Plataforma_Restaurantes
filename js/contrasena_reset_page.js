@@ -1,23 +1,19 @@
 import { supabase } from "./supabase.js";
 import { sendRecoveryForEmail } from "./contrasena.js";
 import { APP_URLS } from "./urls.js";
-import { WEBHOOK_VERIFICAR_NIT_CEDULA } from "./webhooks.js";
-import { enforceNumericInput } from "./input_utils.js";
 
 const form = document.getElementById("resetPasswordForm");
 const nuevaContrasena = document.getElementById("nuevaContrasena");
 const toggleNuevaContrasena = document.getElementById("toggleNuevaContrasena");
 const estado = document.getElementById("estadoReset");
 const recoveryEmail = document.getElementById("recoveryEmail");
-const cedulaRecovery = document.getElementById("cedulaRecovery");
-const verificarCedulaBtn = document.getElementById("verificarCedulaBtn");
+const emailRecoveryInput = document.getElementById("emailRecovery");
+const btnEnviarRecovery = document.getElementById("btnEnviarRecovery");
 const identityHint = document.getElementById("identityHint");
 const identityBlock = document.getElementById("identityBlock");
 
 const setEstado = (message) => { if (estado) estado.textContent = message || ""; };
 const setHint = (message) => { if (identityHint) identityHint.textContent = message || ""; };
-
-enforceNumericInput([cedulaRecovery]);
 
 const getRecoveryParams = () => {
   const hash = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
@@ -36,91 +32,27 @@ const hasRecoveryTokens = () => {
   return Boolean(params.access_token || params.token_hash || params.code);
 };
 
-const maskEmail = (email) => {
-  const [name, domain] = String(email || "").split("@");
-  if (!name || !domain) return "correo no disponible";
-  return `${name.slice(0, 2)}***@${domain}`;
-};
-
-const parseJsonResponse = async (response) => {
-  const text = await response.text();
-  if (!text) return {};
-  try { return JSON.parse(text); } catch (_error) { return { ok: response.ok, raw: text }; }
-};
-
-const pickEmailFromVerification = (data) => {
-  const candidates = [
-    data?.email,
-    data?.correo,
-    data?.correo_usuario,
-    data?.correo_login,
-    data?.login,
-    data?.usuario?.email,
-    data?.usuario?.correo,
-    data?.data?.email,
-    data?.data?.correo,
-    data?.data?.login
-  ];
-  return String(candidates.find((value) => String(value || "").includes("@")) || "").trim();
-};
-
-const verifyIdentityByWebhook = async (identificador) => {
-  const response = await fetch(WEBHOOK_VERIFICAR_NIT_CEDULA, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      identificador,
-      cedula_o_nit: identificador,
-      cedula: identificador,
-      nit: identificador,
-      origen: "recuperacion_contrasena_no_logueado"
-    })
-  });
-
-  const data = await parseJsonResponse(response);
-  if (!response.ok) {
-    throw new Error(data?.error || data?.message || `HTTP ${response.status}`);
-  }
-
-  return data;
-};
-
 if (recoveryEmail) recoveryEmail.value = String(new URLSearchParams(window.location.search || "").get("email") || "").trim();
-setEstado("Ingresa tu nueva contraseña. Si el enlace falla, verifica tu cédula/NIT para solicitar uno nuevo.");
 
-verificarCedulaBtn?.addEventListener("click", async () => {
-  const identificador = String(cedulaRecovery?.value || "").trim();
-  if (!identificador) {
-    setEstado("Ingresa tu cédula o NIT antes de verificar.");
+btnEnviarRecovery?.addEventListener("click", async () => {
+  const email = String(emailRecoveryInput?.value || "").trim();
+  if (!email) {
+    setEstado("Ingresa tu correo electrónico para enviarte el enlace.");
     return;
   }
 
-  setHint("Verificando identidad en plataforma...");
-  verificarCedulaBtn.disabled = true;
+  setHint("Enviando enlace...");
+  btnEnviarRecovery.disabled = true;
   try {
-    const data = await verifyIdentityByWebhook(identificador);
-    if (data?.ok !== true) {
-      setHint(data?.message || data?.error || "El dato no fue aprobado para recuperación.");
-      setEstado("No encontramos un usuario válido para generar token de recuperación. Verifica la cédula/NIT e intenta de nuevo.");
-      return;
-    }
-
-    const email = pickEmailFromVerification(data);
-    if (!email) {
-      setHint("El webhook aprobó la identidad, pero no devolvió un correo/login para emitir el token de Supabase.");
-      setEstado("Identidad verificada, pero falta el correo de login en la respuesta. Devuelve `email`, `correo` o `login` desde n8n para continuar.");
-      return;
-    }
-
     await sendRecoveryForEmail(email);
     if (recoveryEmail) recoveryEmail.value = email;
-    setHint(data?.message || "Identidad validada por verificación externa.");
-    setEstado(`Identidad verificada. Enviamos un nuevo enlace de recuperación a ${maskEmail(email)} para que puedas cambiar la contraseña con token válido.`);
+    setHint("");
+    setEstado(`Enlace de recuperación enviado. Revisa la bandeja de entrada de ${email}.`);
   } catch (error) {
     setHint("");
-    setEstado(`No fue posible verificar la identidad (${error.message || "sin detalle"}).`);
+    setEstado(`No fue posible enviar el enlace: ${error.message || "sin detalle"}`);
   } finally {
-    verificarCedulaBtn.disabled = false;
+    btnEnviarRecovery.disabled = false;
   }
 });
 
@@ -154,6 +86,11 @@ const ensureRecoverySession = async () => {
 const toggleIdentityByToken = () => {
   const hideIdentity = hasRecoveryTokens();
   if (identityBlock) identityBlock.style.display = hideIdentity ? "none" : "block";
+  if (hideIdentity) {
+    setEstado("Ingresa tu nueva contraseña.");
+  } else {
+    setEstado("Ingresa tu correo para recuperar tu contraseña.");
+  }
 };
 
 toggleIdentityByToken();
@@ -175,13 +112,13 @@ form?.addEventListener("submit", async (event) => {
   try {
     await ensureRecoverySession();
   } catch (_error) {
-    return setEstado("Enlace inválido o expirado. Usa 'Verificar' para solicitar uno nuevo.");
+    return setEstado("Enlace inválido o expirado. Solicita uno nuevo.");
   }
 
   const { error } = await supabase.auth.updateUser({ password: nueva });
   if (error) return setEstado(`No se pudo actualizar: ${error.message || "sin detalle"}`);
 
-  setEstado("Contraseña actualizada. Inicia sesión con tu nueva contraseña.");
+  setEstado("Contraseña actualizada con éxito. Redirigiendo...");
   setTimeout(() => {
     window.location.href = APP_URLS.login;
   }, 1200);

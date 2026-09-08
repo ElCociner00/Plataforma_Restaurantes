@@ -2,22 +2,28 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AXIOMA | Facturacion</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>AXIOMA | Facturación</title>
+  <link rel="stylesheet" href="../css/variables.css">
   <link rel="stylesheet" href="../css/main.css">
-  <link rel="stylesheet" href="../css/facturacion.css">
+  <!-- ?v= obligatorio: sin él el navegador sirve la versión cacheada y el
+       cambio parece no haberse aplicado. Subir la fecha al tocar la hoja. -->
+  <link rel="stylesheet" href="../css/facturacion.css?v=20260827b">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
 </head>
 <body style="display:none">
   <script type="module" src="../js/router.js"></script>
-<script type="module" src="../js/header.js"></script>
-  <script type="module" src="../js/facturacion.js"></script>
+  <script type="module" src="../js/header.js"></script>
+  <script type="module" src="../js/facturacion.js?v=20260827b"></script>
 
   <main class="main facturacion-main">
-    <h1>Facturacion</h1>
-    <p class="helper-text">Factura mensual de suscripcion por empresa.</p>
+    <h1>Tu suscripción</h1>
+    <p class="helper-text">
+      Plan, sedes incluidas, fecha de corte y pagos de tu cuenta de AXIOMA.
+    </p>
+    <!-- Todo lo pinta facturacion.js dentro de este contenedor. El orden de
+         los bloques lo decide pintar(), no este archivo. -->
     <section id="factura-contenido" class="factura-shell"></section>
-    <section id="pago-comprobante" class="pago-shell"></section>
-    <section id="historial-pagos" class="historial-shell"></section>
   </main>
 
   <script type="module" src="../js/footer.js"></script>
@@ -25,5 +31,3 @@
   <script type="module" src="../js/module_fix/init.js"></script>
 </body>
 </html>
-
-

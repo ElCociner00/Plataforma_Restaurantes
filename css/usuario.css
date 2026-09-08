@@ -5,5 +5,5 @@
 .helper-text {
   margin: 6px 0 14px;
   font-size: 0.9rem;
-  color: #6b7280;
+  color: var(--ek-muted, #5d6b7e);
 }

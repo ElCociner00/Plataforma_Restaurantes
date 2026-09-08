@@ -17,18 +17,96 @@
 // ======================
 // MANTENIMIENTO: este archivo es la matriz de URLs. Para probar endpoints de Nómina, cambiar constantes aquí y no en los módulos consumidores.
 
+// ============================================================================
+// WEBHOOKS MUERTOS
+// ----------------------------------------------------------------------------
+// n8n se está desconectando. Estas rutas no responden ni van a responder:
+// unas porque el módulo que las usaba quedó descontinuado, otras porque su
+// trabajo ya lo hace la base de datos.
+//
+// Las constantes siguen exportadas a propósito: borrarlas rompería los import
+// de los módulos consumidores. Lo que se corta es la LLAMADA, comprobando
+// `webhookVigente(url)` antes de cada fetch. Así el módulo degrada con un
+// mensaje en vez de colgarse contra un host que ya no existe.
+//
+// Para reactivar una ruta: quitar su entrada de WEBHOOKS_MUERTOS.
+// ============================================================================
+
+export const WEBHOOKS_MUERTOS = {
+  // Módulo Siigo, descontinuado por completo.
+  "https://n8n.enkrato.com/webhook/cargar_facturas_correo":
+    "El módulo Siigo fue descontinuado.",
+  "https://n8n.enkrato.com/webhook/subir_factura_siigo":
+    "El módulo Siigo fue descontinuado.",
+  "https://n8n.enkrato.com/webhook/corregir_factura_inconveniente":
+    "El módulo Siigo fue descontinuado.",
+  "https://n8n.enkrato.com/webhook/siigo_proveedores_listar":
+    "El módulo Siigo fue descontinuado.",
+  "https://n8n.enkrato.com/webhook/siigo_proveedores_registrar":
+    "El módulo Siigo fue descontinuado.",
+
+  // Facturación y cobros: los flujos de n8n solo disparaban funciones SQL que
+  // ya existen en la base. Ahora las ejecuta pg_cron
+  // (migración 20260822200000_fase_d_webhooks_muertos.sql).
+  "https://n8n.enkrato.com/webhook/billing_daily_enforcer":
+    "Sustituido por la tarea pg_cron billing-enforcer-diario.",
+  "https://n8n.enkrato.com/webhook/crear_ciclos_mensuales":
+    "Sustituido por la tarea pg_cron billing-crear-ciclos.",
+  "https://n8n.enkrato.com/webhook/notificaciones_pagos":
+    "Sin reemplazo: el estado del pago ya queda registrado en Supabase.",
+  "https://n8n.enkrato.com/webhook/verificar_pagos":
+    "Sin reemplazo: el comprobante ya se guarda en payment_attempts y en Storage.",
+
+  // Módulos en desuso confirmados.
+  "https://n8n.enkrato.com/webhook/registrar_credibanco":
+    "La integración con Credibanco fue descontinuada.",
+  "https://n8n.enkrato.com/webhook/dashboard":
+    "El envío de métricas del dashboard fue descontinuado.",
+  "https://n8n.enkrato.com/webhook/verificar_nit_cedula":
+    "La recuperación de contraseña la gestiona Supabase Auth.",
+};
+
+// Dominio de ejemplo que quedó copiado en varias constantes. Nunca existió.
+const HOST_PLACEHOLDER = "tu-n8n-instancia.com";
+
+/** Motivo por el que una URL está muerta, o cadena vacía si sigue viva. */
+export function motivoObsoleto(url) {
+  const limpia = String(url || "").trim();
+  if (!limpia) return "Webhook sin URL configurada.";
+  if (limpia.includes(HOST_PLACEHOLDER)) return "Webhook nunca configurado (host de ejemplo).";
+  return WEBHOOKS_MUERTOS[limpia] || "";
+}
+
+// Pantallas descontinuadas que reutilizaban una ruta genérica todavía viva.
+// api_integraciones_siigo.js, por ejemplo, guarda credenciales de Siigo a
+// través del mismo `registro_credenciales` que usa Loggro: la URL sigue en
+// pie, pero el módulo que la llama ya no.
+export const MODULOS_DESCONTINUADOS = {
+  siigo: "El módulo Siigo fue descontinuado.",
+  credibanco: "La integración con Credibanco fue descontinuada.",
+};
+
+/** true si merece la pena hacer la llamada. Comprobar SIEMPRE antes de fetch. */
+export function webhookVigente(url) {
+  return motivoObsoleto(url) === "";
+}
+
+// [OBSOLETO desde fase 2] Google verifica el correo; ya nadie importa esta constante.
 // registro/registro.js (botón: "Enviar código de verificación" en Registro de Empresa)
 export const WEBHOOK_CREAR_CODIGO_VERIFICACION =
   "https://n8n.enkrato.com/webhook/crear_codigo_verificacion";
 
+// [OBSOLETO desde fase 2] Google verifica el correo; ya nadie importa esta constante.
 // registro/registro.js (botón: "Verificar código" en Registro de Empresa)
 export const WEBHOOK_VERIFICAR_CODIGO =
   "https://n8n.enkrato.com/webhook/verificar_codigo";
 
+// [OBSOLETO desde fase 2] Sustituido por insert directo en `empresas` (js/registro.js).
 // registro/registro.js (botón: "Continuar registro" en Registro de Empresa)
 export const WEBHOOK_REGISTRO_EMPRESA =
   "https://n8n.enkrato.com/webhook/registro";
 
+// [OBSOLETO desde fase 2] Sustituido por insert directo en `usuarios_sistema` (js/registro.js).
 // registro/usuario.js (botón: "Crear cuenta" en Crear usuario administrador)
 export const WEBHOOK_REGISTRO_USUARIO =
   "https://n8n.enkrato.com/webhook/registro_usuario";
@@ -36,6 +114,7 @@ export const WEBHOOK_REGISTRO_USUARIO =
 
 
 // configuracion/contrasena.html (botón: "Verificar" cédula o NIT para recuperación no logueada)
+// [MUERTO] Ver WEBHOOKS_MUERTOS al inicio del archivo. La constante se conserva solo para no romper los import.
 export const WEBHOOK_VERIFICAR_NIT_CEDULA =
   "https://n8n.enkrato.com/webhook/verificar_nit_cedula";
 
@@ -77,6 +156,7 @@ export const WEBHOOK_REGISTRO_CREDENCIALES =
   "https://n8n.enkrato.com/webhook/registro_credenciales";
 
 // configuracion/credibanco.html (guardar credenciales Credibanco)
+// [MUERTO] Ver WEBHOOKS_MUERTOS al inicio del archivo. La constante se conserva solo para no romper los import.
 export const WEBHOOK_REGISTRAR_CREDIBANCO =
   "https://n8n.enkrato.com/webhook/registrar_credibanco";
 
@@ -122,22 +202,27 @@ export const WEBHOOK_ALERTA_MANIPULACION_CIERRE =
 
 
 // siigo/subir_facturas_siigo/index.html (consultar facturas desde correo)
+// [MUERTO] Ver WEBHOOKS_MUERTOS al inicio del archivo. La constante se conserva solo para no romper los import.
 export const WEBHOOK_CARGAR_FACTURAS_CORREO =
   "https://n8n.enkrato.com/webhook/cargar_facturas_correo";
 
 // siigo/subir_facturas_siigo/index.html (subir/revertir factura en Siigo)
+// [MUERTO] Ver WEBHOOKS_MUERTOS al inicio del archivo. La constante se conserva solo para no romper los import.
 export const WEBHOOK_SUBIR_SIIGO =
   "https://n8n.enkrato.com/webhook/subir_factura_siigo";
 
 // siigo/subir_facturas_siigo/index.html (corregir facturas en panel de revision)
+// [MUERTO] Ver WEBHOOKS_MUERTOS al inicio del archivo. La constante se conserva solo para no romper los import.
 export const WEBHOOK_CORREGIR_FACTURA_INCONVENIENTE =
   "https://n8n.enkrato.com/webhook/corregir_factura_inconveniente";
 
 // siigo/configuracion_siigo/proveedores_siigo.html (listar proveedores del tenant)
+// [MUERTO] Ver WEBHOOKS_MUERTOS al inicio del archivo. La constante se conserva solo para no romper los import.
 export const WEBHOOK_SIIGO_PROVEEDORES_LISTAR =
   "https://n8n.enkrato.com/webhook/siigo_proveedores_listar";
 
 // siigo/configuracion_siigo/proveedores_siigo.html (registrar nuevo proveedor)
+// [MUERTO] Ver WEBHOOKS_MUERTOS al inicio del archivo. La constante se conserva solo para no romper los import.
 export const WEBHOOK_SIIGO_PROVEEDORES_REGISTRAR =
   "https://n8n.enkrato.com/webhook/siigo_proveedores_registrar";
 
@@ -182,6 +267,7 @@ export const WEBHOOK_NOMINA_PARAMETROS_REGISTRAR =
   "https://n8n.enkrato.com/webhook/nuevo_parametro_nómina";
 
 // dashboard/index.html (auto-carga inicial de métricas)
+// [MUERTO] Ver WEBHOOKS_MUERTOS al inicio del archivo. La constante se conserva solo para no romper los import.
 export const WEBHOOK_DASHBOARD_DATOS =
   "https://n8n.enkrato.com/webhook/dashboard";
 
@@ -212,7 +298,7 @@ export const WEBHOOK_COMPRAS_REASIGNAR_LOCAL =
 export const WEBHOOKS = {
   // Permisos excepcionales (crear/actualizar)
   PERMISOS_EXCEPCION: {
-    url: "https://ivgzwgyjyqfunheaesxx.supabase.co/rest/v1/rpc/guardar_permiso_excepcion",
+    url: "https://tgkvcvnwwnrlyhbqmhaf.supabase.co/rest/v1/rpc/guardar_permiso_excepcion",
     archivos_que_usan: [
       "js/permisos.js"
     ],

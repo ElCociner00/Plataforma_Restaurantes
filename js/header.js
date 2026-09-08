@@ -129,7 +129,7 @@ function showLocalContextLoading(message = "Cambiando local...") {
 const buildLocalSwitcherItems = ({ context, localContexts = [] } = {}) => {
   console.log("[header] buildLocalSwitcherItems - localContexts.length:", localContexts.length);
   
-  const canManageLocals = ["admin_root", "admin"].includes(String(context?.rol || "").toLowerCase());
+  const canManageLocals = ["admin_root", "admin", "administrador", "master"].includes(String(context?.rol || "").toLowerCase());
   const hasSwitchableLocals = Array.isArray(localContexts) && localContexts.length >= 1;
 
   if (!canManageLocals && !hasSwitchableLocals) return "";
@@ -222,6 +222,11 @@ function buildMenu({ context, environmentForMenu, localContexts = [] }) {
         <div class="nav-dropdown-menu">
           <a href="${APP_URLS.cierreTurno}">Cierre turno</a>
           <a href="${APP_URLS.historicoCierreTurno}">Histórico</a>
+          ${context?.rol === "admin" || context?.rol === "admin_root"
+            ? `<a href="${APP_URLS.auditoriaTurnos}">Auditoría de turnos</a>
+               <a href="${APP_URLS.libroDescuadres}">Libro de descuadres</a>
+               <a href="${APP_URLS.loggro}">Integración Loggro</a>`
+            : ""}
         </div>
       </div>
       <div class="nav-dropdown">
@@ -229,33 +234,46 @@ function buildMenu({ context, environmentForMenu, localContexts = [] }) {
         <div class="nav-dropdown-menu">
           <a href="${APP_URLS.cierreInventarios}">Cierre inventarios</a>
           <a href="${APP_URLS.historicoCierreInventarios}">Historico cierre inventario</a>
+          ${isAdminContext(context) ? `<a href="${APP_URLS.loggro}">Integración Loggro</a>` : ""}
         </div>
       </div>
     `;
     menu += `<a class="nav-link-btn" href="${APP_URLS.compras}">Compras</a>`;
-    menu += `
-      <div class="nav-dropdown">
-        <button type="button" class="nav-dropdown-toggle">Nomina</button>
-        <div class="nav-dropdown-menu">
-          <a href="${APP_URLS.nomina}">Nómina</a>
-          <a href="${APP_URLS.nominaHistorico}">Histórico Nómina</a>
-        </div>
-      </div>`;
+    if (context?.rol === "admin" || context?.rol === "admin_root") {
+      menu += `
+        <div class="nav-dropdown">
+          <button type="button" class="nav-dropdown-toggle">Nomina</button>
+          <div class="nav-dropdown-menu">
+            <a href="${APP_URLS.nomina}">Nómina</a>
+            <a href="${APP_URLS.nominaHistorico}">Histórico Nómina</a>
+          </div>
+        </div>`;
+    }
   }
 
   if (environmentForMenu === ENV_SIIGO) {
     menu += `<a class="nav-link-btn" href="${APP_URLS.dashboardSiigo}">Dashboard</a>`;
     menu += `<a class="nav-link-btn" href="${APP_URLS.subirFacturasSiigo}">Ver o subir facturas correo</a>`;
-    menu += `
-      <div class="nav-dropdown">
-        <button type="button" class="nav-dropdown-toggle">Nomina</button>
-        <div class="nav-dropdown-menu">
-          <a href="${APP_URLS.nomina}">Nómina</a>
-          <a href="${APP_URLS.nominaHistorico}">Histórico Nómina</a>
-        </div>
-      </div>`;
+    if (context?.rol === "admin" || context?.rol === "admin_root") {
+      menu += `
+        <div class="nav-dropdown">
+          <button type="button" class="nav-dropdown-toggle">Nomina</button>
+          <div class="nav-dropdown-menu">
+            <a href="${APP_URLS.nomina}">Nómina</a>
+            <a href="${APP_URLS.nominaHistorico}">Histórico Nómina</a>
+          </div>
+        </div>`;
+    }
   }
 
+  menu += `
+    <div class="nav-dropdown">
+      <button type="button" class="nav-dropdown-toggle">Rappi</button>
+      <div class="nav-dropdown-menu">
+        <a href="${APP_URLS.rappiOperacion}">Rappi</a>
+        ${isAdminContext(context) ? `<a href="${APP_URLS.rappiIntegracion}">Integración Rappi</a>` : ""}
+      </div>
+    </div>`;
   menu += `<a class="nav-link-btn" href="${APP_URLS.facturacion}">Facturacion</a>`;
 
   const configLink = environmentForMenu === ENV_SIIGO
@@ -273,7 +291,7 @@ function buildMenu({ context, environmentForMenu, localContexts = [] }) {
         <span class="user-name">${userName}</span>
       </button>
       <div class="nav-dropdown-menu user-dropdown-menu">
-        ${context?.rol === "admin_root" || context?.rol === "admin" ? `<a href="${APP_URLS.gestionUsuarios}">Gestión usuarios</a><a href="${APP_URLS.anadirLocal}">Añadir local</a><a href="${configLink}">Configuracion</a>` : ""}
+        ${["admin_root", "admin", "administrador", "master"].includes(String(context?.rol).toLowerCase()) ? `<a href="${APP_URLS.gestionUsuarios}">Gestión usuarios</a><a href="${APP_URLS.anadirLocal}">Añadir local</a><a href="${configLink}">Configuracion</a>` : ""}
         ${buildLocalSwitcherItems({ context, localContexts })}
         <div class="menu-group-title">Cambiar de entorno</div>
         ${environmentOptions}
@@ -283,6 +301,11 @@ function buildMenu({ context, environmentForMenu, localContexts = [] }) {
   `;
 
   return menu;
+}
+
+function isAdminContext(context) {
+  const role = String(context?.rol || "").toLowerCase();
+  return context?.super_admin === true || ["admin", "admin_root"].includes(role);
 }
 
 function wireHeaderEvents(header, context) {

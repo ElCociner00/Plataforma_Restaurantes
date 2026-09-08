@@ -1,1 +1,291 @@
+/* =========================================================
+   ENKRATO · TOKENS DE DISEÑO
+   Fase 0 — Fundaciones
+   ---------------------------------------------------------
+   Fuente única de verdad para color, tipografía, espaciado y
+   elevación de toda la plataforma.
 
+   Este archivo SOLO declara custom properties. No contiene
+   ninguna regla que aplique estilos, por lo que incluirlo no
+   cambia el aspecto de ninguna vista hasta que las hojas de
+   página empiecen a consumir los tokens (fases 1 a 7).
+
+   Debe cargarse ANTES que main.css en cada vista.
+
+   Nombres alineados con la escala de Tailwind (600, 500, 100...)
+   para que una eventual migración a Tailwind sea un reemplazo
+   mecánico y no un rediseño.
+
+   ---------------------------------------------------------
+   DIRECCIÓN VISUAL · minimalista y luminosa (light mode)
+   ---------------------------------------------------------
+   Tres reglas gobiernan cada valor de este archivo:
+
+   1. El lienzo es blanco o gris muy claro. Las superficies
+      grandes -- fondo de página, tarjetas, cabecera, pie -- se
+      pintan con #ffffff o #f8fafc. Nunca con color de marca.
+
+   2. Los neutrales son slate, no ciruela. La versión anterior
+      sesgaba los grises hacia el morado (#f8f6fb, #f5f2fa) y el
+      resultado se percibía apagado y sucio. Un slate limpio deja
+      que el acento sea lo único con color en pantalla.
+
+   3. Plum, violet y gold son ACENTO, no relleno. Se reservan
+      para áreas pequeñas y de alta intención: botón primario,
+      icono activo, anillo de foco, borde de selección. En
+      cuanto un color de marca cubre una banda entera de la
+      pantalla, esta paleta está mal aplicada.
+========================================================= */
+
+:root {
+  /* ---------------------------------------------------------
+     MARCA · sólo acento
+     Valores heredados de la identidad existente (#2c1f47 y
+     #5b3a8f). Se conservan porque la marca es reconocible, pero
+     su superficie de uso se reduce drásticamente: en el nuevo
+     sistema el ciruela profundo pasa de rellenar la cabecera a
+     ser, casi siempre, un color de texto o de icono.
+  --------------------------------------------------------- */
+  --ek-plum-900: #2c1f47;
+  --ek-plum-800: #3b2a5e;
+  --ek-plum-700: #4a3474;
+  --ek-plum-600: #5b3a8f;  /* relleno del botón primario */
+  --ek-plum-500: #7c53b8;
+  --ek-plum-200: #ddd0f5;
+  --ek-plum-100: #efe9fb;
+  --ek-plum-050: #f9f6fe;
+
+  --ek-violet-600: #7c3aed;
+  --ek-violet-500: #8b5cf6;  /* foco, selección, estado activo */
+  --ek-violet-300: #c4b5fd;
+  --ek-violet-100: #f3efff;
+
+  --ek-gold-500: #c98a1e;
+  --ek-gold-400: #e0a92e;
+  --ek-gold-100: #fdf6e6;
+
+  /* ---------------------------------------------------------
+     SEMÁNTICOS
+     El corazón del producto: señalan el veredicto de una
+     conciliación. Nunca se usan con fines decorativos.
+
+     Los fondos son de nivel 100 muy tenue, para que una fila con
+     diferencia se lea como un matiz sobre blanco y no como un
+     bloque de color. El peso lo carga el texto (nivel 700), que
+     conserva contraste alto sobre su propio fondo.
+  --------------------------------------------------------- */
+  --ek-ok-700: #065f46;
+  --ek-ok-600: #059669;
+  --ek-ok-100: #ecfdf5;
+
+  --ek-warn-700: #7c3f0a;
+  --ek-warn-600: #d97706;
+  --ek-warn-100: #fffbeb;
+
+  --ek-bad-700: #991b1b;
+  --ek-bad-600: #dc2626;
+  --ek-bad-100: #fef2f2;
+
+  --ek-info-600: #2563eb;
+  --ek-info-100: #eff6ff;
+
+  /* ---------------------------------------------------------
+     NEUTRALES · escala slate
+     Estos son los tokens que hacen el trabajo pesado: cubren
+     prácticamente toda la superficie de la aplicación. Se
+     mantienen deliberadamente sin tinte de marca.
+  --------------------------------------------------------- */
+  --ek-ink: #0f172a;        /* titulares y cifras */
+  --ek-ink-2: #334155;      /* texto corrido */
+  --ek-muted: #5d6b7e;      /* rótulos, notas, texto secundario */
+  --ek-muted-2: #78889c;    /* marcador de posición, texto inactivo */
+
+  --ek-line: #e8edf3;        /* separador por defecto */
+  --ek-line-strong: #86939f; /* borde de control, contorno de campo */
+
+  --ek-surface: #ffffff;    /* tarjetas, modales, filas de tabla */
+  --ek-surface-2: #f1f5f9;  /* relleno sutil: cabecera de tabla, chip */
+  --ek-ground: #f8fafc;     /* fondo de página */
+
+  --ek-on-brand: #ffffff;   /* texto sobre relleno de marca */
+
+  /* ---------------------------------------------------------
+     CROMO DE LA APLICACIÓN · cabecera, pie y navegación
+     Hoy main.css pinta la cabecera y el pie con #2c1f47, una
+     banda oscura a ancho completo presente en todas las vistas.
+     Es exactamente el uso de marca que esta dirección descarta.
+     Estos tokens definen su reemplazo luminoso; la fase 2 los
+     conecta al cromo real, que es donde vive ese marcado.
+  --------------------------------------------------------- */
+  /* Barra de marca. Fondo oscuro y letras blancas: la cabecera se
+     lee de un vistazo y queda claramente separada del contenido.
+     Solo la consume .app-header y sus descendientes en main.css;
+     la landing tiene su propia cabecera clara y no depende de aquí. */
+  --ek-header-bg: #3b2a5e;
+  --ek-header-ink: #ffffff;
+  --ek-header-ink-muted: #ddd0f5;
+  --ek-header-border: #2c1f47;
+  --ek-header-active: #ffffff;
+
+  --ek-footer-bg: #f8fafc;
+  --ek-footer-ink: #5d6b7e;
+  --ek-footer-border: #e8edf3;
+
+  /* ---------------------------------------------------------
+     TIPOGRAFÍA
+     Inter para interfaz y datos (numerales tabulares reales).
+     Poppins se reserva para la landing.
+     El stack de respaldo arranca con Tahoma, la cara actual, para
+     que ninguna vista quede sin fuente si Inter no carga.
+
+     OJO: Inter todavía NO se carga en ninguna vista. El enlace a
+     Google Fonts entra en la fase 1; hasta entonces el navegador
+     resuelve al respaldo.
+  --------------------------------------------------------- */
+  --ek-font-ui: "Inter", "Segoe UI", Tahoma, Arial, sans-serif;
+  --ek-font-display: "Inter", "Segoe UI", Tahoma, Arial, sans-serif;
+  --ek-font-marketing: "Poppins", "Segoe UI", system-ui, sans-serif;
+  --ek-font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", monospace;
+
+  --ek-text-display: 1.75rem;   /* 28px · título de vista */
+  --ek-text-section: 1.1875rem; /* 19px · encabezado de .bloque */
+  --ek-text-metric: 1.5rem;     /* 24px · cifra de tarjeta */
+  --ek-text-body: 0.9375rem;    /* 15px · texto e inputs */
+  --ek-text-label: 0.75rem;     /* 12px · rótulo sobre campo */
+  --ek-text-note: 0.78125rem;   /* 12.5px · ayudas y notas */
+
+  --ek-weight-regular: 400;
+  --ek-weight-medium: 500;
+  --ek-weight-semibold: 600;
+  --ek-weight-bold: 700;
+
+  --ek-leading-tight: 1.2;
+  --ek-leading-normal: 1.5;
+  --ek-leading-relaxed: 1.62;
+
+  --ek-tracking-label: 0.04em;
+
+  /* ---------------------------------------------------------
+     ESPACIADO · escala de 4
+     Reemplaza los 11 valores sueltos que hoy conviven sin patrón.
+  --------------------------------------------------------- */
+  --ek-sp-1: 4px;
+  --ek-sp-2: 8px;
+  --ek-sp-3: 12px;
+  --ek-sp-4: 16px;
+  --ek-sp-5: 20px;
+  --ek-sp-6: 24px;
+  --ek-sp-8: 32px;
+  --ek-sp-10: 40px;
+  --ek-sp-12: 48px;
+
+  /* ---------------------------------------------------------
+     RADIOS Y ELEVACIÓN
+     En un sistema luminoso la sombra separa, no decora. Estas
+     son deliberadamente tenues: dos capas de opacidad muy baja
+     sobre slate, no sobre negro puro, para que el canto de la
+     tarjeta se insinúe sin ensuciar el blanco de alrededor.
+
+     La cabecera pierde su sombra proyectada y pasa a una línea
+     de un píxel: en una interfaz clara, un filo define mejor que
+     un degradado.
+  --------------------------------------------------------- */
+  --ek-radius-sm: 6px;
+  --ek-radius-md: 10px;
+  --ek-radius-lg: 14px;
+  --ek-radius-xl: 18px;
+  --ek-radius-pill: 999px;
+
+  --ek-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.05);
+  --ek-shadow-raised: 0 4px 16px -6px rgba(15, 23, 42, 0.10), 0 1px 3px rgba(15, 23, 42, 0.04);
+  --ek-shadow-header: 0 1px 0 rgba(15, 23, 42, 0.06);
+
+  /* Elevaciones añadidas en la pasada de la app:
+     -modal  para diálogos que flotan sobre un velo,
+     -sticky para cabeceras de tabla fijas al hacer scroll. */
+  --ek-shadow-modal: 0 24px 48px -12px rgba(15, 23, 42, 0.18), 0 4px 12px -4px rgba(15, 23, 42, 0.08);
+  --ek-shadow-sticky: 0 1px 0 var(--ek-line, #e8edf3), 0 4px 8px -6px rgba(15, 23, 42, 0.10);
+
+  /* ---------------------------------------------------------
+     ANCHOS DE CONTENEDOR POR TIPO DE VISTA
+     Sustituye al max-width: 420px único que hoy asfixia a nómina.
+  --------------------------------------------------------- */
+  --ek-w-auth: 440px;     /* login, registro, recuperación */
+  --ek-w-form: 760px;     /* captura: cierre turno, inventarios */
+  --ek-w-data: 1180px;    /* históricos, compras, facturación */
+  --ek-w-wide: 100%;      /* comprobante de nómina */
+
+  /* ---------------------------------------------------------
+     TOQUE Y ACCESIBILIDAD
+     Mínimos para uso en planta y cocina.
+  --------------------------------------------------------- */
+  --ek-touch-min: 44px;       /* área táctil mínima */
+  --ek-touch-gap: 8px;        /* separación entre destinos táctiles */
+  --ek-input-font-min: 16px;  /* por debajo de esto iOS hace zoom al enfocar */
+  --ek-focus-ring: 0 0 0 3px rgba(139, 92, 246, 0.30);
+
+  /* ---------------------------------------------------------
+     CAPAS
+     Ordena los z-index que hoy están dispersos (1000, 1200, 9999).
+  --------------------------------------------------------- */
+  --ek-z-header: 1200;
+  --ek-z-dropdown: 1300;
+  --ek-z-footer: 1000;
+  --ek-z-modal: 5000;
+  --ek-z-overlay: 9999;
+
+  /* ---------------------------------------------------------
+     MOVIMIENTO
+  --------------------------------------------------------- */
+  --ek-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ek-duration-fast: 120ms;
+  --ek-duration-base: 200ms;
+
+  /* ---------------------------------------------------------
+     ICONOGRAFÍA · Phosphor
+     Puntos de código de la fuente web Phosphor (peso regular),
+     verificados contra
+     unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css
+     y centralizados aquí para que un cambio de versión del CDN
+     se corrija en un solo lugar.
+
+     Uso en elementos que admiten pseudo-elementos:
+       .selector::before {
+         font-family: "Phosphor";
+         content: var(--ek-ph-check-circle);
+       }
+
+     OJO: los <input> NO admiten ::before ni ::after. Para ellos
+     se usan los iconos SVG embebidos de más abajo.
+  --------------------------------------------------------- */
+  --ek-ph-check-circle: "\e184";
+  --ek-ph-warning-circle: "\e4e2";
+  --ek-ph-arrow-down-right: "\e042";
+  --ek-ph-arrow-up-right: "\e092";
+  --ek-ph-caret-down: "\e136";
+  --ek-ph-storefront: "\e470";
+  --ek-ph-cash-register: "\ed80";
+  --ek-ph-package: "\e390";
+  --ek-ph-receipt: "\e3ec";
+  --ek-ph-users-three: "\e68e";
+  --ek-ph-credit-card: "\e1d2";
+  --ek-ph-sliders-horizontal: "\e434";
+
+  /* ---------------------------------------------------------
+     ICONOS DE ESTADO EMBEBIDOS (SVG)
+     Geometría Phosphor regular (viewBox 256, trazo 16) servida
+     como data URI, porque el destino de las clases .diff-* es un
+     <input> y los elementos reemplazados no admiten pseudo-
+     elementos. No dependen del CDN: si Phosphor no carga, el
+     veredicto de la conciliación se sigue viendo.
+
+     El trazo va codificado (%23 = #) y debe mantenerse en
+     sincronía con --ek-bad-600, --ek-warn-600 y --ek-ok-600. Un
+     data URI no resuelve var(), así que este es el único punto
+     del archivo donde un color aparece duplicado: si se cambia
+     el semántico, hay que cambiarlo también aquí.
+  --------------------------------------------------------- */
+  --ek-icon-faltante: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256' fill='none' stroke='%23dc2626' stroke-width='18' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='64' y1='64' x2='192' y2='192'/%3E%3Cpolyline points='192 112 192 192 112 192'/%3E%3C/svg%3E");
+  --ek-icon-sobrante: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256' fill='none' stroke='%23d97706' stroke-width='18' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='64' y1='192' x2='192' y2='64'/%3E%3Cpolyline points='112 64 192 64 192 144'/%3E%3C/svg%3E");
+  --ek-icon-ok: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256' fill='none' stroke='%23059669' stroke-width='18' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='128' cy='128' r='96'/%3E%3Cpolyline points='88 136 112 160 168 96'/%3E%3C/svg%3E");
+}

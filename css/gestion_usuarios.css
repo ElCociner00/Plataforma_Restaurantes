@@ -4,7 +4,7 @@
 
 .intro {
   margin: 0 0 12px;
-  color: #4b5563;
+  color: var(--ek-ink-2, #334155);
 }
 
 .status {
@@ -14,9 +14,9 @@
 
 .tabla-wrap {
   overflow-x: auto;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--ek-line, #e8edf3);
   border-radius: 10px;
-  background: #fff;
+  background: var(--ek-surface, #ffffff);
 }
 
 .usuarios-tabla {
@@ -27,14 +27,14 @@
 
 .usuarios-tabla th,
 .usuarios-tabla td {
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--ek-line, #e8edf3);
   padding: 10px;
   text-align: center;
   font-size: 14px;
 }
 
 .usuarios-tabla th {
-  background: #f9fafb;
+  background: var(--ek-ground, #f8fafc);
 }
 
 .badge {
@@ -45,13 +45,13 @@
 }
 
 .badge.empleado {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--ek-ok-100, #ecfdf5);
+  color: var(--ek-ok-700, #065f46);
 }
 
 .badge.otro {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--ek-info-100, #eff6ff);
+  color: var(--ek-info-600, #2563eb);
 }
 
 .switch-cell {
@@ -71,7 +71,7 @@
   position: absolute;
   inset: 0;
   cursor: pointer;
-  background: #d1d5db;
+  background: var(--ek-line, #e8edf3);
   border-radius: 999px;
   transition: .2s ease;
 }
@@ -84,12 +84,12 @@
   left: 3px;
   top: 3px;
   border-radius: 999px;
-  background: #fff;
+  background: var(--ek-surface, #ffffff);
   transition: .2s ease;
 }
 
 .switch-cell input:checked + .switch-slider {
-  background: #2563eb;
+  background: var(--ek-info-600, #2563eb);
 }
 
 .switch-cell input:checked + .switch-slider::before {
@@ -99,9 +99,9 @@
 .gestion-usuarios-card {
   margin: 16px auto;
   max-width: 760px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--ek-line, #e8edf3);
   border-radius: 12px;
-  background: #f8fafc;
+  background: var(--ek-surface-2, #f1f5f9);
 }
 
 .password-card {

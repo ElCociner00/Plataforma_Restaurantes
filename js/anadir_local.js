@@ -3,8 +3,7 @@ import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 import {
   WEBHOOK_CREAR_CODIGO_VERIFICACION,
-  WEBHOOK_VERIFICAR_CODIGO,
-  WEBHOOK_REGISTRO_LOCAL_DEPENDIENTE
+  WEBHOOK_VERIFICAR_CODIGO
 } from "./webhooks.js";
 import { APP_URLS } from "./urls.js";
 
@@ -168,15 +167,12 @@ continuarBtn?.addEventListener("click", async () => {
   setStatus("Registrando local dependiente...");
 
   try {
-    const res = await fetch(WEBHOOK_REGISTRO_LOCAL_DEPENDIENTE, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(datosLocal)
+    const { data, error } = await supabase.functions.invoke("registro-local", {
+      body: datosLocal
     });
-    const data = await parseJsonResponse(res);
 
-    if (!res.ok || data.ok === false) {
-      setStatus(data.error || `No se pudo registrar el local (HTTP ${res.status}).`);
+    if (error || !data || data.ok === false) {
+      setStatus(data?.error || error?.message || "No se pudo registrar el local.");
       return;
     }
 

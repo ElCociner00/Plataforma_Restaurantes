@@ -27,7 +27,7 @@ import { buildRequestHeaders, getUserContext, listAvailableLocalContexts } from 
 import { fetchResponsablesActivos } from "./responsables.js";
 import { getActiveEnvironment } from "./environment.js";
 import { supabase } from "./supabase.js";
-import { WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO, WEBHOOK_NOMINA_HISTORICO_GUARDAR, WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR, WEBHOOK_NOMINA_PARAMETROS_REGISTRAR } from "./webhooks.js"; // MANTENIMIENTO: URLs centralizadas; cambiar endpoints solo en js/webhooks.js.
+import { WEBHOOK_NOMINA_HISTORICO_GUARDAR, WEBHOOK_NOMINA_PARAMETROS_REGISTRAR } from "./webhooks.js"; // MANTENIMIENTO: URLs centralizadas; cambiar endpoints solo en js/webhooks.js.
 import { drawPngBrandWatermark } from "./png_branding.js";
 import { nominaLog, nominaWarn } from "./nomina.debug.js";
 
@@ -1385,14 +1385,11 @@ const consultarNomina = async () => {
   let rows = [];
 
   try {
-    const authHeaders = await buildRequestHeaders({ includeTenant: true });
-    const response = await fetch(WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders },
-      body: JSON.stringify(payload)
+    const { data: webhookData, error: functionError } = await supabase.functions.invoke("nomina-consultar", {
+      body: payload
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const webhookData = await parseWebhookResponseSafe(response);
+    if (functionError) throw functionError;
+
     const excelData = parseExcelWebhookPayload(webhookData);
     setStatus("Datos recibidos del webhook del Excel. Procesando nómina para interfaz...");
     rows = excelData ? normalizeExcelPayrollForUi(excelData, empleadoSeleccionado) : await normalizeWithRetries(webhookData, empleadoSeleccionado, 4);
@@ -1833,31 +1830,13 @@ const descargarExcelEmpleado = async () => {
 
   setStatus("Solicitando nómina calculada del empleado...");
   try {
-    const authHeaders = await buildRequestHeaders({ includeTenant: true });
-    const response = await fetch(WEBHOOK_NOMINA_CONSULTAR_HISTORICO_EMPLEADO, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...authHeaders
-      },
-      body: JSON.stringify(payload)
+    const { data: webhookData, error: functionError } = await supabase.functions.invoke("nomina-consultar", {
+      body: payload
     });
-
-    const rawText = await response.text();
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}${rawText ? ` - ${rawText.slice(0, 200)}` : ""}`);
-    }
-
-    let parsed = null;
-    try {
-      parsed = rawText ? JSON.parse(rawText) : null;
-    } catch (_e) {
-      parsed = rawText;
-    }
-
-    const data = parseWebhookPayload(parsed);
+    if (functionError) throw functionError;
+    const data = parseWebhookPayload(webhookData);
     if (!data) {
-      throw new Error(`El webhook respondió sin estructura de nómina exportable. Vista previa: ${(rawText || "").slice(0, 180)}`);
+      throw new Error(`El Edge Function respondió sin estructura de nómina exportable.`);
     }
 
     const detalleCount = Array.isArray(data.detalle) ? data.detalle.length : 0;
@@ -1944,22 +1923,26 @@ const actualizarParametrosNomina = async () => {
 
   setStatus(`Actualizando ${payloads.length} parámetro(s) de nómina...`);
   try {
-    const authHeaders = await buildRequestHeaders({ includeTenant: true });
     const results = await Promise.all(payloads.map(async (payload) => {
-      const response = await fetch(WEBHOOK_NOMINA_PARAMETROS_REGISTRAR, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify(payload)
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || data?.success === false || data?.ok === false) throw new Error(data?.message || `HTTP ${response.status}`);
-      return data;
+      const { data, error } = await supabase
+        .from("parametros_nomina")
+        .upsert({
+          empresa_id: payload.empresa_id,
+          dimension_tiempo_id: payload.tiempo_id,
+          dimension_concepto_id: payload.concepto_id,
+          valor_monetario: payload.valor,
+          registrado_por: payload.usuario_id
+        }, {
+          onConflict: 'empresa_id, dimension_tiempo_id, dimension_concepto_id'
+        });
+      
+      if (error) throw new Error(error.message);
+      return { success: true };
     }));
-    const message = results.find((item) => item?.message)?.message;
-    setStatus(message || `${payloads.length} parámetro(s) de nómina actualizados con el mismo formato del módulo Parámetros de nómina.`);
+    setStatus(`${payloads.length} parámetro(s) de nómina actualizados exitosamente.`);
   } catch (error) {
     nominaWarn("parametros.actualizar.error", error?.message || error);
-    setStatus(`No fue posible actualizar parámetros (${error.message || "sin detalle"}).`);
+    setStatus(`Error al actualizar parámetros: ${error?.message || error}`);
   }
 };
 
@@ -1991,7 +1974,18 @@ const init = async () => {
 };
 
 consultarBtn?.addEventListener("click", consultarNomina);
-descargarBtn?.addEventListener("click", () => { descargarComprobante(); guardarHistoricoNomina(); });
+descargarBtn?.addEventListener("click", async () => { 
+  if (descargarBtn.disabled) return;
+  descargarBtn.disabled = true;
+  const originalText = descargarBtn.textContent;
+  descargarBtn.textContent = "Guardando...";
+  try {
+    await Promise.all([descargarComprobante(), guardarHistoricoNomina()]); 
+  } finally {
+    descargarBtn.disabled = false;
+    descargarBtn.textContent = originalText;
+  }
+});
 descargarExcelEmpleadoBtn?.addEventListener("click", descargarExcelEmpleado);
 enviarDeduccionesBtn?.addEventListener("click", () => enviarDeduccionesNomina());
 actualizarParametrosBtn?.addEventListener("click", () => actualizarParametrosNomina());
@@ -2413,10 +2407,13 @@ const enviarDeduccionesNomina = async () => {
     formData.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }), "metadata.json");
     formData.append("pdf", pdfBlob, "Autorizacion Deducciones.pdf");
 
-    const authHeaders = await buildRequestHeaders({ includeTenant: true });
-    const response = await fetch(WEBHOOK_NOMINA_DEDUCCIONES_ENVIAR, { method: "POST", headers: authHeaders, body: formData });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    setStatus("PDF de autorizacion de descuentos enviado al webhook para procesamiento seguro.");
+    const { data, error } = await supabase.functions.invoke("nomina-enviar-correo", {
+      body: formData
+    });
+    if (error || !data || data.ok === false) {
+      throw new Error(data?.message || error?.message || "Error al enviar deducciones por correo");
+    }
+    setStatus("PDF de autorizacion de descuentos enviado correctamente para procesamiento seguro.");
   } catch (error) {
     nominaWarn("deducciones.enviar.error", error?.message || error);
     setStatus(`No fue posible enviar deducciones (${error.message || "sin detalle"}).`);
@@ -2427,13 +2424,42 @@ const guardarHistoricoNomina = async () => {
   if (!state.movimientos.length || !empleadoSelect.value) return;
   try {
     const payload = await buildHistoricoNominaPayload();
-    const authHeaders = await buildRequestHeaders({ includeTenant: true });
-    await fetch(WEBHOOK_NOMINA_HISTORICO_GUARDAR, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders },
-      body: JSON.stringify(payload)
-    });
-    setStatus("Comprobante descargado y nómina enviada al histórico en un único JSON por tablas.");
+    
+    const insertData = {
+      empresa_id: payload.empresa?.id || payload.empresa_id || "",
+      responsable_id: payload.empleado?.id || payload.empleado?.usuario_id || payload.empleado_id || "",
+      fecha: payload.generado_en,
+      periodo: payload.periodo?.texto || payload.periodo?.nombre || payload.periodo?.inicio || "",
+      totales: payload.tablas.resumen,
+      detalles: payload.tablas.detalle,
+      apoyos: payload.tablas.apoyos,
+      ingresos: payload.tablas.ingresos,
+      deducciones: payload.tablas.deducciones,
+      parametros: payload.tablas.parametros
+    };
+
+    const { data: existingRecords, error: fetchError } = await supabase
+      .from("historico_nomina")
+      .select("id")
+      .eq("empresa_id", insertData.empresa_id)
+      .eq("responsable_id", insertData.responsable_id)
+      .eq("periodo", insertData.periodo)
+      .limit(1);
+
+    if (fetchError) throw new Error(fetchError.message);
+
+    if (existingRecords && existingRecords.length > 0) {
+      const { error } = await supabase
+        .from("historico_nomina")
+        .update(insertData)
+        .eq("id", existingRecords[0].id);
+      if (error) throw new Error(error.message);
+      setStatus("Comprobante descargado y nómina actualizada en el histórico exitosamente.");
+    } else {
+      const { error } = await supabase.from("historico_nomina").insert([insertData]);
+      if (error) throw new Error(error.message);
+      setStatus("Comprobante descargado y nómina enviada al histórico exitosamente.");
+    }
   } catch (error) {
     nominaWarn("historico.guardar.error", error?.message || error);
     setStatus("Comprobante descargado. No fue posible enviar el histórico de nómina en este momento.");

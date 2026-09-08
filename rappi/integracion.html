@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Enkrato | Integración Rappi</title>
+  <link rel="stylesheet" href="../css/variables.css?v=20260829v4">
+  <link rel="stylesheet" href="../css/main.css?v=20260829v4">
+  <link rel="stylesheet" href="../css/rappi.css?v=20260829v4">
+</head>
+<body class="rappi-page" data-rappi-page="integration" style="display:none">
+  <script type="module" src="../js/router.js?v=20260829v4"></script>
+  <script type="module" src="../js/header.js?v=20260901rappi2"></script>
+
+  <main class="rappi-main">
+    <nav class="rappi-subnav" aria-label="Secciones de Rappi">
+      <a href="operacion.html" data-rappi-nav="operation">Rappi</a>
+      <a href="integracion.html" data-rappi-nav="integration">Integración Rappi</a>
+    </nav>
+
+    <section class="rappi-hero">
+      <div><p class="eyebrow">Entorno de pruebas</p><h1>Integración Rappi</h1><p class="muted">Conecta tu cuenta y Enkrato configurará automáticamente lo necesario.</p></div>
+      <button class="button secondary compact" id="refresh-status" type="button">Actualizar estado</button>
+    </section>
+
+    <section id="admin-required" class="notice warning" hidden>Esta sección requiere un usuario administrador. Puedes consultar la operación desde Rappi.</section>
+    <div id="integration-content" data-admin-only>
+      <section class="status-grid" aria-label="Estado de la conexión">
+        <article class="metric"><span class="metric-label">Conexión con Rappi</span><strong id="connection-status">—</strong></article>
+        <article class="metric"><span class="metric-label">Tiendas conectadas</span><strong id="connected-stores">—</strong></article>
+        <article class="metric"><span class="metric-label">Última actualización</span><strong class="metric-text" id="last-update">—</strong></article>
+        <article class="metric"><span class="metric-label">Estado de configuración</span><strong class="metric-text" id="configuration-status">—</strong></article>
+      </section>
+
+      <section class="split-grid" style="margin-top:20px">
+        <article class="card">
+          <div class="section-heading"><div><h2>Conectar Rappi</h2><p class="helper">Usa las credenciales entregadas por Rappi para el entorno de pruebas. Los datos se cifran y nunca vuelven a mostrarse.</p></div></div>
+          <form id="credentials-form" class="form-grid" autocomplete="off">
+            <div class="field"><label for="test-client-id">Client ID de pruebas</label><input id="test-client-id" name="client_id" autocomplete="off" placeholder="Dejar vacío para conservar"></div>
+            <div class="field"><label for="test-client-secret">Client Secret de pruebas</label><input id="test-client-secret" name="client_secret" type="password" autocomplete="new-password" placeholder="Dejar vacío para conservar"></div>
+            <div class="field full"><button class="button" type="submit">Conectar y configurar</button></div>
+          </form>
+        </article>
+
+        <article class="card">
+          <div class="section-heading"><div><h2>Proceso de conexión</h2><p class="helper">Enkrato valida y prepara automáticamente la integración.</p></div></div>
+          <ol class="onboarding-list">
+            <li id="step-credentials"><span>Credenciales válidas</span><strong>—</strong></li>
+            <li id="step-stores"><span>Tiendas identificadas</span><strong>—</strong></li>
+            <li id="step-webhooks"><span>Recepción de información configurada</span><strong>—</strong></li>
+            <li id="step-data"><span>Información recibida</span><strong>—</strong></li>
+          </ol>
+          <div id="connection-message" class="notice" hidden></div>
+        </article>
+      </section>
+
+      <section class="card">
+        <div class="section-heading"><div><h2>Tiendas</h2><p class="helper">Tiendas encontradas en la cuenta conectada.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Tienda</th><th>Estado</th><th>Última actualización</th><th>Menú</th></tr></thead><tbody id="integration-stores"><tr><td class="empty-cell" colspan="4">Conecta Rappi para identificar las tiendas.</td></tr></tbody></table></div>
+      </section>
+
+      <section class="card">
+        <div class="section-heading"><div><h2>Menú de pruebas</h2><p class="helper">Carga el archivo JSON de una tienda. Enkrato validará su estructura antes de enviarlo al entorno de pruebas.</p></div></div>
+        <form id="menu-form" class="form-grid">
+          <div class="field"><label for="menu-store">Tienda</label><select id="menu-store" name="store_id" required><option value="">Conecta Rappi primero</option></select></div>
+          <div class="field"><label for="menu-file">Archivo del menú</label><input id="menu-file" name="menu_file" type="file" accept="application/json,.json" required></div>
+          <div class="field full"><button class="button" type="submit">Validar y enviar menú</button></div>
+        </form>
+      </section>
+
+      <section class="card" id="incident-card" hidden>
+        <div class="section-heading"><div><h2>Requiere atención</h2><p class="helper" id="incident-message"></p></div></div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="../js/rappi/integracion.js?v=20260901rappi2"></script>
+</body>
+</html>

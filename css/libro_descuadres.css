@@ -1,0 +1,202 @@
+/* =============================================
+   LIBRO DE DESCUADRES — Estilos
+   ============================================= */
+
+/* Tabla principal */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+  padding: 0.875rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--ek-line, #e8edf3);
+  font-size: var(--ek-text-body, 0.9375rem);
+  color: var(--ek-ink-2, #334155);
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.data-table th {
+  background: var(--ek-plum-600, #5b3a8f);
+  font-weight: var(--ek-weight-semibold, 600);
+  font-size: var(--ek-text-label, 0.75rem);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ek-on-brand, #ffffff);
+  white-space: nowrap;
+}
+
+.data-table tbody tr:hover {
+  background: var(--ek-surface-2, #f1f5f9);
+}
+
+/* Inputs en tabla */
+.input-modern {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--ek-line-strong, #86939f);
+  border-radius: var(--ek-radius-sm, 6px);
+  background: var(--ek-surface, #ffffff);
+  color: var(--ek-ink, #0f172a);
+  font-size: var(--ek-text-body, 0.9375rem);
+  min-width: 180px;
+  transition: border-color var(--ek-duration-base, 200ms) var(--ek-ease);
+}
+
+.input-modern:focus {
+  outline: none;
+  border-color: var(--ek-violet-600, #7c3aed);
+  box-shadow: var(--ek-focus-ring, 0 0 0 3px rgba(139, 92, 246, 0.30));
+}
+
+.comentario-input {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--ek-line, #e8edf3);
+  border-radius: var(--ek-radius-sm, 6px);
+  background: var(--ek-surface, #ffffff);
+  color: var(--ek-ink-2, #334155);
+  font-size: 0.85rem;
+  resize: vertical;
+  min-height: 38px;
+  max-height: 80px;
+  font-family: var(--ek-font-ui);
+  transition: border-color var(--ek-duration-base, 200ms) var(--ek-ease);
+}
+
+.comentario-input:focus {
+  outline: none;
+  border-color: var(--ek-violet-600, #7c3aed);
+  box-shadow: var(--ek-focus-ring, 0 0 0 3px rgba(139, 92, 246, 0.30));
+}
+
+.valor-input {
+  width: 110px;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--ek-line, #e8edf3);
+  border-radius: var(--ek-radius-sm, 6px);
+  background: var(--ek-surface, #ffffff);
+  color: var(--ek-ink-2, #334155);
+  text-align: right;
+  font-size: var(--ek-text-body, 0.9375rem);
+  font-weight: var(--ek-weight-medium, 500);
+}
+
+/* Acciones */
+.descuadre-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.btn-sm {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  border-radius: var(--ek-radius-sm, 6px);
+  border: 1px solid var(--ek-line, #e8edf3);
+  background: var(--ek-surface, #fff);
+  color: var(--ek-ink-2, #334155);
+  cursor: pointer;
+  font-weight: var(--ek-weight-medium, 500);
+  transition: all var(--ek-duration-fast, 120ms) var(--ek-ease);
+  white-space: nowrap;
+}
+
+.btn-sm:hover {
+  background: var(--ek-surface-2, #f1f5f9);
+}
+
+.btn-sm.btn-primary {
+  background: var(--ek-plum-600, #5b3a8f);
+  color: var(--ek-on-brand, #fff);
+  border-color: var(--ek-plum-600, #5b3a8f);
+}
+
+.btn-sm.btn-primary:hover {
+  background: var(--ek-plum-700, #4a3474);
+}
+
+.btn-sm.btn-reabrir {
+  color: var(--ek-warn-600, #d97706);
+  border-color: var(--ek-warn-600, #d97706);
+}
+
+/* Badges */
+.badge-solucionado {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--ek-radius-pill, 999px);
+  background: var(--ek-ok-100, #ecfdf5);
+  color: var(--ek-ok-700, #065f46);
+  font-size: 0.8rem;
+  font-weight: var(--ek-weight-semibold, 600);
+}
+
+/* Status */
+.status-message {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--ek-muted, #5d6b7e);
+}
+
+.text-danger { color: var(--ek-bad-600, #dc2626); font-weight: 600; }
+.text-warning { color: var(--ek-warn-600, #d97706); font-weight: 600; }
+.text-success { color: var(--ek-ok-600, #059669); font-weight: 600; }
+
+/* Loading */
+.loading-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(255,255,255,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--ek-z-overlay, 9999);
+  font-size: 1.1rem;
+  color: var(--ek-ink, #0f172a);
+}
+
+.loading-overlay.is-hidden {
+  display: none;
+}
+
+/* Botones de Icono */
+.btn-icon {
+  background: transparent;
+  border: none;
+  color: var(--ek-muted, #5d6b7e);
+  font-size: 1.25rem;
+  padding: 0.4rem;
+  border-radius: var(--ek-radius-sm, 6px);
+  cursor: pointer;
+  transition: all var(--ek-duration-fast, 120ms) var(--ek-ease);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon:hover {
+  background: var(--ek-surface-2, #f1f5f9);
+  color: var(--ek-ink, #0f172a);
+}
+
+.btn-icon.btn-guardar:hover {
+  color: var(--ek-ok-600, #059669);
+  background: var(--ek-ok-100, #ecfdf5);
+}
+
+.btn-icon.btn-actualizar:hover {
+  color: var(--ek-plum-600, #5b3a8f);
+  background: var(--ek-surface-2, #f1f5f9);
+}
+
+.btn-icon.btn-editar:hover {
+  color: var(--ek-warn-600, #d97706);
+  background: #fef3c7;
+}

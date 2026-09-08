@@ -16,3 +16,26 @@
 // Módulo reservado para futuras mejoras de configuración.
 // Se mantiene intencionalmente ligero para conservar limpia la vista principal
 // de acordeones y redirecciones.
+
+import { getUserContext } from "./session.js";
+
+document.addEventListener("DOMContentLoaded", async () => {
+  const context = await getUserContext();
+  const rol = String(context?.rol || "").toLowerCase();
+  const isAdmin = ["admin_root", "admin", "administrador", "master"].includes(rol);
+
+  if (!isAdmin) {
+    // Ocultar opciones de admin
+    const accordions = document.querySelectorAll(".accordion-toggle");
+    accordions.forEach(button => {
+      const text = button.textContent.trim().toLowerCase();
+      if (text === "usuarios" || text === "apis e integraciones") {
+        button.style.display = "none";
+        const content = button.nextElementSibling;
+        if (content) {
+          content.style.display = "none";
+        }
+      }
+    });
+  }
+});

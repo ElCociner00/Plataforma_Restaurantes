@@ -1,0 +1,315 @@
+/* ==========================================================================
+   Auditoría de turnos
+   Sobre los tokens semánticos de variables.css, igual que el resto del módulo
+   de cierre de turno. Cada color va con su valor de reserva por si la hoja de
+   variables no ha cargado todavía.
+   ========================================================================== */
+
+.main {
+  max-width: 1400px;
+}
+
+.intro {
+  margin: 0 0 18px;
+  max-width: 70ch;
+  color: var(--ek-ink-2, #334155);
+  font-size: 0.94rem;
+  line-height: 1.5;
+}
+
+.bloque {
+  margin-bottom: 20px;
+  border: 1px solid var(--ek-plum-100, #efe9fb);
+  border-radius: 12px;
+  background: var(--ek-surface-2, #f1f5f9);
+  padding: 14px;
+}
+
+.hint {
+  margin: 4px 0 12px;
+  font-size: 0.85rem;
+  color: var(--ek-ink-2, #334155);
+}
+
+.is-hidden { display: none !important; }
+
+/* ── Sin acceso ─────────────────────────────────────────────────────────── */
+.sin-acceso {
+  border: 1px solid var(--ek-warn-600, #d97706);
+  background: var(--ek-warn-100, #fffbeb);
+  border-radius: 12px;
+  padding: 22px;
+  text-align: center;
+}
+
+.sin-acceso h2 {
+  margin: 0 0 8px;
+  color: var(--ek-warn-700, #7c3f0a);
+}
+
+/* ── Resumen ────────────────────────────────────────────────────────────── */
+.resumen-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.resumen-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--ek-surface, #ffffff);
+  border: 1px solid var(--ek-plum-100, #efe9fb);
+}
+
+.resumen-titulo {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ek-ink-2, #334155);
+}
+
+.resumen-valor {
+  font-size: 1.28rem;
+  color: var(--ek-plum-800, #3b2a5e);
+}
+
+/* ── Filtros ────────────────────────────────────────────────────────────── */
+.filtros-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.filtros-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.88rem;
+}
+
+.acciones-filtros {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.conteo-filtro {
+  font-size: 0.85rem;
+  color: var(--ek-ink-2, #334155);
+}
+
+/* ── Tablas ─────────────────────────────────────────────────────────────── */
+.tabla-wrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid var(--ek-plum-100, #efe9fb);
+  background: var(--ek-surface, #ffffff);
+}
+
+.tabla-lotes,
+.tabla-detalle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.tabla-lotes th,
+.tabla-lotes td,
+.tabla-detalle th,
+.tabla-detalle td {
+  padding: 9px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--ek-plum-100, #efe9fb);
+  white-space: nowrap;
+}
+
+.tabla-lotes th,
+.tabla-detalle th {
+  background: var(--ek-plum-050, #f9f6fe);
+  color: var(--ek-plum-800, #3b2a5e);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.num { text-align: right; }
+
+.fila-lote { cursor: pointer; }
+
+.fila-lote:hover,
+.fila-lote:focus-visible {
+  background: var(--ek-violet-100, #f3efff);
+  outline: none;
+}
+
+.fila-lote.is-abierto {
+  background: var(--ek-violet-100, #f3efff);
+  box-shadow: inset 3px 0 0 var(--ek-violet-500, #8b5cf6);
+}
+
+.vacio {
+  text-align: center;
+  padding: 22px;
+  color: var(--ek-ink-2, #334155);
+}
+
+/* Una sola sede: la columna no aporta nada y roba ancho */
+body.una-sola-sede .col-sede,
+body.una-sola-sede .tabla-lotes th:nth-child(3) {
+  display: none;
+}
+
+/* ── Etiquetas de motivo y estado ───────────────────────────────────────── */
+.tag {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tag-dup        { background: var(--ek-plum-100, #efe9fb);   color: var(--ek-plum-800, #3b2a5e); }
+.tag-corr       { background: var(--ek-info-100, #eff6ff);   color: var(--ek-info-600, #2563eb); }
+.tag-sobre      { background: var(--ek-gold-100, #fdf6e6);   color: var(--ek-gold-500, #c98a1e); }
+.tag-prueba     { background: var(--ek-surface-2, #f1f5f9);  color: var(--ek-ink-2, #334155); }
+.tag-rara       { background: var(--ek-bad-100, #fef2f2);    color: var(--ek-bad-700, #991b1b); }
+.tag-manual     { background: var(--ek-violet-100, #f3efff); color: var(--ek-violet-600, #7c3aed); }
+.tag-archivado  { background: var(--ek-surface-2, #f1f5f9);  color: var(--ek-ink-2, #334155); }
+.tag-restaurado { background: var(--ek-ok-100, #ecfdf5);     color: var(--ek-ok-700, #065f46); }
+.tag-editado    { background: var(--ek-warn-100, #fffbeb);   color: var(--ek-warn-700, #7c3f0a); }
+
+/* ── Detalle ────────────────────────────────────────────────────────────── */
+.detalle-lote {
+  background: var(--ek-surface, #ffffff);
+  border-radius: 10px;
+  border: 1px solid var(--ek-plum-100, #efe9fb);
+  padding: 16px;
+}
+
+.detalle-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.detalle-cabecera h3 {
+  margin: 0 0 4px;
+  color: var(--ek-plum-800, #3b2a5e);
+}
+
+.detalle-meta {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ek-ink-2, #334155);
+}
+
+.campo-observacion {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 0.88rem;
+}
+
+.campo-observacion textarea {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
+  font: inherit;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.detalle-acciones {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.btn-restaurar {
+  background: var(--ek-ok-600, #059669);
+  border-color: var(--ek-ok-600, #059669);
+}
+
+.btn-eliminar {
+  background: var(--ek-bad-600, #dc2626);
+  border-color: var(--ek-bad-600, #dc2626);
+}
+
+.detalle-acciones button[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.aviso-vigente {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border-left: 3px solid var(--ek-warn-600, #d97706);
+  background: var(--ek-warn-100, #fffbeb);
+  color: var(--ek-warn-700, #7c3f0a);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.valor-editable {
+  width: 130px;
+  padding: 4px 8px;
+  text-align: right;
+  border-radius: 6px;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
+  font: inherit;
+}
+
+/* Lo que no coincide con la base es justo lo que hay que mirar */
+.fila-distinta {
+  background: var(--ek-warn-100, #fffbeb);
+}
+
+.fila-distinta td:first-child {
+  box-shadow: inset 3px 0 0 var(--ek-warn-600, #d97706);
+}
+
+.cargando {
+  color: var(--ek-ink-2, #334155);
+  font-style: italic;
+}
+
+/* ── Paginación y estado ────────────────────────────────────────────────── */
+.paginacion {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 12px;
+  font-size: 0.86rem;
+}
+
+.status {
+  margin-top: 14px;
+  min-height: 1.2em;
+  font-size: 0.88rem;
+  color: var(--ek-ok-700, #065f46);
+}
+
+.status.is-error,
+.is-error {
+  color: var(--ek-bad-700, #991b1b);
+}
+
+@media (max-width: 720px) {
+  .detalle-cabecera { flex-direction: column; }
+  .detalle-acciones button { flex: 1 1 100%; }
+}

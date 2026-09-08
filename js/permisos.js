@@ -39,6 +39,7 @@ const DEFAULT_PAGES = [
   "dashboard",
   "cierre_turno",
   "historico_cierre_turno",
+  "auditoria_turnos",
   "cierre_inventarios",
   "historico_cierre_inventarios",
   "configuracion",

@@ -26,7 +26,8 @@
  * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
  */
 import { getUserContext } from "./session.js";
-import { WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS } from "./webhooks.js";
+import { supabase } from "./supabase.js";
+import { initBulkActions } from "./bulk_actions.js";
 
 const panelGeneral = document.getElementById("columnasGeneralesPanel");
 const panelDetalle = document.getElementById("columnasDetallePanel");
@@ -144,19 +145,13 @@ const loadColumns = async () => {
   setStatus("Cargando campos...");
 
   try {
-    const res = await fetchWithTimeout(WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tenant_id: context.empresa_id,
-        empresa_id: context.empresa_id,
-        usuario_id: context.user?.id || context.user?.user_id,
-        rol: context.rol,
-        timestamp: getTimestamp()
-      })
-    });
+    const { data: raw, error } = await supabase
+      .from('cierres_turno_final')
+      .select('*')
+      .eq('empresa_id', context.empresa_id);
 
-    const rows = normalizeRows(await res.json());
+    if (error) throw new Error(error.message);
+    const rows = normalizeRows(raw || []);
     const columnas = buildColumns(rows);
 
     const generalKey = getGeneralVisibilityKey(context.empresa_id);
@@ -181,3 +176,4 @@ const loadColumns = async () => {
 };
 
 loadColumns();
+initBulkActions();

@@ -1,5 +1,5 @@
 import { getUserContext } from "./session.js";
-import { WEBHOOK_DUPLICAR_USUARIOS_LOCAL } from "./webhooks.js";
+import { supabase } from "./supabase.js";
 import { APP_URLS } from "./urls.js";
 
 const status = document.getElementById("status");
@@ -15,12 +15,6 @@ const localEmpresaId = sessionStorage.getItem("local_dependiente_empresa_id");
 
 const setStatus = (message) => {
   if (status) status.innerText = message || "";
-};
-
-const parseJsonResponse = async (response) => {
-  const text = await response.text();
-  if (!text) return {};
-  try { return JSON.parse(text); } catch (_error) { return { ok: response.ok, raw: text }; }
 };
 
 const canManageLocals = (userContext) => ["admin", "admin_root"].includes(String(userContext?.rol || "").toLowerCase());
@@ -83,15 +77,15 @@ form?.addEventListener("submit", async (event) => {
   setStatus("Preparando usuarios del nuevo local...");
 
   try {
-    const res = await fetch(WEBHOOK_DUPLICAR_USUARIOS_LOCAL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+    // functions.invoke y NO fetch: invoke adjunta la cabecera Authorization con
+    // el JWT de la sesión. Con un fetch plano el gateway de Supabase responde
+    // 401 antes de que la función llegue a ejecutarse.
+    const { data, error } = await supabase.functions.invoke("local-usuarios-duplicar", {
+      body: payload
     });
-    const data = await parseJsonResponse(res);
 
-    if (!res.ok || data.ok === false) {
-      setStatus(data.error || `No se pudo preparar usuarios del local (HTTP ${res.status}).`);
+    if (error || !data || data.ok === false) {
+      setStatus(data?.message || data?.error || error?.message || "No se pudo preparar usuarios del local.");
       return;
     }
 
@@ -99,7 +93,10 @@ form?.addEventListener("submit", async (event) => {
     sessionStorage.removeItem("local_dependiente_correo");
     sessionStorage.removeItem("local_dependiente_empresa_id");
 
-    alert("Local registrado. El flujo de usuarios quedó preparado para el nuevo tenant.");
+    const duplicados = Number(data?.duplicados || 0);
+    alert(duplicados
+      ? `Local registrado. Se prepararon ${duplicados} usuario(s) para el nuevo local.`
+      : "Local registrado. Los usuarios del local ya estaban preparados.");
     window.location.href = APP_URLS.configuracion;
   } catch (_error) {
     setStatus("Error inesperado preparando usuarios del local. Intenta nuevamente.");

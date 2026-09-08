@@ -22,16 +22,16 @@
 }
 
 .turno-datos-card {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--ek-line, #e8edf3);
   border-radius: 10px;
   padding: 12px;
-  background: #f9fafb;
+  background: var(--ek-surface-2, #f1f5f9);
 }
 
 .turno-datos-card h5 {
   margin: 0 0 8px;
   font-size: 0.9rem;
-  color: #374151;
+  color: var(--ek-ink-2, #334155);
 }
 
 .hora-llegada-grid {
@@ -54,52 +54,28 @@
   font-size: 0.88rem;
 }
 
-.apertura-grid {
-  margin-top: 10px;
-  display: grid;
-  grid-template-columns: minmax(220px, 260px) 1fr;
-  gap: 12px;
-  align-items: stretch;
-  margin-bottom: 12px;
-}
-
-.apertura-grid label {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 0.88rem;
-}
-
-.apertura-grid input {
-  width: 100%;
-}
-
- .apertura-note {
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
-  border-radius: 8px;
-  padding: 6px 10px;
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-}
-
-.apertura-note p {
-  margin: 0;
-  color: #3730a3;
-  font-size: 0.8rem;
-  font-weight: 400;
-  line-height: 1.15;
-}
-
-
 /* Grid financiero */
+/* Alto unico de campo para toda la rejilla. Con box-sizing: border-box
+   (main.css) los 42px incluyen borde y padding, asi que todos los <input>
+   miden exactamente lo mismo sin depender de las metricas de la fuente. */
 .finanzas-grid {
+  --ek-field-h: 42px;
   display: grid;
   grid-template-columns: 1fr 1fr 1fr 1fr;
   gap: 12px;
-  align-items: center;
+  /* start y no center. Las cuatro celdas de una misma fila no miden lo
+     mismo: la de "Sistema" del efectivo lleva una nota debajo, la de
+     diferencia reserva hueco para el veredicto y la de "Real" no lleva
+     nada. Centrando cada celda contra el alto de la fila, cada campo
+     quedaba a una altura distinta (el real 10px mas abajo, el de
+     diferencia 10px mas arriba). Alineando arriba, los cuatro bordes
+     superiores caen en la misma linea y las notas cuelgan por debajo. */
+  align-items: start;
   margin-bottom: 14px;
+}
+
+.finanzas-grid input {
+  height: var(--ek-field-h);
 }
 
 .finanzas-row {
@@ -114,13 +90,19 @@
   text-align: center;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #4b5563;
+  color: var(--ek-ink-2, #334155);
 }
 
+/* La etiqueta ya no puede centrarse contra la celda (ver align-items:
+   start), asi que se centra contra un bloque del alto exacto del campo:
+   su texto queda a la misma altura que el del input de al lado. */
 .row-title {
   font-size: 0.9rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--ek-ink-2, #334155);
+  display: flex;
+  align-items: center;
+  min-height: var(--ek-field-h, 42px);
 }
 
 .diff-cell {
@@ -131,7 +113,7 @@
 
 .diff-note {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--ek-muted, #5d6b7e);
   min-height: 16px;
 }
 
@@ -161,24 +143,97 @@
   font-size: 0.88rem;
 }
 
-.diff-faltante {
-  background: rgba(239, 68, 68, 0.15);
-}
+/* =========================================================
+   VEREDICTO DE CONCILIACION
+   ---------------------------------------------------------
+   js/cierre_turno.js aplica estas tres clases sobre el <input> de
+   diferencia. El marcado lo genera el JS, asi que el enganche vive
+   entero aqui: no se toca el JS.
 
-.diff-sobrante {
-  background: rgba(250, 204, 21, 0.2);
-}
+   Antes cada estado pintaba tambien un icono direccional de fondo
+   (--ek-icon-faltante y compañia, en variables.css). Hubo que
+   quitarlo: `input[readonly]` (0,1,1) gana en especificidad a
+   `.diff-faltante` (0,1,0) y usa el atajo `background`, que reseteaba
+   el background-repeat de este bloque. El SVG acababa repetido en
+   mosaico a lo ancho del campo y tapaba la cifra, que es justo el dato
+   que hay que leer. Sin imagen no hay nada que se pueda romper asi.
 
+   Quedan dos canales para el mismo dato, que es lo que importa: cerca
+   del 8% de los hombres tiene deficiencia de vision al rojo-verde y
+   aqui el rojo-verde ES la informacion.
+     1. color de fondo   2. texto en .diff-note ("Recibiste de menos")
+========================================================= */
+.diff-faltante,
+.diff-sobrante,
 .diff-ok {
-  background: rgba(34, 197, 94, 0.15);
+  font-weight: var(--ek-weight-semibold, 600);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Los siete campos de diferencia son readonly, y `input[readonly]` (0,1,1)
+   gana en especificidad a `.diff-faltante` (0,1,0). Resultado: el veredicto
+   de la conciliacion no llegaba a pintarse nunca. Calificar con .diff-input
+   sube la especificidad a (0,2,0), que si gana, y no necesita !important.
+
+   El `color` de aqui solo lo ve un campo: el de "Efectivo de apertura >
+   Diferencia", que es el unico .diff-input sin capa de formato encima (no
+   esta en MONEY_INPUT_IDS de js/cierre_turno_contabilidad_visual.js) y por
+   tanto muestra su propio texto. Los seis de la rejilla financiera van
+   tapados por un <span>: su texto queda invisible pase lo que pase con
+   `color`, porque cierre_turno_contabilidad.css les fija
+   -webkit-text-fill-color: transparent. El color que se ve en esos seis es
+   el de los selectores del <span>, mas abajo. */
+.diff-input.diff-faltante {
+  background-color: var(--ek-bad-100, rgba(239, 68, 68, 0.15));
+  border-color: var(--ek-bad-600, transparent);
+  color: var(--ek-bad-700, #991b1b);
+}
+.cierre-money-visual-wrap > input.diff-input.diff-faltante + .cierre-money-visual-value {
+  color: var(--ek-bad-700, #991b1b);
+}
+
+.diff-input.diff-sobrante {
+  background-color: var(--ek-warn-100, rgba(250, 204, 21, 0.2));
+  border-color: var(--ek-warn-600, transparent);
+  color: var(--ek-warn-700, #7c3f0a);
+}
+.cierre-money-visual-wrap > input.diff-input.diff-sobrante + .cierre-money-visual-value {
+  color: var(--ek-warn-700, #7c3f0a);
+}
+
+.diff-input.diff-ok {
+  background-color: var(--ek-ok-100, rgba(34, 197, 94, 0.15));
+  border-color: var(--ek-ok-600, transparent);
+  color: var(--ek-ok-700, #065f46);
+}
+.cierre-money-visual-wrap > input.diff-input.diff-ok + .cierre-money-visual-value {
+  color: var(--ek-ok-700, #065f46);
+}
+
+/* Por que `.diff-input.diff-faltante` y no solo `.diff-faltante` en el selector
+   del <span>: `.cierre-money-visual-wrap > input[readonly] + .cierre-money-visual-value`
+   (cierre_turno_contabilidad.css) tambien es (0,3,1) —un atributo pesa como una
+   clase— y se carga despues, asi que en el empate ganaba el gris de readonly y el
+   veredicto salia sin color. Con las dos clases el selector sube a (0,4,1) y gana
+   por especificidad, sin !important.
+
+   El peso y las cifras tabulares hay que repetirlos sobre el <span>: puestos
+   solo sobre el <input> (arriba) no se veian en la rejilla financiera, porque
+   el span lleva `font: inherit` y hereda del wrapper, no del campo. El
+   veredicto salia en peso normal aunque el CSS pidiera semibold. */
+.cierre-money-visual-wrap > input.diff-input.diff-faltante + .cierre-money-visual-value,
+.cierre-money-visual-wrap > input.diff-input.diff-sobrante + .cierre-money-visual-value,
+.cierre-money-visual-wrap > input.diff-input.diff-ok + .cierre-money-visual-value {
+  font-weight: var(--ek-weight-semibold, 600);
+  font-variant-numeric: tabular-nums;
 }
 
 .confirmacion-envio {
   margin-top: 12px;
   padding: 12px;
   border-radius: 8px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--ek-surface-2, #f1f5f9);
+  border: 1px solid var(--ek-line, #e8edf3);
 }
 
 .confirmacion-envio.is-hidden {
@@ -221,8 +276,9 @@
 }
 
 .acciones-cierre button:disabled {
-  background: #e5e7eb;
-  color: #9ca3af;
+  background: var(--ek-surface-2, #f1f5f9);
+  color: var(--ek-muted, #5d6b7e);
+  border-color: var(--ek-line, #e8edf3);
   cursor: not-allowed;
 }
 
@@ -231,12 +287,12 @@
 }
 
 input[readonly] {
-  background: #f1efff;
-  border-color: #d8d2ff;
+  background: var(--ek-plum-050, #f9f6fe);
+  border-color: var(--ek-plum-200, #ddd0f5);
 }
 
 input:not([readonly]) {
-  background: #ffffff;
+  background: var(--ek-surface, #ffffff);
 }
 
 .efectivo-sistema-wrap {
@@ -249,17 +305,40 @@ input:not([readonly]) {
 .icon-btn {
   position: absolute;
   right: 6px;
-  top: 6px;
-  border: 1px solid #c7d2fe;
-  background: #eef2ff;
-  color: #4338ca;
+  /* El contenedor es una columna con el input y una nota debajo, asi que
+     top:50% centraria contra las dos. La mitad del alto del campo (que
+     ahora es un valor fijo, --ek-field-h) mas translateY(-50%) deja el
+     circulo centrado en el campo, no en la columna. */
+  top: calc(var(--ek-field-h, 42px) / 2);
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
+  background: var(--ek-plum-050, #f9f6fe);
+  color: var(--ek-plum-600, #5b3a8f);
   border-radius: 999px;
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  font-size: 14px;
+  /* padding y line-height se resetean porque la regla global de `button`
+     (main.css) aplica 11px/16px y 1.2, que descuadraban el icono. */
+  padding: 0;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
   cursor: pointer;
+  transition: background-color var(--ek-duration-fast, 120ms) var(--ek-ease, ease);
+}
+
+.icon-btn:hover {
+  background: var(--ek-plum-100, #efe9fb);
+}
+
+/* El icono es de Phosphor, no un glifo de texto. Los glifos que habia antes
+   (U+21BB y el emoji de lupa) traen su propia caja y linea base dentro de la
+   fuente, asi que ningun centrado del contenedor los cuadraba. */
+.icon-btn .ph {
+  display: block;
+  line-height: 1;
 }
 
 .icon-btn.rotating {
@@ -267,12 +346,12 @@ input:not([readonly]) {
 }
 
 @keyframes spin-soft {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from { transform: translateY(-50%) rotate(0deg); }
+  to { transform: translateY(-50%) rotate(360deg); }
 }
 
 .field-note {
-  color: #5b21b6;
+  color: var(--ek-plum-700, #4a3474);
   font-size: 0.74rem;
 }
 
@@ -281,12 +360,23 @@ input:not([readonly]) {
 }
 
 .hint-icon {
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  font-size: 12px;
-  opacity: 0.85;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  line-height: 1;
+  font-size: 18px;
+  color: var(--ek-plum-600, #5b3a8f);
   cursor: help;
+}
+
+/* Junto a "Efectivo real" la ayuda va dentro del campo, centrada respecto al
+   alto real del input en vez de anclada a un top fijo. */
+.input-with-hint .hint-icon {
+  position: absolute;
+  top: 50%;
+  right: var(--ek-sp-2, 8px);
+  transform: translateY(-50%);
 }
 
 .extras-list {
@@ -300,14 +390,14 @@ input:not([readonly]) {
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--ek-surface-2, #f1f5f9);
+  border: 1px solid var(--ek-line, #e8edf3);
   border-radius: 8px;
 }
 
 .extra-row span {
   font-size: 0.9rem;
-  color: #374151;
+  color: var(--ek-ink-2, #334155);
 }
 
 .extra-row input {
@@ -320,8 +410,8 @@ input:not([readonly]) {
   display: flex;
   justify-content: space-between;
   padding: 10px 12px;
-  border: 1px solid #ddd6fe;
-  background: #f5f3ff;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
+  background: var(--ek-plum-100, #efe9fb);
   border-radius: 8px;
 }
 
@@ -334,15 +424,15 @@ input:not([readonly]) {
 
 .apoyos-inline-block {
   margin-top: 14px;
-  border: 1px solid #ddd6fe;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
   border-radius: 10px;
   padding: 12px;
-  background: #faf5ff;
+  background: var(--ek-plum-100, #efe9fb);
 }
 
 .apoyos-inline-block h3 {
   margin: 0 0 10px;
-  color: #5b21b6;
+  color: var(--ek-plum-700, #4a3474);
   font-size: 1rem;
 }
 
@@ -355,7 +445,7 @@ input:not([readonly]) {
 }
 
 .apoyo-tabla-wrap {
-  border: 1px solid #ddd6fe;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
   border-radius: 10px;
   overflow: hidden;
 }
@@ -363,15 +453,15 @@ input:not([readonly]) {
 .apoyo-tabla-head,
 .apoyo-row {
   display: grid;
-  grid-template-columns: 1.4fr 0.8fr 1fr;
+  grid-template-columns: minmax(140px, 1.2fr) minmax(80px, 0.8fr) minmax(280px, 1.8fr);
   gap: 10px;
   align-items: center;
   padding: 8px 10px;
 }
 
 .apoyo-tabla-head {
-  background: #ede9fe;
-  color: #4c1d95;
+  background: var(--ek-plum-100, #efe9fb);
+  color: var(--ek-plum-800, #3b2a5e);
   font-weight: 600;
   font-size: 0.82rem;
 }
@@ -382,8 +472,8 @@ input:not([readonly]) {
 }
 
 .apoyo-row {
-  border-top: 1px solid #ede9fe;
-  background: #faf5ff;
+  border-top: 1px solid var(--ek-plum-200, #ddd0f5);
+  background: var(--ek-plum-100, #efe9fb);
 }
 
 .apoyo-row input,
@@ -398,20 +488,20 @@ input:not([readonly]) {
 
 .apoyo-rango-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 6px;
 }
 
 .apoyo-rango-box {
-  border: 1px solid #ddd6fe;
-  background: #fff;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
+  background: var(--ek-surface-2, #f1f5f9);
   border-radius: 8px;
   padding: 6px;
 }
 
 .apoyo-rango-box small {
   display: block;
-  color: #6b21a8;
+  color: var(--ek-plum-700, #4a3474);
   margin-bottom: 4px;
 }
 
@@ -428,8 +518,8 @@ input:not([readonly]) {
 }
 
 .total-card {
-  border: 1px solid #ddd6fe;
-  background: #faf5ff;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
+  background: var(--ek-plum-100, #efe9fb);
   border-radius: 10px;
   padding: 10px 12px;
   display: flex;
@@ -439,26 +529,22 @@ input:not([readonly]) {
 
 .total-label {
   font-size: 0.84rem;
-  color: #6b21a8;
+  color: var(--ek-plum-700, #4a3474);
   font-weight: 600;
 }
 
 .total-card strong {
   font-size: 1rem;
-  color: #312e81;
+  color: var(--ek-plum-800, #3b2a5e);
 }
 
 .totales-note {
   margin-top: 10px;
   font-size: 0.84rem;
-  color: #5b21b6;
+  color: var(--ek-plum-700, #4a3474);
 }
 
 @media (max-width: 768px) {
-  .apertura-grid {
-    grid-template-columns: 1fr;
-  }
-
   .apoyo-tabla-head,
   .apoyo-row {
     grid-template-columns: 1fr;
@@ -475,9 +561,9 @@ input:not([readonly]) {
 .snapshot-locked select:disabled,
 .snapshot-locked textarea:disabled,
 .snapshot-locked button:disabled {
-  background: #ede9fe !important;
-  border-color: #d8b4fe !important;
-  color: #6b21a8 !important;
+  background: var(--ek-plum-100, #efe9fb) !important;
+  border-color: var(--ek-plum-200, #ddd0f5) !important;
+  color: var(--ek-plum-700, #4a3474) !important;
   opacity: 1;
 }
 
@@ -490,7 +576,7 @@ input:not([readonly]) {
 .btn-correccion {
   max-width: 420px;
   width: 100%;
-  background: #7c3aed;
+  background: var(--ek-violet-600, #7c3aed);
 }
 
 .modal-alerta {
@@ -504,22 +590,21 @@ input:not([readonly]) {
 
 .modal-alerta-card {
   width: min(680px, 92vw);
-  background: #fff;
+  background: var(--ek-surface, #ffffff);
   border-radius: 12px;
-  border: 1px solid #ddd6fe;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
   padding: 18px;
   text-align: center;
 }
 
 .modal-alerta-card p {
   margin: 0 0 14px;
-  color: #312e81;
+  color: var(--ek-plum-800, #3b2a5e);
   line-height: 1.4;
 }
 
-.is-hidden {
-  display: none !important;
-}
+/* .is-hidden se define ahora en css/main.css (capa global de estado).
+   Duplicarla aqui reintroduce el conflicto que la fase 0 elimino. */
 
 
 .apoyos-consulta-box {
@@ -535,30 +620,20 @@ input:not([readonly]) {
 
 .apoyos-consulta-box small {
   font-size: 0.76rem;
-  color: #6b21a8;
+  color: var(--ek-plum-700, #4a3474);
   line-height: 1.2;
 }
 
-.auxiliar-note {
-  margin: -4px 0 18px;
-  padding: 10px 12px;
-  border: 1px solid #fde68a;
-  border-radius: 10px;
-  background: #fffbeb;
-  color: #92400e;
-  font-weight: 700;
-}
-
 #status[data-type="success"] {
-  border-color: #86efac;
-  background: #dcfce7;
-  color: #14532d;
+  border-color: var(--ek-ok-100, #ecfdf5);
+  background: var(--ek-ok-100, #ecfdf5);
+  color: var(--ek-ok-700, #065f46);
 }
 
 #status[data-type="error"] {
-  border-color: #fca5a5;
-  background: #fee2e2;
-  color: #7f1d1d;
+  border-color: var(--ek-bad-100, #fef2f2);
+  background: var(--ek-bad-100, #fef2f2);
+  color: var(--ek-bad-700, #991b1b);
 }
 
 /* Parche 2026-08-20: mini carga aislada para evitar doble consulta del turno. */
@@ -580,3 +655,79 @@ input:not([readonly]) {
   animation: cierre-turno-spin 0.8s linear infinite;
 }
 @keyframes cierre-turno-spin { to { transform: rotate(360deg); } }
+
+/* ==========================================================================
+   Jornada del turno y efectivo de apertura
+   Fases 3 y 4: identidad del turno y conciliacion de caja entre turnos.
+   Todo se apoya en clases que la pagina ya tenia (turno-datos-card,
+   field-note, diff-input) para no introducir un lenguaje visual nuevo.
+   ========================================================================== */
+
+/* La jornada es una lista desplegable y no dos botones: uno al lado del otro
+   no dejaba ver cual estaba seleccionado. */
+#numeroTurno {
+  margin-top: var(--ek-sp-3, 12px);
+}
+
+.jornada-aviso {
+  margin: var(--ek-sp-2, 8px) 0 0;
+  padding: var(--ek-sp-2, 8px) var(--ek-sp-3, 12px);
+  border-left: 3px solid var(--ek-warn-600, #d97706);
+  background: var(--ek-warn-100, #fffbeb);
+  border-radius: 0 var(--ek-radius-sm, 6px) var(--ek-radius-sm, 6px) 0;
+  font-size: var(--ek-text-note, 0.78125rem);
+  line-height: var(--ek-leading-normal, 1.5);
+  color: var(--ek-warn-700, #7c3f0a);
+}
+
+.jornada-aviso.is-error {
+  border-left-color: var(--ek-bad-600, #dc2626);
+  background: var(--ek-bad-100, #fef2f2);
+  color: var(--ek-bad-700, #991b1b);
+}
+
+/* Tres tarjetas hermanas, del mismo ancho, que se leen de izquierda a
+   derecha como una frase: esto recibi, esto debia haber, esto sobra o falta.
+
+   Columnas FIJAS a proposito. Con repeat(auto-fit, minmax(200px, 1fr)) el
+   navegador decidia solo cuantas caben: las tres necesitaban 624px y solo
+   habia ~660px disponibles, asi que cualquier padding de mas, una ventana
+   algo mas estrecha o un zoom tiraba una tarjeta a la fila siguiente sin
+   avisar. Con repeat(3, ...) o estan las tres en fila o se apilan en el
+   punto de corte, y no hay estados intermedios que nadie diseño.
+
+   minmax(0, 1fr) y no 1fr: impide que una cifra larga o una etiqueta como
+   "Caja del 20/08/2026 turno 2" ensanche su columna y descuadre las otras. */
+.apertura-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: var(--ek-sp-3, 12px);
+  margin-bottom: var(--ek-sp-3, 12px);
+}
+
+/* Movil: apiladas porque tres columnas de ~110px no se pueden leer, no
+   porque el layout se haya roto. Mismo punto de corte que ya usa el
+   bloque de apoyos, para no inventar otro. */
+@media (max-width: 768px) {
+  .apertura-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.apertura-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.apertura-card input {
+  width: 100%;
+}
+
+/* La nota reserva su hueco para que las tres tarjetas midan lo mismo aunque
+   solo una tenga texto en ese momento. */
+.apertura-card .field-note {
+  margin-top: var(--ek-sp-2, 8px);
+  min-height: 1.2em;
+}

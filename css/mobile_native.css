@@ -8,7 +8,10 @@ html.mobile-native body {
 body.mobile-native {
   overflow-x: clip;
   -webkit-text-size-adjust: 100%;
-  background: linear-gradient(180deg, #f4f7ff 0%, #eef2ff 100%);
+  background:
+    radial-gradient(900px 360px at 50% 0, rgba(124, 58, 237, 0.045), transparent 72%),
+    linear-gradient(180deg, #ffffff 0%, #fbfcfe 200px, var(--ek-ground, #f8fafc) 520px);
+  background-repeat: no-repeat;
 }
 
 body.mobile-native * {
@@ -23,7 +26,8 @@ body.mobile-native .app-header {
   justify-items: stretch;
   gap: 12px;
   padding: calc(12px + env(safe-area-inset-top)) 14px 12px;
-  box-shadow: 0 12px 30px rgba(44, 31, 71, 0.22);
+  box-shadow: var(--ek-shadow-header, 0 1px 0 rgba(15, 23, 42, 0.06));
+  border-bottom: 1px solid var(--ek-header-border, #e8edf3);
 }
 
 body.mobile-native .app-header .logo,
@@ -100,7 +104,7 @@ body.mobile-native .main {
   margin-bottom: 20px !important;
   padding: 16px !important;
   border-radius: 18px !important;
-  box-shadow: 0 12px 34px rgba(59, 40, 99, 0.12);
+  box-shadow: var(--ek-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.05));
 }
 
 body.mobile-native form,
@@ -129,7 +133,7 @@ body.mobile-native .legal-footer {
   margin: 0 auto 14px;
   border-radius: 18px;
   padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
-  box-shadow: 0 12px 28px rgba(44, 31, 71, 0.16);
+  box-shadow: var(--ek-shadow-raised, 0 4px 16px -6px rgba(15, 23, 42, 0.10));
 }
 
 body.mobile-native.has-legal-footer {
@@ -169,11 +173,11 @@ body.mobile-native table[data-mobile-stack="true"] tbody {
 }
 
 body.mobile-native table[data-mobile-stack="true"] tr {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  padding: 10px 12px;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+  background: var(--ek-surface, #ffffff);
+  border: 1px solid var(--ek-line, #e8edf3);
+  border-radius: var(--ek-radius-lg, 14px);
+  padding: 12px;
+  box-shadow: var(--ek-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.05));
 }
 
 body.mobile-native table[data-mobile-stack="true"] td,
@@ -187,9 +191,9 @@ body.mobile-native table[data-mobile-stack="true"] td::before,
 body.mobile-native table[data-mobile-stack="true"] th::before {
   content: attr(data-mobile-label);
   display: block;
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: #6b7280;
+  font-size: var(--ek-text-label, 0.75rem);
+  font-weight: var(--ek-weight-semibold, 600);
+  color: var(--ek-muted, #5d6b7e);
   margin-bottom: 2px;
   text-transform: uppercase;
   letter-spacing: 0.03em;

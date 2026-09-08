@@ -22,6 +22,7 @@
  */
 import { getUserContext } from "./session.js";
 import { WEBHOOK_CONSULTAR_GASTOS_VISUALIZACION } from "./webhooks.js";
+import { initBulkActions } from "./bulk_actions.js";
 
 const STORAGE_KEY = "cierre_turno_visibilidad";
 
@@ -187,3 +188,4 @@ const loadExtras = async () => {
 };
 
 loadExtras();
+initBulkActions();

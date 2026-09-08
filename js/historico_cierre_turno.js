@@ -33,7 +33,6 @@
 import { buildRequestHeaders, getUserContext } from "./session.js";
 import { fetchResponsablesActivos } from "./responsables.js";
 import { supabase } from "./supabase.js";
-import { WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS } from "./webhooks.js";
 
 const head = document.getElementById("historicoHead");
 const body = document.getElementById("historicoBody");
@@ -63,6 +62,7 @@ const MAX_LOADING_MS = 5000;
 const SUPABASE_PAGE_SIZE = 1000;
 const TURNO_TABLES = { principal: "turnos_agrupados", local: "turnos_agrupados_locales" };
 const CIERRE_FINAL_TABLES = { principal: "cierres_turno_final", local: "cierres_turno_final_locales" };
+const APOYO_TABLES = { principal: "apoyos_turno", local: "apoyos_turno_locales" };
 const EXCLUDED_GENERAL_FIELDS = new Set(["empresa_id", "registrado_por", "responsable_id", "total_variables", "diferencia_caja", "variables_detalle", "created_at", "turno_nombre", "nombre_turno"]);
 const EXCLUDED_DETAIL_FIELDS = new Set(["id"]);
 const normalizeFieldKey = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -550,20 +550,6 @@ const mergeRowsByIdentity = (...groups) => {
   return Array.from(merged.values());
 };
 
-const fetchWebhookRows = async (payload) => {
-  try {
-    const headers = await buildRequestHeaders({ includeTenant: true });
-    const webhookResponse = await fetchWithTimeout(WEBHOOK_HISTORICO_CIERRE_TURNO_DATOS, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...headers },
-      body: JSON.stringify(payload)
-    });
-    if (!webhookResponse.ok) return [];
-    return normalizeRows(await webhookResponse.json());
-  } catch (_error) {
-    return [];
-  }
-};
 
 const enrichRowsWithApoyosTurno = async (rows = [], empresaId = "") => {
   if (!Array.isArray(rows) || !rows.length || !empresaId) return rows;
@@ -576,8 +562,8 @@ const enrichRowsWithApoyosTurno = async (rows = [], empresaId = "") => {
   const fechaMax = [...fechas].sort()[fechas.length - 1];
 
   const { data, error } = await supabase
-    .from("apoyos_turno")
-    .select("empresa_id, fecha_turno, hora_inicio, hora_fin, apoyo_responsable_id, responsable_turno_id, propina, tiempo_minutos, tiempo_texto")
+    .from(getScopedTable(APOYO_TABLES))
+    .select("empresa_id, fecha_turno, numero_turno, hora_inicio, hora_fin, apoyo_responsable_id, responsable_turno_id, propina, tiempo_minutos, tiempo_texto")
     .eq("empresa_id", empresaId)
     .gte("fecha_turno", fechaMin)
     .lte("fecha_turno", fechaMax)
@@ -589,6 +575,7 @@ const enrichRowsWithApoyosTurno = async (rows = [], empresaId = "") => {
   data.forEach((item) => {
     const key = [
       String(item?.fecha_turno || "").trim(),
+      String(item?.numero_turno || "").trim(),
       String(item?.hora_inicio || "").trim(),
       String(item?.hora_fin || "").trim()
     ].join("|");
@@ -600,6 +587,7 @@ const enrichRowsWithApoyosTurno = async (rows = [], empresaId = "") => {
   rows.forEach((row) => {
     const key = [
       String(row?.meta?.fecha_turno || row?.general?.fecha_turno || "").trim(),
+      String(row?.meta?.numero_turno || row?.general?.numero_turno || "").trim(),
       String(row?.meta?.hora_inicio || row?.general?.hora_inicio || "").trim(),
       String(row?.meta?.hora_fin || row?.general?.hora_fin || "").trim()
     ].join("|");
@@ -613,6 +601,17 @@ const enrichRowsWithApoyosTurno = async (rows = [], empresaId = "") => {
       tiempo_minutos: toNumber(item.tiempo_minutos) ?? 0,
       tiempo_texto: String(item.tiempo_texto || "").trim()
     }));
+    const propinaGuardada = toNumber(row?.general?.propinas ?? row?.general?.propina_global) ?? 0;
+    const propinaApoyos = row.apoyos.reduce((total, item) => total + (toNumber(item.propina) ?? 0), 0);
+    const fechaTurno = String(row?.meta?.fecha_turno || row?.general?.fecha_turno || "").slice(0, 10);
+    // Hasta el 27/08 propina_global contenía el total; desde este parche
+    // contiene solamente la parte del responsable.
+    const propinaResponsable = fechaTurno >= "2026-08-28"
+      ? propinaGuardada
+      : Math.max(0, propinaGuardada - propinaApoyos);
+    row.general.propina_responsable = propinaResponsable;
+    row.general.propina_apoyos = propinaApoyos;
+    row.general.propinas = propinaResponsable + propinaApoyos;
   });
 
   return rows;
@@ -1521,17 +1520,13 @@ const loadInitialData = async () => {
     await enrichResponsableNamesForLocalContext(payload.empresa_id);
 
     const tableName = getScopedTable(TURNO_TABLES);
-    const [directResult, webhookRows] = await Promise.all([
-      fetchAllSupabaseRows(tableName, state.context.empresa_id),
-      fetchWebhookRows(payload)
-    ]);
+    const directResult = await fetchAllSupabaseRows(tableName, state.context.empresa_id);
 
-    if (directResult.error && !webhookRows.length) {
+    if (directResult.error) {
       throw new Error(directResult.error.message || directResult.error.code || "Sin detalle.");
     }
 
-    const rowsData = mergeRowsByIdentity(directResult.data, webhookRows);
-    const sanitizedRows = rowsData.map(sanitizeRow);
+    const sanitizedRows = (directResult.data || []).map(sanitizeRow);
     const enrichedRows = await enrichRowsWithCierreTurnoFinal(sanitizedRows, payload.empresa_id);
     state.allRows = await enrichRowsWithApoyosTurno(enrichedRows, payload.empresa_id);
     state.filteredRows = [...state.allRows];

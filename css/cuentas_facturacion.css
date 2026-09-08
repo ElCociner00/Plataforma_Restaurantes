@@ -1,0 +1,347 @@
+/* =========================================================
+   CONSOLA DE CUENTAS · css/cuentas_facturacion.css
+   ---------------------------------------------------------
+   Esta hoja es la de facturación ANTERIOR al rediseño del
+   2026-08-27, movida aquí tal cual.
+
+   Por qué existe: facturacion/cuentas.html y su
+   js/cuentas_facturacion.js son el backoffice de plataforma,
+   y venían compartiendo css/facturacion.css con la pantalla
+   del cliente. Al rediseñar esa pantalla —clases nuevas con
+   prefijo fx-— el backoffice se habría quedado sin
+   .billing-panel, .btn-pago, .factura-table ni .metricas.
+
+   Se copia en vez de reescribirse a propósito: el backoffice
+   no entraba en el encargo, y así queda idéntico a como
+   estaba. Cuando le toque su turno de rediseño, esta hoja se
+   sustituye entera.
+
+   NO la enlaza la pantalla del cliente: esa usa
+   css/facturacion.css, que ya no comparte ninguna clase con
+   este archivo.
+========================================================= */
+
+.facturacion-main {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.factura-shell {
+  background: var(--ek-plum-050, #f9f6fe);
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
+  border-radius: 14px;
+  padding: 18px;
+  display: grid;
+  gap: 16px;
+}
+
+.factura-sheet {
+  width: min(920px, 100%);
+  margin: 0 auto;
+  background: var(--ek-surface, #ffffff);
+  border: 1px solid var(--ek-line, #e8edf3);
+  border-radius: 8px;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+  box-shadow: var(--ek-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.05));
+}
+
+.factura-block {
+  border: 1px solid var(--ek-line, #e8edf3);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.factura-header {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 10px;
+}
+
+.factura-title {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  color: var(--ek-ink, #0f172a);
+}
+
+.kv-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.customer-list .kv-line {
+  grid-template-columns: 180px 1fr;
+}
+
+.kv-line {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.kv-line dt,
+.kv-line dd {
+  margin: 0;
+}
+
+.kv-line dt {
+  color: var(--ek-ink-2, #334155);
+  font-weight: 600;
+}
+
+.kv-line dd {
+  color: var(--ek-ink, #0f172a);
+  word-break: break-word;
+}
+
+.factura-table-wrap {
+  overflow-x: auto;
+}
+
+.factura-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 840px;
+}
+
+.factura-table th,
+.factura-table td {
+  border: 1px solid var(--ek-line, #e8edf3);
+  padding: 8px;
+  font-size: 0.88rem;
+  text-align: left;
+}
+
+.factura-table th {
+  background: var(--ek-ground, #f8fafc);
+  font-weight: 700;
+}
+
+.factura-table td.is-num,
+.factura-table th.is-num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.factura-tax-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 0.9rem;
+}
+
+.factura-bottom {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 10px;
+}
+
+.factura-bottom-only-totals {
+  grid-template-columns: 1fr;
+}
+
+.factura-totals {
+  margin-left: auto;
+  width: min(360px, 100%);
+  border: 1px solid var(--ek-line, #e8edf3);
+  border-radius: 6px;
+}
+
+.factura-totals .row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ek-line, #e8edf3);
+}
+
+.factura-totals .row:last-child {
+  border-bottom: 0;
+}
+
+.factura-totals .row strong:last-child {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.factura-signature {
+  min-height: 120px;
+}
+
+.factura-legal {
+  font-size: 0.8rem;
+  color: var(--ek-ink-2, #334155);
+}
+
+.factura-payment {
+  border: 1px dashed var(--ek-violet-300, #c4b5fd);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--ek-plum-100, #efe9fb);
+}
+
+.factura-payment p {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+}
+
+.btn-pago {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 168px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid var(--ek-violet-300, #c4b5fd);
+  background: var(--ek-violet-600, #7c3aed);
+  color: var(--ek-surface, #ffffff);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.factura-payment .btn-pago {
+  margin: 0 auto;
+}
+
+.factura-payment {
+  text-align: center;
+}
+
+.billing-panel {
+  background: var(--ek-surface-2, #f1f5f9);
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.billing-panel h3 { margin-top: 0; }
+.billing-form { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 10px; align-items: end; }
+.billing-form--simple { grid-template-columns: minmax(260px, 1fr); max-width: 520px; }
+.billing-form label { display: grid; gap: 4px; font-size: 0.9rem; }
+.billing-form input,
+.billing-form select,
+.billing-form button { height: 38px; padding: 0 10px; }
+.billing-form input[type="file"] { height: auto; padding: 6px 0; }
+.billing-form button { border: 1px solid var(--ek-violet-300, #c4b5fd); background: var(--ek-plum-600, #5b3a8f); color: var(--ek-surface, #ffffff); border-radius: 8px; font-weight: 600; }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--ek-line, #e8edf3); border-radius: 8px; background: var(--ek-surface, #ffffff); }
+.table-wrap table { width: 100%; border-collapse: collapse; min-width: 680px; }
+.table-wrap th, .table-wrap td { padding: 10px 12px; border-bottom: 1px solid var(--ek-line, #e8edf3); text-align: left; }
+.table-wrap th { background: var(--ek-ground, #f8fafc); }
+
+.badge { display: inline-flex; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.badge.ok { background: var(--ek-ok-100, #ecfdf5); color: var(--ek-ok-700, #065f46); }
+.badge.bad { background: var(--ek-bad-100, #fef2f2); color: var(--ek-bad-700, #991b1b); }
+.badge.warn { background: var(--ek-warn-100, #fffbeb); color: var(--ek-warn-700, #7c3f0a); }
+
+@media (max-width: 900px) {
+  .factura-shell { padding: 10px; }
+  .factura-sheet { padding: 10px; }
+  .factura-header,
+  .factura-bottom,
+  .billing-form { grid-template-columns: 1fr; }
+  .kv-line,
+  .customer-list .kv-line { grid-template-columns: 1fr; }
+  .factura-totals { margin-left: 0; }
+}
+
+
+.factura-payment-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn-pago-alt {
+  background: var(--ek-ok-700, #065f46);
+  border-color: var(--ek-ok-700, #065f46);
+}
+
+.factura-payment-note {
+  margin-top: 10px;
+  color: var(--ek-ink, #0f172a);
+}
+
+/* ══ Ciclo de vida del cliente ══════════════════════════════════════════════
+   Bloques nuevos: el cartel de activación de la prueba, el aviso de cuenta
+   limitada y el botón de baja. */
+
+.activacion {
+  border-left: 4px solid var(--color-accent, #6c4ce0);
+}
+.activacion h2 {
+  margin-top: 0;
+}
+.activacion--urgente {
+  border-left-color: #d97706;
+}
+.activacion--espera {
+  border-left-color: #64748b;
+}
+.activacion-aviso {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.aviso-acceso {
+  border-left: 4px solid #b45309;
+  background: #fffbeb;
+}
+.aviso-acceso h2 {
+  margin-top: 0;
+}
+
+/* La baja es destructiva: no compite visualmente con "Pagar". Se lee como una
+   acción secundaria y solo se tiñe de rojo al pasar por encima. */
+.btn-baja {
+  background: transparent;
+  border: 1px solid var(--color-border, #d8d4e4);
+  color: var(--color-text-muted, #6b6580);
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+}
+.btn-baja:hover:not(:disabled) {
+  border-color: #dc2626;
+  color: #dc2626;
+}
+.btn-baja:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
+/* Semáforo del backoffice */
+.cuenta-alerta   { border-left: 4px solid #dc2626; }
+.cuenta-atencion { border-left: 4px solid #d97706; }
+.cuenta-ok       { border-left: 4px solid #16a34a; }
+
+.metricas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.metrica {
+  border: 1px solid var(--color-border, #e3e0ec);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.metrica-valor {
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.metrica-nombre {
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--color-text-muted, #6b6580);
+}

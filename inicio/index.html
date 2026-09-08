@@ -2,84 +2,183 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Enkrato | Iniciar sesión</title>
+  <link rel="stylesheet" href="../css/variables.css">
   <link rel="stylesheet" href="../css/main.css">
   <link rel="stylesheet" href="../css/login.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
 </head>
 <body>
-  <div class="main login-container">
-    <h2>Accede a tu cuenta</h2>
+  <main class="main login-container">
+    <img src="../images/Logo.webp" alt="Enkrato" class="login-logo" onerror="this.style.display='none'">
 
-    <form id="loginForm">
-      <div class="form-group">
-        <label for="email">Correo electrónico</label>
-        <input type="email" id="email" name="email" required autocomplete="email">
+    <h1 class="login-title">Accede a tu cuenta</h1>
+    <p class="login-subtitle">Entra con tu correo o tu cuenta de Google.</p>
+
+    <form id="emailLoginForm" class="login-form" style="display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px;">
+      <div class="input-group" style="display: flex; flex-direction: column; text-align: left;">
+        <label for="loginEmail" style="margin-bottom: 5px; font-weight: 500; font-size: 0.9rem;">Correo electrónico</label>
+        <input type="email" id="loginEmail" required placeholder="ejemplo@correo.com" style="padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 1rem;">
       </div>
-
-      <div class="form-group">
-        <label for="password">Contraseña</label>
-        <input type="password" id="password" name="password" required autocomplete="current-password">
+      <div class="input-group" style="display: flex; flex-direction: column; text-align: left;">
+        <label for="loginPassword" style="margin-bottom: 5px; font-weight: 500; font-size: 0.9rem;">Contraseña</label>
+        <input type="password" id="loginPassword" required placeholder="••••••••" style="padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 1rem;">
+        <a href="../configuracion/contrasena.html" style="font-size: 0.85rem; color: var(--ek-plum-600); text-decoration: none; text-align: right; margin-top: 5px;">¿Olvidaste tu contraseña?</a>
       </div>
-
-      <button type="submit">Iniciar sesión</button>
-      <p id="error-message" style="color: red; margin-top: 10px;"></p>
+      <button type="submit" id="emailSignInBtn" class="primary-btn" style="padding: 12px; border-radius: 6px; border: none; background: var(--ek-plum-600); color: white; font-weight: 600; cursor: pointer;">Iniciar Sesión</button>
     </form>
 
-    <div class="login-extra">
-      <a href="#" id="forgotPasswordLink">¿Olvidé mi contraseña?</a>
+    <div class="login-divider" style="display: flex; align-items: center; text-align: center; margin: 20px 0; color: #666; font-size: 0.9rem;">
+      <div style="flex: 1; border-bottom: 1px solid var(--border-color);"></div>
+      <span style="margin: 0 10px;">o continúa con</span>
+      <div style="flex: 1; border-bottom: 1px solid var(--border-color);"></div>
     </div>
 
-    <p id="status" aria-live="polite"></p>
+    <button type="button" id="googleSignInBtn" class="google-btn">
+      <span class="google-btn-icon" aria-hidden="true">
+        <svg viewBox="0 0 48 48" width="20" height="20">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+      </span>
+      <span class="google-btn-label">Continuar con Google</span>
+    </button>
 
-    <div class="login-extra">
+    <p id="status" class="login-status" role="status" aria-live="polite"></p>
+
+    <div class="login-extra" id="registroDesdeLogin">
       <a href="../registro/index.html" class="registro-link">
-        ¿No tienes cuenta? Regístrate aquí
+        ¿No tienes cuenta? Registra tu empresa
       </a>
     </div>
-  </div>
+  </main>
 
   <script type="module">
-    import { signInWithPassword } from "../js/auth.js";
-    import { sendRecoveryForEmail } from "../js/contrasena.js";
+    import { supabase } from "../js/supabase.js";
+    import { signInWithGoogle, signInWithPassword } from "../js/auth.js";
+    import { getUserContext } from "../js/session.js";
     import { APP_URLS } from "../js/urls.js";
-    const form = document.getElementById("loginForm");
-    const emailInput = document.getElementById("email");
-    const passwordInput = document.getElementById("password");
-    const errorEl = document.getElementById("error-message");
-    const forgotPasswordLink = document.getElementById("forgotPasswordLink");
 
-    
-    forgotPasswordLink?.addEventListener("click", async (event) => {
-      event.preventDefault();
-      const email = String(emailInput?.value || "").trim();
-      if (!email) { if (errorEl) errorEl.textContent = "Ingresa tu correo para recuperar contraseña."; return; }
+    const btn = document.getElementById("googleSignInBtn");
+    const statusEl = document.getElementById("status");
+
+    const DESTINO = APP_URLS.localPreselector || "../contexto_local/";
+
+    const setStatus = (message, tone = "info") => {
+      if (!statusEl) return;
+      statusEl.textContent = message || "";
+      statusEl.dataset.tone = message ? tone : "";
+    };
+
+    const setBusy = (busy, label) => {
+      if (!btn) return;
+      btn.disabled = busy;
+      btn.setAttribute("aria-busy", busy ? "true" : "false");
+      const labelEl = btn.querySelector(".google-btn-label");
+      if (labelEl && label) labelEl.textContent = label;
+    };
+
+    /**
+     * Con sesion valida, comprueba que el usuario tenga contexto en la
+     * plataforma ANTES de navegar.
+     *
+     * getUserContext() resuelve empresa, rol y permisos buscando en
+     * usuarios_sistema por el id del usuario autenticado. Si esa fila no
+     * existe, router.js cierra la sesion y devuelve al login sin explicar
+     * nada, y el usuario queda rebotando. Aqui se detecta antes y se dice
+     * exactamente que pasa.
+     */
+    async function continuarConSesion(session) {
+      setBusy(true, "Verificando acceso...");
+      setStatus("Verificando tu acceso...");
+
+      const context = await getUserContext().catch(() => null);
+
+      if (!context) {
+        const correo = session?.user?.email || "esta cuenta";
+        await supabase.auth.signOut().catch(() => {});
+        setBusy(false, "Continuar con Google");
+        setStatus(
+          `${correo} no está vinculada a ningún usuario de la plataforma. ` +
+          `Si vas a dar de alta tu negocio, regístralo; si ya existe, pide acceso al administrador.`,
+          "error"
+        );
+        document.getElementById("registroDesdeLogin")?.classList.remove("is-hidden");
+        return;
+      }
+
+      setStatus("Entrando...");
+      window.location.href = DESTINO;
+    }
+
+    // Retorno de Google: detectSessionInUrl (js/supabase.js) canjea el codigo
+    // y persiste la sesion en localStorage por su cuenta. Solo hay que esperar
+    // el evento y decidir la ruta.
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" && session) continuarConSesion(session);
+    });
+
+    // Sesion ya existente (visita directa al login estando dentro).
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data?.session) continuarConSesion(data.session);
+    })();
+
+    const emailForm = document.getElementById("emailLoginForm");
+    const emailInput = document.getElementById("loginEmail");
+    const passwordInput = document.getElementById("loginPassword");
+    const emailSignInBtn = document.getElementById("emailSignInBtn");
+
+    const setEmailBusy = (busy, label) => {
+      if (!emailSignInBtn) return;
+      emailSignInBtn.disabled = busy;
+      if (label) emailSignInBtn.textContent = label;
+    };
+
+    emailForm?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      setStatus("");
+      setEmailBusy(true, "Iniciando...");
+
       try {
-        await sendRecoveryForEmail(email);
-        if (errorEl) errorEl.textContent = "Te enviamos un enlace de recuperación al correo indicado.";
+        const data = await signInWithPassword(emailInput.value, passwordInput.value);
+        if (data?.session) {
+          continuarConSesion(data.session);
+        } else {
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (sessionData?.session) continuarConSesion(sessionData.session);
+          else {
+            setEmailBusy(false, "Iniciar Sesión");
+            setStatus("No se pudo iniciar sesión. Verifica tus credenciales.", "error");
+          }
+        }
       } catch (error) {
-        if (errorEl) errorEl.textContent = `No se pudo enviar recuperación: ${error?.message || "sin detalle"}`;
+        console.error("Error al iniciar sesión con correo:", error);
+        setEmailBusy(false, "Iniciar Sesión");
+        setStatus(
+          error?.message === "Invalid login credentials" 
+            ? "Correo o contraseña incorrectos."
+            : `Error: ${error?.message || "sin detalle"}`,
+          "error"
+        );
       }
     });
 
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      if (errorEl) errorEl.textContent = "";
-
-      const email = String(emailInput?.value || "").trim();
-      const password = String(passwordInput?.value || "");
-
+    btn?.addEventListener("click", async () => {
+      setStatus("");
+      setBusy(true, "Redirigiendo a Google...");
       try {
-        await signInWithPassword(email, password);
-        window.location.href = APP_URLS.localPreselector || "../contexto_local/";
+        await signInWithGoogle();
       } catch (error) {
-        console.error("Error de inicio de sesión:", error);
-        const message = String(error?.message || "");
-        if (message.includes("Invalid login credentials")) {
-          if (errorEl) errorEl.textContent = "Correo o contraseña incorrectos.";
-        } else {
-          if (errorEl) errorEl.textContent = "Error de conexión. Inténtalo de nuevo.";
-        }
+        console.error("Error al iniciar sesión con Google:", error);
+        setBusy(false, "Continuar con Google");
+        setStatus(
+          `No se pudo abrir el inicio de sesión de Google: ${error?.message || "sin detalle"}`,
+          "error"
+        );
       }
     });
   </script>

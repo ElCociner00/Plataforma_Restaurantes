@@ -2,25 +2,140 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>AXIOMA | Dashboard</title>
-  <link rel="stylesheet" href="../css/main.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Dashboard Analítico | Enkrato</title>
+  
+  <!-- Estilos base -->
+  <link rel="stylesheet" href="../css/variables.css?v=20260823b">
+  <link rel="stylesheet" href="../css/main.css?v=20260823b">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  
+  <!-- Librerías de terceros (Gráficos) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body style="display:none">
   
-  <!-- 🔐 Auth global -->
-  <script type="module" src="../js/router.js"></script>
+  <!-- Auth global -->
+  <script type="module" src="../js/router.js?v=20260823b"></script>
 
-  <!-- 🔐 Permisos por rol -->
-<!-- 🧭 Header -->
-  <script type="module" src="../js/header.js"></script>
+  <!-- Header -->
+  <script type="module" src="../js/header.js?v=20260823b"></script>
 
-  <div class="main">
-    <h1>Dashboard</h1>
-    <p>Bienvenido al panel principal</p>
-  </div>
+  <main class="main" style="max-width: var(--ek-w-data, 1180px); margin: 0 auto; padding-top: 2rem; padding-bottom: 4rem;">
+    
+    <div class="dashboard-header" style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2rem;">
+      <div>
+        <h1 style="margin: 0; font-size: var(--ek-text-display); color: var(--ek-ink);">Dashboard Analítico</h1>
+        <p style="margin: 0.25rem 0 0 0; color: var(--ek-muted);">Vista unificada de la operación</p>
+      </div>
 
-  <script type="module" src="../js/dashboard.js"></script>
-  <script type="module" src="../js/footer.js"></script>
+      <!-- Filtros Globales -->
+      <div class="dashboard-filters" style="display: flex; gap: 1rem; align-items: center;">
+        <div class="filter-group">
+          <label for="filtroSede" style="display: block; font-size: var(--ek-text-label); font-weight: var(--ek-weight-medium); color: var(--ek-muted); margin-bottom: 0.25rem;">Sede</label>
+          <select id="filtroSede" class="form-input" style="padding: 0.5rem; border-radius: var(--ek-radius-md); min-width: 150px;">
+            <option value="">Cargando sedes...</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="filtroPeriodo" style="display: block; font-size: var(--ek-text-label); font-weight: var(--ek-weight-medium); color: var(--ek-muted); margin-bottom: 0.25rem;">Período</label>
+          <select id="filtroPeriodo" class="form-input" style="padding: 0.5rem; border-radius: var(--ek-radius-md); min-width: 150px;">
+            <option value="mes">Mes específico</option>
+            <option value="3m">Últimos 3 meses</option>
+            <option value="6m">Últimos 6 meses</option>
+            <option value="anio">Este año</option>
+            <option value="personalizado">Personalizado…</option>
+          </select>
+        </div>
+
+        <div class="filter-group" id="grupoMes">
+          <label for="filtroMes" style="display: block; font-size: var(--ek-text-label); font-weight: var(--ek-weight-medium); color: var(--ek-muted); margin-bottom: 0.25rem;">Mes</label>
+          <input type="month" id="filtroMes" class="form-input" style="padding: 0.5rem; border-radius: var(--ek-radius-md);">
+        </div>
+
+        <div class="filter-group" id="grupoRango" style="display: none;">
+          <label style="display: block; font-size: var(--ek-text-label); font-weight: var(--ek-weight-medium); color: var(--ek-muted); margin-bottom: 0.25rem;">Desde / Hasta</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="date" id="filtroDesde" class="form-input" style="padding: 0.5rem; border-radius: var(--ek-radius-md);">
+            <input type="date" id="filtroHasta" class="form-input" style="padding: 0.5rem; border-radius: var(--ek-radius-md);">
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <label for="filtroGranularidad" style="display: block; font-size: var(--ek-text-label); font-weight: var(--ek-weight-medium); color: var(--ek-muted); margin-bottom: 0.25rem;">Agrupar por</label>
+          <select id="filtroGranularidad" class="form-input" style="padding: 0.5rem; border-radius: var(--ek-radius-md); min-width: 130px;">
+            <option value="auto">Automático</option>
+            <option value="dia">Día</option>
+            <option value="semana">Semana</option>
+            <option value="mes">Mes</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pestañas (Minimalistas) -->
+    <div class="dashboard-tabs" style="display: flex; gap: 2rem; border-bottom: 1px solid var(--ek-line); margin-bottom: 2rem;">
+      <button class="tab-btn active" data-tab="tab-conciliacion" style="background: none; border: none; padding: 0.5rem 0; font-weight: var(--ek-weight-semibold); color: var(--ek-ink); border-bottom: 2px solid var(--ek-violet-600); cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+        <i class="ph ph-cash-register"></i> Conciliación
+      </button>
+      <button class="tab-btn" data-tab="tab-ventas" style="background: none; border: none; padding: 0.5rem 0; font-weight: var(--ek-weight-medium); color: var(--ek-muted); border-bottom: 2px solid transparent; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+        <i class="ph ph-storefront"></i> Ventas y Turnos
+      </button>
+      <button class="tab-btn" data-tab="tab-responsables" style="background: none; border: none; padding: 0.5rem 0; font-weight: var(--ek-weight-medium); color: var(--ek-muted); border-bottom: 2px solid transparent; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+        <i class="ph ph-users-three"></i> Ventas por responsable
+      </button>
+      <button class="tab-btn" data-tab="tab-gastos" style="background: none; border: none; padding: 0.5rem 0; font-weight: var(--ek-weight-medium); color: var(--ek-muted); border-bottom: 2px solid transparent; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+        <i class="ph ph-receipt"></i> Gastos de Turno
+      </button>
+    </div>
+
+    <!-- Contenedores de Tableros -->
+    <div class="tab-content" id="tab-conciliacion">
+      <!-- Carga inicial -->
+      <div id="loadingConciliacion" style="text-align: center; padding: 3rem; color: var(--ek-muted);">
+        <i class="ph ph-spinner" style="font-size: 2rem; animation: spin 1s linear infinite;"></i>
+        <p>Cargando datos de conciliación...</p>
+      </div>
+      <div id="contentConciliacion" style="display: none;"></div>
+    </div>
+
+    <div class="tab-content" id="tab-ventas" style="display: none;">
+      <div id="loadingVentas" style="text-align: center; padding: 3rem; color: var(--ek-muted);">
+        <i class="ph ph-spinner" style="font-size: 2rem; animation: spin 1s linear infinite;"></i>
+        <p>Cargando ventas e ingresos...</p>
+      </div>
+      <div id="contentVentas" style="display: none;"></div>
+    </div>
+
+    <div class="tab-content" id="tab-responsables" style="display: none;">
+      <div id="loadingResponsables" style="text-align: center; padding: 3rem; color: var(--ek-muted);">
+        <i class="ph ph-spinner" style="font-size: 2rem; animation: spin 1s linear infinite;"></i>
+        <p>Cargando ventas por responsable...</p>
+      </div>
+      <div id="contentResponsables" style="display: none;"></div>
+    </div>
+
+    <div class="tab-content" id="tab-gastos" style="display: none;">
+      <div id="loadingGastos" style="text-align: center; padding: 3rem; color: var(--ek-muted);">
+        <i class="ph ph-spinner" style="font-size: 2rem; animation: spin 1s linear infinite;"></i>
+        <p>Cargando estructura de gastos...</p>
+      </div>
+      <div id="contentGastos" style="display: none;"></div>
+    </div>
+
+  </main>
+
+  <script type="module" src="../js/dashboard.js?v=20260823b"></script>
+  <script type="module" src="../js/footer.js?v=20260823b"></script>
+  
+  <style>
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    
+    .tab-btn:hover:not(.active) {
+      color: var(--ek-ink);
+    }
+  </style>
 </body>
 </html>

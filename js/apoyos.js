@@ -24,7 +24,7 @@
  *
  * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
  */
-const WEBHOOK_CONSULTAR_PROPINA_APOYO = "https://n8n.enkrato.com/webhook/consultar_propina_apoyo";
+import { supabase } from "./supabase.js";
 
 const asInt = (value) => {
   const n = Number(value);
@@ -54,6 +54,7 @@ const normalizeResponseData = (payload) => {
     return payload;
   }
   if (Array.isArray(payload?.data)) return payload.data;
+  if (typeof payload === 'object' && payload !== null) return [payload];
   return [];
 };
 
@@ -218,15 +219,10 @@ export function initApoyosPropinaManager({
     btnConsultarPropina.disabled = true;
 
     try {
-      const response = await fetch(WEBHOOK_CONSULTAR_PROPINA_APOYO, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(consultaPayload)
-      });
+      const { data, error } = await supabase.functions.invoke("consultar-propina-apoyos", { body: consultaPayload });
 
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setStatus(data?.message || `No se pudo consultar propina de apoyos (HTTP ${response.status}).`);
+      if (error || !data || data.ok === false) {
+        setStatus(data?.message || error?.message || "No se pudo consultar propina de apoyos.");
         return;
       }
 

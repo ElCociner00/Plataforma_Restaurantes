@@ -1,9 +1,9 @@
 .siigo-main {
   max-width: 1280px;
-  border: 1px solid #d9d6fe;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
   border-radius: 14px;
   padding: 24px;
-  background: linear-gradient(180deg, #ffffff 0%, #faf9ff 100%);
+  background: linear-gradient(180deg, var(--ek-surface, #ffffff) 0%, var(--ek-plum-050, #f9f6fe) 100%);
 }
 
 .siigo-main h1 {
@@ -20,9 +20,9 @@
 
 .bloque {
   margin-bottom: 18px;
-  border: 1px solid #e7e5ff;
+  border: 1px solid var(--ek-plum-100, #efe9fb);
   border-radius: 12px;
-  background: #fff;
+  background: var(--ek-surface-2, #f1f5f9);
   padding: 14px;
 }
 
@@ -64,16 +64,16 @@
 }
 
 #cargarTodasFacturas {
-  background: #6d28d9;
+  background: var(--ek-violet-600, #7c3aed);
 }
 
 #cargarTodasFacturas:hover {
-  background: #5b21b6;
+  background: var(--ek-plum-700, #4a3474);
 }
 
 .tabla-wrap {
   overflow: auto;
-  border: 1px solid #ddd6fe;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
   border-radius: 10px;
 }
 
@@ -86,7 +86,7 @@ table {
 
 th,
 td {
-  border-bottom: 1px solid #ede9fe;
+  border-bottom: 1px solid var(--ek-plum-100, #efe9fb);
   padding: 8px;
   text-align: left;
   font-size: 0.88rem;
@@ -94,7 +94,7 @@ td {
 }
 
 th {
-  background: #f7f5ff;
+  background: var(--ek-plum-050, #f9f6fe);
 }
 
 th.dragging {
@@ -102,13 +102,13 @@ th.dragging {
 }
 
 tr.selected {
-  background: #ede9fe;
-  outline: 2px solid #7c3aed;
+  background: var(--ek-plum-100, #efe9fb);
+  outline: 2px solid var(--ek-violet-600, #7c3aed);
   outline-offset: -2px;
 }
 
 tr.invoice-row:not(.selected) {
-  background: #ffffff;
+  background: var(--ek-surface, #ffffff);
 }
 
 .fecha-col {
@@ -134,7 +134,7 @@ tr.invoice-row:not(.selected) {
   position: absolute;
   cursor: pointer;
   inset: 0;
-  background: #cbd5f5;
+  background: var(--ek-plum-200, #ddd0f5);
   border-radius: 999px;
   transition: .2s;
 }
@@ -146,13 +146,13 @@ tr.invoice-row:not(.selected) {
   height: 18px;
   left: 3px;
   bottom: 3px;
-  background: #fff;
+  background: var(--ek-surface, #ffffff);
   border-radius: 50%;
   transition: .2s;
 }
 
 .switch input:checked + .slider {
-  background: #4f46e5;
+  background: var(--ek-plum-600, #5b3a8f);
 }
 
 .switch input:checked + .slider::before {
@@ -160,25 +160,25 @@ tr.invoice-row:not(.selected) {
 }
 
 .detalle-box {
-  border: 1px solid #ddd6fe;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
   border-radius: 8px;
   padding: 10px;
-  background: #f8f7ff;
+  background: var(--ek-plum-100, #efe9fb);
 }
 
 .detail-inline-row td {
   padding: 0;
-  border-bottom: 1px solid #ddd6fe;
-  background: #f8faff;
+  border-bottom: 1px solid var(--ek-plum-200, #ddd0f5);
+  background: var(--ek-plum-050, #f9f6fe);
 }
 
 .detail-inline-row {
-  border-left: 4px solid #93c5fd;
+  border-left: 4px solid var(--ek-info-100, #eff6ff);
 }
 
 .inline-detail-wrap {
   padding: 10px;
-  background: #f8faff;
+  background: var(--ek-plum-100, #efe9fb);
 }
 
 .inline-detail-table {
@@ -196,12 +196,12 @@ tr.invoice-row:not(.selected) {
 .drag-col {
   width: 30px;
   text-align: center;
-  color: #9ca3af;
+  color: var(--ek-muted-2, #78889c);
 }
 
 .status {
   margin-top: 10px;
-  color: #374151;
+  color: var(--ek-ink-2, #334155);
 }
 
 .facturas-panel-switch {
@@ -218,7 +218,7 @@ tr.invoice-row:not(.selected) {
 }
 
 .facturas-panel-switch button.active {
-  background: #312e81;
+  background: var(--ek-plum-800, #3b2a5e);
 }
 
 .revision-dot {
@@ -226,14 +226,14 @@ tr.invoice-row:not(.selected) {
   width: 9px;
   height: 9px;
   border-radius: 999px;
-  background: #dc2626;
+  background: var(--ek-bad-600, #dc2626);
   margin-left: 6px;
 }
 
 .inconvenientes-aviso {
-  border: 1px solid #fecaca;
-  background: #fef2f2;
-  color: #991b1b;
+  border: 1px solid var(--ek-bad-100, #fef2f2);
+  background: var(--ek-bad-100, #fef2f2);
+  color: var(--ek-bad-700, #991b1b);
   border-radius: 10px;
   padding: 10px;
   margin-bottom: 8px;
@@ -250,9 +250,9 @@ tr.invoice-row:not(.selected) {
   position: sticky;
   top: 78px;
   z-index: 21;
-  background: #ffffffeb;
+  background: var(--ek-surface, #ffffff);
   padding: 8px;
-  border: 1px solid #e9d5ff;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
   border-radius: 10px;
 }
 
@@ -269,24 +269,23 @@ tr.invoice-row:not(.selected) {
   gap: 4px;
   min-width: 280px;
   font-size: 0.82rem;
-  color: #374151;
+  color: var(--ek-ink-2, #334155);
 }
 
-.hidden {
-  display: none !important;
-}
+/* .hidden se define ahora en css/main.css (capa global de estado).
+   Duplicarla aqui reintroduce el conflicto que la fase 0 elimino. */
 
 .descarga-label {
   display: flex;
   flex-direction: column;
   gap: 4px;
   font-size: 0.82rem;
-  color: #4b5563;
+  color: var(--ek-ink-2, #334155);
   min-width: 260px;
 }
 
 .descarga-label select {
-  background: #fff;
+  background: var(--ek-surface, #ffffff);
 }
 
 .paginacion {
@@ -302,7 +301,7 @@ tr.invoice-row:not(.selected) {
 }
 
 .paginacion button.active {
-  background: #312e81;
+  background: var(--ek-plum-800, #3b2a5e);
 }
 
 
@@ -338,13 +337,13 @@ tr.invoice-row:not(.selected) {
 }
 
 .siigo-state.is-on {
-  color: #065f46;
-  background: #d1fae5;
+  color: var(--ek-ok-700, #065f46);
+  background: var(--ek-ok-100, #ecfdf5);
 }
 
 .siigo-state.is-off {
-  color: #92400e;
-  background: #fef3c7;
+  color: var(--ek-warn-700, #7c3f0a);
+  background: var(--ek-warn-100, #fffbeb);
 }
 
 
@@ -372,8 +371,8 @@ tr.invoice-row:not(.selected) {
 }
 
 .siigo-state.is-error {
-  color: #ffffff;
-  background: #b91c1c;
+  color: var(--ek-surface, #ffffff);
+  background: var(--ek-bad-700, #991b1b);
 }
 
 .switch.siigo-switch-failed {
@@ -404,11 +403,11 @@ tr.invoice-row:not(.selected) {
 
 .siigo-warning-card {
   width: min(640px, 95vw);
-  background: #ffffff;
+  background: var(--ek-surface, #ffffff);
   border-radius: 14px;
-  border: 1px solid #ddd6fe;
+  border: 1px solid var(--ek-plum-200, #ddd0f5);
   padding: 18px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--ek-shadow-modal, 0 24px 48px -12px rgba(15, 23, 42, 0.18));
 }
 
 .siigo-warning-card h3 {
@@ -417,7 +416,7 @@ tr.invoice-row:not(.selected) {
 
 .siigo-warning-card p {
   margin: 0;
-  color: #374151;
+  color: var(--ek-ink-2, #334155);
   line-height: 1.5;
 }
 
@@ -429,9 +428,9 @@ tr.invoice-row:not(.selected) {
 }
 
 .siigo-warning-cancel {
-  background: #6b7280;
+  background: var(--ek-muted, #5d6b7e);
 }
 
 .siigo-warning-confirm {
-  background: #b91c1c;
+  background: var(--ek-bad-700, #991b1b);
 }

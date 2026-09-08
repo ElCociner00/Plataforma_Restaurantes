@@ -2,10 +2,20 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>AXIOMA | Cierre de turno</title>
+  <link rel="stylesheet" href="../css/variables.css">
   <link rel="stylesheet" href="../css/main.css">
-  <link rel="stylesheet" href="../css/cierre_turno.css">
-  <link rel="stylesheet" href="../css/cierre_turno_contabilidad.css">
+  <!-- El ?v= no es decorativo: sin el, el navegador reutiliza el CSS y el JS
+       cacheados aunque este HTML sea nuevo, y los cambios no llegan a verse.
+       El token es fecha + letra, y sube en CADA guardado del CSS/JS de este
+       modulo, no una vez al dia: si se deja fijo mientras el archivo cambia,
+       la misma URL acaba sirviendo contenidos distintos y el navegador se
+       queda con el viejo. Paso ya una vez (numeros pisados en Diferencias,
+       ver docs/2026-08-23_cierre_turno_diferencias_texto_superpuesto.md). -->
+  <link rel="stylesheet" href="../css/cierre_turno.css?v=20260823d">
+  <link rel="stylesheet" href="../css/cierre_turno_contabilidad.css?v=20260823d">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
 </head>
 
 <body style="display:none">
@@ -15,7 +25,7 @@
 
   <!-- 🔐 Permisos -->
 <!-- 🧭 Header -->
-  <script type="module" src="../js/header.js"></script>
+  <script type="module" src="../js/header.js?v=20260901rappi2"></script>
   <script type="module" src="../js/local_context_navigation_guard.js"></script>
 
   <div class="main">
@@ -27,6 +37,14 @@
       <select id="responsable">
         <option value="">Seleccione responsable</option>
       </select>
+
+      <select id="numeroTurno" aria-label="Jornada del turno">
+        <option value="">Seleccione la jornada</option>
+        <option value="1">Turno 1 &middot; Ma&ntilde;ana</option>
+        <option value="2">Turno 2 &middot; Tarde</option>
+        <option value="3">Turno 3 &middot; Noche</option>
+      </select>
+      <p id="jornadaAviso" class="jornada-aviso is-hidden" role="status"></p>
 
       <h4>Datos del turno</h4>
       <div class="turno-datos-grid">
@@ -66,14 +84,22 @@
         </div>
       </div>
 
-      <div class="apertura-grid">
-        <label>
-          Efectivo Apertura
+      <h4>Efectivo de apertura</h4>
+      <div class="apertura-cards">
+        <label class="turno-datos-card apertura-card">
+          <h5>Lo que recibiste</h5>
           <input id="efectivo_apertura" type="text" inputmode="numeric" pattern="[0-9]*">
+          <small class="field-note">Cu&eacute;ntala y escribe el valor</small>
         </label>
-
-        <div class="apertura-note" role="note">
-          <p>Tip: para consultar Loggro correctamente, mantenlo abierto en el negocio correspondiente.</p>
+        <div class="turno-datos-card apertura-card">
+          <h5>Caja del turno anterior</h5>
+          <input id="efectivo_apertura_esperado" type="text" readonly>
+          <small id="efectivoAperturaOrigen" class="field-note">Se carga al consultar Loggro</small>
+        </div>
+        <div class="turno-datos-card apertura-card">
+          <h5>Diferencia</h5>
+          <input id="efectivo_apertura_diferencia" type="text" readonly class="diff-input">
+          <small id="efectivoAperturaNota" class="field-note"></small>
         </div>
       </div>
 
@@ -93,7 +119,7 @@
         <button id="consultarGastos" type="button">Consultar gastos</button>
         <button id="verificar" disabled>Verificar</button>
         <button id="enviar" disabled>Subir cierre</button>
-        <span class="hint-icon" title="Al subir cierre exitosamente se descargará la constancia PNG automáticamente.">🔍</span>
+        <span class="hint-icon" title="Al subir cierre exitosamente se descargará la constancia PNG automáticamente."><i class="ph ph-info" aria-hidden="true"></i></span>
         <button id="limpiarDatos" type="button">Limpiar datos</button>
       </div>
       <div class="correccion-wrap is-hidden" id="correccionWrap">
@@ -141,7 +167,7 @@
         <div id="apoyoTablaWrap" class="apoyo-tabla-wrap is-hidden">
           <div class="apoyo-tabla-head">
             <span>Responsable</span>
-            <span>Propina</span>
+            <span>Propina asignada</span>
             <span>Tiempo</span>
           </div>
           <div id="apoyoRows" class="apoyo-rows"></div>
@@ -162,12 +188,12 @@
       <div class="row-title">Efectivo</div>
       <div class="efectivo-sistema-wrap">
         <input id="efectivo_sistema" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
-        <button id="toggleEfectivoSistema" class="icon-btn" type="button" title="Cambiar valor visible" aria-label="Cambiar valor visible de efectivo sistema">↻</button>
+        <button id="toggleEfectivoSistema" class="icon-btn" type="button" title="Cambiar valor visible" aria-label="Cambiar valor visible de efectivo sistema"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i></button>
         <small id="efectivoSistemaModo" class="field-note">efectivo bruto</small>
       </div>
       <div class="input-with-hint">
         <input id="efectivo_real" type="text" inputmode="numeric" pattern="[0-9]*" readonly>
-        <span class="hint-icon" title="Este valor proviene de la suma entre bolsa y caja.">🔍</span>
+        <span class="hint-icon" title="Este valor proviene de la suma entre bolsa y caja."><i class="ph ph-info" aria-hidden="true"></i></span>
       </div>
       <div class="diff-cell">
         <input id="efectivo_diferencia" type="text" inputmode="numeric" pattern="[0-9-]*" readonly class="diff-input">
@@ -226,7 +252,7 @@
     </div>
 
     <div class="finanzas-row" data-field="propina">
-      <div class="row-title">Propina</div>
+      <div class="row-title">Propina general</div>
       <input id="propina" type="text" inputmode="numeric" pattern="[0-9]*" readonly class="input-span-3">
     </div>
 
@@ -283,8 +309,8 @@
     </section>
   </div>
 
-  <script type="module" src="../js/cierre_turno.js"></script>
-  <script type="module" src="../js/cierre_turno_contabilidad_visual.js"></script>
+  <script type="module" src="../js/cierre_turno.js?v=20260828b"></script>
+  <script type="module" src="../js/cierre_turno_contabilidad_visual.js?v=20260823d"></script>
 
   <script type="module" src="../js/footer.js"></script>
 </body>

@@ -15,12 +15,8 @@
  *
  * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
  */
-import { buildRequestHeaders, getUserContext } from "./session.js";
-import {
-  WEBHOOK_NOMINA_CONCEPTOS_CONSULTAR,
-  WEBHOOK_NOMINA_PARAMETROS_REGISTRAR,
-  WEBHOOK_NOMINA_TIEMPOS_CONSULTAR
-} from "./webhooks.js";
+import { getUserContext } from "./session.js";
+import { supabase } from "./supabase.js";
 
 const form = document.getElementById("parametrosNominaForm");
 const tiempoSelect = document.getElementById("parametroTiempo");
@@ -34,13 +30,13 @@ const CATALOGS = {
     select: tiempoSelect,
     placeholder: "Selecciona un tiempo",
     loadingLabel: "Cargando tiempos...",
-    url: WEBHOOK_NOMINA_TIEMPOS_CONSULTAR
+    table: "dimensiones_tiempo"
   },
   conceptos: {
     select: conceptoSelect,
     placeholder: "Selecciona un concepto",
     loadingLabel: "Cargando conceptos...",
-    url: WEBHOOK_NOMINA_CONCEPTOS_CONSULTAR
+    table: "dimensiones_concepto"
   }
 };
 
@@ -95,58 +91,15 @@ const fillSelect = (select, options, placeholder) => {
   });
 };
 
-const readResponseBody = async (response) => {
-  const raw = await response.text();
-  if (!raw) return {};
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return { message: raw };
-  }
-};
+const fetchCatalogRows = async (table) => {
+  const { data, error } = await supabase
+    .from(table)
+    .select('id, nombre, factor_conversion')
+    .order('nombre');
 
-const extractDataRows = (value) => {
-  if (!value) return [];
-  if (Array.isArray(value)) {
-    if (value.every((item) => item && typeof item === "object" && !Array.isArray(item) && "id" in item && "nombre" in item)) {
-      return value;
-    }
+  if (error) throw new Error(error.message || `Error al consultar ${table}`);
 
-    return value.flatMap((item) => extractDataRows(item));
-  }
-
-  if (typeof value === "object") {
-    if (Array.isArray(value.data)) return extractDataRows(value.data);
-    if (Array.isArray(value.body)) return extractDataRows(value.body);
-    if (Array.isArray(value.result)) return extractDataRows(value.result);
-  }
-
-  return [];
-};
-
-const buildCatalogRequestPayload = () => ({
-  tenant_id: currentContext?.empresa_id,
-  empresa_id: currentContext?.empresa_id,
-  usuario_id: currentContext?.user?.id || currentContext?.user?.user_id || null,
-  origen: "configuracion_parametros_nomina",
-  timestamp: new Date().toISOString()
-});
-
-const fetchCatalogRows = async (url) => {
-  const authHeaders = await buildRequestHeaders({ includeTenant: true });
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders
-    },
-    body: JSON.stringify(buildCatalogRequestPayload())
-  });
-
-  const data = await readResponseBody(response);
-  if (!response.ok) throw new Error(data?.message || `HTTP ${response.status}`);
-
-  return extractDataRows(data)
+  return (data || [])
     .map(normalizeCatalogRow)
     .filter(Boolean);
 };
@@ -155,9 +108,9 @@ const loadCatalog = async (catalogName) => {
   const config = CATALOGS[catalogName];
   fillSelect(config.select, [], config.loadingLabel);
 
-  const rows = await fetchCatalogRows(config.url);
+  const rows = await fetchCatalogRows(config.table);
   if (!rows.length) {
-    throw new Error(`El webhook de ${catalogName} respondió sin datos compatibles.`);
+    throw new Error(`La tabla ${catalogName} no devolvió datos.`);
   }
 
   catalogState[catalogName] = rows;
@@ -215,22 +168,23 @@ const submitParametro = async (event) => {
   setStatus("Guardando parámetro de nómina...");
 
   try {
-    const authHeaders = await buildRequestHeaders({ includeTenant: true });
-    const response = await fetch(WEBHOOK_NOMINA_PARAMETROS_REGISTRAR, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...authHeaders
-      },
-      body: JSON.stringify(payload)
-    });
+    const { error } = await supabase
+      .from("parametros_nomina")
+      .upsert({
+        empresa_id: payload.empresa_id,
+        dimension_tiempo_id: payload.tiempo_id,
+        dimension_concepto_id: payload.concepto_id,
+        valor_monetario: payload.valor,
+        registrado_por: payload.usuario_id
+      }, {
+        onConflict: 'empresa_id, dimension_tiempo_id, dimension_concepto_id'
+      });
 
-    const data = await readResponseBody(response);
-    if (!response.ok || data?.success === false || data?.ok === false) {
-      throw new Error(data?.message || `HTTP ${response.status}`);
+    if (error) {
+      throw new Error(error.message);
     }
 
-    setStatus(data?.message || "Parámetro de nómina enviado correctamente.");
+    setStatus("Parámetro de nómina guardado correctamente.");
     valorInput.value = "";
     valorInput.focus();
   } catch (error) {

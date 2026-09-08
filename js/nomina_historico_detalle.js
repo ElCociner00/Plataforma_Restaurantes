@@ -4,8 +4,8 @@
  * Recibe el ID por querystring, consulta WEBHOOK_NOMINA_HISTORICO_RENDERIZAR
  * y renderiza tablas limpias equivalentes al módulo de nómina, sin exponer IDs.
  */
-import { buildRequestHeaders, getUserContext, listAvailableLocalContexts } from "./session.js";
-import { WEBHOOK_NOMINA_HISTORICO_RENDERIZAR } from "./webhooks.js";
+import { getUserContext, listAvailableLocalContexts } from "./session.js";
+import { supabase } from "./supabase.js";
 
 const tituloEl = document.getElementById("historicoNominaDetalleTitulo");
 const resumenEl = document.getElementById("historicoNominaDetalleResumen");
@@ -187,11 +187,14 @@ const renderParametros = (rows) => table("Parámetros", ["Concepto", "Valor", "U
 const consultarDetalle = async (id) => {
   const context = await getUserContext().catch(() => null);
   const locales = (await listAvailableLocalContexts().catch(() => [])).map(normalizeLocal).filter(Boolean);
-  const authHeaders = await buildRequestHeaders({ includeTenant: true });
-  const payload = { id, nomina_id: id, row_id: id, empresa_id: context?.empresa_id || "", tenant_id: context?.empresa_id || "", origen: "nomina_historico_detalle" };
-  const response = await fetch(WEBHOOK_NOMINA_HISTORICO_RENDERIZAR, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders }, body: JSON.stringify(payload) });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const [raw] = extractRows(await response.json().catch(() => null));
+  const { data: raw, error } = await supabase
+    .from("historico_nomina")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) throw new Error(error.message);
+  
   return { row: normalizeNomina(raw), locales };
 };
 const renderDetalle = (row, locales) => {

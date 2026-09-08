@@ -10,7 +10,8 @@
  */
 import { getUserContext } from "./session.js";
 import { buildRequestHeaders } from "./session.js";
-import { WEBHOOK_REGISTRAR_CREDIBANCO } from "./webhooks.js";
+import { WEBHOOK_REGISTRAR_CREDIBANCO, motivoObsoleto, webhookVigente } from "./webhooks.js";
+import { avisarModuloDescontinuado } from "./modulo_descontinuado.js";
 
 const form = document.getElementById("credibancoForm");
 const clientIdInput = document.getElementById("credibancoClientId");
@@ -48,6 +49,18 @@ const readResponseBody = async (res) => {
   }
 };
 
+// La integración quedó descontinuada: se bloquea el formulario en cuanto
+// carga la pantalla, para que nadie escriba un client secret que no se va a
+// guardar en ninguna parte.
+const CREDIBANCO_ACTIVO = webhookVigente(WEBHOOK_REGISTRAR_CREDIBANCO);
+if (!CREDIBANCO_ACTIVO) {
+  avisarModuloDescontinuado({
+    motivo: motivoObsoleto(WEBHOOK_REGISTRAR_CREDIBANCO),
+    status,
+    formularios: [form],
+  });
+}
+
 toggleSecretBtn?.addEventListener("click", () => {
   const shouldShow = clientSecretInput.type === "password";
   clientSecretInput.type = shouldShow ? "text" : "password";
@@ -57,6 +70,11 @@ toggleSecretBtn?.addEventListener("click", () => {
 
 form?.addEventListener("submit", async (event) => {
   event.preventDefault();
+
+  if (!CREDIBANCO_ACTIVO) {
+    setStatus(motivoObsoleto(WEBHOOK_REGISTRAR_CREDIBANCO));
+    return;
+  }
 
   const clientId = String(clientIdInput?.value || "").trim();
   const clientSecret = String(clientSecretInput?.value || "").trim();

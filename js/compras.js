@@ -1,10 +1,8 @@
 import { getUserContext, listAvailableLocalContexts } from "./session.js";
+import { supabase } from "./supabase.js";
 import {
-  WEBHOOK_COMPRAS_VERIFICACION_FACTURAS,
-  WEBHOOK_COMPRAS_DATOS_FACTURA,
-  WEBHOOK_COMPRAS_CONSULTAR_INVENTARIOS,
-  WEBHOOK_COMPRAS_SUBIR_MATCH,
-  WEBHOOK_COMPRAS_REASIGNAR_LOCAL
+  WEBHOOK_COMPRAS_CONSULTAR_CATALOGO,
+  WEBHOOK_COMPRAS_GUARDAR
 } from "./webhooks.js";
 
 const statusEl = document.getElementById("comprasStatus");
@@ -100,30 +98,37 @@ async function postJson(url, payload) {
 }
 
 async function fetchFacturas() {
-  const data = await postJson(WEBHOOK_COMPRAS_VERIFICACION_FACTURAS, {
-    empresa_id: context.empresa_id,
-    tenant_id: context.empresa_id
+  const { data, error } = await supabase.functions.invoke("compras-importar", {
+    body: {
+      empresa_id: context.empresa_id,
+      tenant_id: context.empresa_id
+    }
   });
+  if (error || !data || data.ok === false) {
+    throw new Error(data?.message || error?.message || "Error al importar facturas");
+  }
   return normalizeList(data).filter((r) => r && getFacturaKey(r));
 }
 
 async function fetchDetalleFactura(factura) {
-  const data = await postJson(WEBHOOK_COMPRAS_DATOS_FACTURA, {
-    empresa_id: context.empresa_id,
-    tenant_id: context.empresa_id,
-    uuid: factura.uuid,
-    prefijo_factura: factura.prefijo,
-    consecutivo_factura: factura.consecutivo
-  });
-  return normalizeList(data);
+  const { data, error } = await supabase
+    .from('facturas_empresas')
+    .select('*')
+    .eq('uuid_factura', factura.uuid);
+
+  if (error) throw new Error(error.message || "Error al consultar detalles de la factura");
+  return normalizeList(data || []);
 }
 
 async function fetchInventarios() {
-  const data = await postJson(WEBHOOK_COMPRAS_CONSULTAR_INVENTARIOS, {
-    empresa_id: context.empresa_id,
-    tenant_id: context.empresa_id
+  const { data, error } = await supabase.functions.invoke("consultar-inventarios", {
+    body: {
+      empresa_id: context.empresa_id,
+      tenant_id: context.empresa_id
+    }
   });
-  return normalizeList(data).filter((p) => p?.id && p?.nombre);
+  if (error) throw new Error(error.message || "Error al consultar inventarios");
+  return normalizeList(data || []).filter((p) => p?.id && p?.nombre);
 }
 
 const normalizeDistribucionStatus = (value) => {
@@ -326,21 +331,12 @@ async function confirmarDistribucionFactura(factura, localDestinoId = context?.e
 
   const destino = localContexts.find((item) => item.empresa_id === localDestinoId);
   const usuarioId = context?.user?.id || context?.user?.user_id || "";
-  await postJson(WEBHOOK_COMPRAS_REASIGNAR_LOCAL, {
-    accion,
-    empresa_matriz_id: getPrincipalEmpresaId(),
-    empresa_actual_id: context.empresa_id,
-    tenant_id_origen: context.empresa_id,
-    tenant_id_destino: localDestinoId,
-    local_destino_nombre: destino?.nombre || context?.empresa_nombre || context?.nombre_empresa || "Empresa actual",
-    usuario_id: usuarioId,
-    factura_uuid: factura.uuid,
-    factura_prefijo: factura.prefijo,
-    factura_consecutivo: factura.consecutivo,
-    proveedor: factura.proveedor,
-    fecha_factura: factura.fecha,
-    distribuida: 1
-  });
+  const { error } = await supabase
+    .from("facturas_empresas")
+    .update({ empresa_id: localDestinoId })
+    .eq("uuid_factura", factura.uuid);
+
+  if (error) throw new Error(error.message || "No se pudo reasignar el local de la factura");
 }
 
 async function reasignarFacturaLocal(factura, localDestinoId) {
@@ -422,17 +418,22 @@ btnNoCorresponde.addEventListener("click", async () => {
   btnEnviar.disabled = true;
   btnNoCorresponde.disabled = true;
   try {
-    await postJson(WEBHOOK_COMPRAS_SUBIR_MATCH, {
-      empresa_id: context.empresa_id,
-      tenant_id: context.empresa_id,
-      usuario_id: usuarioId,
-      sale_de_caja: saleDeCaja,
-      factura_uuid: facturaActiva.uuid,
-      factura_prefijo: facturaActiva.prefijo,
-      factura_consecutivo: facturaActiva.consecutivo,
-      no_corresponde: true,
-      items: []
+    const { data, error } = await supabase.functions.invoke("compras-subir", {
+      body: {
+        empresa_id: context.empresa_id,
+        tenant_id: context.empresa_id,
+        usuario_id: usuarioId,
+        sale_de_caja: saleDeCaja,
+        factura_uuid: facturaActiva.uuid,
+        factura_prefijo: facturaActiva.prefijo,
+        factura_consecutivo: facturaActiva.consecutivo,
+        no_corresponde: true,
+        items: []
+      }
     });
+    if (error || !data || data.ok === false) {
+      throw new Error(data?.message || error?.message || "Error al subir match (no corresponde)");
+    }
     setStatus("✅ Factura marcada como NO CORRESPONDE y enviada correctamente.", "success");
     facturasBase = await fetchFacturas();
     detalleWrap.classList.add("is-hidden");
@@ -487,16 +488,21 @@ btnEnviar.addEventListener("click", async () => {
   btnEnviar.disabled = true;
   btnNoCorresponde.disabled = true;
   try {
-    await postJson(WEBHOOK_COMPRAS_SUBIR_MATCH, {
-      empresa_id: context.empresa_id,
-      tenant_id: context.empresa_id,
-      usuario_id: usuarioId,
-      sale_de_caja: saleDeCaja,
-      factura_uuid: facturaActiva.uuid,
-      factura_prefijo: facturaActiva.prefijo,
-      factura_consecutivo: facturaActiva.consecutivo,
-      items
+    const { data, error } = await supabase.functions.invoke("compras-subir", {
+      body: {
+        empresa_id: context.empresa_id,
+        tenant_id: context.empresa_id,
+        usuario_id: usuarioId,
+        sale_de_caja: saleDeCaja,
+        factura_uuid: facturaActiva.uuid,
+        factura_prefijo: facturaActiva.prefijo,
+        factura_consecutivo: facturaActiva.consecutivo,
+        items
+      }
     });
+    if (error || !data || data.ok === false) {
+      throw new Error(data?.message || error?.message || "Error al subir compras");
+    }
     setStatus("✅ Compra enviada correctamente.", "success");
     facturasBase = await fetchFacturas();
     detalleWrap.classList.add("is-hidden");

@@ -2,52 +2,36 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>AXIOMA | Crear Usuario Administrador</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Enkrato | Registrar empresa</title>
+  <meta name="robots" content="noindex">
+  <!--
+    OBSOLETA desde la fase 2.
+
+    El registro se unifico en registro/index.html: al pasar a Google OAuth
+    desaparecieron el correo y la contrasena, que era todo lo que pedia esta
+    pagina. Se conserva como redireccion, y no como archivo borrado, porque
+    APP_URLS.registroUsuario sigue declarado en js/urls.js y puede haber
+    enlaces o marcadores apuntando aqui.
+
+    Ya no carga js/usuario.js, que dependia de sessionStorage.empresa_nit.
+  -->
+  <link rel="canonical" href="./">
+  <meta http-equiv="refresh" content="0; url=./">
+  <script>window.location.replace("./");</script>
+  <link rel="stylesheet" href="../css/variables.css">
   <link rel="stylesheet" href="../css/main.css">
-  <link rel="stylesheet" href="../css/usuario.css">
+  <link rel="stylesheet" href="../css/registro.css">
 </head>
 
 <body>
-  <div class="main">
-    <h1>Crear usuario administrador</h1>
-    <p class="helper-text">
-      Recuerda que estos serán los datos que usarás para ingresar a la plataforma.
+  <main class="main registro-container">
+    <p class="registro-subtitle">
+      El registro se hace ahora en una sola página.
     </p>
-
-    <form id="registroUsuario">
-      <!-- Nombre completo -->
-      <input
-        type="text"
-        id="nombre_visible"
-        placeholder="Nombre completo"
-        required
-      >
-
-      <!-- Correo del usuario -->
-      <input
-        type="email"
-        id="email"
-        placeholder="Correo electrónico"
-        required
-      >
-      <p class="helper-text" id="correoSugerido"></p>
-
-      <!-- Contraseña -->
-      <input
-        type="password"
-        id="password"
-        placeholder="Contraseña"
-        required
-      >
-
-      <button type="submit">Crear cuenta</button>
-    </form>
-
-    <div id="status"></div>
-  </div>
-
-  <!-- JS separado -->
-  <script type="module" src="../js/usuario.js"></script>
-  <script type="module" src="../js/footer.js"></script>
+    <div class="registro-extra">
+      <a href="./" class="registro-link">Ir al registro de empresa</a>
+    </div>
+  </main>
 </body>
 </html>

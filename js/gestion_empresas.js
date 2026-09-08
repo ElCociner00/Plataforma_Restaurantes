@@ -24,7 +24,7 @@ import { supabase } from "./supabase.js";
 import { esSuperAdmin } from "./permisos.core.js";
 import { getSessionConEmpresa } from "./session.js";
 import { resolveEmpresaPlan, normalizeEmpresaActiva } from "./plan.js";
-import { WEBHOOKS } from "./webhooks.js";
+import { WEBHOOKS, webhookVigente } from "./webhooks.js";
 import { APP_URLS } from "./urls.js";
 
 const bodyEl = document.getElementById("empresasBody");
@@ -233,7 +233,10 @@ async function onToggleAnuncio(input) {
   await syncBillingStateWithEmpresa(empresaId, { mostrar });
   if (empresaId === state.empresaActualId) window.dispatchEvent(new Event("empresaCambiada"));
 
-  if (WEBHOOKS?.NOTIFICACION_IMAGO?.url) {
+  // Esta URL apuntaba a un host de ejemplo que nunca existió, así que la
+  // llamada siempre falló en silencio. El estado de impago ya quedó guardado
+  // en updateEmpresa/syncBillingStateWithEmpresa, arriba.
+  if (webhookVigente(WEBHOOKS?.NOTIFICACION_IMAGO?.url)) {
     fetch(WEBHOOKS.NOTIFICACION_IMAGO.url, {
       method: WEBHOOKS.NOTIFICACION_IMAGO.metodo || "POST",
       headers: { "Content-Type": "application/json" },

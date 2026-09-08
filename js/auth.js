@@ -59,3 +59,34 @@ export async function signOut() {
   if (error) console.error("Error al cerrar sesión:", error);
   window.location.href = LOGIN_URL;
 }
+
+/**
+ * Inicia sesión con Google (OAuth 2.0).
+ *
+ * El destino de retorno se deriva de la URL actual en lugar de construirse
+ * con APP_URLS, para que el flujo funcione igual en produccion, en GitHub
+ * Pages y en Live Server, donde la profundidad de carpeta puede variar.
+ * Esa misma URL debe estar dada de alta en Supabase → Authentication →
+ * URL Configuration → Redirect URLs, o el proveedor rechaza el retorno.
+ *
+ * No redirige por su cuenta: signInWithOAuth navega el navegador a Google.
+ * Al volver, el cliente de Supabase captura la sesion automaticamente
+ * gracias a detectSessionInUrl: true (ver js/supabase.js) y la persiste en
+ * localStorage. Quien decide la ruta posterior es la vista de login.
+ */
+export async function signInWithGoogle({ redirectTo } = {}) {
+  const target = redirectTo || `${window.location.origin}${window.location.pathname}`;
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: target,
+      queryParams: {
+        prompt: "select_account"
+      }
+    }
+  });
+
+  if (error) throw error;
+  return data;
+}

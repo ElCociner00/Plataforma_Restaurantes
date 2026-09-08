@@ -2,14 +2,17 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>AXIOMA | Cierre de inventarios</title>
+  <link rel="stylesheet" href="../css/variables.css">
   <link rel="stylesheet" href="../css/main.css">
   <link rel="stylesheet" href="../css/cierre_inventarios.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
 </head>
 
 <body style="display:none">
   <script type="module" src="../js/router.js"></script>
-<script type="module" src="../js/header.js"></script>
+<script type="module" src="../js/header.js?v=20260901rappi2"></script>
   <script type="module" src="../js/local_context_navigation_guard.js"></script>
 
   <div id="loadingOverlay" class="loading-overlay is-hidden">Cargando productos...</div>
@@ -41,9 +44,7 @@
         <label>
           Momento inventario
           <select id="momento_inventario" required>
-            <option value="">Seleccione momento</option>
-            <option value="Apertura">Apertura</option>
-            <option value="Cierre">Cierre</option>
+            <option value="Cierre" selected>Cierre</option>
           </select>
         </label>
       </div>

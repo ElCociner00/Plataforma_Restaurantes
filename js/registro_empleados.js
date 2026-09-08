@@ -18,6 +18,7 @@
 import { enforceNumericInput } from "./input_utils.js";
 import { buildRequestHeaders, getUserContext } from "./session.js";
 import { WEBHOOK_REGISTRAR_EMPLEADO } from "./webhooks.js";
+import { supabase } from "./supabase.js";
 
 const form = document.getElementById("registroEmpleadoForm");
 const btnRegistrar = document.getElementById("btnRegistrar");
@@ -78,26 +79,17 @@ form?.addEventListener("submit", async (e) => {
   statusDiv.textContent = "Registrando empleado...";
 
   try {
-    const authHeaders = await buildRequestHeaders({ includeTenant: true });
-    const res = await fetch(WEBHOOK_REGISTRAR_EMPLEADO, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...authHeaders
-      },
-      body: JSON.stringify(payload)
+    const { data, error } = await supabase.functions.invoke("registro-empleados", {
+      body: payload
     });
 
-    const data = await readResponseBody(res);
-    const isSuccess = res.ok && (data?.success === true || data?.ok === true || /registrad/i.test(String(data?.message || "")));
-
-    if (isSuccess) {
+    if (error || !data || !data.ok) {
+      statusDiv.textContent = data?.message || error?.message || `Error registrando empleado.`;
+    } else {
       statusDiv.textContent = data?.message || "Empleado registrado correctamente.";
       form.reset();
-    } else {
-      statusDiv.textContent = data?.message || `Error registrando empleado (HTTP ${res.status}).`;
     }
-  } catch {
+  } catch (err) {
     statusDiv.textContent = "Error de conexión. Intenta nuevamente.";
   } finally {
     setSubmitting(false);

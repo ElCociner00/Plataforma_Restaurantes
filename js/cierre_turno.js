@@ -33,18 +33,13 @@
 import { enforceNumericInput } from "./input_utils.js";
 import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
-import { fetchResponsablesActivos } from "./responsables.js";
+import { fetchResponsablesActivos, fetchUsuariosEmpresa } from "./responsables.js";
 import { getEmpresaPolicy, puedeEnviarDatos } from "./permisos.core.js";
 import { initApoyosPropinaManager } from "./apoyos.js";
-import { descargarImagenResumenCierreTurno } from "./cierre_turno_png.js";
+import { descargarImagenResumenCierreTurno } from "./cierre_turno_png.js?v=20260828b";
 import {
-  WEBHOOK_CONSULTAR_DATOS_CIERRE,
   WEBHOOK_LISTAR_RESPONSABLES,
-  WEBHOOK_SUBIR_CIERRE,
-  WEBHOOK_VERIFICAR_CIERRE,
-  WEBHOOK_CONSULTAR_GASTOS,
-  WEBHOOK_CONSULTAR_GASTOS_CATALOGO,
-  WEBHOOK_ALERTA_MANIPULACION_CIERRE
+  WEBHOOK_CONSULTAR_GASTOS_CATALOGO
 } from "./webhooks.js";
 
 // ../js/cierre_turno.js
@@ -58,6 +53,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const horaLlegadaMinuto = document.getElementById("hora_llegada_minuto");
   const horaLlegadaMomento = document.getElementById("hora_llegada_momento");
   const efectivoApertura = document.getElementById("efectivo_apertura");
+  const efectivoAperturaEsperado = document.getElementById("efectivo_apertura_esperado");
+  const efectivoAperturaDiferencia = document.getElementById("efectivo_apertura_diferencia");
+  const efectivoAperturaOrigen = document.getElementById("efectivoAperturaOrigen");
+  const efectivoAperturaNota = document.getElementById("efectivoAperturaNota");
+  const jornadaSelect = document.getElementById("numeroTurno");
+  const jornadaAviso = document.getElementById("jornadaAviso");
   const bolsa = document.getElementById("bolsa");
   const caja = document.getElementById("caja");
   const status = document.getElementById("status");
@@ -211,6 +212,196 @@ document.addEventListener("DOMContentLoaded", () => {
     return `${hours} horas ${remMinutes} minutos`;
   };
 
+  // ── Jornada del turno ─────────────────────────────────────────────────
+  // La identidad del turno es (empresa, fecha, numero_turno). La hora sigue
+  // siendo libre justamente porque un turno de mañana puede cerrar a las 15:10.
+  let numeroTurno = null;
+
+  // Identificador de este intento de envío. Si el usuario hace doble clic o la
+  // red obliga a reintentar, el backend reconoce el token y no duplica el
+  // turno. Se renueva solo cuando un cierre entra de verdad.
+  let tokenEnvio = (crypto?.randomUUID?.() || `envio-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+
+  const setJornadaAviso = (mensaje, esError = false) => {
+    if (!jornadaAviso) return;
+    jornadaAviso.textContent = mensaje || "";
+    jornadaAviso.classList.toggle("is-hidden", !mensaje);
+    jornadaAviso.classList.toggle("is-error", Boolean(esError));
+  };
+
+  // El aviso mostraba el uuid crudo de auth ("9cee41f8-dd65-4bb7-..."), que
+  // para quien esta cerrando el turno no significa absolutamente nada. Se
+  // traduce a nombre con la lista de responsables que la pagina ya tiene
+  // cargada; si quien subio el turno no esta ahi (por ejemplo, alguien dado
+  // de baja despues), se consulta una sola vez el padron completo de la
+  // empresa y se guarda. Si aun asi no hay nombre, el aviso se queda SIN el
+  // "por X": es preferible no decir quien lo subio a mostrar un codigo.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  let padronUsuarios = null;
+
+  const nombreDeUsuario = async (valor) => {
+    const id = String(valor ?? "").trim();
+    if (!id) return "";
+    // Los cierres antiguos guardaban el nombre en texto plano, no el uuid.
+    if (!UUID_RE.test(id)) return id;
+
+    const activo = responsablesActivos.find((item) => String(item?.id) === id);
+    if (activo?.nombre_completo) return activo.nombre_completo;
+
+    if (padronUsuarios === null) {
+      try {
+        const contextPayload = await getContextPayload();
+        const empresaId = contextPayload?.empresa_id || contextPayload?.tenant_id;
+        padronUsuarios = empresaId ? await fetchUsuariosEmpresa(empresaId) : [];
+      } catch (_error) {
+        // Cachear el fallo como lista vacia evita reintentar en cada cambio
+        // de fecha o de jornada; el aviso simplemente omite el nombre.
+        padronUsuarios = [];
+      }
+    }
+
+    const registrado = padronUsuarios.find((item) => String(item?.id) === id);
+    return registrado?.nombre_completo || "";
+  };
+
+  // Avisa si ese turno ya fue subido, ANTES de que la persona rellene todo.
+  const revisarTurnoExistente = async () => {
+    if (!fecha?.value || !numeroTurno) {
+      setJornadaAviso("");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc("turno_existente", {
+        p_fecha: fecha.value,
+        p_numero: numeroTurno
+      });
+      if (error || !data?.ok) return;
+
+      if (!data.existe) {
+        setJornadaAviso("");
+        return;
+      }
+
+      const nombreQuienSubio = await nombreDeUsuario(data.registrado_por);
+      const quien = nombreQuienSubio ? ` por ${nombreQuienSubio}` : "";
+      const cuando = data.subido_en
+        ? ` el ${new Date(data.subido_en).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" })}`
+        : "";
+
+      setJornadaAviso(
+        data.puede_sobrescribir
+          ? `Este turno ya fue subido${quien}${cuando}. Si continúas, reemplazarás esa versión.`
+          : `Este turno ya fue subido${quien}${cuando}. Solo un administrador puede reemplazarlo.`,
+        !data.puede_sobrescribir
+      );
+    } catch (_error) {
+      // Un fallo aquí no debe impedir cerrar el turno: es solo un aviso previo.
+    }
+  };
+
+  const seleccionarJornada = (valor) => {
+    numeroTurno = Number(valor) || null;
+    // La caja heredada depende de numero_turno tanto como de la fecha: pasar
+    // de Turno 1 a Turno 2 despues de consultar dejaba en pantalla una cifra
+    // que ya no correspondia a ese turno.
+    limpiarEfectivoApertura();
+    revisarTurnoExistente();
+  };
+
+  jornadaSelect?.addEventListener("change", () => seleccionarJornada(jornadaSelect.value));
+
+  fecha?.addEventListener("change", () => {
+    // La caja heredada depende de la fecha, así que deja de ser válida.
+    limpiarEfectivoApertura();
+    revisarTurnoExistente();
+  });
+
+  // ── Efectivo de apertura ──────────────────────────────────────────────
+  // El esperado lo calcula el servidor. Aquí solo se muestra y se compara,
+  // porque el dato que cuenta para el descuadre se vuelve a calcular al
+  // guardar: si se fiara de esta pantalla, bastaría con editarla.
+  function limpiarEfectivoApertura() {
+    if (efectivoAperturaEsperado) efectivoAperturaEsperado.value = "";
+    if (efectivoAperturaDiferencia) {
+      efectivoAperturaDiferencia.value = "";
+      efectivoAperturaDiferencia.classList.remove("diff-faltante", "diff-sobrante", "diff-ok");
+    }
+    if (efectivoAperturaOrigen) efectivoAperturaOrigen.textContent = "Se carga al consultar Loggro";
+    if (efectivoAperturaNota) efectivoAperturaNota.textContent = "";
+  }
+
+  const actualizarDiferenciaApertura = () => {
+    if (!efectivoAperturaDiferencia) return;
+    const esperado = toNumberValue(efectivoAperturaEsperado?.value);
+    const declarado = toNumberValue(efectivoApertura?.value);
+
+    efectivoAperturaDiferencia.classList.remove("diff-faltante", "diff-sobrante", "diff-ok");
+
+    if (!efectivoAperturaEsperado?.value) {
+      efectivoAperturaDiferencia.value = "";
+      if (efectivoAperturaNota) efectivoAperturaNota.textContent = "";
+      return;
+    }
+
+    const diferencia = declarado - esperado;
+    efectivoAperturaDiferencia.value = String(diferencia);
+
+    // Tolerancia cero: cualquier valor distinto de 0 es un descuadre. Se
+    // señala con el mismo indicador que las filas de Datos Financieros, para
+    // que la persona no tenga que aprender un codigo nuevo.
+    if (diferencia < 0) {
+      efectivoAperturaDiferencia.classList.add("diff-faltante");
+      if (efectivoAperturaNota) efectivoAperturaNota.textContent = "Recibiste de menos";
+      return;
+    }
+    if (diferencia > 0) {
+      efectivoAperturaDiferencia.classList.add("diff-sobrante");
+      if (efectivoAperturaNota) efectivoAperturaNota.textContent = "Recibiste de más";
+      return;
+    }
+    efectivoAperturaDiferencia.classList.add("diff-ok");
+    if (efectivoAperturaNota) efectivoAperturaNota.textContent = "Cuadra";
+  };
+
+  // Carga la caja con la que cerró el turno anterior. Se llama desde el botón
+  // "Consultar Loggro", nunca al abrir: la persona declara primero lo que
+  // contó y solo después ve cuánto debería haber. Al revés, bastaría con
+  // copiar la cifra y el control no medirá nada.
+  const cargarEfectivoAperturaEsperado = async () => {
+    if (!fecha?.value || !numeroTurno) return;
+
+    const { data, error } = await supabase.rpc("efectivo_apertura_esperado", {
+      p_fecha: fecha.value,
+      p_numero: numeroTurno
+    });
+
+    // Un fallo del RPC y "no hay turno anterior" se veian igual en pantalla:
+    // el campo vacio. Ahora se distinguen, y el motivo real queda en consola
+    // para no tener que diagnosticar a ciegas.
+    if (error || !data?.ok) {
+      console.error("[cierre_turno] efectivo_apertura_esperado fallo", {
+        p_fecha: fecha.value,
+        p_numero: numeroTurno,
+        error,
+        data
+      });
+      if (efectivoAperturaOrigen) efectivoAperturaOrigen.textContent = "No se pudo cargar la caja anterior";
+      return;
+    }
+
+    if (!data.hay_anterior) {
+      if (efectivoAperturaEsperado) efectivoAperturaEsperado.value = "";
+      if (efectivoAperturaOrigen) efectivoAperturaOrigen.textContent = "Sin cierre anterior registrado";
+      actualizarDiferenciaApertura();
+      return;
+    }
+
+    if (efectivoAperturaEsperado) efectivoAperturaEsperado.value = String(data.valor ?? 0);
+    if (efectivoAperturaOrigen) efectivoAperturaOrigen.textContent = data.etiqueta || "";
+    actualizarDiferenciaApertura();
+  };
+
   const syncEfectivoRealFromCajaBolsa = () => {
     const total = toNumberValue(bolsa?.value) + toNumberValue(caja?.value);
     inputsFinanzas.efectivo.real.value = String(total);
@@ -329,18 +520,9 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     try {
-      const body = JSON.stringify(payload);
-      if (navigator.sendBeacon) {
-        const blob = new Blob([body], { type: "application/json" });
-        navigator.sendBeacon(WEBHOOK_ALERTA_MANIPULACION_CIERRE, blob);
-        return;
-      }
-      fetch(WEBHOOK_ALERTA_MANIPULACION_CIERRE, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-        keepalive: true
-      }).catch(() => {});
+      supabase.functions.invoke("alerta-manipulacion", {
+        body: payload
+      }).catch(err => console.error("Error enviando alerta:", err));
     } catch (_error) {
       // no-op
     }
@@ -730,7 +912,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const readApoyoRange = (row) => {
-    const fechaRango = row.querySelector('[data-field="fecha_rango"]')?.value || new Date().toISOString().slice(0, 10);
+    const fechaRango = new Date().toISOString().slice(0, 10);
     const inicioHora = row.querySelector('[data-field="inicio_hora"]')?.value || "";
     const inicioMin = row.querySelector('[data-field="inicio_min"]')?.value || "";
     const inicioMom = row.querySelector('[data-field="inicio_momento"]')?.value || "";
@@ -746,10 +928,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let duration = finMinutes - inicioMinutes;
     if (duration < 0) duration += 24 * 60;
+    
+    // Función para convertir a 24 horas (formato HH:mm militar) como lo hacía N8N
+    const to24h = (h12, ampm) => {
+      let h = Number(h12);
+      if (String(ampm).toUpperCase() === "PM" && h !== 12) h += 12;
+      if (String(ampm).toUpperCase() === "AM" && h === 12) h = 0;
+      return String(h).padStart(2, "0");
+    };
+
     const inicioHoraSimple = `${inicioHora}:${inicioMin}`;
     const finHoraSimple = `${finHora}:${finMin}`;
     const inicioTexto = `${inicioHoraSimple} ${inicioMom}`;
     const finTexto = `${finHoraSimple} ${finMom}`;
+    const inicioHora24 = `${to24h(inicioHora, inicioMom)}:${inicioMin}`;
+    const finHora24 = `${to24h(finHora, finMom)}:${finMin}`;
+    
     return {
       complete: true,
       fechaRango,
@@ -761,6 +955,8 @@ document.addEventListener("DOMContentLoaded", () => {
       finMom,
       inicioHoraSimple,
       finHoraSimple,
+      inicioHora24,
+      finHora24,
       fechaHoraInicio: `${fechaRango} ${inicioHoraSimple}`,
       inicioTexto,
       finTexto,
@@ -794,7 +990,6 @@ document.addEventListener("DOMContentLoaded", () => {
       <select data-field="responsable">${getResponsableOptionsHtml()}</select>
       <input data-field="propina" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Automático" readonly>
       <div class="apoyo-rango-wrap">
-        <input data-field="fecha_rango" type="date" value="${new Date().toISOString().slice(0, 10)}">
         <div class="apoyo-rango-grid">
           <div class="apoyo-rango-box">
             <small>Inicio</small>
@@ -857,6 +1052,8 @@ document.addEventListener("DOMContentLoaded", () => {
         rango_hora_unificado: range.complete ? range.rangoTexto : "",
         rango_hora_inicio_simple: range.complete ? range.inicioHoraSimple : "",
         rango_hora_fin_simple: range.complete ? range.finHoraSimple : "",
+        rango_hora_inicio_24: range.complete ? range.inicioHora24 : "",
+        rango_hora_fin_24: range.complete ? range.finHora24 : "",
         rango_fecha_hora_inicio: range.complete ? range.fechaHoraInicio : "",
         fecha_rango: range.fechaRango || ""
       };
@@ -945,6 +1142,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     return {
       fecha: fecha.value,
+      numero_turno: numeroTurno,
       responsable: responsable.value,
       turno: {
         hora_llegada: getHoraLlegadaCompleta(),
@@ -1128,6 +1326,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (efectivoApertura) {
       efectivoApertura.value = "";
     }
+    limpiarEfectivoApertura();
     if (bolsa) {
       bolsa.value = "";
     }
@@ -1236,6 +1435,8 @@ document.addEventListener("DOMContentLoaded", () => {
     syncApoyosConsultaVisibility();
     marcarComoNoVerificado();
   });
+  efectivoApertura?.addEventListener("input", actualizarDiferenciaApertura);
+
   efectivoApertura?.addEventListener("input", () => {
     syncEfectivoSistemaDisplay();
     syncDiferenciaEfectivo();
@@ -1360,6 +1561,12 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    if (!numeroTurno) {
+      setStatus("Atención: Selecciona la jornada del turno (Turno 1, 2 o 3).");
+      setConsultarLoading(false);
+      return;
+    }
+
     const payload = await buildTurnoPayload();
     if (!payload) {
       setConsultarLoading(false);
@@ -1367,15 +1574,21 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
-      const res = await fetchWithTimeout(WEBHOOK_CONSULTAR_DATOS_CIERRE, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      }, BUTTON_LOADING_MS);
+      const [res] = await Promise.all([
+        supabase.functions.invoke("consultar-ventas", { body: payload }),
+        cargarEfectivoAperturaEsperado().catch((err) => {
+          // No debe tumbar la consulta de ventas, pero tampoco desaparecer:
+          // si esto se traga en silencio, la tarjeta se queda con el texto
+          // inicial y parece que el boton no hace nada.
+          console.error("[cierre_turno] carga de caja anterior interrumpida", err);
+          if (efectivoAperturaOrigen) efectivoAperturaOrigen.textContent = "No se pudo cargar la caja anterior";
+        })
+      ]);
 
-      const data = await readResponseBody(res);
-      if (!res.ok) {
-        setStatus(data?.message || `Error al consultar datos (HTTP ${res.status}).`);
+      const { data, error } = res;
+      if (error || !data || !data.ok) {
+        setStatus(data?.message || error?.message || `Error al consultar datos.`);
+        setConsultarLoading(false);
         return;
       }
 
@@ -1447,15 +1660,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!payload) return;
 
     try {
-      const res = await fetchWithTimeout(WEBHOOK_CONSULTAR_GASTOS, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      }, BUTTON_LOADING_MS);
+      const res = await supabase.functions.invoke("consultar-gastos", { body: payload });
 
-      const data = await readResponseBody(res);
-      if (!res.ok) {
-        setStatus(data?.message || `Error al consultar gastos (HTTP ${res.status}).`);
+      const { data, error } = res;
+      if (error || !data || data.ok === false) {
+        setStatus(data?.message || error?.message || `Error al consultar gastos.`);
         return;
       }
       const extras = normalizeExtras(data);
@@ -1558,17 +1767,9 @@ document.addEventListener("DOMContentLoaded", () => {
         ...contextPayload
       };
 
-      const res = await fetchWithTimeout(WEBHOOK_VERIFICAR_CIERRE, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      }, BUTTON_LOADING_MS);
-
-      const data = await readResponseBody(res);
-      if (!res.ok) {
-        setStatus(data?.message || `Error al verificar cierre (HTTP ${res.status}).`);
-        return;
-      }
+      // Lógica de verificación trasladada desde n8n al cliente (más eficiente)
+      // Simular un pequeño retardo de red para la percepción de guardado/proceso
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       const diferenciaEfectivoCalculada = syncDiferenciaEfectivo();
       const diferenciaLocal = (medio) => (
@@ -1591,13 +1792,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
       await cargarPoliticaEmpresa(true);
       verificado = true;
-      const serverMsg = String(data?.message || "").trim();
-      setStatus(`${serverMsg ? `${serverMsg} ` : ""}Ya puedes subir el cierre.`);
+      const serverMsg = "";
+      setStatus(`Cálculos de cuadre verificados correctamente. Ya puedes subir el cierre.`);
       refreshEstadoBotonSubir();
     } catch (err) {
-      setStatus(err?.name === "AbortError"
-        ? "La verificación tardó más de 8 segundos."
-        : "Error de conexión al verificar.");
+      setStatus("Error de cálculo al verificar el cierre.");
     } finally {
       btnVerificar.disabled = false;
     }
@@ -1630,6 +1829,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const construirPayloadEnvio = async () => {
     const contextPayload = await getContextPayload();
     if (!contextPayload) return null;
+
+    if (!numeroTurno) {
+      setStatus("Selecciona la jornada del turno (Turno 1, 2 o 3) antes de enviar.");
+      return null;
+    }
 
     if (!validateCamposObligatoriosCompletos()) return null;
     if (!validateApoyoRows()) return null;
@@ -1716,8 +1920,14 @@ document.addEventListener("DOMContentLoaded", () => {
     return {
       global: {
         fecha: fecha.value,
+        numero_turno: numeroTurno,
+        token_envio: tokenEnvio,
+        sobrescribir: false,
         empresa_id: contextPayload.empresa_id,
         tenant_id: contextPayload.tenant_id,
+        es_local_contexto: contextPayload.local_context === true
+          || Boolean(contextPayload.empresa_principal_id
+            && contextPayload.empresa_id !== contextPayload.empresa_principal_id),
         usuario_id: contextPayload.usuario_id,
         responsable_id: responsable.value,
         registrado_por: contextPayload.registrado_por,
@@ -1735,12 +1945,16 @@ document.addEventListener("DOMContentLoaded", () => {
           fecha_fin: fechaCompleta
         },
         efectivo_apertura: efectivoApertura.value || 0,
-        propina_global: inputsSoloVista.propina.value || 0,
+        // En BD se conserva solamente la parte del responsable. El total del
+        // turno sigue viajando en resumen.total_propinas para auditoría.
+        propina_global: inputsSoloVista.propina.dataset.propinaResponsable
+          || inputsSoloVista.propina.value
+          || 0,
         domicilios_global: inputsSoloVista.domicilios.value || 0,
         bolsa_global: bolsa?.value || 0,
         caja_global: caja?.value || 0
       },
-      items: [...itemsFinanzas, ...itemsGastos],
+      variables: [...itemsFinanzas, ...itemsGastos],
       resumen: {
         total_sistema: totalSistema,
         total_real: totalReal,
@@ -1787,37 +2001,70 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    try {
-      const res = await fetch(WEBHOOK_SUBIR_CIERRE, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+    // El RPC es transaccional e idempotente: o entra el cierre entero o no
+    // entra nada, y reenviar el mismo token no duplica el turno.
+    const enviarCierre = async (cuerpo) => {
+      const { data, error } = await supabase.rpc("subir_cierre_turno", { p_datos: cuerpo });
+      if (error) throw error;
+      return data || {};
+    };
 
-      const raw = await res.text();
-      let data = {};
-      try {
-        data = raw ? JSON.parse(raw) : {};
-      } catch (_parseError) {
-        data = { message: raw };
+    try {
+      let data = await enviarCierre(payload);
+
+      // El turno ya existía: el backend no toca nada hasta que se confirme.
+      if (data?.requiere_confirmacion) {
+        const aceptar = window.confirm(
+          `${data.message}
+
+La versión anterior quedará guardada en el histórico, con tu nombre y la fecha del cambio.`
+        );
+
+        if (!aceptar) {
+          setStatus("Envío cancelado. No se modificó el turno que ya estaba guardado.");
+          confirmacionEnvio.classList.add("is-hidden");
+          return;
+        }
+
+        const motivo = window.prompt("¿Por qué reemplazas este turno? (opcional)", "") || "";
+        data = await enviarCierre({
+          ...payload,
+          global: { ...payload.global, sobrescribir: true, motivo }
+        });
       }
 
-      if (!res.ok) {
-        console.error("Error webhook subir_cierre", { status: res.status, data });
-        setStatus(data?.message || `Error al subir cierre (HTTP ${res.status}).`);
+      if (data?.ok === false) {
+        setStatus(data?.message || "No se pudo subir el cierre.");
         return;
       }
 
-      console.info("Webhook subir_cierre OK", { status: res.status, data });
+      const esperabaLocal = payload?.global?.es_local_contexto === true;
+      if (Boolean(data?.es_local) !== Boolean(esperabaLocal)) {
+        throw new Error("El servidor resolvió un destino distinto al contexto seleccionado. El cierre no se marcará como completado.");
+      }
+
+      console.info("subir_cierre_turno OK", data);
+
+      // Token nuevo: este cierre ya entró y el siguiente envío es otro turno.
+      tokenEnvio = (crypto?.randomUUID?.() || `envio-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+
       const descargaOk = descargarImagenResumen({ bloquearDespues: false });
+      const apertura = data?.efectivo_apertura;
+      const avisoApertura = apertura && Number(apertura.diferencia) !== 0
+        ? ` Atención: el efectivo de apertura difiere en ${apertura.diferencia} respecto a ${apertura.origen || "el cierre anterior"}.`
+        : "";
+
       setStatus(
         (data?.message || "Cierre enviado correctamente.")
         + (descargaOk ? " Constancia descargada automáticamente." : " No se pudo descargar constancia automática.")
+        + avisoApertura
       );
       confirmacionEnvio.classList.add("is-hidden");
       aplicarBloqueoConstancia(false);
+      revisarTurnoExistente();
     } catch (err) {
-      setStatus("Error de conexión al subir cierre.");
+      console.error("Error subiendo cierre", err);
+      setStatus(err?.message || "Error de conexión al subir cierre.");
     }
   });
 

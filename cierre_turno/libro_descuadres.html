@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Enkrato | Libro de descuadres</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/libro_descuadres.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+</head>
+<body style="display:none">
+  <script type="module" src="../js/router.js"></script>
+  <script type="module" src="../js/header.js"></script>
+
+  <div id="loadingOverlay" class="loading-overlay is-hidden">Cargando libro de descuadres...</div>
+
+  <main class="main" style="max-width: var(--ek-w-data, 1180px); margin: 0 auto; padding-top: 2rem; padding-bottom: 4rem;">
+    <h1 style="margin: 0; font-size: var(--ek-text-display); color: var(--ek-ink);">Libro de descuadres de caja</h1>
+    <p style="margin: 0.25rem 0 2rem 0; color: var(--ek-muted);">Gestiona y justifica las diferencias presentadas en los cierres de turno.</p>
+
+    <!-- Filtros -->
+    <div style="background: var(--ek-surface); border: 1px solid var(--ek-line); border-radius: var(--ek-radius-md); padding: 1.5rem; margin-bottom: 2rem; box-shadow: var(--ek-shadow-card);">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1.5rem;">
+        
+        <!-- Contenedor izquierdo: Filtros y Consultar -->
+        <div style="display: flex; gap: 1.5rem; align-items: flex-end; flex-wrap: wrap; flex: 1;">
+          <div>
+            <label for="vistaSelect" style="display: block; font-size: var(--ek-text-label); font-weight: var(--ek-weight-medium); color: var(--ek-muted); margin-bottom: 0.25rem;">Vista:</label>
+            <select id="vistaSelect" class="input-modern">
+              <option value="pendientes" selected>Descuadres Pendientes</option>
+              <option value="solucionados">Histórico de Solucionados</option>
+            </select>
+          </div>
+          
+          <div>
+            <label for="sedeSelect" style="display: block; font-size: var(--ek-text-label); font-weight: var(--ek-weight-medium); color: var(--ek-muted); margin-bottom: 0.25rem;">Sede (Opcional):</label>
+            <select id="sedeSelect" class="input-modern">
+              <option value="">Todas las sedes</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="responsableSelect" style="display: block; font-size: var(--ek-text-label); font-weight: var(--ek-weight-medium); color: var(--ek-muted); margin-bottom: 0.25rem;">Responsable:</label>
+            <select id="responsableSelect" class="input-modern">
+              <option value="">Todos los responsables</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="fechaInicio" style="display: block; font-size: var(--ek-text-label); font-weight: var(--ek-weight-medium); color: var(--ek-muted); margin-bottom: 0.25rem;">Desde:</label>
+            <input type="date" id="fechaInicio" class="input-modern">
+          </div>
+          
+          <div>
+            <label for="fechaFin" style="display: block; font-size: var(--ek-text-label); font-weight: var(--ek-weight-medium); color: var(--ek-muted); margin-bottom: 0.25rem;">Hasta:</label>
+            <input type="date" id="fechaFin" class="input-modern">
+          </div>
+          
+          <div>
+            <label for="ordenSelect" style="display: block; font-size: var(--ek-text-label); font-weight: var(--ek-weight-medium); color: var(--ek-muted); margin-bottom: 0.25rem;">Ordenar por:</label>
+            <select id="ordenSelect" class="input-modern">
+              <option value="fecha_desc">Más recientes primero</option>
+              <option value="fecha_asc">Más antiguos primero</option>
+              <option value="valor_desc">Mayor descuadre primero</option>
+              <option value="valor_asc">Menor descuadre primero</option>
+            </select>
+          </div>
+          
+          <div>
+            <button id="consultarBtn" class="btn-primary" style="padding: 0.6rem 1.2rem;">Consultar</button>
+          </div>
+        </div>
+
+        <!-- Contenedor derecho: Exportar -->
+        <div>
+          <button id="exportarBtn" class="btn-primary" style="padding: 0.6rem 1.2rem; background: var(--ek-ok-600); border-color: var(--ek-ok-600);" title="Exportar a Excel">
+            <i class="ph ph-file-xls"></i> Exportar
+          </button>
+        </div>
+
+      </div>
+      
+      <div id="statusMessage" class="status-message" style="margin-top: 1.5rem;">Selecciona los filtros para empezar.</div>
+      
+      <!-- Tabla -->
+      <div style="overflow-x: auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="min-width: 110px; white-space: nowrap;">Fecha</th>
+              <th style="min-width: 130px;">Sede</th>
+              <th style="min-width: 150px;">Responsable</th>
+              <th style="min-width: 90px; white-space: nowrap;">Turno</th>
+              <th style="min-width: 130px;">Descuadre Neto</th>
+              <th style="min-width: 150px;">Detalle por Canal</th>
+              <th style="min-width: 200px;">Comentario</th>
+              <th style="min-width: 110px; text-align: right;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="descuadresBody">
+            <tr><td colspan="8" style="text-align: center; padding: 2rem; color: var(--ek-muted);">Selecciona los filtros y haz clic en Consultar.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Modal Editar Cierre -->
+    <div id="editModal" class="loading-overlay is-hidden" style="align-items: flex-start; padding-top: 4rem;">
+      <div style="background: var(--ek-surface); padding: 2rem; border-radius: var(--ek-radius-lg); width: 90%; max-width: 600px; box-shadow: var(--ek-shadow-modal); max-height: 80vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+          <h2 style="margin: 0; font-size: 1.25rem; color: var(--ek-ink);">Editar Variables del Cierre</h2>
+          <button id="closeModalBtn" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--ek-muted);">&times;</button>
+        </div>
+        <p style="color: var(--ek-muted); margin-bottom: 1rem; font-size: 0.9rem;">
+          Corrige los valores reales ingresados por error. Los cambios modificarán la base de datos y recalcularán el descuadre del turno.
+        </p>
+        <div id="editModalBody">
+          <!-- Inputs generados dinámicamente -->
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem;">
+          <button id="cancelModalBtn" style="padding: 0.5rem 1rem; background: var(--ek-surface-2); border: 1px solid var(--ek-line); border-radius: var(--ek-radius-md); cursor: pointer;">Cancelar</button>
+          <button id="saveModalBtn" style="padding: 0.5rem 1rem; background: var(--ek-plum-600); color: white; border: none; border-radius: var(--ek-radius-md); cursor: pointer; font-weight: 500;">Guardar Cambios</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module" src="../js/libro_descuadres.js"></script>
+  <script type="module" src="../js/footer.js"></script>
+</body>
+</html>

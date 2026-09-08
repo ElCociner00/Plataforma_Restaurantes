@@ -11,23 +11,23 @@
   margin: 12px 0 16px;
 }
 
-#estadoAccion { font-size: 14px; color: #374151; }
+#estadoAccion { font-size: 14px; color: var(--ek-ink-2, #334155); }
 
 .table-wrap {
   overflow-x: auto;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--ek-surface, #ffffff);
+  border: 1px solid var(--ek-line, #e8edf3);
   border-radius: 10px;
 }
 
 #tablaEmpresas { width: 100%; border-collapse: collapse; min-width: 920px; }
 #tablaEmpresas th,
-#tablaEmpresas td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: middle; }
-#tablaEmpresas th { background: #f8fafc; font-weight: 600; }
+#tablaEmpresas td { padding: 10px 12px; border-bottom: 1px solid var(--ek-line, #e8edf3); text-align: left; vertical-align: middle; }
+#tablaEmpresas th { background: var(--ek-ground, #f8fafc); font-weight: 600; }
 
 .empresa-meta {
   margin-top: 4px;
-  color: #6b7280;
+  color: var(--ek-muted, #5d6b7e);
   font-size: 0.86rem;
 }
 
@@ -40,11 +40,11 @@
 
 .switch-cell { position: relative; display: inline-block; width: 44px; height: 24px; vertical-align: middle; }
 .switch-cell input { opacity: 0; width: 0; height: 0; }
-.switch-slider { position: absolute; inset: 0; background: #d1d5db; border-radius: 999px; transition: all .2s ease; }
-.switch-slider::before { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; border-radius: 50%; background: #fff; transition: all .2s ease; }
-.switch-cell input:checked + .switch-slider { background: #2563eb; }
+.switch-slider { position: absolute; inset: 0; background: var(--ek-line, #e8edf3); border-radius: 999px; transition: all .2s ease; }
+.switch-slider::before { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; border-radius: 50%; background: var(--ek-surface, #ffffff); transition: all .2s ease; }
+.switch-cell input:checked + .switch-slider { background: var(--ek-info-600, #2563eb); }
 .switch-cell input:checked + .switch-slider::before { transform: translateX(20px); }
 
 .badge { display: inline-block; margin-left: 8px; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-.badge.activo { background: #dcfce7; color: #166534; }
-.badge.inactivo { background: #fee2e2; color: #991b1b; }
+.badge.activo { background: var(--ek-ok-100, #ecfdf5); color: var(--ek-ok-700, #065f46); }
+.badge.inactivo { background: var(--ek-bad-100, #fef2f2); color: var(--ek-bad-700, #991b1b); }

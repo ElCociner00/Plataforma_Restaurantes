@@ -1,27 +1,27 @@
 .main { max-width: 1240px; }
 .bloque {
   margin-bottom: 20px;
-  border: 1px solid #e2ddff;
+  border: 1px solid var(--ek-plum-100, #efe9fb);
   border-radius: 12px;
-  background: #fff;
+  background: var(--ek-surface-2, #f1f5f9);
   padding: 14px;
 }
 .filtros-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; }
 .filtros-grid label { display:flex; flex-direction:column; gap:6px; font-size:.9rem; }
 .acciones-filtros, .acciones-descarga { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; align-items:flex-end; }
 .acciones-descarga label { display:flex; flex-direction:column; gap:6px; min-width:260px; }
-.hint { color:#6b7280; font-size:.85rem; margin:6px 0 10px; }
-.tabla-wrap { overflow:auto; border: 1px solid #ddd6fe; border-radius: 10px; }
+.hint { color:var(--ek-muted, #5d6b7e); font-size:.85rem; margin:6px 0 10px; }
+.tabla-wrap { overflow:auto; border: 1px solid var(--ek-plum-200, #ddd0f5); border-radius: 10px; }
 table { width:100%; border-collapse:collapse; min-width:900px; }
-th,td { border-bottom:1px solid #ece9ff; padding:8px; text-align:left; }
-th { background: #f7f5ff; }
+th,td { border-bottom:1px solid var(--ek-plum-100, #efe9fb); padding:8px; text-align:left; }
+th { background: var(--ek-plum-050, #f9f6fe); }
 th.dragging { opacity:.45; }
-tr.selected { background:#f5f3ff; }
+tr.selected { background:var(--ek-plum-050, #f9f6fe); }
 .paginacion { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
-.detalle-turno { border:1px solid #ddd6fe; border-radius:8px; padding:10px; background:#f9f8ff; }
-.status { margin-top:10px; color:#374151; }
-.drag-col { width:32px; color:#9ca3af; text-align:center; }
-input[readonly] { background:#f1efff; border-color:#d8d2ff; }
+.detalle-turno { border:1px solid var(--ek-plum-200, #ddd0f5); border-radius:8px; padding:10px; background: var(--ek-plum-100, #efe9fb); }
+.status { margin-top:10px; color:var(--ek-ink-2, #334155); }
+.drag-col { width:32px; color:var(--ek-muted-2, #78889c); text-align:center; }
+input[readonly] { background:var(--ek-plum-050, #f9f6fe); border-color:var(--ek-plum-200, #ddd0f5); }
 
 
 .tabla-wrap td,

@@ -1,3 +1,18 @@
+/**
+ * OBSOLETO desde el rediseño de la landing.
+ *
+ * Este archivo animaba un autómata celular (Game of Life) sobre
+ * #automaton-canvas en el hero, más un parallax del contenido siguiendo el
+ * ratón. index.html ya no lo carga: el canvas, la imagen de fondo remota de
+ * Unsplash y el parallax eran justo los "elementos pesados" que el rediseño
+ * elimina, y una rejilla de celdas moradas sobre fondo oscuro no tiene
+ * traducción posible al modo claro minimalista de la fase 0.
+ *
+ * No se borra por si se quiere recuperar el efecto en otro contexto. Todo el
+ * cuerpo está guardado tras la comprobación de existencia de los tres nodos,
+ * así que si alguien vuelve a incluirlo sin el canvas, no hace nada ni lanza
+ * errores.
+ */
 document.addEventListener("DOMContentLoaded", () => {
   const canvas = document.getElementById("automaton-canvas");
   const heroSection = document.getElementById("heroSection");

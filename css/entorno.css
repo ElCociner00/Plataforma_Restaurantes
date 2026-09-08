@@ -3,18 +3,18 @@
   margin: 64px auto;
   padding: 38px 34px;
   border-radius: 18px;
-  border: 1px solid #e9ddff;
-  box-shadow: 0 20px 40px rgba(91, 58, 143, 0.12);
+  border: 1px solid var(--ek-plum-100, #efe9fb);
+  box-shadow: var(--ek-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.05));
 }
 
 .entorno-main h1 {
-  color: #2c1f47;
+  color: var(--ek-plum-900, #2c1f47);
   margin-bottom: 10px;
 }
 
 .entorno-main p {
   margin-bottom: 26px;
-  color: #6b7280;
+  color: var(--ek-muted, #5d6b7e);
 }
 
 .entorno-actions {
@@ -29,19 +29,19 @@
   font-size: 1rem;
   font-weight: 700;
   border-radius: 10px;
-  border: 1px solid #c4b5fd;
-  background: linear-gradient(135deg, #c4b5fd, #a78bfa);
-  color: #2c1f47;
+  border: 1px solid transparent;
+  background: var(--ek-plum-600, #5b3a8f);
+  color: var(--ek-on-brand, #ffffff);
 }
 
 .entorno-actions button:hover {
-  background: linear-gradient(135deg, #b79cff, #9579f5);
+  background: var(--ek-plum-700, #4a3474);
 }
 
 #status {
   margin-top: 16px;
   min-height: 24px;
-  color: #4b5563;
+  color: var(--ek-ink-2, #334155);
   font-weight: 600;
 }
 

@@ -1,0 +1,1618 @@
+[
+  {
+    "parameters": {
+      "httpMethod": "POST",
+      "path": "consultar_nomina_nuevo",
+      "responseMode": "responseNode",
+      "options": {
+        "allowedOrigins": "*",
+        "responseHeaders": {
+          "entries": [
+            {
+              "name": "Access-Control-Allow-Origin",
+              "value": "*"
+            },
+            {
+              "name": "Access-Control-Allow-Headers",
+              "value": "Content-Type"
+            }
+          ]
+        }
+      }
+    },
+    "type": "n8n-nodes-base.webhook",
+    "typeVersion": 2.1,
+    "position": [
+      -832,
+      16
+    ],
+    "id": "0a99d89e-eefa-42bb-b35a-a67743e38fc4",
+    "name": "Webhook",
+    "webhookId": "efe17ecf-28d1-4251-8b4a-8328d7247736"
+  },
+  {
+    "parameters": {
+      "operation": "get",
+      "tableId": "turnos_agrupados",
+      "filters": {
+        "conditions": [
+          {
+            "keyName": "responsable_id",
+            "keyValue": "={{ $('Loop Over Items').item.json.responsable_id }}"
+          },
+          {
+            "keyName": "empresa_id",
+            "keyValue": "={{ $('Loop Over Items').item.json.empresa_id }}"
+          }
+        ]
+      }
+    },
+    "type": "n8n-nodes-base.supabase",
+    "typeVersion": 1,
+    "position": [
+      1872,
+      0
+    ],
+    "id": "4178d284-68c0-4843-8ee4-f2ffdf36857c",
+    "name": "Get a row",
+    "alwaysOutputData": true,
+    "credentials": {
+      "supabaseApi": {
+        "id": "m1woCcRiviWIbcit",
+        "name": "Supabase Plataforma_Restaurantes"
+      }
+    }
+  },
+  {
+    "parameters": {
+      "conditions": {
+        "options": {
+          "caseSensitive": true,
+          "leftValue": "",
+          "typeValidation": "strict",
+          "version": 3
+        },
+        "conditions": [
+          {
+            "id": "88578116-b883-467e-bc99-46ae64ce31fb",
+            "leftValue": "={{ $json.fecha_turno }}",
+            "rightValue": "={{ $('Webhook').item.json.body.fecha_inicio }}",
+            "operator": {
+              "type": "dateTime",
+              "operation": "afterOrEquals"
+            }
+          },
+          {
+            "id": "31d0c6c7-4e74-492c-9159-0a20a3440da3",
+            "leftValue": "={{ $json.fecha_turno }}",
+            "rightValue": "={{ $('Webhook').item.json.body.fecha_fin }}",
+            "operator": {
+              "type": "dateTime",
+              "operation": "beforeOrEquals"
+            }
+          }
+        ],
+        "combinator": "and"
+      },
+      "options": {}
+    },
+    "type": "n8n-nodes-base.filter",
+    "typeVersion": 2.3,
+    "position": [
+      1456,
+      -160
+    ],
+    "id": "aafb538f-0dfb-42e2-87d5-af43aa01c605",
+    "name": "Filter"
+  },
+  {
+    "parameters": {
+      "operation": "get",
+      "tableId": "parametros_nomina",
+      "filters": {
+        "conditions": [
+          {
+            "keyName": "empresa_id",
+            "keyValue": "={{ $json.body.empresa_id }}"
+          }
+        ]
+      }
+    },
+    "type": "n8n-nodes-base.supabase",
+    "typeVersion": 1,
+    "position": [
+      -624,
+      16
+    ],
+    "id": "617dec52-7b66-4c9f-82c6-92d23876f18e",
+    "name": "Get a row1",
+    "alwaysOutputData": true,
+    "credentials": {
+      "supabaseApi": {
+        "id": "m1woCcRiviWIbcit",
+        "name": "Supabase Plataforma_Restaurantes"
+      }
+    }
+  },
+  {
+    "parameters": {
+      "aggregate": "aggregateAllItemData",
+      "destinationFieldName": "rows",
+      "options": {}
+    },
+    "type": "n8n-nodes-base.aggregate",
+    "typeVersion": 1,
+    "position": [
+      1872,
+      -304
+    ],
+    "id": "82d6f4d5-a633-42e0-afa3-b595a52459e7",
+    "name": "Aggregate"
+  },
+  {
+    "parameters": {
+      "options": {}
+    },
+    "type": "n8n-nodes-base.respondToWebhook",
+    "typeVersion": 1.5,
+    "position": [
+      3744,
+      -448
+    ],
+    "id": "7a52636a-4993-45b9-9d6b-0be537228886",
+    "name": "Respond to Webhook"
+  },
+  {
+    "parameters": {
+      "assignments": {
+        "assignments": [
+          {
+            "id": "58c429e8-f4c4-4e6c-bb72-e934511de5e9",
+            "name": "Tabla_Parametros.Datos",
+            "value": "={{ $('Aggregate2').item.json.rows }}",
+            "type": "array"
+          },
+          {
+            "id": "4b0cde1b-31ca-4de8-92b9-ca86f7291501",
+            "name": "Tabla_Datos.Rows",
+            "value": "={{ $('Aggregate').item.json.rows }}",
+            "type": "array"
+          },
+          {
+            "id": "6ae8dae4-9c18-4522-aad9-2307369bee20",
+            "name": "Tabla_Apoyos.Datos",
+            "value": "={{ $('Aggregate1').item.json.rows }}",
+            "type": "array"
+          }
+        ]
+      },
+      "options": {}
+    },
+    "type": "n8n-nodes-base.set",
+    "typeVersion": 3.4,
+    "position": [
+      3328,
+      -448
+    ],
+    "id": "96d69fec-0abc-49d3-9a20-ee00c5121b26",
+    "name": "Edit Fields2"
+  },
+  {
+    "parameters": {
+      "aggregate": "aggregateAllItemData",
+      "destinationFieldName": "rows",
+      "options": {}
+    },
+    "type": "n8n-nodes-base.aggregate",
+    "typeVersion": 1,
+    "position": [
+      624,
+      0
+    ],
+    "id": "d0750f2f-7c14-4ce0-9e00-3814545ca24e",
+    "name": "Aggregate2"
+  },
+  {
+    "parameters": {
+      "operation": "get",
+      "tableId": "dimensiones_tiempo",
+      "filters": {
+        "conditions": [
+          {
+            "keyName": "id",
+            "keyValue": "={{ $('Get a row1').item.json.dimension_tiempo_id }}"
+          }
+        ]
+      }
+    },
+    "type": "n8n-nodes-base.supabase",
+    "typeVersion": 1,
+    "position": [
+      208,
+      0
+    ],
+    "id": "66b49868-4a5d-44f7-86fe-4738daf04d91",
+    "name": "Get a row4",
+    "alwaysOutputData": true,
+    "credentials": {
+      "supabaseApi": {
+        "id": "m1woCcRiviWIbcit",
+        "name": "Supabase Plataforma_Restaurantes"
+      }
+    }
+  },
+  {
+    "parameters": {
+      "operation": "getAll",
+      "tableId": "dimensiones_concepto",
+      "limit": 1,
+      "matchType": "allFilters",
+      "filters": {
+        "conditions": [
+          {
+            "keyName": "id",
+            "condition": "eq",
+            "keyValue": "={{ $json.dimension_concepto_id }}"
+          }
+        ]
+      }
+    },
+    "type": "n8n-nodes-base.supabase",
+    "typeVersion": 1,
+    "position": [
+      0,
+      0
+    ],
+    "id": "15eee770-7e48-417c-b75c-205fafe1f764",
+    "name": "Get many rows",
+    "alwaysOutputData": true,
+    "credentials": {
+      "supabaseApi": {
+        "id": "m1woCcRiviWIbcit",
+        "name": "Supabase Plataforma_Restaurantes"
+      }
+    }
+  },
+  {
+    "parameters": {
+      "assignments": {
+        "assignments": [
+          {
+            "id": "45556084-88ac-4b25-b2cc-6ea11ab10c64",
+            "name": "dimension_tiempo_id",
+            "value": "={{ $('Get a row1').item.json.dimension_tiempo_id }}",
+            "type": "string"
+          },
+          {
+            "id": "05257ba7-6deb-404d-bf71-28ff5e501348",
+            "name": "dimension_concepto_id",
+            "value": "={{ $('Get a row1').item.json.dimension_concepto_id }}",
+            "type": "string"
+          },
+          {
+            "id": "0e9ce9ab-bc09-490b-b1ed-b2b32afc59d6",
+            "name": "valor_monetario",
+            "value": "={{ $('Get a row1').item.json.valor_monetario }}",
+            "type": "number"
+          },
+          {
+            "id": "06cf54d8-73fb-42cb-a6b4-f9e6157e6cdd",
+            "name": "nombre_tiempo_id",
+            "value": "={{ $json.nombre }}",
+            "type": "string"
+          },
+          {
+            "id": "3f63fd15-6d58-470e-8ae7-772b2ece2b3f",
+            "name": "nombre_concepto_id",
+            "value": "={{ $('Get many rows').item.json.nombre }}",
+            "type": "string"
+          }
+        ]
+      },
+      "options": {}
+    },
+    "type": "n8n-nodes-base.set",
+    "typeVersion": 3.4,
+    "position": [
+      416,
+      0
+    ],
+    "id": "dfc83743-16d7-466a-abfd-4e19de6dba2a",
+    "name": "Edit Fields3"
+  },
+  {
+    "parameters": {
+      "conditions": {
+        "options": {
+          "caseSensitive": true,
+          "leftValue": "",
+          "typeValidation": "strict",
+          "version": 3
+        },
+        "conditions": [
+          {
+            "id": "88578116-b883-467e-bc99-46ae64ce31fb",
+            "leftValue": "={{ $json.fecha_turno }}",
+            "rightValue": "={{ $('Webhook').item.json.body.fecha_inicio }}",
+            "operator": {
+              "type": "dateTime",
+              "operation": "afterOrEquals"
+            }
+          },
+          {
+            "id": "31d0c6c7-4e74-492c-9159-0a20a3440da3",
+            "leftValue": "={{ $json.fecha_turno }}",
+            "rightValue": "={{ $('Webhook').item.json.body.fecha_fin }}",
+            "operator": {
+              "type": "dateTime",
+              "operation": "beforeOrEquals"
+            }
+          }
+        ],
+        "combinator": "and"
+      },
+      "options": {}
+    },
+    "type": "n8n-nodes-base.filter",
+    "typeVersion": 2.3,
+    "position": [
+      2704,
+      -448
+    ],
+    "id": "39aaa47c-f48b-47a2-883b-cc477533031d",
+    "name": "Filter1",
+    "alwaysOutputData": true
+  },
+  {
+    "parameters": {
+      "assignments": {
+        "assignments": [
+          {
+            "id": "6495309a-54ae-4259-ac7b-440fa7d8b63a",
+            "name": "fecha_turno",
+            "value": "={{ $json.fecha_turno }}",
+            "type": "string"
+          },
+          {
+            "id": "21e02c14-6d73-4651-b819-e8d11c14621f",
+            "name": "responsable_turno_id",
+            "value": "={{ $json.responsable_turno_id }}",
+            "type": "string"
+          },
+          {
+            "id": "489b32db-f577-4a06-8258-113a49fa1b76",
+            "name": "apoyo_responsable_id",
+            "value": "={{ $json.apoyo_responsable_id }}",
+            "type": "string"
+          },
+          {
+            "id": "7acacedf-26ca-407f-815c-315f14542eff",
+            "name": "tiempo_minutos",
+            "value": "={{ $json.tiempo_minutos }}",
+            "type": "number"
+          },
+          {
+            "id": "2676e309-26bc-4893-8d3d-4df6b99578c5",
+            "name": "tiempo_texto",
+            "value": "={{ $json.tiempo_texto }}",
+            "type": "string"
+          },
+          {
+            "id": "854911d8-d7ed-481b-86f9-bdc3df98c28a",
+            "name": "tiempo_horas",
+            "value": "={{    (function() {     const minutos = $json.tiempo_minutos;     const horas = Math.floor(minutos / 60);     const mins = Math.round(minutos % 60);     return horas + \":\" + (mins < 10 ? \"0\" : \"\") + mins;   })()  }}",
+            "type": "string"
+          },
+          {
+            "id": "afb20e82-fd6c-4d38-a50f-b358423e0c33",
+            "name": "hora_inicio",
+            "value": "={{ $json.hora_inicio }}",
+            "type": "string"
+          },
+          {
+            "id": "cffcb34c-3895-48ca-b41c-5d4de674ec07",
+            "name": "hora_fin",
+            "value": "={{ $json.hora_fin }}",
+            "type": "string"
+          },
+          {
+            "id": "13b7098d-005e-40e1-958a-2a495c610553",
+            "name": "propina",
+            "value": "={{ $json.propina }}",
+            "type": "number"
+          },
+          {
+            "id": "45bcb86d-a858-44ac-8b21-494ecb496a4a",
+            "name": "sede",
+            "value": "={{ $json.empresa_id }}",
+            "type": "string"
+          }
+        ]
+      },
+      "options": {}
+    },
+    "type": "n8n-nodes-base.set",
+    "typeVersion": 3.4,
+    "position": [
+      2912,
+      -448
+    ],
+    "id": "9b99bc15-7a1e-4012-afa7-8b56bfbb4ce8",
+    "name": "Edit Fields"
+  },
+  {
+    "parameters": {
+      "aggregate": "aggregateAllItemData",
+      "destinationFieldName": "rows",
+      "options": {}
+    },
+    "type": "n8n-nodes-base.aggregate",
+    "typeVersion": 1,
+    "position": [
+      3120,
+      -448
+    ],
+    "id": "edb76e35-0f4f-489e-b268-2f3496955cbe",
+    "name": "Aggregate1"
+  },
+  {
+    "parameters": {
+      "jsCode": "// Obtener los datos directamente (n8n ya los pasa en items[0].json)\nconst inputData = items[0].json;\n\n// Como tu JSON tiene los datos directamente, no necesitas [0]\nconst data = Array.isArray(inputData) ? inputData[0] : inputData;\n\n// ------------------\n// UTILIDADES (SOLO PARA TIEMPOS)\n// ------------------\n\nfunction horasADecimal(horaStr) {\n    if (!horaStr || horaStr === \"00:00\") return 0;\n    const [h, m] = horaStr.split(\":\").map(Number);\n    return h + (m / 60);\n}\n\nfunction formatoHoras(horasDecimal) {\n    const horas = Math.floor(horasDecimal);\n    const minutos = Math.round((horasDecimal - horas) * 60);\n    return `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;\n}\n\nfunction minutosAHoras(minutos) {\n    const horas = Math.floor(minutos / 60);\n    const mins = minutos % 60;\n    return `${horas.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;\n}\n\n// ------------------\n// 1. TABLA PARÁMETROS (COMPLETOS - SE MANTIENEN)\n// ------------------\n\nconst parametrosLista = [];\n\nif (data.Tabla_Parametros && data.Tabla_Parametros.Datos) {\n    for (const row of data.Tabla_Parametros.Datos) {\n        const nombreCompleto = `${row.nombre_concepto_id} - ${row.nombre_tiempo_id}`;\n        parametrosLista.push({\n            concepto: nombreCompleto,\n            valor: row.valor_monetario,\n            valorFormateado: new Intl.NumberFormat('es-CO', {\n                style: 'currency',\n                currency: 'COP',\n                minimumFractionDigits: 2,\n                maximumFractionDigits: 2\n            }).format(row.valor_monetario)\n        });\n    }\n}\n\n// ------------------\n// 2. TABLA DETALLE (SOLO DATOS EN BRUTO)\n// ------------------\n\nconst detalleRows = [];\nlet totalHorasDecimal = 0;\n\nif (data.Tabla_Datos && data.Tabla_Datos.Rows) {\n    for (const row of data.Tabla_Datos.Rows) {\n        \n        const horasTotalesDecimal = horasADecimal(row.Horas);\n        \n        // Acumular solo horas totales\n        totalHorasDecimal += horasTotalesDecimal;\n        \n        detalleRows.push({\n            responsable: row.responsable_id || \"N/A\",\n            dia: row.Dia,\n            fecha: row.fecha_turno,\n            hora_inicio: row.hora_inicio,\n            hora_fin: row.hora_fin,\n            horas_totales: row.Horas,\n            propina: row.Propinas || 0,\n            sede: row.sede || \"N/A\"\n            // ❌ ELIMINADO: horas_diurnas\n            // ❌ ELIMINADO: horas_nocturnas\n            // ❌ ELIMINADO: TODOS los cálculos monetarios\n        });\n    }\n}\n\n// ------------------\n// 2.5 TABLA PROPINAS (SOLO TIEMPOS, SIN MONTO) - CORREGIDO: Tabla_Apoyos\n// ------------------\n\nconst propinasRows = [];\nlet totalMinutosPropinas = 0;\nlet totalHorasPropinasDecimal = 0;\n\nif (data.Tabla_Apoyos && data.Tabla_Apoyos.Datos) {\n    for (const row of data.Tabla_Apoyos.Datos) {\n        const minutos = row.tiempo_minutos || 0;\n        \n        totalMinutosPropinas += minutos;\n        \n        propinasRows.push({\n            fecha_turno: row.fecha_turno,\n            responsable_turno_id: row.responsable_turno_id,\n            apoyo_responsable_id: row.apoyo_responsable_id,\n            tiempo_minutos: minutos,\n            tiempo_horas: row.tiempo_horas || minutosAHoras(minutos),\n            tiempo_texto: row.tiempo_texto || `${Math.floor(minutos / 60)} horas ${minutos % 60} minutos`,\n            hora_inicio: row.hora_inicio,\n            hora_fin: row.hora_fin,\n            propina: row.propina || 0,\n            sede: row.sede// ✅ ÚNICO CAMBIO: se añadió este campo\n            // ❌ ELIMINADO: propina (valor monetario)\n            // ❌ ELIMINADO: propina_formato\n        });\n    }\n    \n    totalHorasPropinasDecimal = totalMinutosPropinas / 60;\n}\n\n// ------------------\n// 3. TABLA RESUMEN (SOLO TIEMPOS TOTALES)\n// ------------------\n\nconst resumenTiempos = {\n    total_horas_trabajadas: totalHorasDecimal,\n    total_horas_trabajadas_formato: formatoHoras(totalHorasDecimal),\n    total_horas_propinas: totalHorasPropinasDecimal,\n    total_horas_propinas_formato: formatoHoras(totalHorasPropinasDecimal)\n};\n\n// ------------------\n// 4. TABLA TOTALES GENERALES (SOLO TIEMPOS Y CONTADORES)\n// ------------------\n\nconst diasTrabajados = data.Tabla_Datos ? data.Tabla_Datos.Rows.length : 0;\n\nconst totalesGenerales = {\n    dias_trabajados: diasTrabajados,\n    horas_trabajadas: totalHorasDecimal,\n    horas_trabajadas_formato: formatoHoras(totalHorasDecimal),\n    horas_propinas: totalHorasPropinasDecimal,\n    horas_propinas_formato: formatoHoras(totalHorasPropinasDecimal),\n    total_apoyos: propinasRows.length\n    // ❌ ELIMINADO: TODOS los cálculos monetarios\n    // ❌ ELIMINADO: clasificaciones de tiempo (diurnas/nocturnas/dominicales)\n};\n\n// ------------------\n// RETORNO PARA N8N\n// ------------------\n\nreturn [{\n    json: {\n        // Tabla 1: Parámetros configurados (COMPLETOS)\n        parametros: parametrosLista,\n        \n        // Tabla 2: Detalle con datos en bruto\n        detalle: detalleRows,\n        \n        // Tabla 3: Propinas y apoyos (sin montos)\n        apoyos: propinasRows,\n        \n        // Tabla 4: Resumen de tiempos\n        resumen_tiempos: resumenTiempos,\n        \n        // Tabla 5: Totales generales (solo tiempos)\n        totales: totalesGenerales,\n        \n        // Datos adicionales útiles\n        metadata: {\n            total_filas_procesadas: detalleRows.length,\n            total_apoyos_procesados: propinasRows.length,\n            fecha_proceso: new Date().toISOString()\n        }\n    }\n}];"
+    },
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+      3536,
+      -448
+    ],
+    "id": "56b2b533-49f7-48b0-b80a-3fb9bf22a33e",
+    "name": "Code in JavaScript1"
+  },
+  {
+    "parameters": {
+      "conditions": {
+        "options": {
+          "caseSensitive": true,
+          "leftValue": "",
+          "typeValidation": "strict",
+          "version": 3
+        },
+        "conditions": [
+          {
+            "id": "353ec99e-c60a-40c0-9b8a-2a3ec89aebd7",
+            "leftValue": "={{$json}}",
+            "rightValue": "",
+            "operator": {
+              "type": "object",
+              "operation": "notEmpty",
+              "singleValue": true
+            }
+          }
+        ],
+        "combinator": "and"
+      },
+      "options": {}
+    },
+    "type": "n8n-nodes-base.if",
+    "typeVersion": 2.3,
+    "position": [
+      -416,
+      16
+    ],
+    "id": "edd28e63-6997-4a96-804b-a6602b1e0247",
+    "name": "If"
+  },
+  {
+    "parameters": {
+      "operation": "get",
+      "tableId": "turnos_agrupados_locales",
+      "filters": {
+        "conditions": [
+          {
+            "keyName": "responsable_id",
+            "keyValue": "={{ $('Webhook').item.json.body.responsable_id }}"
+          },
+          {
+            "keyName": "empresa_id",
+            "keyValue": "={{ $('Webhook').item.json.body.empresa_id }}"
+          }
+        ]
+      }
+    },
+    "type": "n8n-nodes-base.supabase",
+    "typeVersion": 1,
+    "position": [
+      1040,
+      176
+    ],
+    "id": "3791ea9e-d838-4553-bb1d-9daa5b7d7025",
+    "name": "Get a row3",
+    "alwaysOutputData": true,
+    "credentials": {
+      "supabaseApi": {
+        "id": "m1woCcRiviWIbcit",
+        "name": "Supabase Plataforma_Restaurantes"
+      }
+    }
+  },
+  {
+    "parameters": {
+      "conditions": {
+        "options": {
+          "caseSensitive": true,
+          "leftValue": "",
+          "typeValidation": "strict",
+          "version": 3
+        },
+        "conditions": [
+          {
+            "id": "88578116-b883-467e-bc99-46ae64ce31fb",
+            "leftValue": "={{ $json.fecha_turno }}",
+            "rightValue": "={{ $('Webhook').item.json.body.fecha_inicio }}",
+            "operator": {
+              "type": "dateTime",
+              "operation": "afterOrEquals"
+            }
+          },
+          {
+            "id": "31d0c6c7-4e74-492c-9159-0a20a3440da3",
+            "leftValue": "={{ $json.fecha_turno }}",
+            "rightValue": "={{ $('Webhook').item.json.body.fecha_fin }}",
+            "operator": {
+              "type": "dateTime",
+              "operation": "beforeOrEquals"
+            }
+          }
+        ],
+        "combinator": "and"
+      },
+      "options": {}
+    },
+    "type": "n8n-nodes-base.filter",
+    "typeVersion": 2.3,
+    "position": [
+      1248,
+      176
+    ],
+    "id": "6db0a9cc-7002-4750-8d2b-ac322a330774",
+    "name": "Filter2"
+  },
+  {
+    "parameters": {
+      "aggregate": "aggregateAllItemData",
+      "destinationFieldName": "rows",
+      "options": {}
+    },
+    "type": "n8n-nodes-base.aggregate",
+    "typeVersion": 1,
+    "position": [
+      1664,
+      176
+    ],
+    "id": "70ac7f13-4e89-4fe8-a664-a9aaf0887524",
+    "name": "Aggregate3"
+  },
+  {
+    "parameters": {
+      "options": {}
+    },
+    "type": "n8n-nodes-base.respondToWebhook",
+    "typeVersion": 1.5,
+    "position": [
+      3120,
+      176
+    ],
+    "id": "bfe63e83-2e0d-4dc3-b66e-92dd4712f951",
+    "name": "Respond to Webhook1"
+  },
+  {
+    "parameters": {
+      "assignments": {
+        "assignments": [
+          {
+            "id": "cb50d77c-d953-43a9-86a4-6dfd270e9c8f",
+            "name": "responsable_id",
+            "value": "={{ $('Get a row3').item.json.responsable_id }}",
+            "type": "string"
+          },
+          {
+            "id": "d5f139bc-b9d7-4e93-9bce-7c5b22eaa395",
+            "name": "Dia",
+            "value": "={{ new Date($('Get a row3').item.json.fecha_turno).toLocaleDateString('es-ES', { weekday: 'long' }) }}",
+            "type": "string"
+          },
+          {
+            "id": "f3f054e8-4fc9-4044-8143-29d68c785422",
+            "name": "fecha_turno",
+            "value": "={{ $('Get a row3').item.json.fecha_turno }}",
+            "type": "string"
+          },
+          {
+            "id": "65a2c331-2240-4aa8-9b66-3ac1cc61ec06",
+            "name": "hora_inicio",
+            "value": "={{ $('Get a row3').item.json.hora_inicio }}",
+            "type": "string"
+          },
+          {
+            "id": "85722893-0aff-44f1-b16e-c963737db753",
+            "name": "hora_fin",
+            "value": "={{ $('Get a row3').item.json.hora_fin }}",
+            "type": "string"
+          },
+          {
+            "id": "c567d06a-79a4-4397-83c7-a892c5172883",
+            "name": "Horas",
+            "value": "={{ (() => { const inicio = new Date(\"1970-01-01T\" + $('Get a row3').item.json.hora_inicio + \"Z\"); const fin = new Date(\"1970-01-01T\" + $json.hora_fin + \"Z\"); const diff = (fin - inicio) / (1000 * 60); const horas = Math.floor(diff / 60); const minutos = diff % 60; return `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`; })() }}",
+            "type": "string"
+          },
+          {
+            "id": "0aa587cb-69f6-4f50-9567-0dd72d82cacd",
+            "name": "Diurnas",
+            "value": "={{ (() => { const inicio = new Date(\"1970-01-01T\" + $('Get a row3').item.json.hora_inicio + \"Z\"); const fin = new Date(\"1970-01-01T\" + $json.hora_fin + \"Z\"); const diurnoInicio = new Date(\"1970-01-01T06:00:00Z\"); const diurnoFin = new Date(\"1970-01-01T18:00:00Z\"); const inicioEfectivo = new Date(Math.max(inicio, diurnoInicio)); const finEfectivo = new Date(Math.min(fin, diurnoFin)); if (inicioEfectivo >= finEfectivo) return \"00:00\"; const diffMinutos = (finEfectivo - inicioEfectivo) / (1000 * 60); const horas = Math.floor(diffMinutos / 60); const minutos = diffMinutos % 60; return `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`; })() }}",
+            "type": "string"
+          },
+          {
+            "id": "ea1fdd4c-7789-49fa-a980-903d4203ec23",
+            "name": "Nocturnas",
+            "value": "={{ (() => { const inicio = new Date(\"1970-01-01T\" + $('Get a row3').item.json.hora_inicio + \"Z\"); const fin = new Date(\"1970-01-01T\" + $('Get a row3').item.json.hora_fin + \"Z\"); let minutosNocturnos = 0; const nocturnoInicio1 = new Date(\"1970-01-01T00:00:00Z\"); const nocturnoFin1 = new Date(\"1970-01-01T06:00:00Z\"); const nocturnoInicio2 = new Date(\"1970-01-01T18:00:00Z\"); const nocturnoFin2 = new Date(\"1970-01-01T23:59:59Z\"); const inicioEfectivo1 = new Date(Math.max(inicio, nocturnoInicio1)); const finEfectivo1 = new Date(Math.min(fin, nocturnoFin1)); if (inicioEfectivo1 < finEfectivo1) minutosNocturnos += (finEfectivo1 - inicioEfectivo1) / (1000 * 60); const inicioEfectivo2 = new Date(Math.max(inicio, nocturnoInicio2)); const finEfectivo2 = new Date(Math.min(fin, nocturnoFin2)); if (inicioEfectivo2 < finEfectivo2) minutosNocturnos += (finEfectivo2 - inicioEfectivo2) / (1000 * 60); const horas = Math.floor(minutosNocturnos / 60); const minutos = minutosNocturnos % 60; return `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`; })() }}",
+            "type": "string"
+          }
+        ]
+      },
+      "options": {}
+    },
+    "type": "n8n-nodes-base.set",
+    "typeVersion": 3.4,
+    "position": [
+      1456,
+      176
+    ],
+    "id": "37562d12-f88c-4fd4-a5d1-da92463bffcc",
+    "name": "Edit Fields4"
+  },
+  {
+    "parameters": {
+      "assignments": {
+        "assignments": [
+          {
+            "id": "58c429e8-f4c4-4e6c-bb72-e934511de5e9",
+            "name": "Tabla_Parametros.Datos",
+            "value": "={{ $('Aggregate4').item.json.rows }}",
+            "type": "array"
+          },
+          {
+            "id": "4b0cde1b-31ca-4de8-92b9-ca86f7291501",
+            "name": "Tabla_Datos.Rows",
+            "value": "={{ $('Aggregate3').item.json.rows }}",
+            "type": "array"
+          },
+          {
+            "id": "6ae8dae4-9c18-4522-aad9-2307369bee20",
+            "name": "Tabla_Apoyos.Datos",
+            "value": "={{ $('Aggregate5').item.json.rows }}",
+            "type": "array"
+          }
+        ]
+      },
+      "options": {}
+    },
+    "type": "n8n-nodes-base.set",
+    "typeVersion": 3.4,
+    "position": [
+      2704,
+      176
+    ],
+    "id": "d90c0cf5-d6e5-46ca-a131-40b25ea23d76",
+    "name": "Edit Fields5"
+  },
+  {
+    "parameters": {
+      "aggregate": "aggregateAllItemData",
+      "destinationFieldName": "rows",
+      "options": {}
+    },
+    "type": "n8n-nodes-base.aggregate",
+    "typeVersion": 1,
+    "position": [
+      832,
+      176
+    ],
+    "id": "1e661803-99c2-4b82-9358-632cc6529b21",
+    "name": "Aggregate4"
+  },
+  {
+    "parameters": {
+      "operation": "get",
+      "tableId": "dimensiones_tiempo",
+      "filters": {
+        "conditions": [
+          {
+            "keyName": "id",
+            "keyValue": "={{ $('Get a row8').item.json.dimension_tiempo_id }}"
+          }
+        ]
+      }
+    },
+    "type": "n8n-nodes-base.supabase",
+    "typeVersion": 1,
+    "position": [
+      416,
+      176
+    ],
+    "id": "bd8a78d0-610a-4919-b6c0-6fa701106fe5",
+    "name": "Get a row5",
+    "alwaysOutputData": true,
+    "credentials": {
+      "supabaseApi": {
+        "id": "m1woCcRiviWIbcit",
+        "name": "Supabase Plataforma_Restaurantes"
+      }
+    }
+  },
+  {
+    "parameters": {
+      "operation": "getAll",
+      "tableId": "dimensiones_concepto",
+      "limit": 1,
+      "matchType": "allFilters",
+      "filters": {
+        "conditions": [
+          {
+            "keyName": "id",
+            "condition": "eq",
+            "keyValue": "={{ $json.dimension_concepto_id }}"
+          }
+        ]
+      }
+    },
+    "type": "n8n-nodes-base.supabase",
+    "typeVersion": 1,
+    "position": [
+      208,
+      176
+    ],
+    "id": "ad915f91-01bb-4061-b694-fa9bd2b385d0",
+    "name": "Get many rows1",
+    "alwaysOutputData": true,
+    "credentials": {
+      "supabaseApi": {
+        "id": "m1woCcRiviWIbcit",
+        "name": "Supabase Plataforma_Restaurantes"
+      }
+    }
+  },
+  {
+    "parameters": {
+      "assignments": {
+        "assignments": [
+          {
+            "id": "45556084-88ac-4b25-b2cc-6ea11ab10c64",
+            "name": "dimension_tiempo_id",
+            "value": "={{ $('Get a row8').item.json.dimension_tiempo_id }}",
+            "type": "string"
+          },
+          {
+            "id": "05257ba7-6deb-404d-bf71-28ff5e501348",
+            "name": "dimension_concepto_id",
+            "value": "={{ $('Get a row8').item.json.dimension_concepto_id }}",
+            "type": "string"
+          },
+          {
+            "id": "0e9ce9ab-bc09-490b-b1ed-b2b32afc59d6",
+            "name": "valor_monetario",
+            "value": "={{ $('Get a row8').item.json.valor_monetario }}",
+            "type": "number"
+          },
+          {
+            "id": "06cf54d8-73fb-42cb-a6b4-f9e6157e6cdd",
+            "name": "nombre_tiempo_id",
+            "value": "={{ $json.nombre }}",
+            "type": "string"
+          },
+          {
+            "id": "3f63fd15-6d58-470e-8ae7-772b2ece2b3f",
+            "name": "nombre_concepto_id",
+            "value": "={{ $('Get many rows1').item.json.nombre }}",
+            "type": "string"
+          }
+        ]
+      },
+      "options": {}
+    },
+    "type": "n8n-nodes-base.set",
+    "typeVersion": 3.4,
+    "position": [
+      624,
+      176
+    ],
+    "id": "7aec0dab-196f-40cc-a63c-f792c75cfb6d",
+    "name": "Edit Fields6"
+  },
+  {
+    "parameters": {
+      "operation": "get",
+      "tableId": "apoyos_turno_locales",
+      "filters": {
+        "conditions": [
+          {
+            "keyName": "empresa_id",
+            "keyValue": "={{ $('Webhook').item.json.body.empresa_id }}"
+          },
+          {
+            "keyName": "apoyo_responsable_id",
+            "keyValue": "={{ $('Webhook').item.json.body.responsable_id }}"
+          }
+        ]
+      }
+    },
+    "type": "n8n-nodes-base.supabase",
+    "typeVersion": 1,
+    "position": [
+      1872,
+      176
+    ],
+    "id": "5629ea02-ed5c-40be-b122-28a45e0d368d",
+    "name": "Get a row6",
+    "alwaysOutputData": true,
+    "credentials": {
+      "supabaseApi": {
+        "id": "m1woCcRiviWIbcit",
+        "name": "Supabase Plataforma_Restaurantes"
+      }
+    }
+  },
+  {
+    "parameters": {
+      "conditions": {
+        "options": {
+          "caseSensitive": true,
+          "leftValue": "",
+          "typeValidation": "strict",
+          "version": 3
+        },
+        "conditions": [
+          {
+            "id": "88578116-b883-467e-bc99-46ae64ce31fb",
+            "leftValue": "={{ $json.fecha_turno }}",
+            "rightValue": "={{ $('Webhook').item.json.body.fecha_inicio }}",
+            "operator": {
+              "type": "dateTime",
+              "operation": "afterOrEquals"
+            }
+          },
+          {
+            "id": "31d0c6c7-4e74-492c-9159-0a20a3440da3",
+            "leftValue": "={{ $json.fecha_turno }}",
+            "rightValue": "={{ $('Webhook').item.json.body.fecha_fin }}",
+            "operator": {
+              "type": "dateTime",
+              "operation": "beforeOrEquals"
+            }
+          }
+        ],
+        "combinator": "and"
+      },
+      "options": {}
+    },
+    "type": "n8n-nodes-base.filter",
+    "typeVersion": 2.3,
+    "position": [
+      2080,
+      176
+    ],
+    "id": "11f401be-5cdc-41dd-a976-7a78f8eefac6",
+    "name": "Filter3",
+    "alwaysOutputData": true
+  },
+  {
+    "parameters": {
+      "assignments": {
+        "assignments": [
+          {
+            "id": "6495309a-54ae-4259-ac7b-440fa7d8b63a",
+            "name": "fecha_turno",
+            "value": "={{ $json.fecha_turno }}",
+            "type": "string"
+          },
+          {
+            "id": "21e02c14-6d73-4651-b819-e8d11c14621f",
+            "name": "responsable_turno_id",
+            "value": "={{ $json.responsable_turno_id }}",
+            "type": "string"
+          },
+          {
+            "id": "489b32db-f577-4a06-8258-113a49fa1b76",
+            "name": "apoyo_responsable_id",
+            "value": "={{ $json.apoyo_responsable_id }}",
+            "type": "string"
+          },
+          {
+            "id": "7acacedf-26ca-407f-815c-315f14542eff",
+            "name": "tiempo_minutos",
+            "value": "={{ $json.tiempo_minutos }}",
+            "type": "number"
+          },
+          {
+            "id": "2676e309-26bc-4893-8d3d-4df6b99578c5",
+            "name": "tiempo_texto",
+            "value": "={{ $json.tiempo_texto }}",
+            "type": "string"
+          },
+          {
+            "id": "854911d8-d7ed-481b-86f9-bdc3df98c28a",
+            "name": "tiempo_horas",
+            "value": "={{    (function() {     const minutos = $json.tiempo_minutos;     const horas = Math.floor(minutos / 60);     const mins = Math.round(minutos % 60);     return horas + \":\" + (mins < 10 ? \"0\" : \"\") + mins;   })()  }}",
+            "type": "string"
+          },
+          {
+            "id": "afb20e82-fd6c-4d38-a50f-b358423e0c33",
+            "name": "hora_inicio",
+            "value": "={{ $json.hora_inicio }}",
+            "type": "string"
+          },
+          {
+            "id": "cffcb34c-3895-48ca-b41c-5d4de674ec07",
+            "name": "hora_fin",
+            "value": "={{ $json.hora_fin }}",
+            "type": "string"
+          },
+          {
+            "id": "13b7098d-005e-40e1-958a-2a495c610553",
+            "name": "propina",
+            "value": "={{ $json.propina }}",
+            "type": "number"
+          }
+        ]
+      },
+      "options": {}
+    },
+    "type": "n8n-nodes-base.set",
+    "typeVersion": 3.4,
+    "position": [
+      2288,
+      176
+    ],
+    "id": "7801914c-d435-49ab-9d70-f5947d638fe6",
+    "name": "Edit Fields7"
+  },
+  {
+    "parameters": {
+      "aggregate": "aggregateAllItemData",
+      "destinationFieldName": "rows",
+      "options": {}
+    },
+    "type": "n8n-nodes-base.aggregate",
+    "typeVersion": 1,
+    "position": [
+      2496,
+      176
+    ],
+    "id": "b4b82900-f99b-48c2-80f1-60fc04e94578",
+    "name": "Aggregate5"
+  },
+  {
+    "parameters": {
+      "jsCode": "// Obtener los datos directamente (n8n ya los pasa en items[0].json)\nconst inputData = items[0].json;\n\n// Como tu JSON tiene los datos directamente, no necesitas [0]\nconst data = Array.isArray(inputData) ? inputData[0] : inputData;\n\n// ------------------\n// UTILIDADES (SOLO PARA TIEMPOS)\n// ------------------\n\nfunction horasADecimal(horaStr) {\n    if (!horaStr || horaStr === \"00:00\") return 0;\n    const [h, m] = horaStr.split(\":\").map(Number);\n    return h + (m / 60);\n}\n\nfunction formatoHoras(horasDecimal) {\n    const horas = Math.floor(horasDecimal);\n    const minutos = Math.round((horasDecimal - horas) * 60);\n    return `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;\n}\n\nfunction minutosAHoras(minutos) {\n    const horas = Math.floor(minutos / 60);\n    const mins = minutos % 60;\n    return `${horas.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;\n}\n\n// ------------------\n// 1. TABLA PARÁMETROS (COMPLETOS - SE MANTIENEN)\n// ------------------\n\nconst parametrosLista = [];\n\nif (data.Tabla_Parametros && data.Tabla_Parametros.Datos) {\n    for (const row of data.Tabla_Parametros.Datos) {\n        const nombreCompleto = `${row.nombre_concepto_id} - ${row.nombre_tiempo_id}`;\n        parametrosLista.push({\n            concepto: nombreCompleto,\n            valor: row.valor_monetario,\n            valorFormateado: new Intl.NumberFormat('es-CO', {\n                style: 'currency',\n                currency: 'COP',\n                minimumFractionDigits: 2,\n                maximumFractionDigits: 2\n            }).format(row.valor_monetario)\n        });\n    }\n}\n\n// ------------------\n// 2. TABLA DETALLE (SOLO DATOS EN BRUTO)\n// ------------------\n\nconst detalleRows = [];\nlet totalHorasDecimal = 0;\n\nif (data.Tabla_Datos && data.Tabla_Datos.Rows) {\n    for (const row of data.Tabla_Datos.Rows) {\n        \n        const horasTotalesDecimal = horasADecimal(row.Horas);\n        \n        // Acumular solo horas totales\n        totalHorasDecimal += horasTotalesDecimal;\n        \n        detalleRows.push({\n            responsable: row.responsable_id || \"N/A\",\n            dia: row.Dia,\n            fecha: row.fecha_turno,\n            hora_inicio: row.hora_inicio,\n            hora_fin: row.hora_fin,\n            horas_totales: row.Horas\n            // ❌ ELIMINADO: horas_diurnas\n            // ❌ ELIMINADO: horas_nocturnas\n            // ❌ ELIMINADO: TODOS los cálculos monetarios\n        });\n    }\n}\n\n// ------------------\n// 2.5 TABLA PROPINAS (SOLO TIEMPOS, SIN MONTO)\n// ------------------\n\nconst propinasRows = [];\nlet totalMinutosPropinas = 0;\nlet totalHorasPropinasDecimal = 0;\n\nif (data.Tabla_Propinas && data.Tabla_Propinas.Datos) {\n    for (const row of data.Tabla_Propinas.Datos) {\n        const minutos = row.tiempo_minutos || 0;\n        \n        totalMinutosPropinas += minutos;\n        \n        propinasRows.push({\n            fecha_turno: row.fecha_turno,\n            responsable_turno_id: row.responsable_turno_id,\n            apoyo_responsable_id: row.apoyo_responsable_id,\n            tiempo_minutos: minutos,\n            tiempo_horas: row.tiempo_horas || minutosAHoras(minutos),\n            tiempo_texto: row.tiempo_texto || `${Math.floor(minutos / 60)} horas ${minutos % 60} minutos`,\n            hora_inicio: row.hora_inicio,\n            hora_fin: row.hora_fin\n            // ❌ ELIMINADO: propina (valor monetario)\n            // ❌ ELIMINADO: propina_formato\n        });\n    }\n    \n    totalHorasPropinasDecimal = totalMinutosPropinas / 60;\n}\n\n// ------------------\n// 3. TABLA RESUMEN (SOLO TIEMPOS TOTALES)\n// ------------------\n\nconst resumenTiempos = {\n    total_horas_trabajadas: totalHorasDecimal,\n    total_horas_trabajadas_formato: formatoHoras(totalHorasDecimal),\n    total_horas_propinas: totalHorasPropinasDecimal,\n    total_horas_propinas_formato: formatoHoras(totalHorasPropinasDecimal)\n};\n\n// ------------------\n// 4. TABLA TOTALES GENERALES (SOLO TIEMPOS Y CONTADORES)\n// ------------------\n\nconst diasTrabajados = data.Tabla_Datos ? data.Tabla_Datos.Rows.length : 0;\n\nconst totalesGenerales = {\n    dias_trabajados: diasTrabajados,\n    horas_trabajadas: totalHorasDecimal,\n    horas_trabajadas_formato: formatoHoras(totalHorasDecimal),\n    horas_propinas: totalHorasPropinasDecimal,\n    horas_propinas_formato: formatoHoras(totalHorasPropinasDecimal),\n    total_apoyos: propinasRows.length\n    // ❌ ELIMINADO: TODOS los cálculos monetarios\n    // ❌ ELIMINADO: clasificaciones de tiempo (diurnas/nocturnas/dominicales)\n};\n\n// ------------------\n// RETORNO PARA N8N\n// ------------------\n\nreturn [{\n    json: {\n        // Tabla 1: Parámetros configurados (COMPLETOS)\n        parametros: parametrosLista,\n        \n        // Tabla 2: Detalle con datos en bruto\n        detalle: detalleRows,\n        \n        // Tabla 3: Propinas y apoyos (sin montos)\n        apoyos: propinasRows,\n        \n        // Tabla 4: Resumen de tiempos\n        resumen_tiempos: resumenTiempos,\n        \n        // Tabla 5: Totales generales (solo tiempos)\n        totales: totalesGenerales,\n        \n        // Datos adicionales útiles\n        metadata: {\n            total_filas_procesadas: detalleRows.length,\n            total_apoyos_procesados: propinasRows.length,\n            fecha_proceso: new Date().toISOString()\n        }\n    }\n}];"
+    },
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+      2912,
+      176
+    ],
+    "id": "31b2ceb2-edd2-4fe3-a135-b3cd9dfd07c6",
+    "name": "Code in JavaScript2"
+  },
+  {
+    "parameters": {
+      "operation": "get",
+      "tableId": "grupos_empresariales",
+      "filters": {
+        "conditions": [
+          {
+            "keyName": "empresa_id",
+            "keyValue": "={{ $('Webhook').item.json.body.empresa_id }}"
+          }
+        ]
+      }
+    },
+    "type": "n8n-nodes-base.supabase",
+    "typeVersion": 1,
+    "position": [
+      -208,
+      176
+    ],
+    "id": "bc0fced8-3670-45e7-ba5d-a1ae9d68b73b",
+    "name": "Get a row7",
+    "credentials": {
+      "supabaseApi": {
+        "id": "m1woCcRiviWIbcit",
+        "name": "Supabase Plataforma_Restaurantes"
+      }
+    }
+  },
+  {
+    "parameters": {
+      "operation": "get",
+      "tableId": "parametros_nomina",
+      "filters": {
+        "conditions": [
+          {
+            "keyName": "empresa_id",
+            "keyValue": "={{ $json.grupo_id }}"
+          }
+        ]
+      }
+    },
+    "type": "n8n-nodes-base.supabase",
+    "typeVersion": 1,
+    "position": [
+      0,
+      176
+    ],
+    "id": "117d5a58-118d-4c65-a0d2-5617318c009a",
+    "name": "Get a row8",
+    "alwaysOutputData": true,
+    "credentials": {
+      "supabaseApi": {
+        "id": "m1woCcRiviWIbcit",
+        "name": "Supabase Plataforma_Restaurantes"
+      }
+    }
+  },
+  {
+    "parameters": {
+      "assignments": {
+        "assignments": [
+          {
+            "id": "3265ac15-9dba-4325-90cd-5ce25ece3d1c",
+            "name": "sedes",
+            "value": "={{ $('Webhook').item.json.body.sedes }}",
+            "type": "array"
+          }
+        ]
+      },
+      "options": {}
+    },
+    "type": "n8n-nodes-base.set",
+    "typeVersion": 3.4,
+    "position": [
+      832,
+      0
+    ],
+    "id": "b4ff3df1-45cb-4f24-9ddd-9459371009ce",
+    "name": "Edit Fields8"
+  },
+  {
+    "parameters": {
+      "options": {}
+    },
+    "type": "n8n-nodes-base.splitInBatches",
+    "typeVersion": 3,
+    "position": [
+      1248,
+      0
+    ],
+    "id": "f89b44ee-ef4b-49fb-8b5f-e54d0b48c55e",
+    "name": "Loop Over Items"
+  },
+  {
+    "parameters": {
+      "fieldToSplitOut": "sedes",
+      "options": {}
+    },
+    "type": "n8n-nodes-base.splitOut",
+    "typeVersion": 1,
+    "position": [
+      1040,
+      0
+    ],
+    "id": "b21e0534-389b-4a3c-8992-605b7644f420",
+    "name": "Split Out"
+  },
+  {
+    "parameters": {
+      "operation": "get",
+      "tableId": "turnos_agrupados_locales",
+      "filters": {
+        "conditions": [
+          {
+            "keyName": "responsable_id",
+            "keyValue": "={{ $('Loop Over Items').item.json.responsable_id }}"
+          },
+          {
+            "keyName": "empresa_id",
+            "keyValue": "={{ $('Loop Over Items').item.json.empresa_id }}"
+          }
+        ]
+      }
+    },
+    "type": "n8n-nodes-base.supabase",
+    "typeVersion": 1,
+    "position": [
+      2080,
+      32
+    ],
+    "id": "31af0913-7c7a-4228-aaa1-db4e5ab852f5",
+    "name": "Get a row9",
+    "alwaysOutputData": true,
+    "credentials": {
+      "supabaseApi": {
+        "id": "m1woCcRiviWIbcit",
+        "name": "Supabase Plataforma_Restaurantes"
+      }
+    }
+  },
+  {
+    "parameters": {
+      "operation": "get",
+      "tableId": "apoyos_turno",
+      "filters": {
+        "conditions": [
+          {
+            "keyName": "empresa_id",
+            "keyValue": "={{ $('Loop Over Items2').item.json.empresa_id }}"
+          },
+          {
+            "keyName": "apoyo_responsable_id",
+            "keyValue": "={{ $('Loop Over Items2').item.json.responsable_id }}"
+          }
+        ]
+      }
+    },
+    "type": "n8n-nodes-base.supabase",
+    "typeVersion": 1,
+    "position": [
+      3120,
+      -304
+    ],
+    "id": "b624d2bc-b829-4711-9582-a105da351481",
+    "name": "Get a row2",
+    "alwaysOutputData": true,
+    "credentials": {
+      "supabaseApi": {
+        "id": "m1woCcRiviWIbcit",
+        "name": "Supabase Plataforma_Restaurantes"
+      }
+    }
+  },
+  {
+    "parameters": {
+      "assignments": {
+        "assignments": [
+          {
+            "id": "cb50d77c-d953-43a9-86a4-6dfd270e9c8f",
+            "name": "responsable_id",
+            "value": "={{ $('Get a row9').item.json.responsable_id }}",
+            "type": "string"
+          },
+          {
+            "id": "d5f139bc-b9d7-4e93-9bce-7c5b22eaa395",
+            "name": "Dia",
+            "value": "={{ new Date($('Get a row9').item.json.fecha_turno).toLocaleDateString('es-ES', { weekday: 'long' }) }}",
+            "type": "string"
+          },
+          {
+            "id": "f3f054e8-4fc9-4044-8143-29d68c785422",
+            "name": "fecha_turno",
+            "value": "={{ $('Get a row9').item.json.fecha_turno }}",
+            "type": "string"
+          },
+          {
+            "id": "65a2c331-2240-4aa8-9b66-3ac1cc61ec06",
+            "name": "hora_inicio",
+            "value": "={{ $('Get a row9').item.json.hora_inicio }}",
+            "type": "string"
+          },
+          {
+            "id": "85722893-0aff-44f1-b16e-c963737db753",
+            "name": "hora_fin",
+            "value": "={{ $('Get a row9').item.json.hora_fin }}",
+            "type": "string"
+          },
+          {
+            "id": "c567d06a-79a4-4397-83c7-a892c5172883",
+            "name": "Horas",
+            "value": "={{ (() => { const inicio = new Date(\"1970-01-01T\" + $('Get a row9').item.json.hora_inicio + \"Z\"); const fin = new Date(\"1970-01-01T\" + $('Filter').item.json.hora_fin + \"Z\"); const diff = (fin - inicio) / (1000 * 60); const horas = Math.floor(diff / 60); const minutos = diff % 60; return `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`; })() }}",
+            "type": "string"
+          },
+          {
+            "id": "0aa587cb-69f6-4f50-9567-0dd72d82cacd",
+            "name": "Diurnas",
+            "value": "={{ (() => { const inicio = new Date(\"1970-01-01T\" + $('Get a row9').item.json.hora_inicio + \"Z\"); const fin = new Date(\"1970-01-01T\" + $('Filter').item.json.hora_fin + \"Z\"); const diurnoInicio = new Date(\"1970-01-01T06:00:00Z\"); const diurnoFin = new Date(\"1970-01-01T18:00:00Z\"); const inicioEfectivo = new Date(Math.max(inicio, diurnoInicio)); const finEfectivo = new Date(Math.min(fin, diurnoFin)); if (inicioEfectivo >= finEfectivo) return \"00:00\"; const diffMinutos = (finEfectivo - inicioEfectivo) / (1000 * 60); const horas = Math.floor(diffMinutos / 60); const minutos = diffMinutos % 60; return `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`; })() }}",
+            "type": "string"
+          },
+          {
+            "id": "ea1fdd4c-7789-49fa-a980-903d4203ec23",
+            "name": "Nocturnas",
+            "value": "={{ (() => { const inicio = new Date(\"1970-01-01T\" + $('Get a row9').item.json.hora_inicio + \"Z\"); const fin = new Date(\"1970-01-01T\" + $('Get a row9').item.json.hora_fin + \"Z\"); let minutosNocturnos = 0; const nocturnoInicio1 = new Date(\"1970-01-01T00:00:00Z\"); const nocturnoFin1 = new Date(\"1970-01-01T06:00:00Z\"); const nocturnoInicio2 = new Date(\"1970-01-01T18:00:00Z\"); const nocturnoFin2 = new Date(\"1970-01-01T23:59:59Z\"); const inicioEfectivo1 = new Date(Math.max(inicio, nocturnoInicio1)); const finEfectivo1 = new Date(Math.min(fin, nocturnoFin1)); if (inicioEfectivo1 < finEfectivo1) minutosNocturnos += (finEfectivo1 - inicioEfectivo1) / (1000 * 60); const inicioEfectivo2 = new Date(Math.max(inicio, nocturnoInicio2)); const finEfectivo2 = new Date(Math.min(fin, nocturnoFin2)); if (inicioEfectivo2 < finEfectivo2) minutosNocturnos += (finEfectivo2 - inicioEfectivo2) / (1000 * 60); const horas = Math.floor(minutosNocturnos / 60); const minutos = minutosNocturnos % 60; return `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`; })() }}",
+            "type": "string"
+          },
+          {
+            "id": "c517d6f3-fc7e-459a-9ea7-b79037f61839",
+            "name": "Propinas",
+            "value": "={{ $('Filter').item.json.propinas }}",
+            "type": "number"
+          },
+          {
+            "id": "fbcbdea4-b35f-464d-8ed2-dfe3bf1fa959",
+            "name": "sede",
+            "value": "={{ $('Filter').item.json.empresa_id }}",
+            "type": "string"
+          }
+        ]
+      },
+      "options": {}
+    },
+    "type": "n8n-nodes-base.set",
+    "typeVersion": 3.4,
+    "position": [
+      2496,
+      -128
+    ],
+    "id": "8a6a91f5-c871-46fe-875c-efb5b9f6510e",
+    "name": "Edit Fields9"
+  },
+  {
+    "parameters": {
+      "operation": "get",
+      "tableId": "grupos_empresariales",
+      "filters": {
+        "conditions": [
+          {
+            "keyName": "empresa_id",
+            "keyValue": "={{ $json.empresa_id }}"
+          }
+        ]
+      }
+    },
+    "type": "n8n-nodes-base.supabase",
+    "typeVersion": 1,
+    "position": [
+      1456,
+      16
+    ],
+    "id": "5b7a16db-acc6-472c-8422-25c979935b68",
+    "name": "Get a row10",
+    "alwaysOutputData": true,
+    "credentials": {
+      "supabaseApi": {
+        "id": "m1woCcRiviWIbcit",
+        "name": "Supabase Plataforma_Restaurantes"
+      }
+    }
+  },
+  {
+    "parameters": {
+      "conditions": {
+        "options": {
+          "caseSensitive": true,
+          "leftValue": "",
+          "typeValidation": "strict",
+          "version": 3
+        },
+        "conditions": [
+          {
+            "id": "77dc803d-e348-4797-b533-d22928cde9ab",
+            "leftValue": "={{ $json }}",
+            "rightValue": "",
+            "operator": {
+              "type": "object",
+              "operation": "empty",
+              "singleValue": true
+            }
+          }
+        ],
+        "combinator": "and"
+      },
+      "options": {}
+    },
+    "type": "n8n-nodes-base.if",
+    "typeVersion": 2.3,
+    "position": [
+      1664,
+      16
+    ],
+    "id": "0e80e3f9-ed75-4377-9f7f-b01955d7fec2",
+    "name": "If1"
+  },
+  {
+    "parameters": {
+      "options": {}
+    },
+    "type": "n8n-nodes-base.splitInBatches",
+    "typeVersion": 3,
+    "position": [
+      1664,
+      -160
+    ],
+    "id": "006422db-0daf-45bb-8484-f5cb0618b13e",
+    "name": "Loop Over Items1"
+  },
+  {
+    "parameters": {
+      "operation": "get",
+      "tableId": "grupos_empresariales",
+      "filters": {
+        "conditions": [
+          {
+            "keyName": "empresa_id",
+            "keyValue": "={{ $json.empresa_id }}"
+          }
+        ]
+      }
+    },
+    "type": "n8n-nodes-base.supabase",
+    "typeVersion": 1,
+    "position": [
+      1872,
+      -144
+    ],
+    "id": "cba32a86-3efa-40c6-a86c-34f952aee916",
+    "name": "Get a row11",
+    "alwaysOutputData": true,
+    "credentials": {
+      "supabaseApi": {
+        "id": "m1woCcRiviWIbcit",
+        "name": "Supabase Plataforma_Restaurantes"
+      }
+    }
+  },
+  {
+    "parameters": {
+      "conditions": {
+        "options": {
+          "caseSensitive": true,
+          "leftValue": "",
+          "typeValidation": "strict",
+          "version": 3
+        },
+        "conditions": [
+          {
+            "id": "77dc803d-e348-4797-b533-d22928cde9ab",
+            "leftValue": "={{ $json }}",
+            "rightValue": "",
+            "operator": {
+              "type": "object",
+              "operation": "empty",
+              "singleValue": true
+            }
+          }
+        ],
+        "combinator": "and"
+      },
+      "options": {}
+    },
+    "type": "n8n-nodes-base.if",
+    "typeVersion": 2.3,
+    "position": [
+      2080,
+      -144
+    ],
+    "id": "4ddca045-e629-48aa-8edb-8045c453da76",
+    "name": "If2"
+  },
+  {
+    "parameters": {
+      "assignments": {
+        "assignments": [
+          {
+            "id": "cb50d77c-d953-43a9-86a4-6dfd270e9c8f",
+            "name": "responsable_id",
+            "value": "={{ $('Get a row').item.json.responsable_id }}",
+            "type": "string"
+          },
+          {
+            "id": "d5f139bc-b9d7-4e93-9bce-7c5b22eaa395",
+            "name": "Dia",
+            "value": "={{ new Date($('Get a row').item.json.fecha_turno).toLocaleDateString('es-ES', { weekday: 'long' }) }}",
+            "type": "string"
+          },
+          {
+            "id": "f3f054e8-4fc9-4044-8143-29d68c785422",
+            "name": "fecha_turno",
+            "value": "={{ $('Get a row').item.json.fecha_turno }}",
+            "type": "string"
+          },
+          {
+            "id": "65a2c331-2240-4aa8-9b66-3ac1cc61ec06",
+            "name": "hora_inicio",
+            "value": "={{ $('Get a row').item.json.hora_inicio }}",
+            "type": "string"
+          },
+          {
+            "id": "85722893-0aff-44f1-b16e-c963737db753",
+            "name": "hora_fin",
+            "value": "={{ $('Get a row').item.json.hora_fin }}",
+            "type": "string"
+          },
+          {
+            "id": "c567d06a-79a4-4397-83c7-a892c5172883",
+            "name": "Horas",
+            "value": "={{ (() => { const inicio = new Date(\"1970-01-01T\" + $('Get a row').item.json.hora_inicio + \"Z\"); const fin = new Date(\"1970-01-01T\" + $('Filter').item.json.hora_fin + \"Z\"); const diff = (fin - inicio) / (1000 * 60); const horas = Math.floor(diff / 60); const minutos = diff % 60; return `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`; })() }}",
+            "type": "string"
+          },
+          {
+            "id": "0aa587cb-69f6-4f50-9567-0dd72d82cacd",
+            "name": "Diurnas",
+            "value": "={{ (() => { const inicio = new Date(\"1970-01-01T\" + $('Get a row').item.json.hora_inicio + \"Z\"); const fin = new Date(\"1970-01-01T\" + $('Filter').item.json.hora_fin + \"Z\"); const diurnoInicio = new Date(\"1970-01-01T06:00:00Z\"); const diurnoFin = new Date(\"1970-01-01T18:00:00Z\"); const inicioEfectivo = new Date(Math.max(inicio, diurnoInicio)); const finEfectivo = new Date(Math.min(fin, diurnoFin)); if (inicioEfectivo >= finEfectivo) return \"00:00\"; const diffMinutos = (finEfectivo - inicioEfectivo) / (1000 * 60); const horas = Math.floor(diffMinutos / 60); const minutos = diffMinutos % 60; return `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`; })() }}",
+            "type": "string"
+          },
+          {
+            "id": "ea1fdd4c-7789-49fa-a980-903d4203ec23",
+            "name": "Nocturnas",
+            "value": "={{ (() => { const inicio = new Date(\"1970-01-01T\" + $('Get a row').item.json.hora_inicio + \"Z\"); const fin = new Date(\"1970-01-01T\" + $('Get a row').item.json.hora_fin + \"Z\"); let minutosNocturnos = 0; const nocturnoInicio1 = new Date(\"1970-01-01T00:00:00Z\"); const nocturnoFin1 = new Date(\"1970-01-01T06:00:00Z\"); const nocturnoInicio2 = new Date(\"1970-01-01T18:00:00Z\"); const nocturnoFin2 = new Date(\"1970-01-01T23:59:59Z\"); const inicioEfectivo1 = new Date(Math.max(inicio, nocturnoInicio1)); const finEfectivo1 = new Date(Math.min(fin, nocturnoFin1)); if (inicioEfectivo1 < finEfectivo1) minutosNocturnos += (finEfectivo1 - inicioEfectivo1) / (1000 * 60); const inicioEfectivo2 = new Date(Math.max(inicio, nocturnoInicio2)); const finEfectivo2 = new Date(Math.min(fin, nocturnoFin2)); if (inicioEfectivo2 < finEfectivo2) minutosNocturnos += (finEfectivo2 - inicioEfectivo2) / (1000 * 60); const horas = Math.floor(minutosNocturnos / 60); const minutos = minutosNocturnos % 60; return `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`; })() }}",
+            "type": "string"
+          },
+          {
+            "id": "c517d6f3-fc7e-459a-9ea7-b79037f61839",
+            "name": "Propinas",
+            "value": "={{ $('Filter').item.json.propinas }}",
+            "type": "number"
+          },
+          {
+            "id": "fbcbdea4-b35f-464d-8ed2-dfe3bf1fa959",
+            "name": "sede",
+            "value": "={{ $('Filter').item.json.empresa_id }}",
+            "type": "string"
+          }
+        ]
+      },
+      "options": {}
+    },
+    "type": "n8n-nodes-base.set",
+    "typeVersion": 3.4,
+    "position": [
+      2288,
+      -160
+    ],
+    "id": "e6cef9ca-e058-47f3-a2a7-7832ceb9703f",
+    "name": "Edit Fields10"
+  },
+  {
+    "parameters": {
+      "operation": "get",
+      "tableId": "apoyos_turno_locales",
+      "filters": {
+        "conditions": [
+          {
+            "keyName": "empresa_id",
+            "keyValue": "={{ $('Loop Over Items2').item.json.empresa_id }}"
+          },
+          {
+            "keyName": "apoyo_responsable_id",
+            "keyValue": "={{ $('Loop Over Items2').item.json.responsable_id }}"
+          }
+        ]
+      }
+    },
+    "type": "n8n-nodes-base.supabase",
+    "typeVersion": 1,
+    "position": [
+      3328,
+      -272
+    ],
+    "id": "4e2bdb1d-6199-44d4-8cb5-dc1d1d3a902f",
+    "name": "Get a row12",
+    "alwaysOutputData": true,
+    "credentials": {
+      "supabaseApi": {
+        "id": "m1woCcRiviWIbcit",
+        "name": "Supabase Plataforma_Restaurantes"
+      }
+    }
+  },
+  {
+    "parameters": {
+      "assignments": {
+        "assignments": [
+          {
+            "id": "3265ac15-9dba-4325-90cd-5ce25ece3d1c",
+            "name": "sedes",
+            "value": "={{ $('Webhook').item.json.body.sedes }}",
+            "type": "array"
+          }
+        ]
+      },
+      "options": {}
+    },
+    "type": "n8n-nodes-base.set",
+    "typeVersion": 3.4,
+    "position": [
+      2080,
+      -304
+    ],
+    "id": "f9ad6d77-aba1-4c6f-b3b9-1f632d24de49",
+    "name": "Edit Fields11"
+  },
+  {
+    "parameters": {
+      "fieldToSplitOut": "sedes",
+      "options": {}
+    },
+    "type": "n8n-nodes-base.splitOut",
+    "typeVersion": 1,
+    "position": [
+      2288,
+      -304
+    ],
+    "id": "7a2ff49c-1048-464b-85de-6ea36e64b7ec",
+    "name": "Split Out1"
+  },
+  {
+    "parameters": {
+      "options": {}
+    },
+    "type": "n8n-nodes-base.splitInBatches",
+    "typeVersion": 3,
+    "position": [
+      2496,
+      -304
+    ],
+    "id": "af1e659b-a454-486f-b965-250d912b9c2e",
+    "name": "Loop Over Items2"
+  },
+  {
+    "parameters": {
+      "operation": "get",
+      "tableId": "grupos_empresariales",
+      "filters": {
+        "conditions": [
+          {
+            "keyName": "empresa_id",
+            "keyValue": "={{ $json.empresa_id }}"
+          }
+        ]
+      }
+    },
+    "type": "n8n-nodes-base.supabase",
+    "typeVersion": 1,
+    "position": [
+      2704,
+      -288
+    ],
+    "id": "1d55b226-ee57-4fdf-8e5b-440272e9d343",
+    "name": "Get a row13",
+    "alwaysOutputData": true,
+    "credentials": {
+      "supabaseApi": {
+        "id": "m1woCcRiviWIbcit",
+        "name": "Supabase Plataforma_Restaurantes"
+      }
+    }
+  },
+  {
+    "parameters": {
+      "conditions": {
+        "options": {
+          "caseSensitive": true,
+          "leftValue": "",
+          "typeValidation": "strict",
+          "version": 3
+        },
+        "conditions": [
+          {
+            "id": "77dc803d-e348-4797-b533-d22928cde9ab",
+            "leftValue": "={{ $json }}",
+            "rightValue": "",
+            "operator": {
+              "type": "object",
+              "operation": "empty",
+              "singleValue": true
+            }
+          }
+        ],
+        "combinator": "and"
+      },
+      "options": {}
+    },
+    "type": "n8n-nodes-base.if",
+    "typeVersion": 2.3,
+    "position": [
+      2912,
+      -288
+    ],
+    "id": "f3a97a41-b7cf-41fa-a3a1-9605d852d696",
+    "name": "If3"
+  }
+]

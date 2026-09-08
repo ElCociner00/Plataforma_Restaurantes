@@ -1,247 +1,929 @@
+/* =========================================================
+   FACTURACIÓN · pantalla de suscripción y cobro
+   ---------------------------------------------------------
+   Todo sobre los tokens de css/variables.css; el literal que
+   acompaña a cada var() es solo el respaldo por si esa hoja
+   no cargara.
+
+   LA DECISIÓN QUE ORDENA ESTA HOJA
+   ---------------------------------------------------------
+   Antes, cada bloque era un .billing-panel idéntico: la tabla
+   de "cómo se calcula tu plan" pesaba lo mismo que el importe
+   a pagar, y el precio -- lo único que el cliente necesita
+   leer en dos segundos -- iba en texto corrido de 15px.
+
+   Ahora hay una jerarquía explícita, de más a menos peso:
+
+     1. .fx-precio          la cifra. 40-56px, ink, tabular.
+     2. .fx-btn--primario   qué hacer con ella.
+     3. .fx-cuenta          quién eres y hasta cuándo estás cubierto.
+     4. .fx-desglose        respaldo. Colapsado, en <details>.
+
+   Nada de lo que hay debajo del CTA puede competir en tamaño
+   ni en color con esos dos primeros.
+
+   PREFIJO
+   ---------------------------------------------------------
+   Todas las clases nuevas van con 'fx-'. Las viejas
+   (.billing-panel, .kv-line, .factura-table) ya no las emite
+   js/facturacion.js; se quedan fuera de esta hoja a propósito
+   para que no queden dos sistemas conviviendo.
+========================================================= */
+
+/* =========================
+   LIENZO
+   .main llega desde main.css como tarjeta blanca de 420px.
+   Aquí deja de ser tarjeta: el contenedor es transparente y
+   ancho, y cada bloque pone su propia superficie.
+========================= */
 .facturacion-main {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.factura-shell {
-  background: #f6f3ff;
-  border: 1px solid #ddd6fe;
-  border-radius: 14px;
-  padding: 18px;
-  display: grid;
-  gap: 16px;
-}
-
-.factura-sheet {
-  width: min(920px, 100%);
-  margin: 0 auto;
-  background: #fff;
-  border: 1px solid #d7d7d7;
-  border-radius: 8px;
-  padding: 14px;
-  display: grid;
-  gap: 10px;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-}
-
-.factura-block {
-  border: 1px solid #dcdcdc;
-  border-radius: 6px;
-  padding: 10px;
-}
-
-.factura-header {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 10px;
-}
-
-.factura-title {
-  margin: 0 0 8px;
-  font-size: 1rem;
-  color: #1f2937;
-}
-
-.kv-list {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-}
-
-.customer-list .kv-line {
-  grid-template-columns: 180px 1fr;
-}
-
-.kv-line {
-  display: grid;
-  grid-template-columns: 150px 1fr;
-  gap: 8px;
-  font-size: 0.9rem;
-}
-
-.kv-line dt,
-.kv-line dd {
-  margin: 0;
-}
-
-.kv-line dt {
-  color: #374151;
-  font-weight: 600;
-}
-
-.kv-line dd {
-  color: #111827;
-  word-break: break-word;
-}
-
-.factura-table-wrap {
-  overflow-x: auto;
-}
-
-.factura-table {
+  max-width: var(--ek-w-data, 1180px);
   width: 100%;
-  border-collapse: collapse;
-  min-width: 840px;
+  margin: clamp(20px, 4vh, 40px) auto clamp(40px, 8vh, 72px);
+  padding: 0 clamp(16px, 4vw, 28px);
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
-.factura-table th,
-.factura-table td {
-  border: 1px solid #e5e7eb;
-  padding: 8px;
-  font-size: 0.88rem;
-  text-align: left;
-}
-
-.factura-table th {
-  background: #f9fafb;
-  font-weight: 700;
-}
-
-.factura-table td.is-num,
-.factura-table th.is-num {
-  text-align: right;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.factura-tax-line {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  font-size: 0.9rem;
-}
-
-.factura-bottom {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 10px;
-}
-
-.factura-bottom-only-totals {
-  grid-template-columns: 1fr;
-}
-
-.factura-totals {
-  margin-left: auto;
-  width: min(360px, 100%);
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-}
-
-.factura-totals .row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 10px;
-  padding: 8px 10px;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.factura-totals .row:last-child {
-  border-bottom: 0;
-}
-
-.factura-totals .row strong:last-child {
-  text-align: right;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.factura-signature {
-  min-height: 120px;
-}
-
-.factura-legal {
-  font-size: 0.8rem;
-  color: #4b5563;
-}
-
-.factura-payment {
-  border: 1px dashed #c4b5fd;
-  border-radius: 8px;
-  padding: 12px;
-  background: #faf8ff;
-}
-
-.factura-payment p {
-  margin: 8px 0 0;
-  font-size: 0.9rem;
-}
-
-.btn-pago {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 168px;
-  height: 40px;
-  padding: 0 18px;
-  border-radius: 10px;
-  border: 1px solid #c4b5fd;
-  background: #6d28d9;
-  color: #fff;
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.factura-payment .btn-pago {
-  margin: 0 auto;
-}
-
-.factura-payment {
+.facturacion-main > h1 {
+  font-family: var(--ek-font-display, inherit);
+  font-size: clamp(1.75rem, 1.2rem + 2vw, 2.375rem);
+  font-weight: var(--ek-weight-bold, 700);
+  letter-spacing: -0.025em;
+  color: var(--ek-ink, #0f172a);
+  margin: 0 0 var(--ek-sp-2, 8px);
   text-align: center;
 }
 
-.billing-panel {
-  background: #fff;
-  border: 1px solid #ddd6fe;
-  border-radius: 12px;
-  padding: 16px;
+.facturacion-main > .helper-text {
+  text-align: center;
+  max-width: 56ch;
+  margin: 0 auto var(--ek-sp-8, 32px);
+  font-size: var(--ek-text-body, 0.9375rem);
+  color: var(--ek-muted, #5d6b7e);
+  line-height: var(--ek-leading-relaxed, 1.65);
 }
 
-.billing-panel h3 { margin-top: 0; }
-.billing-form { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 10px; align-items: end; }
-.billing-form--simple { grid-template-columns: minmax(260px, 1fr); max-width: 520px; }
-.billing-form label { display: grid; gap: 4px; font-size: 0.9rem; }
-.billing-form input,
-.billing-form select,
-.billing-form button { height: 38px; padding: 0 10px; }
-.billing-form input[type="file"] { height: auto; padding: 6px 0; }
-.billing-form button { border: 1px solid #c4b5fd; background: #4f46e5; color: #fff; border-radius: 8px; font-weight: 600; }
-
-.table-wrap { overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
-.table-wrap table { width: 100%; border-collapse: collapse; min-width: 680px; }
-.table-wrap th, .table-wrap td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; text-align: left; }
-.table-wrap th { background: #f8fafc; }
-
-.badge { display: inline-flex; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
-.badge.ok { background: #dcfce7; color: #166534; }
-.badge.bad { background: #fee2e2; color: #991b1b; }
-.badge.warn { background: #fef3c7; color: #92400e; }
-
-@media (max-width: 900px) {
-  .factura-shell { padding: 10px; }
-  .factura-sheet { padding: 10px; }
-  .factura-header,
-  .factura-bottom,
-  .billing-form { grid-template-columns: 1fr; }
-  .kv-line,
-  .customer-list .kv-line { grid-template-columns: 1fr; }
-  .factura-totals { margin-left: 0; }
+/* =========================
+   REJILLA
+========================= */
+.factura-shell {
+  display: grid;
+  gap: var(--ek-sp-5, 20px);
 }
 
+/* Compra + cuenta. En móvil, una debajo de otra y la compra primero:
+   el orden del DOM ya es el correcto, no hace falta reordenar. */
+.fx-principal {
+  display: grid;
+  gap: var(--ek-sp-5, 20px);
+  align-items: start;
+}
 
-.factura-payment-actions {
+@media (min-width: 900px) {
+  .fx-principal {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  }
+
+  /* Cuentas exentas, en implementación o sin activar no tienen bloque de
+     compra: la tarjeta de cuenta se queda sola y no debe encajonarse en la
+     columna estrecha, ni estirarse a lo ancho de la pantalla. */
+  .fx-principal > .fx-cuenta:only-child {
+    grid-column: 1 / -1;
+    max-width: 640px;
+  }
+}
+
+/* =========================
+   TARJETA BASE
+========================= */
+.fx-card {
+  background: var(--ek-surface, #ffffff);
+  border: 1px solid var(--ek-line, #e8edf3);
+  border-radius: var(--ek-radius-xl, 18px);
+  box-shadow: var(--ek-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.05));
+  padding: clamp(20px, 3vw, 28px);
+}
+
+/* main.css centra todo párrafo dentro de .main. Aquí el texto es de
+   lectura, no de formulario: se alinea a la izquierda. */
+.facturacion-main .fx-card p,
+.facturacion-main .fx-card h2,
+.facturacion-main .fx-card h3,
+.facturacion-main .fx-pie p {
+  text-align: left;
+}
+
+.fx-card-title {
+  font-family: var(--ek-font-display, inherit);
+  font-size: var(--ek-text-section, 1.1875rem);
+  font-weight: var(--ek-weight-semibold, 600);
+  letter-spacing: -0.015em;
+  color: var(--ek-ink, #0f172a);
+  margin: 0 0 var(--ek-sp-2, 8px);
+  line-height: var(--ek-leading-tight, 1.25);
+}
+
+.fx-card-title--sm {
+  font-size: 1.0625rem;
+}
+
+.facturacion-main .fx-card p {
+  font-size: var(--ek-text-body, 0.9375rem);
+  line-height: var(--ek-leading-relaxed, 1.65);
+  color: var(--ek-ink-2, #334155);
+  margin: 0 0 var(--ek-sp-3, 12px);
+}
+
+.facturacion-main .fx-card p:last-child {
+  margin-bottom: 0;
+}
+
+.facturacion-main .fx-muted {
+  font-size: var(--ek-text-note, 0.78125rem);
+  color: var(--ek-muted, #5d6b7e);
+  line-height: var(--ek-leading-normal, 1.5);
+}
+
+.fx-eyebrow {
+  display: inline-block;
+  font-size: var(--ek-text-label, 0.75rem);
+  font-weight: var(--ek-weight-semibold, 600);
+  letter-spacing: var(--ek-tracking-label, 0.06em);
+  text-transform: uppercase;
+  color: var(--ek-plum-600, #5b3a8f);
+  margin-bottom: var(--ek-sp-1, 4px);
+}
+
+.fx-eyebrow--interno {
+  color: var(--ek-muted-2, #78889c);
+}
+
+.facturacion-main .fx-alerta {
+  font-size: var(--ek-text-note, 0.78125rem);
+  font-weight: var(--ek-weight-medium, 500);
+  color: var(--ek-bad-700, #b91c1c);
+  margin: 0 0 var(--ek-sp-3, 12px);
+}
+
+.fx-estado:empty {
+  display: none;
+}
+
+.facturacion-main .fx-estado {
+  margin-top: var(--ek-sp-3, 12px);
+  font-size: var(--ek-text-note, 0.78125rem);
+  color: var(--ek-plum-700, #4a3474);
+  font-weight: var(--ek-weight-medium, 500);
+}
+
+/* Tarjetas de estado: avisan sin gritar. */
+.fx-card--aviso {
+  border-color: var(--ek-info-600, #2563eb);
+  background: var(--ek-info-100, #eff6ff);
+}
+
+.fx-card--alerta {
+  border-color: var(--ek-warn-600, #d97706);
+  background: var(--ek-warn-100, #fffbeb);
+}
+
+.fx-cargando {
+  text-align: center;
+  color: var(--ek-muted, #5d6b7e);
+}
+
+/* =========================
+   INSIGNIAS
+========================= */
+.fx-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ek-sp-1, 4px);
+  padding: 5px 12px;
+  border-radius: var(--ek-radius-pill, 999px);
+  font-size: var(--ek-text-label, 0.75rem);
+  font-weight: var(--ek-weight-semibold, 600);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  background: var(--ek-surface-2, #f1f5f9);
+  color: var(--ek-ink-2, #334155);
+  border: 1px solid var(--ek-line, #e8edf3);
+}
+
+.fx-badge--ok {
+  background: var(--ek-ok-100, #ecfdf5);
+  color: var(--ek-ok-700, #047857);
+  border-color: transparent;
+}
+
+.fx-badge--warn {
+  background: var(--ek-warn-100, #fffbeb);
+  color: var(--ek-warn-700, #b45309);
+  border-color: transparent;
+}
+
+.fx-badge--mudo {
+  color: var(--ek-muted-2, #78889c);
+}
+
+.fx-badge--modalidad {
+  background: var(--ek-plum-100, #efe9fb);
+  color: var(--ek-plum-700, #4a3474);
+  border-color: transparent;
+}
+
+/* =========================
+   BLOQUE DE COMPRA · el protagonista
+========================= */
+.fx-compra {
+  border-color: var(--ek-plum-200, #ddd0f5);
+  box-shadow: var(--ek-shadow-raised, 0 4px 16px -6px rgba(15, 23, 42, 0.10));
+  /* Filete de marca arriba: señala cuál es el bloque que importa sin
+     recurrir a rellenar la tarjeta entera de color. */
+  border-top: 3px solid var(--ek-plum-600, #5b3a8f);
+  padding-top: clamp(18px, 2.6vw, 26px);
+}
+
+.fx-compra--vencida {
+  border-top-color: var(--ek-bad-600, #dc2626);
+}
+
+.fx-compra--vencida .fx-eyebrow {
+  color: var(--ek-bad-700, #b91c1c);
+}
+
+/* Una renovación anticipada no es deuda: es una reserva del periodo
+   siguiente. El filete verde lo dice antes de leer una palabra. */
+.fx-compra--reserva {
+  border-top-color: var(--ek-ok-600, #059669);
+}
+
+.fx-compra--reserva .fx-eyebrow {
+  color: var(--ek-ok-700, #047857);
+}
+
+/* ---- Cambio de modalidad ---- */
+.fx-cambio {
+  margin: var(--ek-sp-5, 20px) 0 0;
+  padding: var(--ek-sp-4, 16px);
+  background: var(--ek-surface-2, #f1f5f9);
+  border-radius: var(--ek-radius-lg, 14px);
+}
+
+.facturacion-main .fx-cambio-titulo {
+  font-size: var(--ek-text-body, 0.9375rem);
+  font-weight: var(--ek-weight-semibold, 600);
+  color: var(--ek-ink, #0f172a);
+  margin: 0 0 var(--ek-sp-3, 12px);
+}
+
+/* Dentro del bloque de cambio el selector se apoya en blanco, no en el gris
+   del propio bloque, o las dos superficies se confunden. */
+.fx-cambio .fx-selector {
+  background: var(--ek-surface, #ffffff);
+  border: 1px solid var(--ek-line, #e8edf3);
+  margin-bottom: var(--ek-sp-3, 12px);
+}
+
+/* La opción ya contratada se muestra marcada y deshabilitada: no es una
+   acción, es el estado actual. Sin el cursor de "no permitido", que sugeriría
+   un error. */
+.fx-selector-op:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.fx-selector-op[data-modalidad]:hover {
+  background: var(--ek-plum-050, #f9f6fe);
+  color: var(--ek-plum-700, #4a3474);
+}
+
+.fx-selector-precio {
+  font-size: var(--ek-text-note, 0.78125rem);
+  font-weight: var(--ek-weight-regular, 400);
+  color: var(--ek-muted, #5d6b7e);
+  font-variant-numeric: tabular-nums;
+}
+
+.fx-selector-op.is-activo .fx-selector-precio {
+  color: var(--ek-ink-2, #334155);
+}
+
+.fx-compra-head {
   display: flex;
-  gap: 10px;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ek-sp-3, 12px);
+  margin-bottom: var(--ek-sp-2, 8px);
+}
+
+.facturacion-main .fx-compra-sub {
+  color: var(--ek-muted, #5d6b7e);
+  margin-bottom: var(--ek-sp-5, 20px);
+}
+
+/* ---- Selector mensual / anual ---- */
+.fx-selector {
+  display: inline-flex;
+  padding: 4px;
+  gap: 4px;
+  background: var(--ek-surface-2, #f1f5f9);
+  border-radius: var(--ek-radius-pill, 999px);
+  margin-bottom: var(--ek-sp-5, 20px);
+  max-width: 100%;
+}
+
+.fx-selector-op {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ek-sp-2, 8px);
+  min-height: 40px;
+  padding: 0 var(--ek-sp-5, 20px);
+  border: 0;
+  border-radius: var(--ek-radius-pill, 999px);
+  background: none;
+  font: inherit;
+  font-size: var(--ek-text-body, 0.9375rem);
+  font-weight: var(--ek-weight-medium, 500);
+  color: var(--ek-muted, #5d6b7e);
+  cursor: pointer;
+  transition: background var(--ek-duration-fast, 120ms) var(--ek-ease, ease),
+              color var(--ek-duration-fast, 120ms) var(--ek-ease, ease);
+}
+
+.fx-selector-op:hover:not(.is-activo) {
+  color: var(--ek-ink, #0f172a);
+}
+
+.fx-selector-op.is-activo {
+  background: var(--ek-surface, #ffffff);
+  color: var(--ek-ink, #0f172a);
+  font-weight: var(--ek-weight-semibold, 600);
+  box-shadow: var(--ek-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.08));
+}
+
+.fx-selector-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--ek-radius-pill, 999px);
+  background: var(--ek-ok-100, #ecfdf5);
+  color: var(--ek-ok-700, #047857);
+  font-size: 0.6875rem;
+  font-weight: var(--ek-weight-bold, 700);
+  letter-spacing: 0.02em;
+}
+
+/* ---- El precio ---- */
+.fx-precio-bloque {
+  margin-bottom: var(--ek-sp-5, 20px);
+}
+
+.facturacion-main .fx-precio {
+  font-family: var(--ek-font-display, inherit);
+  font-size: clamp(2.5rem, 1.6rem + 3.6vw, 3.5rem);
+  font-weight: var(--ek-weight-bold, 700);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  color: var(--ek-ink, #0f172a);
+  /* Cifras de ancho fijo: el importe no baila al repintar. */
+  font-variant-numeric: tabular-nums;
+  margin: 0 0 var(--ek-sp-2, 8px);
+}
+
+.fx-precio-ciclo {
+  font-size: 1.125rem;
+  font-weight: var(--ek-weight-medium, 500);
+  letter-spacing: 0;
+  color: var(--ek-muted, #5d6b7e);
+  margin-left: var(--ek-sp-1, 4px);
+}
+
+.facturacion-main .fx-precio-nota {
+  font-size: var(--ek-text-body, 0.9375rem);
+  color: var(--ek-muted, #5d6b7e);
+  margin: 0 0 var(--ek-sp-2, 8px);
+}
+
+.facturacion-main .fx-ahorro {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: var(--ek-radius-pill, 999px);
+  background: var(--ek-ok-100, #ecfdf5);
+  color: var(--ek-ok-700, #047857);
+  font-size: var(--ek-text-note, 0.78125rem);
+  font-weight: var(--ek-weight-semibold, 600);
+  margin: 0 0 var(--ek-sp-2, 8px);
+}
+
+/* ---- Detalle de la factura pendiente ---- */
+.fx-detalle-factura {
+  display: grid;
+  gap: var(--ek-sp-2, 8px);
+  margin: 0 0 var(--ek-sp-4, 16px);
+  padding: var(--ek-sp-4, 16px);
+  background: var(--ek-surface-2, #f1f5f9);
+  border-radius: var(--ek-radius-lg, 14px);
+}
+
+.fx-detalle-factura > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ek-sp-4, 16px);
+}
+
+.fx-detalle-factura dt {
+  font-size: var(--ek-text-note, 0.78125rem);
+  color: var(--ek-muted, #5d6b7e);
+}
+
+.fx-detalle-factura dd {
+  margin: 0;
+  font-size: var(--ek-text-note, 0.78125rem);
+  font-weight: var(--ek-weight-semibold, 600);
+  color: var(--ek-ink, #0f172a);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.facturacion-main .fx-nota-modalidad {
+  font-size: var(--ek-text-note, 0.78125rem);
+  line-height: var(--ek-leading-relaxed, 1.65);
+  color: var(--ek-muted, #5d6b7e);
+  padding-top: var(--ek-sp-3, 12px);
+  border-top: 1px solid var(--ek-line, #e8edf3);
+  margin: var(--ek-sp-4, 16px) 0 0;
+}
+
+.facturacion-main .fx-letras {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ek-muted-2, #78889c);
+  margin: var(--ek-sp-3, 12px) 0 0;
+}
+
+/* =========================
+   BOTONES
+========================= */
+.fx-acciones {
+  display: flex;
   flex-wrap: wrap;
+  gap: var(--ek-sp-3, 12px);
+  margin: var(--ek-sp-4, 16px) 0 0;
 }
 
-.btn-pago-alt {
-  background: #0f766e;
-  border-color: #0f766e;
+.fx-acciones--principal {
+  margin-top: var(--ek-sp-5, 20px);
 }
 
-.factura-payment-note {
-  margin-top: 10px;
-  color: #0f172a;
+.fx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ek-sp-2, 8px);
+  min-height: var(--ek-touch-min, 44px);
+  padding: 0 var(--ek-sp-6, 24px);
+  border: 1px solid transparent;
+  border-radius: var(--ek-radius-md, 10px);
+  font: inherit;
+  font-size: var(--ek-text-body, 0.9375rem);
+  font-weight: var(--ek-weight-semibold, 600);
+  cursor: pointer;
+  text-align: center;
+  transition: background var(--ek-duration-fast, 120ms) var(--ek-ease, ease),
+              border-color var(--ek-duration-fast, 120ms) var(--ek-ease, ease),
+              transform var(--ek-duration-fast, 120ms) var(--ek-ease, ease);
+}
+
+.fx-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.fx-btn:focus-visible {
+  outline: var(--ek-focus-ring, 2px solid #8b5cf6);
+  outline-offset: 2px;
+}
+
+.fx-btn--primario {
+  background: var(--ek-plum-600, #5b3a8f);
+  color: var(--ek-on-brand, #ffffff);
+}
+
+.fx-btn--primario:hover:not(:disabled) {
+  background: var(--ek-plum-700, #4a3474);
+}
+
+.fx-btn--primario:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* El CTA de pago. Ancho completo en su tarjeta: es la única acción
+   que se espera de esta pantalla, y no compite con nada. */
+.fx-btn--grande {
+  width: 100%;
+  min-height: 52px;
+  font-size: 1.0625rem;
+  border-radius: var(--ek-radius-lg, 14px);
+  font-variant-numeric: tabular-nums;
+}
+
+.fx-btn--suave {
+  background: var(--ek-surface, #ffffff);
+  color: var(--ek-ink-2, #334155);
+  border-color: var(--ek-line-strong, #d5dee8);
+}
+
+.fx-btn--suave:hover:not(:disabled) {
+  background: var(--ek-surface-2, #f1f5f9);
+  border-color: var(--ek-muted-2, #78889c);
+}
+
+/* La baja no se esconde, pero tampoco se ofrece: sin relleno ni borde. */
+.fx-btn--texto {
+  background: none;
+  color: var(--ek-muted, #5d6b7e);
+  padding: 0 var(--ek-sp-3, 12px);
+  font-weight: var(--ek-weight-medium, 500);
+}
+
+.fx-btn--texto:hover:not(:disabled) {
+  color: var(--ek-bad-600, #dc2626);
+}
+
+/* =========================
+   QUÉ INCLUYE
+========================= */
+.fx-incluye {
+  list-style: none;
+  margin: var(--ek-sp-5, 20px) 0 0;
+  padding: var(--ek-sp-4, 16px) 0 0;
+  border-top: 1px solid var(--ek-line, #e8edf3);
+  display: grid;
+  gap: var(--ek-sp-3, 12px);
+}
+
+.fx-incluye li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ek-sp-2, 8px);
+  font-size: var(--ek-text-note, 0.78125rem);
+  line-height: var(--ek-leading-normal, 1.5);
+  color: var(--ek-ink-2, #334155);
+}
+
+.fx-incluye i {
+  flex-shrink: 0;
+  font-size: 1.0625rem;
+  line-height: 1.2;
+  color: var(--ek-ok-600, #059669);
+}
+
+.facturacion-main .fx-confianza {
+  display: flex;
+  align-items: center;
+  gap: var(--ek-sp-2, 8px);
+  margin: var(--ek-sp-4, 16px) 0 0;
+  font-size: var(--ek-text-note, 0.78125rem);
+  color: var(--ek-muted, #5d6b7e);
+}
+
+.fx-confianza i {
+  font-size: 1.125rem;
+  color: var(--ek-ok-600, #059669);
+  flex-shrink: 0;
+}
+
+/* =========================
+   TARJETA DE CUENTA
+========================= */
+.fx-cuenta-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ek-sp-3, 12px);
+}
+
+.fx-cuenta-nombre {
+  font-family: var(--ek-font-display, inherit);
+  font-size: 1.25rem;
+  font-weight: var(--ek-weight-semibold, 600);
+  letter-spacing: -0.02em;
+  color: var(--ek-ink, #0f172a);
+  margin: 0 0 2px;
+  line-height: var(--ek-leading-tight, 1.25);
+}
+
+.facturacion-main .fx-cuenta-detalle {
+  font-size: var(--ek-text-note, 0.78125rem);
+  color: var(--ek-muted, #5d6b7e);
+  margin: var(--ek-sp-3, 12px) 0 0;
+}
+
+.fx-cifras {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: var(--ek-sp-5, 20px) 0 0;
+  padding: 0;
+  background: var(--ek-line, #e8edf3);
+  border: 1px solid var(--ek-line, #e8edf3);
+  border-radius: var(--ek-radius-lg, 14px);
+  overflow: hidden;
+}
+
+.fx-cifra {
+  background: var(--ek-surface, #ffffff);
+  padding: var(--ek-sp-3, 12px) var(--ek-sp-4, 16px);
+}
+
+.fx-cifra dt {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: var(--ek-tracking-label, 0.06em);
+  color: var(--ek-muted, #5d6b7e);
+  margin-bottom: 2px;
+}
+
+.fx-cifra dd {
+  margin: 0;
+  font-size: var(--ek-text-body, 0.9375rem);
+  font-weight: var(--ek-weight-semibold, 600);
+  color: var(--ek-ink, #0f172a);
+  font-variant-numeric: tabular-nums;
+}
+
+.fx-sedes {
+  list-style: none;
+  margin: var(--ek-sp-4, 16px) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--ek-sp-2, 8px);
+}
+
+.fx-sedes li {
+  display: flex;
+  align-items: center;
+  gap: var(--ek-sp-2, 8px);
+  font-size: var(--ek-text-note, 0.78125rem);
+  color: var(--ek-ink-2, #334155);
+}
+
+.fx-sede-punto {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ek-plum-500, #7c53b8);
+  flex-shrink: 0;
+}
+
+.fx-sede-tag {
+  font-size: 0.6875rem;
+  color: var(--ek-muted, #5d6b7e);
+  font-style: italic;
+}
+
+/* =========================
+   DESGLOSE E HISTORIAL · respaldo, colapsados
+========================= */
+.fx-desglose {
+  padding: 0;
+  overflow: hidden;
+}
+
+.fx-desglose > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ek-sp-3, 12px);
+  flex-wrap: wrap;
+  padding: var(--ek-sp-4, 16px) clamp(20px, 3vw, 28px);
+  cursor: pointer;
+  font-size: var(--ek-text-body, 0.9375rem);
+  font-weight: var(--ek-weight-semibold, 600);
+  color: var(--ek-ink, #0f172a);
+  list-style: none;
+}
+
+.fx-desglose > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Cheurón propio: gira al abrir. */
+.fx-desglose > summary::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--ek-muted, #5d6b7e);
+  border-bottom: 2px solid var(--ek-muted, #5d6b7e);
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform var(--ek-duration-fast, 120ms) var(--ek-ease, ease);
+  order: 3;
+  flex-shrink: 0;
+}
+
+.fx-desglose[open] > summary::after {
+  transform: rotate(-135deg) translate(-2px, -2px);
+}
+
+.fx-desglose > summary:hover {
+  background: var(--ek-surface-2, #f1f5f9);
+}
+
+.fx-desglose > summary:focus-visible {
+  outline: var(--ek-focus-ring, 2px solid #8b5cf6);
+  outline-offset: -2px;
+}
+
+.fx-desglose-resumen {
+  margin-left: auto;
+  font-size: var(--ek-text-note, 0.78125rem);
+  font-weight: var(--ek-weight-regular, 400);
+  color: var(--ek-muted, #5d6b7e);
+  font-variant-numeric: tabular-nums;
+}
+
+/* =========================
+   TABLAS
+========================= */
+.fx-tabla-scroll {
+  overflow-x: auto;
+  border-top: 1px solid var(--ek-line, #e8edf3);
+  -webkit-overflow-scrolling: touch;
+}
+
+.fx-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ek-text-note, 0.78125rem);
+  min-width: 460px;
+}
+
+.fx-tabla th,
+.fx-tabla td {
+  padding: var(--ek-sp-3, 12px) var(--ek-sp-4, 16px);
+  text-align: left;
+  border-bottom: 1px solid var(--ek-line, #e8edf3);
+  white-space: nowrap;
+}
+
+.fx-tabla thead th {
+  background: var(--ek-surface-2, #f1f5f9);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: var(--ek-tracking-label, 0.06em);
+  color: var(--ek-muted, #5d6b7e);
+  font-weight: var(--ek-weight-semibold, 600);
+}
+
+.fx-tabla tbody td:first-child {
+  white-space: normal;
+  min-width: 200px;
+  color: var(--ek-ink-2, #334155);
+}
+
+.fx-tabla td:nth-child(n + 2) {
+  font-variant-numeric: tabular-nums;
+}
+
+.fx-tabla tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.fx-tabla tfoot th,
+.fx-tabla tfoot td {
+  background: var(--ek-surface-2, #f1f5f9);
+  font-weight: var(--ek-weight-semibold, 600);
+  color: var(--ek-ink, #0f172a);
+  border-bottom: 0;
+  border-top: 1px solid var(--ek-line-strong, #d5dee8);
+}
+
+.fx-tabla tfoot td {
+  text-align: left;
+}
+
+/* =========================
+   GESTIÓN E INTERNO
+========================= */
+.fx-gestion {
+  background: var(--ek-surface, #ffffff);
+}
+
+/* La herramienta de plataforma se distingue del producto: fondo apagado
+   y filete rayado, para que nadie la confunda con una opción del cliente. */
+.fx-interno {
+  background: var(--ek-surface-2, #f1f5f9);
+  border-style: dashed;
+  border-color: var(--ek-muted-2, #78889c);
+  box-shadow: none;
+}
+
+.fx-interno code {
+  font-family: var(--ek-font-mono, ui-monospace, monospace);
+  font-size: 0.75em;
+  padding: 2px 6px;
+  border-radius: var(--ek-radius-sm, 6px);
+  background: var(--ek-surface, #ffffff);
+  border: 1px solid var(--ek-line, #e8edf3);
+}
+
+/* =========================
+   PIE
+========================= */
+.fx-pie {
+  padding: var(--ek-sp-5, 20px) clamp(20px, 3vw, 28px);
+  border-top: 1px solid var(--ek-line, #e8edf3);
+}
+
+.facturacion-main .fx-pie p {
+  font-size: var(--ek-text-note, 0.78125rem);
+  color: var(--ek-muted, #5d6b7e);
+  line-height: var(--ek-leading-relaxed, 1.65);
+  margin: 0 0 var(--ek-sp-1, 4px);
+}
+
+.fx-pie a {
+  color: var(--ek-plum-600, #5b3a8f);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* =========================
+   MÓVIL
+========================= */
+@media (max-width: 640px) {
+  .facturacion-main {
+    padding: 0 var(--ek-sp-4, 16px);
+  }
+
+  .fx-card {
+    padding: var(--ek-sp-5, 20px);
+    border-radius: var(--ek-radius-lg, 14px);
+  }
+
+  .fx-compra-head,
+  .fx-cuenta-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* Cada opción a la mitad: dos objetivos táctiles de tamaño real. */
+  .fx-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .fx-selector-op {
+    justify-content: center;
+    padding: 0 var(--ek-sp-3, 12px);
+  }
+
+  /* Con nombre, precio y distintivo no cabe todo en una línea de móvil. */
+  .fx-cambio .fx-selector-op {
+    flex-direction: column;
+    gap: 2px;
+    min-height: 60px;
+    padding: var(--ek-sp-2, 8px);
+  }
+
+  .fx-cifras {
+    grid-template-columns: 1fr;
+  }
+
+  .fx-acciones {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fx-desglose > summary {
+    padding: var(--ek-sp-4, 16px) var(--ek-sp-5, 20px);
+  }
+
+  .fx-desglose-resumen {
+    width: 100%;
+    margin-left: 0;
+    order: 4;
+  }
+}
+
+/* =========================
+   ACCESIBILIDAD
+========================= */
+@media (prefers-reduced-motion: reduce) {
+  .fx-btn,
+  .fx-selector-op,
+  .fx-desglose > summary::after {
+    transition: none;
+  }
+
+  .fx-btn--primario:active:not(:disabled) {
+    transform: none;
+  }
 }
