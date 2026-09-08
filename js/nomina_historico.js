@@ -253,17 +253,35 @@ const borrarNominaHistorica = async (row) => {
 const consultarHistoricoNomina = async () => {
   setStatus("Consultando histórico de nómina...");
   try {
+    // El selector de sede ofrece "Todas las sedes" y `filterHistoricoRows` ya
+    // filtra por sede en el navegador. La consulta, en cambio, se fijaba a
+    // `context.empresa_id`: el selector no podía funcionar y, en una sede sin
+    // nóminas propias, la pantalla salía siempre vacía. Se traen las sedes del
+    // grupo y el filtrado fino queda donde ya estaba.
+    // RLS (`app_puede_ver_empresa`) sigue acotando lo que cada usuario ve.
+    const empresaActual = String(state.context?.empresa_id || "").trim();
+    const empresasVisibles = [...new Set(
+      state.locales.map((local) => String(local.id || "").trim())
+        .concat(empresaActual)
+        .filter(Boolean)
+    )];
+
+    if (!empresasVisibles.length) {
+      throw new Error("no hay ninguna sede disponible para consultar");
+    }
+
     const { data, error } = await supabase
       .from("historico_nomina")
       .select("*")
-      .eq("empresa_id", state.context?.empresa_id || "")
+      .in("empresa_id", empresasVisibles)
       .order("created_at", { ascending: false });
 
     if (error) throw new Error(error.message);
 
     state.nominas = normalizeHistoricoRows(data || []);
     renderHistoricoRows(state.nominas);
-    setStatus(`Histórico consultado. ${state.nominas.length} nómina(s) recibida(s).`);
+    const alcance = empresasVisibles.length > 1 ? `${empresasVisibles.length} sedes` : "1 sede";
+    setStatus(`Histórico consultado (${alcance}). ${state.nominas.length} nómina(s) recibida(s).`);
   } catch (error) {
     state.nominas = [];
     renderHistoricoRows([]);

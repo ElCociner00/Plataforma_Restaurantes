@@ -33,6 +33,7 @@
 import { buildRequestHeaders, getUserContext } from "./session.js";
 import { fetchResponsablesActivos } from "./responsables.js";
 import { supabase } from "./supabase.js";
+import { resolverEsLocal, tablaSegunSede } from "./local_scope.js";
 
 const head = document.getElementById("historicoHead");
 const body = document.getElementById("historicoBody");
@@ -68,11 +69,16 @@ const EXCLUDED_DETAIL_FIELDS = new Set(["id"]);
 const normalizeFieldKey = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 const shouldExcludeGeneralField = (key) => EXCLUDED_GENERAL_FIELDS.has(key) || normalizeFieldKey(key).includes("responsableid");
 const getTimestamp = () => new Date().toISOString();
-const isLocalContext = () => state.context?.local_context === true || (state.context?.empresa_principal_id && state.context?.empresa_id && state.context.empresa_principal_id !== state.context.empresa_id);
-const getScopedTable = (tables) => tables[isLocalContext() ? "local" : "principal"];
+// La sede la resuelve la base (`app_es_local`), no una deducción del contexto
+// de sesión: ver js/local_scope.js. Se resuelve una vez en `loadInitialData` y
+// queda en `state.esLocal`; antes de eso `getScopedTable` lanza en vez de
+// adivinar una tabla.
+const isLocalContext = () => state.esLocal === true;
+const getScopedTable = (tables) => tablaSegunSede(tables, state.esLocal);
 
 const state = {
   context: null,
+  esLocal: null,
   allRows: [],
   filteredRows: [],
   allGeneralColumns: [],
@@ -1493,6 +1499,11 @@ const loadInitialData = async () => {
 
   setLoading(true, "Cargando historico...");
   try {
+    // Primero la sede, antes de cualquier consulta: de ella depende si se lee
+    // la tabla principal o la de sedes. Si no se resuelve, se corta aquí con
+    // un mensaje en pantalla en lugar de mostrar una tabla vacía.
+    state.esLocal = await resolverEsLocal(state.context.empresa_id);
+
     const payload = {
       tenant_id: state.context.empresa_id,
       empresa_id: state.context.empresa_id,
@@ -1555,7 +1566,11 @@ const loadInitialData = async () => {
     state.currentPage = 1;
 
     renderTable();
-    setStatus(state.allRows.length ? "Datos cargados." : "No se recibieron cierres.");
+    // Cuando no hay filas, decir DE DÓNDE se leyó. Un "no hay datos" a secas no
+    // permite distinguir un histórico vacío de una consulta a la tabla equivocada.
+    setStatus(state.allRows.length
+      ? "Datos cargados."
+      : `No se encontraron cierres para esta ${state.esLocal ? "sede" : "empresa"} en ${tableName}.`);
   } catch (error) {
     if (error?.name === "AbortError") {
       setStatus("La carga tardo mas de 5 segundos.");

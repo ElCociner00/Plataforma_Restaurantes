@@ -32,6 +32,7 @@
  */
 import { buildRequestHeaders, getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
+import { resolverEsLocal, tablaSegunSede } from "./local_scope.js";
 
 
 const head = document.getElementById("historicoHead");
@@ -55,8 +56,9 @@ const PAGE_SIZE = 20;
 const SUPABASE_PAGE_SIZE = 1000;
 const INVENTARIO_TABLES = { principal: "inventario_diario_resumen", local: "inventario_diario_resumen_locales" };
 const getTimestamp = () => new Date().toISOString();
-const isLocalContext = () => state.context?.local_context === true || (state.context?.empresa_principal_id && state.context?.empresa_id && state.context.empresa_principal_id !== state.context.empresa_id);
-const getScopedInventoryTable = () => INVENTARIO_TABLES[isLocalContext() ? "local" : "principal"];
+// La sede la resuelve la base (`app_es_local`), no el contexto de sesión:
+// ver js/local_scope.js. Se resuelve en `loadData` y queda en `state.esLocal`.
+const getScopedInventoryTable = () => tablaSegunSede(INVENTARIO_TABLES, state.esLocal);
 const getGeneralVisibilityKey = (tenantId) => `historico_cierre_inventarios_visibilidad_${tenantId || "global"}`;
 const getDetailVisibilityKey = (tenantId) => `historico_cierre_inventarios_detalle_visibilidad_${tenantId || "global"}`;
 const getDetailProductVisibilityKey = (tenantId) => `historico_cierre_inventarios_productos_visibilidad_${tenantId || "global"}`;
@@ -66,6 +68,7 @@ const getDetailOrderKey = (tenantId) => `historico_cierre_inventarios_orden_deta
 
 const state = {
   context: null,
+  esLocal: null,
   allRows: [],
   filteredRows: [],
   visibleGeneralColumns: ["fecha_cierre", "total_productos", "stock_total_inicial", "consumo_total", "stock_total_final"],
@@ -395,6 +398,9 @@ const loadData = async () => {
   setStatus("Cargando historico de inventarios...");
 
   try {
+    // La sede primero: de ella depende la tabla que se consulta.
+    state.esLocal = await resolverEsLocal(state.context.empresa_id);
+
     const tableName = getScopedInventoryTable();
     const directResult = await fetchAllInventoryRows(tableName, state.context.empresa_id);
 
@@ -418,9 +424,14 @@ const loadData = async () => {
     state.visibleDetailColumns = ordered.filter((col) => detailColumnsVisibility[col] !== false);
 
     applyFilters();
-    setStatus(rows.length ? "historico cargado." : "No hay datos historicos.");
+    setStatus(rows.length
+      ? "historico cargado."
+      : `No se encontraron inventarios para esta ${state.esLocal ? "sede" : "empresa"} en ${tableName}.`);
   } catch (error) {
-    setStatus("Error cargando historico de inventarios.");
+    // El motivo real importa: una vista inexistente y un histórico vacío se
+    // veían igual, y eso ocultó durante semanas que la tabla de sedes no existe.
+    console.error("[historico_cierre_inventarios] carga fallida", error);
+    setStatus(`Error cargando historico de inventarios: ${error?.message || "sin detalle"}`);
   }
 };
 
