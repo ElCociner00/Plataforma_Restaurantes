@@ -17,8 +17,20 @@ const previousCashBlock = between(
   "const syncEfectivoRealFromCajaBolsa",
 );
 assert(
-  previousCashBlock.includes("p_empresa_id: contextPayload.empresa_id"),
-  "La caja anterior no se consulta para la sede activa",
+  previousCashBlock.includes('.eq("empresa_id", contextPayload.empresa_id)'),
+  "La caja anterior no queda filtrada por la sede activa",
+);
+assert(
+  previousCashBlock.includes('"cierres_turno_final_locales"'),
+  "La caja anterior no distingue la tabla de sedes locales",
+);
+assert(
+  previousCashBlock.includes("app_es_local"),
+  "La caja anterior no valida si la empresa activa es una sede local",
+);
+assert(
+  !previousCashBlock.includes('rpc("efectivo_apertura_esperado"'),
+  "La caja anterior todavia acepta el fallback ambiguo del RPC",
 );
 
 const submitStateBlock = between(
@@ -34,12 +46,25 @@ assert(
   source.includes("no bloquea el cierre"),
   "El formulario no aclara que la observación permite continuar",
 );
+const buttonStateBlock = between(
+  source,
+  "const refreshEstadoBotonSubir",
+  "const aplicarBloqueoConstancia",
+);
+assert(
+  !buttonStateBlock.includes("solo_lectura"),
+  "La lectura de plan sigue deshabilitando el boton antes de enviar",
+);
+assert(
+  !between(source, 'btnEnviar.addEventListener("click"', 'btnConfirmarEnvio.addEventListener("click"').includes("solo_lectura"),
+  "El boton de envio sigue bloqueado en el cliente por la politica de plan",
+);
 assert(
   source.includes("Boolean(data?.es_local) !== Boolean(esperabaLocal)"),
   "Falta la guarda que confirma el destino local del cierre",
 );
 assert(
-  html.includes("../js/cierre_turno.js?v=20260908viva1"),
+  html.includes("../js/cierre_turno.js?v=20260908viva2"),
   "El HTML no fuerza la carga del hotfix de Viva",
 );
 

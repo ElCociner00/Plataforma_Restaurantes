@@ -377,37 +377,64 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const { data, error } = await supabase.rpc("efectivo_apertura_esperado", {
-      p_fecha: fecha.value,
-      p_numero: numeroTurno,
-      // Es obligatorio para sedes locales. Sin este valor, Postgres usa la
-      // empresa principal del usuario y puede heredar una caja de otra sede.
+    // El RPC historico sustituia silenciosamente una sede no resuelta por la
+    // empresa principal. Eso podia mostrar una caja real, pero de otro local.
+    // Se consulta la tabla correcta y se conserva el UUID exacto como filtro.
+    const { data: esLocal, error: tipoError } = await supabase.rpc("app_es_local", {
       p_empresa_id: contextPayload.empresa_id
     });
+    if (tipoError) {
+      console.error("[cierre_turno] no se pudo resolver el tipo de sede", tipoError);
+      if (efectivoAperturaOrigen) efectivoAperturaOrigen.textContent = "No se pudo cargar la caja anterior";
+      return;
+    }
 
-    // Un fallo del RPC y "no hay turno anterior" se veian igual en pantalla:
-    // el campo vacio. Ahora se distinguen, y el motivo real queda en consola
-    // para no tener que diagnosticar a ciegas.
-    if (error || !data?.ok) {
-      console.error("[cierre_turno] efectivo_apertura_esperado fallo", {
-        p_fecha: fecha.value,
-        p_numero: numeroTurno,
-        error,
-        data
+    const tablaCierres = esLocal === true
+      ? "cierres_turno_final_locales"
+      : "cierres_turno_final";
+    const filtroAnterior = [
+      `fecha_turno.lt.${fecha.value}`,
+      `and(fecha_turno.eq.${fecha.value},numero_turno.lt.${numeroTurno})`
+    ].join(",");
+    const { data: filas, error } = await supabase
+      .from(tablaCierres)
+      .select("empresa_id, fecha_turno, numero_turno, caja_global, created_at")
+      .eq("empresa_id", contextPayload.empresa_id)
+      .or(filtroAnterior)
+      .order("fecha_turno", { ascending: false })
+      .order("numero_turno", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.error("[cierre_turno] consulta directa de caja anterior fallo", {
+        empresa_id: contextPayload.empresa_id,
+        tabla: tablaCierres,
+        error
       });
       if (efectivoAperturaOrigen) efectivoAperturaOrigen.textContent = "No se pudo cargar la caja anterior";
       return;
     }
 
-    if (!data.hay_anterior) {
+    const cierreAnterior = Array.isArray(filas) ? filas[0] : null;
+    if (!cierreAnterior) {
       if (efectivoAperturaEsperado) efectivoAperturaEsperado.value = "";
-      if (efectivoAperturaOrigen) efectivoAperturaOrigen.textContent = "Sin cierre anterior registrado";
+      if (efectivoAperturaOrigen) efectivoAperturaOrigen.textContent = "Sin cierre anterior registrado para esta sede";
       actualizarDiferenciaApertura();
       return;
     }
 
-    if (efectivoAperturaEsperado) efectivoAperturaEsperado.value = String(data.valor ?? 0);
-    if (efectivoAperturaOrigen) efectivoAperturaOrigen.textContent = data.etiqueta || "";
+    if (String(cierreAnterior.empresa_id) !== String(contextPayload.empresa_id)) {
+      console.error("[cierre_turno] se rechazo una caja perteneciente a otra sede", cierreAnterior);
+      if (efectivoAperturaOrigen) efectivoAperturaOrigen.textContent = "Caja anterior rechazada por sede incorrecta";
+      return;
+    }
+
+    if (efectivoAperturaEsperado) efectivoAperturaEsperado.value = String(cierreAnterior.caja_global ?? 0);
+    if (efectivoAperturaOrigen) {
+      const [year, month, day] = String(cierreAnterior.fecha_turno || "").split("-");
+      efectivoAperturaOrigen.textContent = `Caja del ${day}/${month}/${year} turno ${cierreAnterior.numero_turno}`;
+    }
     actualizarDiferenciaApertura();
   };
 
@@ -538,8 +565,10 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const refreshEstadoBotonSubir = () => {
-    const habilitar = verificado && empresaPolicy?.solo_lectura !== true;
-    btnEnviar.disabled = !habilitar;
+    // El servidor conserva la guarda de escritura. En el formulario, una
+    // observacion de cuadre o un fallo temporal leyendo el plan no puede dejar
+    // el cierre atrapado sin siquiera permitir el intento de envio.
+    btnEnviar.disabled = !verificado;
   };
 
   const aplicarBloqueoConstancia = (activo) => {
@@ -1176,14 +1205,6 @@ document.addEventListener("DOMContentLoaded", () => {
       { label: "Efectivo apertura", value: efectivoApertura?.value },
       { label: "Bolsa", value: bolsa?.value },
       { label: "Caja", value: caja?.value },
-      { label: "Efectivo real", value: inputsFinanzas.efectivo.real?.value },
-      { label: "Datafono real", value: inputsFinanzas.datafono.real?.value },
-      { label: "Rappi real", value: inputsFinanzas.rappi.real?.value },
-      { label: "Nequi real", value: inputsFinanzas.nequi.real?.value },
-      { label: "Transferencias real", value: inputsFinanzas.transferencias.real?.value },
-      { label: "Bono regalo real", value: inputsFinanzas.bono_regalo.real?.value },
-      { label: "Propina", value: inputsSoloVista.propina?.value },
-      { label: "Domicilios", value: inputsSoloVista.domicilios?.value },
       { label: "¿Hubo apoyos durante el turno?", value: apoyoHubo?.value }
     ];
     return requiredFields
@@ -1982,11 +2003,6 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   btnEnviar.addEventListener("click", async () => {
-    if (empresaPolicy?.solo_lectura === true) {
-      setStatus("Plan FREE: envio bloqueado. Solo visualizacion.");
-      confirmacionEnvio.classList.add("is-hidden");
-      return;
-    }
     if (!validateCamposObligatoriosCompletos()) return;
     if (!validateApoyoRows()) return;
     const estado = obtenerEstadoGlobalDiferencias();
@@ -1995,12 +2011,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   btnConfirmarEnvio.addEventListener("click", async () => {
-    if (empresaPolicy?.solo_lectura === true) {
-      setStatus("Plan FREE: no se permite subir cierres.");
-      confirmacionEnvio.classList.add("is-hidden");
-      return;
-    }
-
     setStatus("Enviando cierre...");
     const payload = await construirPayloadEnvio();
     if (!payload) return;
