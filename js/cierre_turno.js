@@ -352,12 +352,12 @@ document.addEventListener("DOMContentLoaded", () => {
     // que la persona no tenga que aprender un codigo nuevo.
     if (diferencia < 0) {
       efectivoAperturaDiferencia.classList.add("diff-faltante");
-      if (efectivoAperturaNota) efectivoAperturaNota.textContent = "Recibiste de menos";
+      if (efectivoAperturaNota) efectivoAperturaNota.textContent = "Recibiste de menos. Esta observación no bloquea el cierre";
       return;
     }
     if (diferencia > 0) {
       efectivoAperturaDiferencia.classList.add("diff-sobrante");
-      if (efectivoAperturaNota) efectivoAperturaNota.textContent = "Recibiste de más";
+      if (efectivoAperturaNota) efectivoAperturaNota.textContent = "Recibiste de más. Esta observación no bloquea el cierre";
       return;
     }
     efectivoAperturaDiferencia.classList.add("diff-ok");
@@ -371,9 +371,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const cargarEfectivoAperturaEsperado = async () => {
     if (!fecha?.value || !numeroTurno) return;
 
+    const contextPayload = await getContextPayload();
+    if (!contextPayload?.empresa_id) {
+      if (efectivoAperturaOrigen) efectivoAperturaOrigen.textContent = "No se pudo identificar la sede";
+      return;
+    }
+
     const { data, error } = await supabase.rpc("efectivo_apertura_esperado", {
       p_fecha: fecha.value,
-      p_numero: numeroTurno
+      p_numero: numeroTurno,
+      // Es obligatorio para sedes locales. Sin este valor, Postgres usa la
+      // empresa principal del usuario y puede heredar una caja de otra sede.
+      p_empresa_id: contextPayload.empresa_id
     });
 
     // Un fallo del RPC y "no hay turno anterior" se veian igual en pantalla:
@@ -745,6 +754,8 @@ document.addEventListener("DOMContentLoaded", () => {
     return {
       empresa_id: context.empresa_id,
       tenant_id: context.empresa_id,
+      empresa_principal_id: context.empresa_principal_id || context.empresa_id,
+      local_context: context.local_context === true,
       usuario_id: context.user?.id || context.user?.user_id,
       rol: context.rol,
       registrado_por: context.user?.id || context.user?.user_id,
@@ -1818,10 +1829,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const obtenerMensajeEnvio = (estado) => {
     if (estado === "faltante") {
-      return "En estos datos hay un faltante, ten en cuenta que esto se descontará de tu nómina.";
+      return "En estos datos hay un faltante. Quedará registrado para revisión, pero no bloquea el cierre.";
     }
     if (estado === "sobrante") {
-      return "En estos datos hay un sobrante, verifica bien las cuentas antes de enviar.";
+      return "En estos datos hay un sobrante. Verifica las cuentas; si son correctas, puedes continuar con el cierre.";
     }
     return "Buen trabajo! todo se ve bien, apreciamos tu esfuerzo.";
   };
