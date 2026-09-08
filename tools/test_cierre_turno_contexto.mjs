@@ -32,6 +32,10 @@ assert(
   !previousCashBlock.includes('rpc("efectivo_apertura_esperado"'),
   "La caja anterior todavia acepta el fallback ambiguo del RPC",
 );
+assert(
+  previousCashBlock.includes("fechaAnterior") && !previousCashBlock.includes("fecha_turno.lt."),
+  "La caja anterior todavía puede saltar a una fecha antigua en vez del día anterior",
+);
 
 const submitStateBlock = between(
   source,
@@ -56,6 +60,10 @@ assert(
   "La lectura de plan sigue deshabilitando el boton antes de enviar",
 );
 assert(
+  buttonStateBlock.includes("!consultaCompletada"),
+  "El envío no queda disponible inmediatamente después de consultar",
+);
+assert(
   !between(source, 'btnEnviar.addEventListener("click"', 'btnConfirmarEnvio.addEventListener("click"').includes("solo_lectura"),
   "El boton de envio sigue bloqueado en el cliente por la politica de plan",
 );
@@ -77,7 +85,7 @@ assert(
   "El payload sigue infiriendo incorrectamente si la empresa es local",
 );
 assert(
-  html.includes("../js/cierre_turno.js?v=20260908viva3"),
+  html.includes("../js/cierre_turno.js?v=20260908viva4"),
   "El HTML no fuerza la carga del hotfix de Viva",
 );
 

@@ -167,6 +167,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let resumenDescargado = false;
   let bloqueoConstanciaActivo = false;
   let verificado = false;
+  let consultaCompletada = false;
   let empresaPolicy = {
     plan: "free",
     activa: true,
@@ -400,10 +401,22 @@ document.addEventListener("DOMContentLoaded", () => {
     const tablaCierres = esLocal === true
       ? "cierres_turno_final_locales"
       : "cierres_turno_final";
-    const filtroAnterior = [
-      `fecha_turno.lt.${fecha.value}`,
-      `and(fecha_turno.eq.${fecha.value},numero_turno.lt.${numeroTurno})`
-    ].join(",");
+    // Una caja de semanas atrás no debe presentarse como si fuera la recibida
+    // ayer. Para el primer turno sólo se admite el último cierre del día
+    // inmediatamente anterior; para turnos posteriores se prioriza un turno
+    // previo del mismo día y, si no existe, el día anterior.
+    const fechaSeleccionada = new Date(`${fecha.value}T12:00:00`);
+    fechaSeleccionada.setDate(fechaSeleccionada.getDate() - 1);
+    const fechaAnterior = [
+      fechaSeleccionada.getFullYear(),
+      String(fechaSeleccionada.getMonth() + 1).padStart(2, "0"),
+      String(fechaSeleccionada.getDate()).padStart(2, "0")
+    ].join("-");
+    const filtros = [`fecha_turno.eq.${fechaAnterior}`];
+    if (numeroTurno > 1) {
+      filtros.push(`and(fecha_turno.eq.${fecha.value},numero_turno.lt.${numeroTurno})`);
+    }
+    const filtroAnterior = filtros.join(",");
     const { data: filas, error } = await supabase
       .from(tablaCierres)
       .select("empresa_id, fecha_turno, numero_turno, caja_global, created_at")
@@ -427,7 +440,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const cierreAnterior = Array.isArray(filas) ? filas[0] : null;
     if (!cierreAnterior) {
       if (efectivoAperturaEsperado) efectivoAperturaEsperado.value = "";
-      if (efectivoAperturaOrigen) efectivoAperturaOrigen.textContent = "Sin cierre anterior registrado para esta sede";
+      if (efectivoAperturaOrigen) efectivoAperturaOrigen.textContent = "Sin cierre del día anterior registrado para esta sede";
       actualizarDiferenciaApertura();
       return;
     }
@@ -573,10 +586,10 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const refreshEstadoBotonSubir = () => {
-    // El servidor conserva la guarda de escritura. En el formulario, una
-    // observacion de cuadre o un fallo temporal leyendo el plan no puede dejar
-    // el cierre atrapado sin siquiera permitir el intento de envio.
-    btnEnviar.disabled = !verificado;
+    // Una vez consultados los datos, el usuario puede enviar aunque exista una
+    // diferencia. Si omitió el botón Verificar, el clic de envío calcula y
+    // registra el cuadre antes de mostrar la confirmación.
+    btnEnviar.disabled = !consultaCompletada;
   };
 
   const aplicarBloqueoConstancia = (activo) => {
@@ -1591,6 +1604,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   btnConsultar.addEventListener("click", async () => {
     if (btnConsultar.disabled) return;
+    consultaCompletada = false;
+    verificado = false;
+    refreshEstadoBotonSubir();
     setConsultarLoading(true, "Consultando turno...");
     setStatus("Consultando Loggro...");
 
@@ -1677,7 +1693,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       setStatus(data.message || "Datos consultados.");
+      consultaCompletada = true;
       toggleButtons({ verificar: true });
+      refreshEstadoBotonSubir();
     } catch (err) {
       setStatus(err?.name === "AbortError"
         ? "La consulta tardó más de 8 segundos."
@@ -2018,8 +2036,32 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   btnEnviar.addEventListener("click", async () => {
+    if (!consultaCompletada) {
+      setStatus("Consulta primero los datos del turno antes de subir el cierre.");
+      return;
+    }
     if (!validateCamposObligatoriosCompletos()) return;
     if (!validateApoyoRows()) return;
+
+    // El envío no depende de que el botón Verificar haya quedado habilitado.
+    // Siempre recalculamos aquí para guardar las diferencias reales —positivas
+    // o negativas— como observación no bloqueante.
+    actualizarDomiciliosDesdeExtras();
+    const diferenciasActuales = {
+      efectivo: syncDiferenciaEfectivo(),
+      datafono: toNumberValue(inputsFinanzas.datafono.real.value) - toNumberValue(inputsFinanzas.datafono.sistema.value),
+      rappi: toNumberValue(inputsFinanzas.rappi.real.value) - toNumberValue(inputsFinanzas.rappi.sistema.value),
+      nequi: toNumberValue(inputsFinanzas.nequi.real.value) - toNumberValue(inputsFinanzas.nequi.sistema.value),
+      transferencias: toNumberValue(inputsFinanzas.transferencias.real.value) - toNumberValue(inputsFinanzas.transferencias.sistema.value),
+      bono_regalo: toNumberValue(inputsFinanzas.bono_regalo.real.value) - toNumberValue(inputsFinanzas.bono_regalo.sistema.value)
+    };
+    Object.entries(diferenciasActuales).forEach(([field, value]) => {
+      if (!inputsDiferencias[field]) return;
+      inputsDiferencias[field].input.value = String(value ?? 0);
+      actualizarEstadoDiferencia(field, value);
+    });
+    verificado = true;
+
     const estado = obtenerEstadoGlobalDiferencias();
     mensajeEnvio.textContent = obtenerMensajeEnvio(estado);
     confirmacionEnvio.classList.remove("is-hidden");
