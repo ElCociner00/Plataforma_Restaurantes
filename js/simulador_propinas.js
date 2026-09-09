@@ -160,9 +160,19 @@ const limiteConsultaSiguienteTurno = async ({ empresaId, esLocal, fecha, jornada
   });
 
   const limiteDia = finDeDiaLocalMs(fecha) ?? finResponsable;
-  return siguienteInicio !== null
+  const limite = siguienteInicio !== null
     ? Math.min(Math.max(finResponsable, limiteDia), siguienteInicio)
     : Math.max(finResponsable, limiteDia);
+
+  // `siguienteInicio` no es solo un número interno: dice si el límite de
+  // arriba viene de un turno de verdad registrado ese día, o si es el
+  // resguardo de "hasta medianoche" porque no hay ningún otro turno con el
+  // que acotar. En el segundo caso, una propina huérfana después del fin del
+  // responsable no es necesariamente un error de reparto: puede ser, con la
+  // misma probabilidad, un turno posterior que sencillamente nunca se
+  // guardó. La pantalla necesita distinguir los dos casos para no sugerir
+  // "aquí hay un bug" cuando lo que hay es un turno faltante.
+  return { limite, siguienteInicio };
 };
 
 /**
@@ -181,9 +191,10 @@ const cargarEventos = async ({ empresaId, esLocal, fecha, jornada, personas }) =
 
   const inicioResponsable = Date.parse(responsable.inicio);
   const finResponsable = Date.parse(responsable.fin);
-  const limite = Number.isFinite(inicioResponsable) && Number.isFinite(finResponsable)
+  const limiteInfo = Number.isFinite(inicioResponsable) && Number.isFinite(finResponsable)
     ? await limiteConsultaSiguienteTurno({ empresaId, esLocal, fecha, jornada, inicioResponsable, finResponsable })
     : null;
+  const limite = limiteInfo?.limite ?? null;
 
   // Filtro propio, independiente de cuándo se haya guardado la evidencia: no
   // basta con que la Edge Function filtrara bien al archivar -si ese archivo
@@ -193,6 +204,24 @@ const cargarEventos = async ({ empresaId, esLocal, fecha, jornada, personas }) =
     if (!Number.isFinite(inicioResponsable) || limite === null) return true;
     const marca = Date.parse(ocurridoEn);
     return Number.isFinite(marca) && marca >= inicioResponsable && marca <= limite;
+  };
+
+  // No hay ningún otro turno registrado ese día con el que acotar la
+  // consulta -el límite de arriba es el resguardo de "hasta medianoche",
+  // no un turno de verdad-. Si además queda alguna propina después del fin
+  // del responsable, lo más probable no es un error de reparto: es que ese
+  // turno siguiente existió de verdad pero nunca se guardó en el sistema.
+  // Se avisa así en vez de dejar que "Sin nadie presente" solo, sin más
+  // contexto, se lea como un fallo del cálculo.
+  const avisoTurnoFaltante = (eventos) => {
+    if (limiteInfo?.siguienteInicio != null) return "";
+    const hayTrasFin = eventos.some((e) => {
+      const marca = Date.parse(e.ocurrido_en);
+      return Number.isFinite(marca) && marca > finResponsable;
+    });
+    return hayTrasFin
+      ? " Las que quedan después de su hora de salida probablemente son de otro turno de ese mismo día que nunca se guardó -no hay ninguno registrado con el que compararlas-."
+      : "";
   };
 
   const { data: archivados, error: errorArchivo } = await supabase
@@ -209,9 +238,9 @@ const cargarEventos = async ({ empresaId, esLocal, fecha, jornada, personas }) =
     return {
       eventos: filtrados,
       origen: "archivo",
-      detalle: descartadas > 0
+      detalle: (descartadas > 0
         ? `${filtrados.length} propinas archivadas de este turno (${descartadas} de otro turno se excluyeron de esta vista).`
-        : `${filtrados.length} propinas archivadas de este turno.`,
+        : `${filtrados.length} propinas archivadas de este turno.`) + avisoTurnoFaltante(filtrados),
     };
   }
 
@@ -276,7 +305,8 @@ const cargarEventos = async ({ empresaId, esLocal, fecha, jornada, personas }) =
     eventos,
     origen: "loggro",
     detalle: `${eventos.length} propinas traídas de Loggro`
-           + (archivadoOk ? " y archivadas: la próxima vez se abren al instante." : "."),
+           + (archivadoOk ? " y archivadas: la próxima vez se abren al instante." : ".")
+           + avisoTurnoFaltante(eventos),
   };
 };
 
