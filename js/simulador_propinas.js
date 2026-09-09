@@ -116,9 +116,6 @@ const horaLocalAIso = (fecha, hhmm, referenciaInicio = null) => {
   return base.toISOString();
 };
 
-/** 23:59:59.999 de `fecha`, hora Colombia. Mismo límite que usa consultar-ventas. */
-const finDelDiaIso = (fecha) => new Date(`${fecha}T23:59:59.999-05:00`).toISOString();
-
 const setLoading = (activo) => loadingOverlay?.classList.toggle("is-hidden", !activo);
 const setStatus = (mensaje, esError = false) => {
   if (!status) return;
@@ -250,19 +247,20 @@ const cargarPersonas = async ({ empresaId, esLocal, fecha, jornada }) => {
   const nombre = (id) => (usuarios || []).find((u) => String(u.id) === String(id))?.nombre_completo || String(id || "Sin nombre");
 
   const inicioResp = horaLocalAIso(fecha, fila.hora_inicio);
-  const finRespTurno = horaLocalAIso(fecha, fila.hora_fin, Date.parse(inicioResp));
-  // El responsable cubre, como mínimo, hasta el fin del día -mismo límite que
-  // usa consultar-ventas para el total que ya se mostró en el cierre real, y
-  // que ahora también respeta la Edge Function del reparto. Sin esto, mover
-  // rangos aquí podía "huerfanar" propinas tardías que la Edge Function sí
-  // cuenta al cargar el turno la primera vez.
-  const finDia = finDelDiaIso(fecha);
+  // El responsable participa SOLO en su franja registrada, igual que
+  // cualquier apoyo -sin extender a fin de día aquí-. La Edge Function ya
+  // pide a Loggro hasta el fin del día para no perder facturas tardías (ver
+  // supabase/functions/consultar-propina-apoyos/index.ts); una propina fuera
+  // del horario de todos aparece como huérfana en vez de atribuírsele al
+  // responsable en silencio. Extenderlo aquí también rompía la simetría: el
+  // mismo horario escrito para el responsable y para un apoyo se comportaba
+  // distinto.
   const personas = [{
     id: String(fila.responsable_id),
     tipo: "responsable",
     nombre: nombre(fila.responsable_id),
     inicio: inicioResp,
-    fin: Date.parse(finRespTurno) >= Date.parse(finDia) ? finRespTurno : finDia,
+    fin: horaLocalAIso(fecha, fila.hora_fin, Date.parse(inicioResp)),
   }];
 
   (apoyos || []).forEach((a) => {
