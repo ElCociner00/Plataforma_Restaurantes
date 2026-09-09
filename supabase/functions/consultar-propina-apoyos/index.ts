@@ -94,15 +94,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
     let finResponsable = instanteLocal(fecha, finResponsableTexto).getTime();
     if (finResponsable <= inicioResponsable) finResponsable += 24 * 60 * 60 * 1000;
 
-    // El responsable cubre, como mínimo, hasta el fin del día -exactamente el
-    // mismo límite que usa consultar-ventas para el total que ya se le
-    // mostró al usuario ("Consultar Loggro"). Sin esto, esta función
-    // consultaba a Loggro solo hasta hora_fin del turno mientras que
-    // consultar-ventas seguía hasta medianoche: dos ventanas de tiempo
-    // distintas, así que los dos totales JAMÁS iban a coincidir, sin importar
-    // quién estuviera presente. (Si el turno cruza medianoche, lo de arriba ya
-    // corrió finResponsable al día siguiente; ese caso sigue mandando aquí.)
-    finResponsable = Math.max(finResponsable, finDelDia(fecha).getTime());
+    // OJO, esto NO se usa para decidir quién estuvo presente -eso sigue
+    // siendo el rango literal que se registró, igual para el responsable que
+    // para cualquier apoyo-. Es SOLO el límite de la consulta a Loggro:
+    // mismo fin del día que ya usa consultar-ventas, para que los dos totales
+    // (el que ve el usuario al abrir el turno y el que calcula esta función)
+    // salgan de la misma ventana de tiempo.
+    //
+    // La primera versión de este arreglo extendía finResponsable mismo, y con
+    // eso el responsable pasaba a "cubrir" el resto del día sin importar lo
+    // que se hubiera escrito, mientras que un apoyo con el MISMO horario
+    // escrito se quedaba en su rango literal -el mismo horario dando dos
+    // comportamientos distintos según quién lo llevara-. Una propina fuera
+    // del horario de todos ahora aparece como huérfana (ver más abajo), en
+    // vez de atribuírsele al responsable en silencio.
+    const finConsultaLoggro = Math.max(finResponsable, finDelDia(fecha).getTime());
 
     // El responsable y cada apoyo participan únicamente dentro de su franja.
     const personas: Persona[] = [{
@@ -141,8 +147,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const consulta = new URLSearchParams({
       status: "Pagada",
-      dateInit: new Date(personas[0].inicio).toISOString(),
-      dateEnd: new Date(personas[0].fin).toISOString(),
+      dateInit: new Date(inicioResponsable).toISOString(),
+      dateEnd: new Date(finConsultaLoggro).toISOString(),
     });
 
     const crudo = await pedirLoggro(admin, ctx.empresaId, `/invoices?${consulta.toString()}`);

@@ -16,28 +16,43 @@ const ventas = await readFile(path.join(root, "supabase/functions/consultar-vent
 const simulador = await readFile(path.join(root, "js/simulador_propinas.js"), "utf8");
 const failures = [];
 
-// ── La ventana de consulta a Loggro tiene que ser la MISMA en las dos
-// Edge Functions. Esta era la causa real, más de fondo que las huérfanas:
-// consultar-ventas (el total que ve el usuario primero) consulta hasta el
-// fin del día; consultar-propina-apoyos cortaba en hora_fin del turno. Dos
-// ventanas de tiempo distintas nunca iban a dar el mismo total, sin importar
-// quién estuviera presente. ──────────────────────────────────────────────
+// ── La ventana de CONSULTA a Loggro tiene que ser la MISMA en las dos Edge
+// Functions -eso fue la causa real del 78k → 15k, más de fondo que las
+// huérfanas: consultar-ventas consulta hasta el fin del día; consultar-
+// propina-apoyos cortaba en hora_fin del turno-. Pero esa extensión es SOLO
+// para la consulta: quién estuvo PRESENTE sigue siendo el rango literal, el
+// mismo mecanismo para el responsable que para un apoyo. La primera versión
+// de este arreglo extendía también la presencia del responsable, y eso hacía
+// que el mismo horario escrito para el responsable y para un apoyo se
+// comportara distinto (reportado probando con el mismo rango en los dos). ──
 
 assert(
   ventas.includes("const hasta = finDelDia(fecha)"),
   "consultar-ventas cambió su límite de consulta; revisa que siga igual antes de comparar",
 );
 assert(
-  edge.includes("finResponsable = Math.max(finResponsable, finDelDia(fecha).getTime())"),
-  "consultar-propina-apoyos ya no extiende al responsable hasta el fin del día: volverá a dar un total distinto al de consultar-ventas",
+  edge.includes("finConsultaLoggro = Math.max(finResponsable, finDelDia(fecha).getTime())"),
+  "consultar-propina-apoyos ya no extiende la CONSULTA hasta el fin del día: volverá a dar un total distinto al de consultar-ventas",
+);
+assert(
+  edge.includes("dateEnd: new Date(finConsultaLoggro).toISOString()"),
+  "la consulta a Loggro ya no usa el límite extendido",
+);
+assert(
+  between(edge, "const personas: Persona[] = [{", "}];").includes("fin: finResponsable,"),
+  "el responsable ya no participa en su franja literal: volvió a cubrir el día completo sin importar lo registrado, distinto de como se trata a un apoyo",
 );
 assert(
   edge.includes('import { esFechaValida, finDelDia, instanteLocal } from "../_shared/fechas.ts"'),
   "consultar-propina-apoyos dejó de importar finDelDia",
 );
 assert(
-  simulador.includes("finDelDiaIso") && between(simulador, "const personas = [{", "}];").includes("finDia"),
-  "el simulador ya no extiende al responsable hasta el fin del día: su recálculo local divergirá de la Edge Function",
+  !simulador.includes("finDelDiaIso") && !simulador.includes("finDia"),
+  "el simulador volvió a extender la presencia del responsable hasta fin de día: el mismo horario escrito para responsable y apoyo se comportará distinto",
+);
+assert(
+  between(simulador, "const personas = [{", "}];").includes('fin: horaLocalAIso(fecha, fila.hora_fin, Date.parse(inicioResp)),'),
+  "el simulador ya no calcula el fin del responsable igual que el de un apoyo",
 );
 
 // ── js/apoyos.js: la propina real nunca se pisa en silencio ────────────────
