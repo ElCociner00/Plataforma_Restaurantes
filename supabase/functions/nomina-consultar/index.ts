@@ -61,8 +61,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const empleadoId = data.empleado_id;
     const fechaInicio = data.fecha_inicio;
     const fechaFin = data.fecha_fin;
-    const tenantIds = data.tenant_ids && data.tenant_ids.length > 0 ? data.tenant_ids : (data.empresa_id ? [data.empresa_id] : [ctx.empresaId]);
-    
+    const tenantIdsSolicitados = data.tenant_ids && data.tenant_ids.length > 0 ? data.tenant_ids : (data.empresa_id ? [data.empresa_id] : [ctx.empresaId]);
+
+    // resolverContexto solo valida data.empresa_id/tenant_id (un único id, usado
+    // para decidir empresaId/esLocal). tenant_ids es un ARRAY aparte que llega
+    // tal cual del cuerpo: sin este filtro, cualquier cuenta podía pedir nómina
+    // de una empresa fuera de su alcance con solo conocer su id.
+    const tenantIds = ctx.esSuperadmin
+      ? tenantIdsSolicitados
+      : tenantIdsSolicitados.filter((id: string) => ctx.empresasVisibles.includes(id));
+    if (!tenantIds.length) throw errores.fueraDeAlcance();
+
     // Obtener el ID principal del usuario, por si el que nos envían es un ID local
     const { data: userLocal } = await admin
       .from("usuarios_locales")

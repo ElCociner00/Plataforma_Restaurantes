@@ -149,6 +149,49 @@ assert(
   "la tabla propina a propina ya no distingue las huérfanas de un reparto real",
 );
 
+// ── El filtro propio también debe aplicarse a la evidencia YA ARCHIVADA ────
+//
+// Un archivo guardado en propinas_turno_eventos ANTES de que existiera el
+// filtro (o antes de un cambio futuro en él) queda contaminado para siempre
+// si solo se filtra lo que llega fresco de Loggro: cargarEventos() lee el
+// archivo primero y, si tiene algo, ya no vuelve a consultar Loggro. Reportado
+// en vivo: un turno de mañana con evidencia archivada seguía mostrando
+// propinas de la tarde como "Sin nadie presente" pese al filtro de la Edge
+// Function, porque ese archivo se guardó con una versión anterior de él.
+
+assert(
+  simulador.includes("limiteConsultaSiguienteTurno") && simulador.includes("dentroDelRango"),
+  "el simulador ya no calcula su propio límite de turno para filtrar eventos",
+);
+assert(
+  between(simulador, "if (!errorArchivo && Array.isArray(archivados)", "return {").includes("archivados.filter((e) => dentroDelRango(e.ocurrido_en))"),
+  "la evidencia archivada ya no se filtra contra el límite del turno: un archivo viejo puede volver a mostrar propinas de otro turno",
+);
+assert(
+  /const eventos = \(Array\.isArray\(data\.eventos\) \? data\.eventos : \[\]\)\.filter\(\(e\) => dentroDelRango\(e\.ocurrido_en\)\)/.test(simulador),
+  "los eventos recién traídos de Loggro ya no se filtran contra el límite del turno en el propio simulador",
+);
+
+// ── El selector de sede solo debe ofrecer lo que el usuario puede tocar ────
+//
+// `empresas` tiene lectura pública en RLS (su nombre se usa en varias
+// pantallas), así que un select sin filtrar trae TODAS las empresas de TODOS
+// los clientes -prueba incluidas-. Reportado en vivo: desde la cuenta de un
+// cliente (no superadmin) el selector ofrecía "Prueba Global Nexo 2",
+// "Restaurante Prueba", etc. app_empresas_visibles() es la misma función que
+// ya usan las políticas RLS de las tablas de turnos: el selector nunca puede
+// ofrecer más de lo que luego se puede abrir de verdad.
+
+const cargarSedesBlock = between(simulador, "const cargarSedes = async", "const esAdmin");
+assert(
+  cargarSedesBlock.includes('supabase.rpc("app_empresas_visibles")'),
+  "cargarSedes ya no acota el selector a app_empresas_visibles(): volverá a listar empresas de otros clientes",
+);
+assert(
+  cargarSedesBlock.includes('.in("id", visibles)'),
+  "cargarSedes ya no filtra la tabla empresas por las visibles para este usuario",
+);
+
 if (failures.length) {
   console.error(failures.map((failure) => `- ${failure}`).join("\n"));
   process.exit(1);
