@@ -194,6 +194,13 @@
           <div id="apoyoRows" class="apoyo-rows"></div>
         </div>
       </div>
+
+      <!-- Desglose del reparto de propinas.
+           Se llena al pulsar "Confirmar apoyo" y NO entra en el PDF de la
+           constancia: es material de revision en pantalla, para poder auditar
+           de donde sale cada peso repartido. El reparto en si lo calcula la
+           Edge Function consultar-propina-apoyos; aqui solo se muestra. -->
+      <div id="propinasDesglose" class="propinas-desglose is-hidden" aria-live="polite"></div>
     </section>
 
     <section class="bloque">
@@ -327,14 +334,9 @@
         Incluye las fuentes de ingreso del turno (efectivo, datáfono, rappi, nequi, transferencias y bono regalo),
         mostrando el total con y sin gastos extras.
       </p>
-        <section class="bloque" id="bloqueRepartoPropinas">
-      <h2>Distribución y reparto de propinas del turno</h2>
-      <p class="totales-note">
-        Desglose visual del reparto de las propinas recaudadas entre el responsable y los apoyos del turno.
-      </p>
-      <div id="propinasDesglose" class="propinas-desglose is-hidden" aria-live="polite"></div>
     </section>
   </div>
+
   <script type="module" src="../js/cierre_turno.js?v=20260909gate1"></script>
   <script type="module" src="../js/cierre_turno_contabilidad_visual.js?v=20260823d"></script>
 

@@ -6,8 +6,8 @@
   <title>AXIOMA | Auditoría de propinas</title>
   <link rel="stylesheet" href="../css/variables.css">
   <link rel="stylesheet" href="../css/main.css">
-  <link rel="stylesheet" href="../css/cierre_turno_propinas.css?v=20260909sim2">
-  <link rel="stylesheet" href="../css/simulador_propinas.css?v=20260909sim2">
+  <link rel="stylesheet" href="../css/cierre_turno_propinas.css?v=20260909sim1">
+  <link rel="stylesheet" href="../css/simulador_propinas.css?v=20260909sim1">
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
 </head>
 <body style="display:none">
@@ -17,11 +17,11 @@
   <div id="loadingOverlay" class="loading-overlay is-hidden">Cargando turno...</div>
 
   <div class="main">
-    <h1>Auditoría y simulador de propinas</h1>
+    <h1>Auditoría de propinas</h1>
     <p class="intro">
-      Abre cualquier turno o define un horario para auditar, propina por propina, a qué hora entró y entre
+      Abre cualquier turno y mira, propina por propina, a qué hora entró y entre
       quiénes se repartió. Puedes mover los horarios de cada persona para ver
-      cómo cambiaría el reparto en tiempo real: <strong>es una simulación, no toca el turno
+      cómo cambiaría el reparto: <strong>es una simulación, no toca el turno
       guardado.</strong>
     </p>
 
@@ -33,19 +33,11 @@
 
     <div id="contenido">
       <section class="bloque">
-        <div class="sim-header-row">
-          <h2>Modo de consulta / simulación</h2>
-          <div class="sim-modo-tabs">
-            <button type="button" class="sim-tab active" id="tabModoBD">Turno cerrado en BD</button>
-            <button type="button" class="sim-tab" id="tabModoManual">Consulta por Horario / Manual</button>
-            <button type="button" class="sim-tab sim-tab-demo" id="btnCargarDemo">⚡ Cargar Demo Rápida</button>
-          </div>
-        </div>
-
-        <div class="sim-selector" id="panelModoBD">
+        <h2>Elige el turno</h2>
+        <div class="sim-selector">
           <label>
             Sede
-            <select id="selSede"><option value="">Cargando sedes...</option></select>
+            <select id="selSede"><option value="">Cargando...</option></select>
           </label>
           <label>
             Fecha
@@ -61,51 +53,20 @@
           </label>
           <button id="btnCargar" type="button">Cargar turno</button>
         </div>
-
-        <div class="sim-selector is-hidden" id="panelModoManual">
-          <label>
-            Sede
-            <select id="selSedeManual"><option value="">Cargando sedes...</option></select>
-          </label>
-          <label>
-            Fecha
-            <input id="selFechaManual" type="date">
-          </label>
-          <label>
-            Hora inicio
-            <input id="selHoraInicio" type="time" value="08:00">
-          </label>
-          <label>
-            Hora fin
-            <input id="selHoraFin" type="time" value="16:00">
-          </label>
-          <button id="btnConsultarLoggroManual" type="button">Consultar Loggro</button>
-          <button id="btnIniciarManual" type="button" class="btn-secundario">Iniciar sin Loggro</button>
-        </div>
-
         <p id="status" class="sim-status"></p>
         <p id="origenDatos" class="sim-origen is-hidden"></p>
       </section>
 
       <section class="bloque is-hidden" id="bloqueTurno">
-        <div class="sim-bloque-head">
-          <div>
-            <h2>Propinas que entraron ese turno</h2>
-            <p class="sim-nota">
-              Tal cual las reportó Loggro o el registro de turno: la hora exacta de cada factura con propina
-              y cuánto fue.
-            </p>
-          </div>
-          <button type="button" id="btnAgregarPropina" class="btn-sm">+ Agregar propina</button>
-        </div>
+        <h2>Propinas que entraron ese turno</h2>
+        <p class="sim-nota">
+          Tal cual las reportó Loggro: la hora exacta de cada factura con propina
+          y cuánto fue. Todavía sin repartir.
+        </p>
         <div class="sim-tabla-scroll">
           <table class="sim-tabla-propinas">
             <thead>
-              <tr>
-                <th>Hora exacta</th>
-                <th class="is-num">Propina</th>
-                <th class="is-action">Acción</th>
-              </tr>
+              <tr><th>Hora exacta</th><th class="is-num">Propina</th></tr>
             </thead>
             <tbody id="tablaPropinasBody"></tbody>
             <tfoot id="tablaPropinasPie"></tfoot>
@@ -114,16 +75,11 @@
       </section>
 
       <section class="bloque is-hidden" id="bloquePersonas">
-        <div class="sim-bloque-head">
-          <div>
-            <h2>Quién estuvo, y en qué horario</h2>
-            <p class="sim-nota">
-              Cambia una hora y mira abajo qué pasa con el reparto. Para deshacerlo,
-              "Volver al reparto real".
-            </p>
-          </div>
-          <button type="button" id="btnAgregarApoyo" class="btn-sm">+ Agregar persona/apoyo</button>
-        </div>
+        <h2>Quién estuvo, y en qué horario</h2>
+        <p class="sim-nota">
+          Cambia una hora y mira abajo qué pasa con el reparto. Para deshacerlo,
+          "Volver al reparto real".
+        </p>
         <div id="listaPersonas" class="sim-personas"></div>
         <div class="sim-acciones">
           <button id="btnRestaurar" type="button">Volver al reparto real</button>
@@ -139,6 +95,6 @@
     </div>
   </div>
 
-  <script type="module" src="../js/simulador_propinas.js?v=20260909sim2"></script>
+  <script type="module" src="../js/simulador_propinas.js?v=20260909sim1"></script>
 </body>
 </html>

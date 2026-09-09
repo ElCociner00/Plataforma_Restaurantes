@@ -72,32 +72,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const cuerpo = await leerCuerpo(req);
     const ctx = await resolverContexto(req, String(cuerpo.empresa_id ?? "") || null);
 
-    const apoyo = (cuerpo.apoyo ?? cuerpo.responsable_y_apoyos ?? cuerpo) as Record<string, unknown>;
-    const registros = Array.isArray(apoyo.registros ?? cuerpo.registros)
-      ? (apoyo.registros ?? cuerpo.registros) as Record<string, unknown>[]
+    const apoyo = (cuerpo.apoyo ?? cuerpo.responsable_y_apoyos ?? {}) as Record<string, unknown>;
+    const registros = Array.isArray(apoyo.registros)
+      ? apoyo.registros as Record<string, unknown>[]
       : [];
 
     const primero = registros[0] ?? {};
     const fecha = texto(apoyo.fecha) || texto(primero.fecha) || texto(cuerpo.fecha);
     if (!esFechaValida(fecha)) throw errores.datosIncompletos("fecha (YYYY-MM-DD)");
 
-    const responsableId = texto(apoyo.responsable_turno_id)
-      || texto(primero.responsable_turno_id)
-      || texto(cuerpo.responsable_turno_id)
-      || texto(cuerpo.responsable_id)
-      || texto(cuerpo.responsable)
-      || "responsable";
+    const responsableId = texto(apoyo.responsable_turno_id) || texto(primero.responsable_turno_id);
+    if (!responsableId) throw errores.datosIncompletos("responsable_turno_id");
 
-    const inicioResponsableTexto = texto(apoyo.hora_inicio)
-      || texto(primero.hora_inicio)
-      || texto(cuerpo.hora_inicio)
-      || texto((cuerpo.turno as Record<string, unknown>)?.inicio)
-      || "08:00";
-    const finResponsableTexto = texto(apoyo.hora_fin)
-      || texto(primero.hora_fin)
-      || texto(cuerpo.hora_fin)
-      || texto((cuerpo.turno as Record<string, unknown>)?.fin)
-      || "23:00";
+    // ── Personas y sus tramos ─────────────────────────────────────────────
+    const inicioResponsableTexto = texto(apoyo.hora_inicio) || texto(primero.hora_inicio);
+    const finResponsableTexto = texto(apoyo.hora_fin) || texto(primero.hora_fin);
     if (!inicioResponsableTexto || !finResponsableTexto) {
       throw errores.datosIncompletos("hora_inicio y hora_fin del turno");
     }
@@ -140,13 +129,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const admin = ctx.clienteAdmin();
     const sesion = await obtenerSesionLoggro(admin, ctx.empresaId);
 
-    const rangoMinimo = Math.min(...personas.map((p) => p.inicio));
-    const rangoMaximo = Math.max(...personas.map((p) => p.fin));
-
     const consulta = new URLSearchParams({
       status: "Pagada",
-      dateInit: new Date(rangoMinimo).toISOString(),
-      dateEnd: new Date(rangoMaximo).toISOString(),
+      dateInit: new Date(personas[0].inicio).toISOString(),
+      dateEnd: new Date(personas[0].fin).toISOString(),
     });
 
     const crudo = await pedirLoggro(admin, ctx.empresaId, `/invoices?${consulta.toString()}`);
