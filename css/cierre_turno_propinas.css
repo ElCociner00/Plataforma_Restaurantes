@@ -1,0 +1,254 @@
+/* Desglose visual del reparto de propinas.
+   Esta seccion NO entra en el PDF de la constancia: es material de revision
+   en pantalla para poder auditar el reparto. */
+
+.propinas-desglose {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid #d9cffa;
+  border-radius: 12px;
+  background: #faf8ff;
+}
+
+.propinas-desglose.is-hidden { display: none; }
+
+/* ── Cuadre ───────────────────────────────────────────────────────────── */
+
+.propinas-cuadre {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 10px;
+  border-left: 5px solid #16a34a;
+  background: #f0fdf4;
+}
+
+.propinas-cuadre-alerta {
+  border-left-color: #dc2626;
+  background: #fef2f2;
+}
+
+.propinas-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 190px;
+  flex: 1 1 190px;
+}
+
+.propinas-tarjeta-titulo {
+  font-size: 12px;
+  color: #52525b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.propinas-tarjeta-valor { font-size: 20px; color: #18181b; }
+
+.propinas-veredicto {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #3f3f46;
+}
+
+.propinas-cuadre-alerta .propinas-veredicto { color: #991b1b; font-weight: 600; }
+
+/* ── Bloques ──────────────────────────────────────────────────────────── */
+
+.propinas-bloque { margin-top: 22px; }
+
+.propinas-bloque-titulo {
+  margin: 0 0 2px;
+  font-size: 15px;
+  color: #4c1d95;
+}
+
+.propinas-bloque-nota {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  color: #52525b;
+}
+
+.propinas-vacio {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #71717a;
+  font-style: italic;
+}
+
+/* ── Linea de tiempo ──────────────────────────────────────────────────── */
+
+.propinas-escala {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #71717a;
+  margin: 0 0 6px 200px;
+}
+
+.propinas-fila-tiempo {
+  display: grid;
+  grid-template-columns: 190px 1fr 110px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.propinas-persona { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.propinas-persona strong { font-size: 13.5px; color: #18181b; overflow-wrap: anywhere; }
+
+.propinas-rol {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  width: fit-content;
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+
+.propinas-rol-responsable { background: #ede9fe; color: #5b21b6; }
+.propinas-rol-apoyo { background: #e0f2fe; color: #075985; }
+
+.propinas-carril {
+  position: relative;
+  height: 26px;
+  border-radius: 6px;
+  background: #ece7fb;
+  overflow: visible;
+}
+
+.propinas-barra {
+  position: absolute;
+  top: 6px;
+  height: 14px;
+  border-radius: 999px;
+}
+
+.propinas-barra-responsable { background: #8b5cf6; }
+.propinas-barra-apoyo { background: #38bdf8; }
+
+/* Cada marca es una propina en su hora exacta. */
+.propinas-marca {
+  position: absolute;
+  top: 2px;
+  width: 10px;
+  height: 22px;
+  margin-left: -5px;
+  border-radius: 3px;
+  background: #f59e0b;
+  border: 2px solid #ffffff;
+  cursor: help;
+}
+
+.propinas-sin-franja {
+  font-size: 11.5px;
+  color: #a1a1aa;
+  padding-left: 8px;
+  line-height: 26px;
+}
+
+.propinas-total-persona { text-align: right; font-weight: 700; color: #18181b; }
+
+/* ── Tabla propina a propina ──────────────────────────────────────────── */
+
+.propinas-tabla-scroll { overflow-x: auto; }
+
+.propinas-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: #ffffff;
+}
+
+.propinas-tabla th,
+.propinas-tabla td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #ece7fb;
+  text-align: left;
+  vertical-align: top;
+}
+
+.propinas-tabla th {
+  background: #f4f0ff;
+  color: #4c1d95;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.propinas-celda-hora { font-variant-numeric: tabular-nums; white-space: nowrap; color: #52525b; }
+.propinas-celda-monto { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.propinas-celda-division { font-variant-numeric: tabular-nums; color: #52525b; white-space: nowrap; }
+.propinas-celda-parte { font-variant-numeric: tabular-nums; font-weight: 700; color: #166534; white-space: nowrap; }
+
+.propinas-chip {
+  display: inline-block;
+  margin: 0 4px 4px 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ede9fe;
+  color: #5b21b6;
+  font-size: 12px;
+}
+
+/* ── Acumulado y bloques ──────────────────────────────────────────────── */
+
+.propinas-fila-persona { margin-bottom: 14px; }
+
+.propinas-fila-persona-cab {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.propinas-fila-persona-cab strong { font-size: 13.5px; }
+
+.propinas-cuenta { font-size: 12px; color: #71717a; }
+.propinas-monto { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.propinas-pista {
+  height: 12px;
+  border-radius: 999px;
+  background: #ece7fb;
+  overflow: hidden;
+}
+
+.propinas-relleno { height: 100%; border-radius: 999px; }
+.propinas-relleno-responsable { background: #8b5cf6; }
+.propinas-relleno-apoyo { background: #38bdf8; }
+.propinas-relleno-bloque { background: #f59e0b; }
+
+.propinas-porcentaje { font-size: 11.5px; color: #71717a; }
+
+.propinas-aviso {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: #991b1b;
+  font-weight: 600;
+}
+
+.propinas-fila-bloque {
+  display: grid;
+  grid-template-columns: 60px 1fr 110px 90px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.propinas-bloque-hora { font-variant-numeric: tabular-nums; font-size: 12.5px; color: #52525b; }
+
+/* ── Pantallas estrechas ──────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  .propinas-fila-tiempo { grid-template-columns: 1fr; gap: 4px; }
+  .propinas-escala { margin-left: 0; }
+  .propinas-total-persona { text-align: left; }
+  .propinas-fila-bloque { grid-template-columns: 52px 1fr 90px; }
+  .propinas-fila-bloque .propinas-cuenta { display: none; }
+}

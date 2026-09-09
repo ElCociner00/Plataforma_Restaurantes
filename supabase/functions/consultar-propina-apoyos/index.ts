@@ -14,7 +14,12 @@
  *   · Se redondea a 2 decimales por persona.
  *
  * Contrato de salida: { ok, detalles: [{ id, tipo, propina_correspondiente }],
+ *                       eventos: [{ factura_id, ocurrido_en, monto,
+ *                                   presentes, reparto }],
  *                       total_propina_dia, total_propina_distribuida }
+ *
+ * `eventos` es la traza propina por propina: misma regla de reparto, anotada
+ * paso a paso para poder mostrarla. Se añadió sin tocar el resto del contrato.
  */
 
 import { corsHeaders, json } from "../_shared/cors.ts";
@@ -136,6 +141,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // ── Reparto ───────────────────────────────────────────────────────────
     let totalRealPropinas = 0;
 
+    // Traza propina por propina. La regla de reparto NO cambia; lo único nuevo
+    // es que se anota cada paso para poder enseñarlo. El cliente veía solo el
+    // total por persona y no podía comprobar de dónde salía, de ahí la
+    // sospecha de que no se repartía.
+    const eventos: Array<{
+      factura_id: string;
+      ocurrido_en: string;
+      monto: number;
+      presentes: Array<{ id: string; tipo: string }>;
+      reparto: Array<{ id: string; tipo: string; parte: number }>;
+    }> = [];
+
     for (const factura of propias) {
       const pagado = (factura.paid ?? {}) as Record<string, unknown>;
       const pagos = Array.isArray(pagado.paymentMethodValue) ? pagado.paymentMethodValue : [];
@@ -155,8 +172,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
         totalRealPropinas += propina;
         const porPersona = propina / activas.length;
         for (const persona of activas) persona.propinaAsignada += porPersona;
+
+        eventos.push({
+          factura_id: texto(factura.id ?? factura.number ?? factura.invoiceNumber ?? ""),
+          ocurrido_en: new Date(marca).toISOString(),
+          monto: Math.round(propina * 100) / 100,
+          presentes: activas.map((p) => ({ id: p.id, tipo: p.tipo })),
+          // Redondeo solo para mostrar: el acumulado por persona sigue siendo
+          // el exacto, y es ese el que se concilia por centavos más abajo.
+          reparto: activas.map((p) => ({
+            id: p.id,
+            tipo: p.tipo,
+            parte: Math.round(porPersona * 100) / 100,
+          })),
+        });
       }
     }
+
+    eventos.sort((a, b) => a.ocurrido_en.localeCompare(b.ocurrido_en));
 
     // Conciliación por centavos: primero se asigna la parte entera y luego el
     // residuo a las fracciones mayores. Así la suma siempre coincide con el
@@ -194,7 +227,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     console.info(
       `[${ETIQUETA}] empresa=${ctx.empresaId} fecha=${fecha} personas=${personas.length} ` +
-      `facturas=${propias.length} total=${totalDia} repartido=${totalAsignado}`,
+      `facturas=${propias.length} propinas=${eventos.length} total=${totalDia} repartido=${totalAsignado}`,
     );
 
     return json({
@@ -203,6 +236,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
       empresa_id: ctx.empresaId,
       fecha,
       detalles,
+      // Añadido, no sustituye a nada: `detalles` y los totales conservan su
+      // contrato. `eventos` es la traza que alimenta la vista de reparto.
+      eventos,
       total_propina_dia: totalDia,
       total_propina_distribuida: Math.round(totalAsignado * 100) / 100,
       coinciden_totales: Math.abs(totalRealPropinas - totalAsignado) < 0.01,

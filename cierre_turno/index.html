@@ -15,6 +15,7 @@
        ver docs/2026-08-23_cierre_turno_diferencias_texto_superpuesto.md). -->
   <link rel="stylesheet" href="../css/cierre_turno.css?v=20260823d">
   <link rel="stylesheet" href="../css/cierre_turno_contabilidad.css?v=20260823d">
+  <link rel="stylesheet" href="../css/cierre_turno_propinas.css?v=20260908prop1">
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
   <!-- Librerias de terceros (PDF de la constancia de cierre).
        Version fijada a proposito: js/cierre_turno_pdf.js depende del global
@@ -177,6 +178,13 @@
           <div id="apoyoRows" class="apoyo-rows"></div>
         </div>
       </div>
+
+      <!-- Desglose del reparto de propinas.
+           Se llena al pulsar "Confirmar apoyo" y NO entra en el PDF de la
+           constancia: es material de revision en pantalla, para poder auditar
+           de donde sale cada peso repartido. El reparto en si lo calcula la
+           Edge Function consultar-propina-apoyos; aqui solo se muestra. -->
+      <div id="propinasDesglose" class="propinas-desglose is-hidden" aria-live="polite"></div>
     </section>
 
     <section class="bloque">

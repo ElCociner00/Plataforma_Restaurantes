@@ -42,6 +42,7 @@ import {
   WEBHOOK_CONSULTAR_GASTOS_CATALOGO
 } from "./webhooks.js";
 import { resolverEsLocal, tablaSegunSede } from "./local_scope.js";
+import { renderRepartoPropinas, limpiarRepartoPropinas } from "./cierre_turno_propinas_visual.js?v=20260908prop1";
 
 // ../js/cierre_turno.js
 
@@ -170,6 +171,20 @@ document.addEventListener("DOMContentLoaded", () => {
   let nombreEmpresaActual = "";
   let responsablesActivos = [];
   let resumenDescargado = false;
+  // Contenedor del desglose de propinas y ultima traza recibida del reparto.
+  // La traza se persiste como evidencia cuando el cierre queda confirmado.
+  const propinasDesglose = document.getElementById("propinasDesglose");
+  let ultimoRepartoPropinas = null;
+
+  // Version sincrona de la resolucion de nombres, para pintar. `responsables
+  // Activos` ya esta cargado cuando se puede confirmar apoyos; si aun asi no
+  // se encuentra, se muestra el id en vez de dejar el hueco vacio.
+  const nombrePorResponsableId = (valor) => {
+    const id = String(valor ?? "").trim();
+    if (!id) return "Sin identificar";
+    const activo = responsablesActivos.find((item) => String(item?.id) === id);
+    return activo?.nombre_completo || id;
+  };
   let bloqueoConstanciaActivo = false;
   let verificado = false;
   let consultaCompletada = false;
@@ -396,6 +411,33 @@ document.addEventListener("DOMContentLoaded", () => {
       throw new Error(`El cierre no quedó registrado en ${tabla}. No se descarga constancia: vuelve a intentar el envío.`);
     }
     return fila;
+  };
+
+  // Guarda la traza propina a propina como evidencia del reparto. Devuelve un
+  // texto para añadir al mensaje de estado, nunca lanza: el cierre ya está
+  // guardado y un fallo aquí no puede tumbarlo. La evidencia se puede
+  // regenerar volviendo a consultar el reparto.
+  const guardarEvidenciaPropinas = async ({ empresaId, fechaTurno, numero }) => {
+    const eventos = Array.isArray(ultimoRepartoPropinas?.eventos)
+      ? ultimoRepartoPropinas.eventos
+      : [];
+
+    if (!eventos.length) return "";
+
+    try {
+      const { data, error } = await supabase.rpc("guardar_propinas_turno", {
+        p_empresa_id: empresaId,
+        p_fecha: fechaTurno,
+        p_numero: numero,
+        p_eventos: eventos
+      });
+      if (error) throw error;
+      const guardados = Number(data?.eventos_guardados) || 0;
+      return ` Desglose de propinas guardado (${guardados}).`;
+    } catch (error) {
+      console.error("[cierre_turno] no se pudo guardar la evidencia de propinas", error);
+      return " El turno quedó guardado, pero no se pudo archivar el desglose de propinas.";
+    }
   };
 
   // Carga la caja con la que cerró el turno anterior. Se llama desde el botón
@@ -1195,7 +1237,17 @@ document.addEventListener("DOMContentLoaded", () => {
     getContextPayload,
     buildApoyoPayload,
     validateApoyoRows,
-    marcarComoNoVerificado: () => marcarComoNoVerificado()
+    marcarComoNoVerificado: () => marcarComoNoVerificado(),
+    onReparto: (reparto) => {
+      // Se guarda la ultima traza para poder persistirla cuando el cierre
+      // quede confirmado. Si el reparto se invalida, tambien se descarta.
+      ultimoRepartoPropinas = reparto?.respuesta || null;
+      renderRepartoPropinas(
+        propinasDesglose,
+        ultimoRepartoPropinas,
+        (id) => nombrePorResponsableId(id)
+      );
+    }
   });
   const apoyoConfirmado = () => Boolean(apoyosPropinaManager?.isConsultaConfirmada?.());
   const syncApoyosConsultaVisibility = () => {
@@ -1393,6 +1445,10 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const limpiarCamposDatos = () => {
+    // El desglose de propinas describe unos datos concretos: si se limpian los
+    // campos, dejarlo en pantalla mostraria el reparto de un turno que ya no es.
+    ultimoRepartoPropinas = null;
+    limpiarRepartoPropinas(propinasDesglose);
     Object.values(inputsFinanzas).forEach((grupo) => {
       grupo.sistema.value = "";
       grupo.real.value = "";
@@ -2165,6 +2221,15 @@ La versión anterior quedará guardada en el histórico, con tu nombre y la fech
       });
       console.info("[cierre_turno] cierre confirmado en base", filaConfirmada);
 
+      // Evidencia del reparto de propinas. Va DESPUÉS del cierre y por su
+      // cuenta a propósito: si falla, el turno ya está guardado y lo único que
+      // se pierde es poder revisar el desglose más adelante. Nunca al revés.
+      const avisoPropinas = await guardarEvidenciaPropinas({
+        empresaId: filaConfirmada.empresa_id,
+        fechaTurno: filaConfirmada.fecha_turno,
+        numero: filaConfirmada.numero_turno
+      });
+
       // Token nuevo: este cierre ya entró y el siguiente envío es otro turno.
       tokenEnvio = (crypto?.randomUUID?.() || `envio-${Date.now()}-${Math.random().toString(16).slice(2)}`);
 
@@ -2184,6 +2249,7 @@ La versión anterior quedará guardada en el histórico, con tu nombre y la fech
         + (descargaOk ? " Constancia en PDF descargada automáticamente." : " No se pudo descargar la constancia en PDF.")
         + avisoReenvio
         + avisoApertura
+        + avisoPropinas
       );
       confirmacionEnvio.classList.add("is-hidden");
       aplicarBloqueoConstancia(false);
