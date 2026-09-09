@@ -25,6 +25,7 @@
  * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
  */
 import { supabase } from "./supabase.js";
+import { mensajeDeError } from "./edge_function_error.js";
 
 const asInt = (value) => {
   const n = Number(value);
@@ -233,7 +234,7 @@ export function initApoyosPropinaManager({
       const { data, error } = await supabase.functions.invoke("consultar-propina-apoyos", { body: consultaPayload });
 
       if (error || !data || data.ok === false) {
-        setStatus(data?.message || error?.message || "No se pudo consultar propina de apoyos.");
+        setStatus(await mensajeDeError(error, data, "No se pudo consultar propina de apoyos."));
         return;
       }
 

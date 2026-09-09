@@ -42,6 +42,7 @@ import { supabase } from "./supabase.js";
 import { resolverEsLocal, tablaSegunSede } from "./local_scope.js";
 import { repartirPropinas, compararRepartos } from "./propinas_reparto.js?v=20260909sim1";
 import { renderRepartoPropinas } from "./cierre_turno_propinas_visual.js?v=20260909sim1";
+import { mensajeDeError } from "./edge_function_error.js";
 
 const CIERRE_TABLES = { principal: "cierres_turno_final", local: "cierres_turno_final_locales" };
 const APOYO_TABLES = { principal: "apoyos_turno", local: "apoyos_turno_locales" };
@@ -174,8 +175,12 @@ const cargarEventos = async ({ empresaId, fecha, jornada, personas }) => {
   const { data, error } = await supabase.functions.invoke("consultar-propina-apoyos", { body: cuerpo });
 
   if (error || !data || data.ok === false) {
-    const motivo = data?.message || error?.message || "sin detalle";
-    return { eventos: [], origen: "error_loggro", detalle: `Loggro no devolvió las propinas de ese día: ${motivo}` };
+    // No siempre es Loggro: puede ser la sesión vencida (401), el turno fuera
+    // de alcance (403), o un dato incompleto (422). `mensajeDeError` saca el
+    // motivo real que escribió la Edge Function en vez del genérico
+    // "Edge Function returned a non-2xx status code" que da invoke().
+    const motivo = await mensajeDeError(error, data, "sin detalle");
+    return { eventos: [], origen: "error_loggro", detalle: `No se pudieron traer las propinas de ese turno: ${motivo}` };
   }
 
   const eventos = Array.isArray(data.eventos) ? data.eventos : [];

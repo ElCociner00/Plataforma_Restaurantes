@@ -224,6 +224,7 @@ function buildMenu({ context, environmentForMenu, localContexts = [] }) {
           <a href="${APP_URLS.historicoCierreTurno}">Histórico</a>
           ${context?.rol === "admin" || context?.rol === "admin_root"
             ? `<a href="${APP_URLS.auditoriaTurnos}">Auditoría de turnos</a>
+               <a href="${APP_URLS.simuladorPropinas}">Auditoría de propinas</a>
                <a href="${APP_URLS.libroDescuadres}">Libro de descuadres</a>
                <a href="${APP_URLS.loggro}">Integración Loggro</a>`
             : ""}
