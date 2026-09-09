@@ -1,0 +1,237 @@
+/* Auditoria de propinas: la pantalla para sentarse con el cliente.
+   El desglose en si usa css/cierre_turno_propinas.css; esto es solo lo propio
+   del simulador (selector, tabla hora/propina y rangos editables). */
+
+.intro {
+  max-width: 78ch;
+  color: #52525b;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ── Selector de turno ─────────────────────────────────────────────────── */
+
+.sim-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-end;
+}
+
+.sim-selector label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  color: #3f3f46;
+}
+
+.sim-selector select,
+.sim-selector input {
+  min-width: 170px;
+  padding: 7px 9px;
+  border: 1px solid #d4d4d8;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.sim-selector button {
+  padding: 9px 20px;
+  border: 0;
+  border-radius: 8px;
+  background: #4c1d95;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sim-selector button:hover { background: #3b1578; }
+
+.sim-status { margin: 12px 0 0; font-size: 13.5px; color: #52525b; }
+.sim-status.is-error { color: #991b1b; font-weight: 600; }
+
+.sim-origen {
+  margin: 8px 0 0;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  border-left: 4px solid #16a34a;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.sim-origen.is-aviso {
+  border-left-color: #d97706;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.sim-origen.is-hidden { display: none; }
+
+.sim-nota { margin: 0 0 12px; font-size: 13px; color: #52525b; }
+
+/* ── Tabla hora / propina ──────────────────────────────────────────────── */
+
+.sim-tabla-scroll { overflow-x: auto; max-height: 460px; overflow-y: auto; }
+
+.sim-tabla-propinas {
+  width: 100%;
+  max-width: 520px;
+  border-collapse: collapse;
+  font-size: 14px;
+  background: #fff;
+}
+
+.sim-tabla-propinas th,
+.sim-tabla-propinas td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #ece7fb;
+  text-align: left;
+}
+
+.sim-tabla-propinas thead th {
+  position: sticky;
+  top: 0;
+  background: #f4f0ff;
+  color: #4c1d95;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.sim-tabla-propinas tfoot th {
+  background: #faf8ff;
+  border-top: 2px solid #d9cffa;
+  border-bottom: 0;
+  font-size: 13.5px;
+}
+
+.sim-tabla-propinas .is-num { text-align: right; }
+.sim-hora { font-variant-numeric: tabular-nums; color: #52525b; white-space: nowrap; }
+.sim-monto { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+
+/* ── Personas y rangos ─────────────────────────────────────────────────── */
+
+.sim-personas { display: flex; flex-direction: column; gap: 10px; }
+
+.sim-persona {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid #ece7fb;
+  border-radius: 10px;
+  background: #faf8ff;
+}
+
+.sim-persona-ident { display: flex; flex-direction: column; gap: 3px; min-width: 190px; }
+.sim-persona-ident strong { font-size: 14px; color: #18181b; }
+
+.sim-rol {
+  width: fit-content;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sim-rol-responsable { background: #ede9fe; color: #5b21b6; }
+.sim-rol-apoyo { background: #e0f2fe; color: #075985; }
+
+.sim-rango { display: flex; gap: 10px; }
+
+.sim-campo { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: #52525b; }
+
+.sim-campo input {
+  padding: 6px 8px;
+  border: 1px solid #c4b5fd;
+  border-radius: 7px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-movido {
+  font-size: 12px;
+  color: #92400e;
+  background: #fffbeb;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.sim-acciones { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+
+.sim-acciones button {
+  padding: 8px 16px;
+  border: 1px solid #c4b5fd;
+  border-radius: 8px;
+  background: #fff;
+  color: #4c1d95;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sim-acciones button:hover { background: #f4f0ff; }
+
+.sim-badge {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.sim-badge.is-hidden { display: none; }
+
+/* ── Resumen de cambios ────────────────────────────────────────────────── */
+
+.sim-cambios {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border-left: 5px solid #d97706;
+  background: #fffbeb;
+}
+
+.sim-cambios.is-hidden { display: none; }
+.sim-cambios h4 { margin: 0 0 8px; font-size: 14.5px; color: #92400e; }
+
+.sim-cambio {
+  margin: 0 0 5px;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-cambio-baja { color: #991b1b; }
+.sim-cambio-sube { color: #166534; }
+
+.sim-cambio-huerfano {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px dashed #fcd34d;
+  color: #92400e;
+  font-weight: 600;
+}
+
+/* ── Sin acceso ────────────────────────────────────────────────────────── */
+
+.sin-acceso {
+  padding: 22px;
+  border-radius: 12px;
+  border-left: 5px solid #dc2626;
+  background: #fef2f2;
+}
+
+.sin-acceso.is-hidden { display: none; }
+.sin-acceso h2 { margin: 0 0 6px; color: #991b1b; font-size: 18px; }
+.sin-acceso p { margin: 0; color: #52525b; }
+
+@media (max-width: 720px) {
+  .sim-persona { flex-direction: column; align-items: flex-start; }
+  .sim-selector select, .sim-selector input { min-width: 0; width: 100%; }
+  .sim-selector label { width: 100%; }
+}

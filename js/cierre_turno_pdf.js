@@ -113,7 +113,7 @@ const getSnapshotRows = ({
   return { finanzas, gastos, totales, apoyos, totalVentasSinApertura };
 };
 
-export const descargarImagenResumenCierreTurno = ({
+export const descargarResumenCierreTurno = ({
   snapshotContext,
   meta,
   formatCOP,
@@ -461,11 +461,31 @@ export const descargarImagenResumenCierreTurno = ({
       });
     }
 
-    const selloY = cardY + cardH - 30;
+    // Pie: sello + identidad de la fila que respalda esta constancia.
+    // El id no es decorativo. Este PDF solo se genera despues de releer el
+    // cierre en la base, asi que estampar el id lo convierte en el recibo de un
+    // registro concreto que se puede ir a buscar en el historico, en lugar de
+    // un dibujo del formulario que podria no corresponder a nada.
+    const selloY = cardY + cardH - 52;
     ctx.textAlign = "center";
     ctx.fillStyle = "#4338ca";
     ctx.font = "bold 20px Arial";
     ctx.fillText(`Expedido por AXIOMA by Global Nexo Shop (${fechaExpedicion})`, cardX + (cardW / 2), selloY);
+
+    const constancia = meta.constancia || {};
+    if (constancia.id) {
+      const registradoEn = constancia.registradoEn
+        ? new Date(constancia.registradoEn).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" })
+        : "";
+      ctx.fillStyle = "#52525b";
+      ctx.font = "16px Arial";
+      ctx.fillText(
+        `Cierre registrado en base de datos · ${String(constancia.id).slice(0, 8)}`
+        + (registradoEn ? ` · ${registradoEn}` : ""),
+        cardX + (cardW / 2),
+        selloY + 26,
+      );
+    }
     ctx.textAlign = "left";
     return canvas;
   };
@@ -492,17 +512,45 @@ export const descargarImagenResumenCierreTurno = ({
 
   const canvases = pagesApoyos.map((slice, idx) => buildCanvas(slice, idx + 1, pagesApoyos.length, idx > 0)).filter(Boolean);
   if (!canvases.length) {
-    setStatus("No se pudo generar la imagen del resumen.");
+    setStatus("No se pudo generar el resumen del cierre.");
     return false;
   }
 
-  canvases.forEach((canvas, idx) => {
-    const link = document.createElement("a");
-    const suffix = canvases.length > 1 ? `_p${idx + 1}` : "";
-    link.download = `cierre_turno_${fechaNombre}${suffix}.png`;
-    link.href = canvas.toDataURL("image/png");
-    link.click();
-  });
+  // El dibujo del resumen no cambia: cada página se sigue componiendo en un
+  // <canvas>. Lo único que cambia es el envase. Antes cada canvas se descargaba
+  // como un PNG suelto, así que un turno con muchos apoyos dejaba dos o tres
+  // archivos separados; ahora todos son páginas de un mismo PDF.
+  const ConstructorPDF = globalThis.jspdf?.jsPDF || globalThis.jsPDF;
+  if (typeof ConstructorPDF !== "function") {
+    // Sin la librería no se entrega media constancia ni se cae de vuelta al
+    // PNG en silencio: la persona tiene que saber que no se llevó el soporte.
+    console.error("[cierre_turno_pdf] jsPDF no está disponible en la página.");
+    setStatus("No se pudo generar el PDF de la constancia: no cargó la librería de PDF. Recarga la página e intenta de nuevo.");
+    return false;
+  }
 
-  return true;
+  const orientacionDe = (canvas) => (canvas.width >= canvas.height ? "landscape" : "portrait");
+
+  try {
+    // Cada página conserva el tamaño real de su canvas: las de continuación no
+    // miden lo mismo que la primera cuando hay muchos apoyos.
+    const pdf = new ConstructorPDF({
+      unit: "px",
+      format: [canvases[0].width, canvases[0].height],
+      orientation: orientacionDe(canvases[0]),
+      compress: true
+    });
+
+    canvases.forEach((canvas, idx) => {
+      if (idx > 0) pdf.addPage([canvas.width, canvas.height], orientacionDe(canvas));
+      pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, canvas.width, canvas.height);
+    });
+
+    pdf.save(`cierre_turno_${fechaNombre}.pdf`);
+    return true;
+  } catch (error) {
+    console.error("[cierre_turno_pdf] no se pudo armar el PDF", error);
+    setStatus(`No se pudo generar el PDF de la constancia: ${error?.message || "sin detalle"}`);
+    return false;
+  }
 };

@@ -36,13 +36,19 @@ import { supabase } from "./supabase.js";
 import { fetchResponsablesActivos, fetchUsuariosEmpresa } from "./responsables.js";
 import { getEmpresaPolicy, puedeEnviarDatos } from "./permisos.core.js";
 import { initApoyosPropinaManager } from "./apoyos.js";
-import { descargarImagenResumenCierreTurno } from "./cierre_turno_png.js?v=20260828b";
+import { descargarResumenCierreTurno } from "./cierre_turno_pdf.js?v=20260909gate1";
 import {
   WEBHOOK_LISTAR_RESPONSABLES,
   WEBHOOK_CONSULTAR_GASTOS_CATALOGO
 } from "./webhooks.js";
+import { resolverEsLocal, tablaSegunSede } from "./local_scope.js";
+import { renderRepartoPropinas, limpiarRepartoPropinas } from "./cierre_turno_propinas_visual.js?v=20260908prop1";
 
 // ../js/cierre_turno.js
+
+// Tabla de cierres segun la sede. La decision de cual usar NO se deduce aqui:
+// la resuelve `app_es_local()` en la base a traves de js/local_scope.js.
+const CIERRE_TABLES = { principal: "cierres_turno_final", local: "cierres_turno_final_locales" };
 
 document.addEventListener("DOMContentLoaded", () => {
   const fecha = document.getElementById("fecha");
@@ -165,6 +171,23 @@ document.addEventListener("DOMContentLoaded", () => {
   let nombreEmpresaActual = "";
   let responsablesActivos = [];
   let resumenDescargado = false;
+  // Contenedor del desglose de propinas y ultima traza recibida del reparto.
+  // La traza se persiste como evidencia cuando el cierre queda confirmado.
+  const propinasDesglose = document.getElementById("propinasDesglose");
+  const falloEnvio = document.getElementById("falloEnvio");
+  const falloEnvioMotivo = document.getElementById("falloEnvioMotivo");
+  const btnCerrarFalloEnvio = document.getElementById("cerrarFalloEnvio");
+  let ultimoRepartoPropinas = null;
+
+  // Version sincrona de la resolucion de nombres, para pintar. `responsables
+  // Activos` ya esta cargado cuando se puede confirmar apoyos; si aun asi no
+  // se encuentra, se muestra el id en vez de dejar el hueco vacio.
+  const nombrePorResponsableId = (valor) => {
+    const id = String(valor ?? "").trim();
+    if (!id) return "Sin identificar";
+    const activo = responsablesActivos.find((item) => String(item?.id) === id);
+    return activo?.nombre_completo || id;
+  };
   let bloqueoConstanciaActivo = false;
   let verificado = false;
   let consultaCompletada = false;
@@ -273,11 +296,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
+      // La sede va SIEMPRE explícita. Sin ella, el RPC caía a `app_empresa_id()`
+      // —la empresa del usuario, no la sede seleccionada— y comprobaba la tabla
+      // equivocada. Un operario en contexto VIVA veía el turno de LE MERIDIEM y
+      // leía "Este turno ya fue subido": daba el cierre por hecho y no lo subía.
+      // Es el aviso que hizo perder quince días de turnos de VIVA.
+      const contextoTurno = await getContextPayload();
+      if (!contextoTurno?.empresa_id) {
+        setJornadaAviso("No se pudo identificar la sede: no se comprobó si este turno ya existe.", true);
+        return;
+      }
+
       const { data, error } = await supabase.rpc("turno_existente", {
         p_fecha: fecha.value,
-        p_numero: numeroTurno
+        p_numero: numeroTurno,
+        p_empresa_id: contextoTurno.empresa_id
       });
-      if (error || !data?.ok) return;
+      if (error || !data?.ok) {
+        console.error("[cierre_turno] turno_existente falló", { error, data });
+        setJornadaAviso("No se pudo comprobar si este turno ya estaba subido.", true);
+        return;
+      }
 
       if (!data.existe) {
         setJornadaAviso("");
@@ -365,12 +404,59 @@ document.addEventListener("DOMContentLoaded", () => {
     if (efectivoAperturaNota) efectivoAperturaNota.textContent = "Cuadra";
   };
 
-  const resolverEmpresaEsLocal = async (empresaId) => {
-    const { data, error } = await supabase.rpc("app_es_local", {
-      p_empresa_id: empresaId
-    });
-    if (error) throw error;
-    return data === true;
+  const resolverEmpresaEsLocal = async (empresaId) => resolverEsLocal(empresaId);
+
+  // La constancia se firma contra la base, no contra el formulario.
+  // El RPC devuelve la identidad del turno que guardó; aquí se vuelve a leer
+  // esa fila antes de dibujar nada. Si no está, no se descarga PDF: un soporte
+  // de un cierre que no entró es peor que no tener soporte.
+  const confirmarCierreGuardado = async ({ empresaId, fechaTurno, numero, esLocal }) => {
+    const tabla = tablaSegunSede(CIERRE_TABLES, esLocal);
+    const { data, error } = await supabase
+      .from(tabla)
+      .select("id, empresa_id, fecha_turno, numero_turno, created_at")
+      .eq("empresa_id", empresaId)
+      .eq("fecha_turno", fechaTurno)
+      .eq("numero_turno", numero)
+      .limit(1);
+
+    if (error) {
+      console.error("[cierre_turno] no se pudo confirmar el cierre en la base", { tabla, error });
+      throw new Error(`El cierre se envió, pero no se pudo confirmar en la base (${error.message}). No se descarga constancia.`);
+    }
+
+    const fila = Array.isArray(data) ? data[0] : null;
+    if (!fila) {
+      throw new Error(`El cierre no quedó registrado en ${tabla}. No se descarga constancia: vuelve a intentar el envío.`);
+    }
+    return fila;
+  };
+
+  // Guarda la traza propina a propina como evidencia del reparto. Devuelve un
+  // texto para añadir al mensaje de estado, nunca lanza: el cierre ya está
+  // guardado y un fallo aquí no puede tumbarlo. La evidencia se puede
+  // regenerar volviendo a consultar el reparto.
+  const guardarEvidenciaPropinas = async ({ empresaId, fechaTurno, numero }) => {
+    const eventos = Array.isArray(ultimoRepartoPropinas?.eventos)
+      ? ultimoRepartoPropinas.eventos
+      : [];
+
+    if (!eventos.length) return "";
+
+    try {
+      const { data, error } = await supabase.rpc("guardar_propinas_turno", {
+        p_empresa_id: empresaId,
+        p_fecha: fechaTurno,
+        p_numero: numero,
+        p_eventos: eventos
+      });
+      if (error) throw error;
+      const guardados = Number(data?.eventos_guardados) || 0;
+      return ` Desglose de propinas guardado (${guardados}).`;
+    } catch (error) {
+      console.error("[cierre_turno] no se pudo guardar la evidencia de propinas", error);
+      return " El turno quedó guardado, pero no se pudo archivar el desglose de propinas.";
+    }
   };
 
   // Carga la caja con la que cerró el turno anterior. Se llama desde el botón
@@ -398,9 +484,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const tablaCierres = esLocal === true
-      ? "cierres_turno_final_locales"
-      : "cierres_turno_final";
+    const tablaCierres = tablaSegunSede(CIERRE_TABLES, esLocal);
     // Una caja de semanas atrás no debe presentarse como si fuera la recibida
     // ayer. Para el primer turno sólo se admite el último cierre del día
     // inmediatamente anterior; para turnos posteriores se prioriza un turno
@@ -1172,7 +1256,17 @@ document.addEventListener("DOMContentLoaded", () => {
     getContextPayload,
     buildApoyoPayload,
     validateApoyoRows,
-    marcarComoNoVerificado: () => marcarComoNoVerificado()
+    marcarComoNoVerificado: () => marcarComoNoVerificado(),
+    onReparto: (reparto) => {
+      // Se guarda la ultima traza para poder persistirla cuando el cierre
+      // quede confirmado. Si el reparto se invalida, tambien se descarta.
+      ultimoRepartoPropinas = reparto?.respuesta || null;
+      renderRepartoPropinas(
+        propinasDesglose,
+        ultimoRepartoPropinas,
+        (id) => nombrePorResponsableId(id)
+      );
+    }
   });
   const apoyoConfirmado = () => Boolean(apoyosPropinaManager?.isConsultaConfirmada?.());
   const syncApoyosConsultaVisibility = () => {
@@ -1370,6 +1464,10 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const limpiarCamposDatos = () => {
+    // El desglose de propinas describe unos datos concretos: si se limpian los
+    // campos, dejarlo en pantalla mostraria el reparto de un turno que ya no es.
+    ultimoRepartoPropinas = null;
+    limpiarRepartoPropinas(propinasDesglose);
     Object.values(inputsFinanzas).forEach((grupo) => {
       grupo.sistema.value = "";
       grupo.real.value = "";
@@ -1515,7 +1613,43 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
 
-  const descargarImagenResumen = ({ bloquearDespues = false } = {}) => {
+  // Aviso de fallo imposible de pasar por alto.
+  //
+  // El problema de agosto no fue solo que el cierre no entrara: fue que nadie
+  // se enteró. El mensaje iba a una línea de estado que se confunde con las
+  // demás, así que la gente se llevaba el soporte y seguía. Esto se planta
+  // encima del formulario, dice explícitamente que el turno NO quedó guardado,
+  // y no desaparece hasta que la persona lo cierra.
+  const mostrarFalloEnvio = (motivo) => {
+    if (!falloEnvio) {
+      // Sin el contenedor no se puede fallar en silencio: se recurre al diálogo
+      // del navegador, que al menos interrumpe.
+      window.alert(`EL TURNO NO QUEDÓ GUARDADO.\n\n${motivo}\n\nNo se descargó constancia. Vuelve a intentar el envío.`);
+      return;
+    }
+    if (falloEnvioMotivo) falloEnvioMotivo.textContent = motivo;
+    falloEnvio.classList.remove("is-hidden");
+    falloEnvio.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  const ocultarFalloEnvio = () => falloEnvio?.classList.add("is-hidden");
+  btnCerrarFalloEnvio?.addEventListener("click", ocultarFalloEnvio);
+
+  // La constancia SOLO existe si existe la fila en la base.
+  //
+  // No es una convención: `filaConfirmada` es obligatoria y tiene que traer el
+  // id que devolvió la relectura de la tabla. Sin eso no se dibuja nada. Un PDF
+  // en las manos de alguien tiene que significar, sin excepción, que el turno
+  // quedó guardado — si no, vuelve a pasar lo de agosto: la gente se llevaba el
+  // soporte, daba el cierre por hecho, y la fila nunca existió.
+  const descargarResumen = (filaConfirmada, { bloquearDespues = false } = {}) => {
+    const idConfirmado = String(filaConfirmada?.id || "").trim();
+    if (!idConfirmado) {
+      console.error("[cierre_turno] se intentó generar constancia sin fila confirmada", filaConfirmada);
+      setStatus("No se genera constancia: este cierre no está confirmado en la base de datos.");
+      return false;
+    }
+
     const snapshotContext = {
       inputsFinanzas,
       inputsDiferencias,
@@ -1542,10 +1676,18 @@ document.addEventListener("DOMContentLoaded", () => {
       efectivoApertura: efectivoApertura?.value || 0,
       bolsa: bolsa?.value || 0,
       caja: caja?.value || 0,
-      comentarioUsuario: comentarios?.value || ""
+      comentarioUsuario: comentarios?.value || "",
+      // Se estampa en el pie del PDF. Con esto una constancia deja de ser un
+      // dibujo del formulario y pasa a ser el recibo de una fila concreta, que
+      // cualquiera puede ir a buscar en el histórico.
+      constancia: {
+        id: idConfirmado,
+        registradoEn: filaConfirmada?.created_at || "",
+        jornada: filaConfirmada?.numero_turno ?? ""
+      }
     };
 
-    const ok = descargarImagenResumenCierreTurno({
+    const ok = descargarResumenCierreTurno({
       snapshotContext,
       meta,
       formatCOP,
@@ -2116,33 +2258,74 @@ La versión anterior quedará guardada en el histórico, con tu nombre y la fech
         return;
       }
 
+      // El destino ya viene de `app_es_local()`, la misma fuente que usa el
+      // servidor, así que esto es una red de seguridad. Ojo con el enunciado:
+      // si salta, el cierre YA está escrito — lo que falla es la coherencia
+      // entre lo que se creía y lo que resolvió el servidor, y hay que mirarlo.
+      // Cuidado: en el reenvío idempotente el RPC corta antes y no incluye
+      // `es_local`. Comparar contra un undefined marcaría destino equivocado en
+      // una sede local cada vez que se reintenta un envío ya procesado.
       const esperabaLocal = payload?.global?.es_local_contexto === true;
-      if (Boolean(data?.es_local) !== Boolean(esperabaLocal)) {
-        throw new Error("El servidor resolvió un destino distinto al contexto seleccionado. El cierre no se marcará como completado.");
+      const esReenvio = data?.reenvio_ignorado === true;
+      if (!esReenvio && Boolean(data?.es_local) !== Boolean(esperabaLocal)) {
+        throw new Error("El cierre se guardó, pero el servidor lo mandó a una sede distinta de la seleccionada. Revisa el turno antes de darlo por bueno.");
       }
+      const esLocalConfirmado = esReenvio ? esperabaLocal : data?.es_local === true;
 
       console.info("subir_cierre_turno OK", data);
+
+      // Antes de dibujar nada: comprobar que la fila existe de verdad. Si esto
+      // lanza, se va al catch y NO se descarga constancia.
+      const filaConfirmada = await confirmarCierreGuardado({
+        empresaId: data?.empresa_id || payload?.global?.empresa_id,
+        fechaTurno: data?.fecha_turno || payload?.global?.fecha,
+        numero: data?.numero_turno ?? payload?.global?.numero_turno,
+        esLocal: esLocalConfirmado
+      });
+      console.info("[cierre_turno] cierre confirmado en base", filaConfirmada);
+
+      // Evidencia del reparto de propinas. Va DESPUÉS del cierre y por su
+      // cuenta a propósito: si falla, el turno ya está guardado y lo único que
+      // se pierde es poder revisar el desglose más adelante. Nunca al revés.
+      const avisoPropinas = await guardarEvidenciaPropinas({
+        empresaId: filaConfirmada.empresa_id,
+        fechaTurno: filaConfirmada.fecha_turno,
+        numero: filaConfirmada.numero_turno
+      });
 
       // Token nuevo: este cierre ya entró y el siguiente envío es otro turno.
       tokenEnvio = (crypto?.randomUUID?.() || `envio-${Date.now()}-${Math.random().toString(16).slice(2)}`);
 
-      const descargaOk = descargarImagenResumen({ bloquearDespues: false });
+      const descargaOk = descargarResumen(filaConfirmada, { bloquearDespues: false });
       const apertura = data?.efectivo_apertura;
       const avisoApertura = apertura && Number(apertura.diferencia) !== 0
         ? ` Atención: el efectivo de apertura difiere en ${apertura.diferencia} respecto a ${apertura.origen || "el cierre anterior"}.`
         : "";
+      // Un reenvío del mismo token no escribe nada nuevo. Decirlo, para que la
+      // constancia no se lea como prueba de un guardado que no ocurrió ahora.
+      const avisoReenvio = data?.reenvio_ignorado === true
+        ? " Este turno ya estaba guardado: la constancia corresponde al cierre que ya existía."
+        : "";
 
       setStatus(
         (data?.message || "Cierre enviado correctamente.")
-        + (descargaOk ? " Constancia descargada automáticamente." : " No se pudo descargar constancia automática.")
+        + (descargaOk ? " Constancia en PDF descargada automáticamente." : " No se pudo descargar la constancia en PDF.")
+        + avisoReenvio
         + avisoApertura
+        + avisoPropinas
       );
       confirmacionEnvio.classList.add("is-hidden");
       aplicarBloqueoConstancia(false);
       revisarTurnoExistente();
     } catch (err) {
       console.error("Error subiendo cierre", err);
-      setStatus(err?.message || "Error de conexión al subir cierre.");
+      const motivo = err?.message || "Error de conexión al subir cierre.";
+      setStatus(motivo);
+      // Una línea de estado no basta: es exactamente lo que pasó en agosto,
+      // el turno no entraba y nadie se enteraba. El fallo se planta en pantalla
+      // y no se va hasta que la persona lo cierra a mano.
+      mostrarFalloEnvio(motivo);
+      confirmacionEnvio.classList.add("is-hidden");
     }
   });
 

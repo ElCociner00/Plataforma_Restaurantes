@@ -119,7 +119,11 @@ export function initApoyosPropinaManager({
   getContextPayload,
   buildApoyoPayload,
   validateApoyoRows,
-  marcarComoNoVerificado
+  marcarComoNoVerificado,
+  // Opcional. Recibe la respuesta completa del reparto (incluida la traza
+  // `eventos`) para pintarla, o null cuando el reparto deja de ser válido.
+  // El reparto no depende de esto: si no se pasa, todo funciona igual.
+  onReparto
 }) {
   if (!btnConsultarPropina || !apoyoRowsContainer || !propinaInput) {
     return { reset: () => {} };
@@ -143,6 +147,13 @@ export function initApoyosPropinaManager({
     repartoActivo = false;
     delete propinaInput.dataset.propinaResponsable;
     ensureReadonlyApoyoPropinas();
+    // Si el reparto deja de ser válido, el desglose en pantalla también:
+    // dejarlo visible mostraría un reparto que ya no corresponde a los apoyos.
+    try {
+      onReparto?.(null);
+    } catch (errorVista) {
+      console.error("[apoyos] no se pudo limpiar el desglose de propinas", errorVista);
+    }
   };
 
   const buildConsultaPayload = async () => {
@@ -227,6 +238,14 @@ export function initApoyosPropinaManager({
       }
 
       applyDistribucion({ consultaPayload, webhookPayload: data });
+
+      // La vista de reparto es un espectador: si falla al pintarse, el reparto
+      // ya está aplicado y el cierre no se ve afectado.
+      try {
+        onReparto?.({ consultaPayload, respuesta: data });
+      } catch (errorVista) {
+        console.error("[apoyos] no se pudo pintar el desglose de propinas", errorVista);
+      }
     } catch (error) {
       setStatus(`Error consultando propina de apoyos: ${error?.message || "sin detalle"}`);
     } finally {

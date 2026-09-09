@@ -33,6 +33,8 @@
 import { buildRequestHeaders, getUserContext } from "./session.js";
 import { fetchResponsablesActivos } from "./responsables.js";
 import { supabase } from "./supabase.js";
+import { resolverEsLocal, tablaSegunSede } from "./local_scope.js";
+import { renderRepartoPropinas } from "./cierre_turno_propinas_visual.js?v=20260908prop1";
 
 const head = document.getElementById("historicoHead");
 const body = document.getElementById("historicoBody");
@@ -68,11 +70,16 @@ const EXCLUDED_DETAIL_FIELDS = new Set(["id"]);
 const normalizeFieldKey = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 const shouldExcludeGeneralField = (key) => EXCLUDED_GENERAL_FIELDS.has(key) || normalizeFieldKey(key).includes("responsableid");
 const getTimestamp = () => new Date().toISOString();
-const isLocalContext = () => state.context?.local_context === true || (state.context?.empresa_principal_id && state.context?.empresa_id && state.context.empresa_principal_id !== state.context.empresa_id);
-const getScopedTable = (tables) => tables[isLocalContext() ? "local" : "principal"];
+// La sede la resuelve la base (`app_es_local`), no una deducción del contexto
+// de sesión: ver js/local_scope.js. Se resuelve una vez en `loadInitialData` y
+// queda en `state.esLocal`; antes de eso `getScopedTable` lanza en vez de
+// adivinar una tabla.
+const isLocalContext = () => state.esLocal === true;
+const getScopedTable = (tables) => tablaSegunSede(tables, state.esLocal);
 
 const state = {
   context: null,
+  esLocal: null,
   allRows: [],
   filteredRows: [],
   allGeneralColumns: [],
@@ -340,6 +347,9 @@ const sanitizeRow = (rawRow, index) => {
     meta: {
       source_id: String(rawRow?.id || "").trim(),
       fecha_turno: String(getGeneralValue(rawRow, ["fecha_turno", "fecha"]) || "").trim(),
+      // Hace falta para localizar la evidencia de propinas del turno, que se
+      // guarda por (empresa, fecha, jornada).
+      numero_turno: String(getGeneralValue(rawRow, ["numero_turno", "turno", "turno_numero"]) || "").trim(),
       responsable_id: resolveResponsableId(rawRow),
       hora_inicio: String(getGeneralValue(rawRow, ["hora_inicio", "hora_llegada", "hora_entrada"]) || "").trim(),
       hora_fin: String(getGeneralValue(rawRow, ["hora_fin", "hora_salida"]) || "").trim()
@@ -640,6 +650,130 @@ const summarizeDetailByVariable = (row) => {
     .sort((a, b) => a.variable.localeCompare(b.variable));
 };
 
+// "HH:MM" + fecha del turno -> instante ISO. Un fin menor que el inicio es un
+// tramo que cruza medianoche, que en turnos de noche es lo normal.
+const instanteDesdeHora = (fecha, hhmm, referenciaInicio = null) => {
+  const coincide = String(hhmm || "").trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!fecha || !coincide) return null;
+
+  // El desfase se escribe explicito (-05:00, hora de Colombia). Construirlo con
+  // setHours usaria la zona del navegador: un equipo configurado en otra zona
+  // colocaria las franjas corridas respecto a las propinas.
+  const hh = String(Number(coincide[1])).padStart(2, "0");
+  const armar = (dia) => new Date(`${dia}T${hh}:${coincide[2]}:00-05:00`);
+
+  const base = armar(fecha);
+  if (Number.isNaN(base.getTime())) return null;
+
+  // Un fin anterior o igual al inicio es un tramo que cruza medianoche, que en
+  // turnos de noche es lo normal.
+  if (Number.isFinite(referenciaInicio) && base.getTime() <= referenciaInicio) {
+    const siguiente = new Date(`${fecha}T12:00:00-05:00`);
+    siguiente.setUTCDate(siguiente.getUTCDate() + 1);
+    const diaSiguiente = siguiente.toISOString().slice(0, 10);
+    const corrido = armar(diaSiguiente);
+    return Number.isNaN(corrido.getTime()) ? base.toISOString() : corrido.toISOString();
+  }
+
+  return base.toISOString();
+};
+
+/**
+ * Reconstruye el desglose de propinas de un turno pasado a partir de la
+ * evidencia guardada en `propinas_turno_eventos`, y lo pinta con el mismo
+ * componente que usa la pantalla de cierre. Así el cliente ve exactamente lo
+ * mismo en el turno de hoy y en el del martes pasado.
+ *
+ * Los totales por persona se recalculan sumando las partes guardadas: no se
+ * inventan, salen de la misma evidencia que se muestra fila a fila.
+ */
+const pintarDesglosePropinasHistorico = async (selected, contenedor) => {
+  if (!contenedor) return;
+
+  const empresaId = state.context?.empresa_id || "";
+  const fechaTurno = selected?.meta?.fecha_turno || "";
+  const numeroTurno = Number(selected?.meta?.numero_turno || 0);
+
+  if (!empresaId || !fechaTurno || !numeroTurno) {
+    contenedor.textContent = "No se puede ubicar el desglose de propinas de este turno (falta fecha o jornada).";
+    return;
+  }
+
+  contenedor.textContent = "Cargando desglose de propinas...";
+
+  const { data, error } = await supabase
+    .from("propinas_turno_eventos")
+    .select("factura_id, ocurrido_en, monto, presentes, reparto")
+    .eq("empresa_id", empresaId)
+    .eq("fecha_turno", fechaTurno)
+    .eq("numero_turno", numeroTurno)
+    .order("ocurrido_en", { ascending: true });
+
+  if (error) {
+    console.error("[historico_cierre_turno] no se pudo leer el desglose de propinas", error);
+    contenedor.textContent = `No se pudo cargar el desglose de propinas: ${error.message}`;
+    return;
+  }
+
+  const eventos = Array.isArray(data) ? data : [];
+  if (!eventos.length) {
+    contenedor.textContent = "Este turno no tiene desglose de propinas guardado. Solo se archiva desde el 8 de septiembre de 2026 en adelante.";
+    return;
+  }
+
+  // Total por persona = suma de sus partes en la evidencia.
+  const totales = new Map();
+  eventos.forEach((evento) => {
+    (Array.isArray(evento.reparto) ? evento.reparto : []).forEach((parte) => {
+      const id = String(parte?.id || "");
+      if (!id) return;
+      if (!totales.has(id)) totales.set(id, { id, tipo: parte?.tipo === "responsable" ? "responsable" : "apoyo", total: 0 });
+      totales.get(id).total += Number(parte?.parte) || 0;
+    });
+  });
+
+  // Franjas: las del turno para el responsable, las suyas para cada apoyo.
+  const inicioTurno = instanteDesdeHora(fechaTurno, selected?.meta?.hora_inicio);
+  const finTurno = instanteDesdeHora(fechaTurno, selected?.meta?.hora_fin, Date.parse(inicioTurno));
+  const franjasApoyo = new Map();
+  (Array.isArray(selected?.apoyos) ? selected.apoyos : []).forEach((apoyo) => {
+    const id = String(apoyo?.apoyo_responsable_id || "");
+    if (!id) return;
+    const inicio = instanteDesdeHora(fechaTurno, apoyo?.hora_inicio);
+    franjasApoyo.set(id, {
+      inicio,
+      fin: instanteDesdeHora(fechaTurno, apoyo?.hora_fin, Date.parse(inicio))
+    });
+  });
+
+  const detalles = [...totales.values()].map((persona) => {
+    const franja = persona.tipo === "responsable"
+      ? { inicio: inicioTurno, fin: finTurno }
+      : (franjasApoyo.get(persona.id) || { inicio: null, fin: null });
+    return {
+      id: persona.id,
+      tipo: persona.tipo,
+      propina_correspondiente: Math.round(persona.total * 100) / 100,
+      periodo: franja
+    };
+  });
+
+  const totalTurno = eventos.reduce((acc, evento) => acc + (Number(evento.monto) || 0), 0);
+  const totalRepartido = detalles.reduce((acc, persona) => acc + persona.propina_correspondiente, 0);
+
+  renderRepartoPropinas(
+    contenedor,
+    {
+      detalles,
+      eventos,
+      total_propina_dia: Math.round(totalTurno * 100) / 100,
+      total_propina_distribuida: Math.round(totalRepartido * 100) / 100,
+      coinciden_totales: Math.abs(totalTurno - totalRepartido) < 0.01
+    },
+    (id) => state.responsableNamesById?.[id] || id
+  );
+};
+
 const renderDetailSection = () => {
   const selected = state.allRows.find((row) => row.id === state.expandedRowId);
   if (!selected) {
@@ -716,9 +850,17 @@ const renderDetailSection = () => {
         </table>
       </div>
     </div>
+
+    <h4 class="detalle-propinas-titulo">Reparto de propinas de este turno</h4>
+    <div id="detallePropinas" class="propinas-desglose"></div>
   `;
 
   detalleTurno.querySelector("#descargarResumenActual")?.addEventListener("click", () => downloadTurnoPng(selected));
+
+  // Asíncrono y aislado: si la evidencia de propinas falla, el resto del
+  // detalle del turno ya está pintado y sigue siendo utilizable.
+  pintarDesglosePropinasHistorico(selected, detalleTurno.querySelector("#detallePropinas"))
+    .catch((error) => console.error("[historico_cierre_turno] desglose de propinas", error));
 };
 
 const moveColumn = (source, target) => {
@@ -1493,6 +1635,11 @@ const loadInitialData = async () => {
 
   setLoading(true, "Cargando historico...");
   try {
+    // Primero la sede, antes de cualquier consulta: de ella depende si se lee
+    // la tabla principal o la de sedes. Si no se resuelve, se corta aquí con
+    // un mensaje en pantalla en lugar de mostrar una tabla vacía.
+    state.esLocal = await resolverEsLocal(state.context.empresa_id);
+
     const payload = {
       tenant_id: state.context.empresa_id,
       empresa_id: state.context.empresa_id,
@@ -1555,7 +1702,11 @@ const loadInitialData = async () => {
     state.currentPage = 1;
 
     renderTable();
-    setStatus(state.allRows.length ? "Datos cargados." : "No se recibieron cierres.");
+    // Cuando no hay filas, decir DE DÓNDE se leyó. Un "no hay datos" a secas no
+    // permite distinguir un histórico vacío de una consulta a la tabla equivocada.
+    setStatus(state.allRows.length
+      ? "Datos cargados."
+      : `No se encontraron cierres para esta ${state.esLocal ? "sede" : "empresa"} en ${tableName}.`);
   } catch (error) {
     if (error?.name === "AbortError") {
       setStatus("La carga tardo mas de 5 segundos.");

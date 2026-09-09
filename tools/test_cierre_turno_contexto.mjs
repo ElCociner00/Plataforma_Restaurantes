@@ -20,8 +20,12 @@ assert(
   previousCashBlock.includes('.eq("empresa_id", contextPayload.empresa_id)'),
   "La caja anterior no queda filtrada por la sede activa",
 );
+// La tabla ya no se escribe a mano en el bloque: la elige `tablaSegunSede` a
+// partir de la sede que resolvio `app_es_local()`. Se comprueba el mecanismo y
+// que el mapa de tablas siga incluyendo la de sedes.
 assert(
-  previousCashBlock.includes('"cierres_turno_final_locales"'),
+  previousCashBlock.includes("tablaSegunSede(CIERRE_TABLES, esLocal)")
+    && source.includes('local: "cierres_turno_final_locales"'),
   "La caja anterior no distingue la tabla de sedes locales",
 );
 assert(
@@ -84,9 +88,54 @@ assert(
   payloadBlock.includes("es_local_contexto: esLocalContexto"),
   "El payload sigue infiriendo incorrectamente si la empresa es local",
 );
+// Lo que importa es que el HTML fuerce una carga fresca del modulo, no un token
+// concreto: fijar el literal obligaba a tocar el test en cada bump legitimo del
+// cachebuster, que es justo lo que hay que hacer al cambiar el JS.
 assert(
-  html.includes("../js/cierre_turno.js?v=20260908viva4"),
-  "El HTML no fuerza la carga del hotfix de Viva",
+  /\.\.\/js\/cierre_turno\.js\?v=[0-9a-z]+/.test(html),
+  "El HTML carga cierre_turno.js sin cachebuster: los cambios no llegarian al navegador",
+);
+// La constancia se entrega en PDF y el modulo depende del global window.jspdf.
+assert(
+  html.includes("jspdf.umd.min.js"),
+  "El HTML no carga jsPDF: la constancia en PDF no se podria generar",
+);
+
+// ── La constancia nunca sale sin fila confirmada ──────────────────────────
+// Los tres se sostienen entre si: la firma obliga a pasar la fila, el cuerpo
+// corta si no trae id, y el unico llamador pasa la fila que devolvio la
+// relectura. Si alguien afloja cualquiera de los tres, esto falla.
+assert(
+  source.includes("const descargarResumen = (filaConfirmada, {"),
+  "descargarResumen ya no exige la fila confirmada como primer argumento",
+);
+assert(
+  source.includes('const idConfirmado = String(filaConfirmada?.id || "").trim()')
+    && source.includes("if (!idConfirmado) {"),
+  "descargarResumen no corta cuando la fila confirmada no trae id",
+);
+assert(
+  source.includes("descargarResumen(filaConfirmada, { bloquearDespues: false })"),
+  "el envio ya no pasa la fila releida de la base a la constancia",
+);
+assert(
+  source.includes("const filaConfirmada = await confirmarCierreGuardado({"),
+  "el envio ya no relee el cierre en la base antes de la constancia",
+);
+
+// El fallo tiene que verse, no quedarse en la linea de estado.
+assert(
+  source.includes("mostrarFalloEnvio(motivo)") && html.includes('id="falloEnvio"'),
+  "un fallo de envio ya no muestra el aviso bloqueante",
+);
+
+// La sede va explicita al comprobar si el turno ya existe. Sin esto, el RPC
+// cae a la empresa del usuario y responde por la sede equivocada: es el aviso
+// "Este turno ya fue subido" que costo quince dias de turnos de VIVA.
+assert(
+  between(source, "turno_existente", "if (error || !data?.ok)")
+    .includes("p_empresa_id: contextoTurno.empresa_id"),
+  "turno_existente vuelve a consultarse sin la sede explicita",
 );
 
 if (failures.length) {

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>AXIOMA | Auditoría de propinas</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/cierre_turno_propinas.css?v=20260909sim1">
+  <link rel="stylesheet" href="../css/simulador_propinas.css?v=20260909sim1">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+</head>
+<body style="display:none">
+  <script type="module" src="../js/router.js"></script>
+  <script type="module" src="../js/header.js"></script>
+
+  <div id="loadingOverlay" class="loading-overlay is-hidden">Cargando turno...</div>
+
+  <div class="main">
+    <h1>Auditoría de propinas</h1>
+    <p class="intro">
+      Abre cualquier turno y mira, propina por propina, a qué hora entró y entre
+      quiénes se repartió. Puedes mover los horarios de cada persona para ver
+      cómo cambiaría el reparto: <strong>es una simulación, no toca el turno
+      guardado.</strong>
+    </p>
+
+    <!-- Aviso que sustituye a todo lo demás si quien entra no es administrador -->
+    <div id="sinAcceso" class="sin-acceso is-hidden">
+      <h2>Esta pantalla es solo para administradores</h2>
+      <p>Tu cuenta no tiene permiso para auditar el reparto de propinas.</p>
+    </div>
+
+    <div id="contenido">
+      <section class="bloque">
+        <h2>Elige el turno</h2>
+        <div class="sim-selector">
+          <label>
+            Sede
+            <select id="selSede"><option value="">Cargando...</option></select>
+          </label>
+          <label>
+            Fecha
+            <input id="selFecha" type="date">
+          </label>
+          <label>
+            Jornada
+            <select id="selJornada">
+              <option value="1">Turno 1 · Mañana</option>
+              <option value="2">Turno 2 · Tarde</option>
+              <option value="3">Turno 3 · Noche</option>
+            </select>
+          </label>
+          <button id="btnCargar" type="button">Cargar turno</button>
+        </div>
+        <p id="status" class="sim-status"></p>
+        <p id="origenDatos" class="sim-origen is-hidden"></p>
+      </section>
+
+      <section class="bloque is-hidden" id="bloqueTurno">
+        <h2>Propinas que entraron ese turno</h2>
+        <p class="sim-nota">
+          Tal cual las reportó Loggro: la hora exacta de cada factura con propina
+          y cuánto fue. Todavía sin repartir.
+        </p>
+        <div class="sim-tabla-scroll">
+          <table class="sim-tabla-propinas">
+            <thead>
+              <tr><th>Hora exacta</th><th class="is-num">Propina</th></tr>
+            </thead>
+            <tbody id="tablaPropinasBody"></tbody>
+            <tfoot id="tablaPropinasPie"></tfoot>
+          </table>
+        </div>
+      </section>
+
+      <section class="bloque is-hidden" id="bloquePersonas">
+        <h2>Quién estuvo, y en qué horario</h2>
+        <p class="sim-nota">
+          Cambia una hora y mira abajo qué pasa con el reparto. Para deshacerlo,
+          "Volver al reparto real".
+        </p>
+        <div id="listaPersonas" class="sim-personas"></div>
+        <div class="sim-acciones">
+          <button id="btnRestaurar" type="button">Volver al reparto real</button>
+          <span id="avisoSimulado" class="sim-badge is-hidden">Estás viendo una simulación</span>
+        </div>
+        <div id="resumenCambios" class="sim-cambios is-hidden"></div>
+      </section>
+
+      <section class="bloque is-hidden" id="bloqueDesglose">
+        <h2>Cómo se reparte</h2>
+        <div id="propinasDesglose" class="propinas-desglose"></div>
+      </section>
+    </div>
+  </div>
+
+  <script type="module" src="../js/simulador_propinas.js?v=20260909sim1"></script>
+</body>
+</html>
