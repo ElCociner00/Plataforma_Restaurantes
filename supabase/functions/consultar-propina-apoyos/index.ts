@@ -145,9 +145,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
       propinaAsignada: 0,
     }];
 
+    // Cuando alguien cierra solo, algunos flujos registran al propio
+    // responsable como su único "apoyo" -es como queda su parte anotada en
+    // apoyos_turno-. Si ese registro se sumara aquí igual que un apoyo real,
+    // la misma persona quedaría presente dos veces con el mismo id: cada
+    // propina se repartiría entre "un presente de más" y, si de verdad había
+    // otro apoyo distinto al mismo tiempo, ese otro terminaría recibiendo
+    // menos de lo que le tocaba. Confirmado en vivo: un turno con responsable
+    // + 1 apoyo real repartía cada propina ÷3 en vez de ÷2 mientras
+    // coincidían los dos.
     for (const registro of registros) {
       const apoyoId = texto(registro.apoyo_responsable_id);
-      if (!apoyoId) continue;
+      if (!apoyoId || apoyoId === responsableId) continue;
 
       const desdeTexto = USAR_RANGO_PROPIO
         ? (texto(registro.rango_hora_inicio_24) || texto(registro.rango_hora_inicio_simple) || texto(registro.hora_inicio))

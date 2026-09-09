@@ -326,8 +326,17 @@ const cargarPersonas = async ({ empresaId, esLocal, fecha, jornada }) => {
     fin: horaLocalAIso(fecha, fila.hora_fin, Date.parse(inicioResp)),
   }];
 
+  // Algunos turnos guardan al propio responsable como una fila más de
+  // apoyos_turno (su forma de dejar registrada su propia parte cuando
+  // trabajó solo). Si esa fila se agregara aquí como una persona aparte, la
+  // misma persona quedaría contada dos veces con el mismo id -y con eso
+  // dividiría cada propina entre "un presente de más", robándole parte a
+  // quien de verdad estuvo de apoyo con ella-. Encontrado en vivo: turno con
+  // responsable + 1 apoyo real donde cada propina se repartía ÷3 en vez de
+  // ÷2 mientras coincidían, e inflaba "repartido entre el equipo" al doble.
   (apoyos || []).forEach((a) => {
     if (!a.apoyo_responsable_id) return;
+    if (String(a.apoyo_responsable_id) === String(fila.responsable_id)) return;
     const ini = horaLocalAIso(fecha, a.hora_inicio);
     personas.push({
       id: String(a.apoyo_responsable_id),
