@@ -53,6 +53,16 @@ assert(
   edge.includes("siguienteTurnoInicio") && edge.includes("Math.min(Math.max(finResponsable, finDelDia(fecha).getTime()), siguienteTurnoInicio)"),
   "la consulta a Loggro ya no se acota por el inicio del siguiente turno registrado ese día",
 );
+
+// ── Filtro propio: no basta con pedirle a Loggro el rango correcto, porque
+// su API no siempre lo respeta -si devuelve una factura fuera de rango, sin
+// filtrar aquí se cuenta igual y aparece como huérfana de un turno al que ni
+// siquiera pertenece-. Esto tiene que valer pase lo que pase con Loggro. ───
+
+assert(
+  edge.includes("if (marca < inicioResponsable || marca > finConsultaLoggro) continue;"),
+  "consultar-propina-apoyos ya no filtra localmente las facturas fuera de rango: si Loggro devuelve algo fuera de fecha, va a contarse igual",
+);
 assert(
   between(edge, "const personas: Persona[] = [{", "}];").includes("fin: finResponsable,"),
   "el responsable ya no participa en su franja literal: volvió a cubrir el día completo sin importar lo registrado, distinto de como se trata a un apoyo",

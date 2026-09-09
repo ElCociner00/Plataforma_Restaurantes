@@ -224,6 +224,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const marca = Date.parse(texto(pago.createdOn ?? pago.created_on ?? pago.date ?? factura.createdOn ?? factura.created_on ?? factura.date));
         if (!Number.isFinite(marca)) continue;
 
+        // Filtro propio, independiente de que Loggro haya filtrado bien por
+        // fecha. dateInit/dateEnd ya se le mandaron en la consulta, pero su
+        // API no siempre los respeta al pie de la letra -por eso el límite
+        // del siguiente turno de arriba a veces no bastaba: si Loggro
+        // devuelve una factura de fuera del rango pedido, sin este filtro se
+        // contaba igual y, al no coincidir con el horario de nadie, aparecía
+        // como huérfana de ESTE turno cuando en realidad ni siquiera es de
+        // este turno. No confiar en que el proveedor filtró: filtrar aquí
+        // siempre, con el mismo rango que se le pidió.
+        if (marca < inicioResponsable || marca > finConsultaLoggro) continue;
+
         totalRecibido += propina;
         const activas = personas.filter((p) => marca >= p.inicio && marca <= p.fin);
 
