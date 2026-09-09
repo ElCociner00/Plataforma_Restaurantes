@@ -461,11 +461,31 @@ export const descargarResumenCierreTurno = ({
       });
     }
 
-    const selloY = cardY + cardH - 30;
+    // Pie: sello + identidad de la fila que respalda esta constancia.
+    // El id no es decorativo. Este PDF solo se genera despues de releer el
+    // cierre en la base, asi que estampar el id lo convierte en el recibo de un
+    // registro concreto que se puede ir a buscar en el historico, en lugar de
+    // un dibujo del formulario que podria no corresponder a nada.
+    const selloY = cardY + cardH - 52;
     ctx.textAlign = "center";
     ctx.fillStyle = "#4338ca";
     ctx.font = "bold 20px Arial";
     ctx.fillText(`Expedido por AXIOMA by Global Nexo Shop (${fechaExpedicion})`, cardX + (cardW / 2), selloY);
+
+    const constancia = meta.constancia || {};
+    if (constancia.id) {
+      const registradoEn = constancia.registradoEn
+        ? new Date(constancia.registradoEn).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" })
+        : "";
+      ctx.fillStyle = "#52525b";
+      ctx.font = "16px Arial";
+      ctx.fillText(
+        `Cierre registrado en base de datos · ${String(constancia.id).slice(0, 8)}`
+        + (registradoEn ? ` · ${registradoEn}` : ""),
+        cardX + (cardW / 2),
+        selloY + 26,
+      );
+    }
     ctx.textAlign = "left";
     return canvas;
   };

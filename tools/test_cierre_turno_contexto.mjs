@@ -101,6 +101,43 @@ assert(
   "El HTML no carga jsPDF: la constancia en PDF no se podria generar",
 );
 
+// ── La constancia nunca sale sin fila confirmada ──────────────────────────
+// Los tres se sostienen entre si: la firma obliga a pasar la fila, el cuerpo
+// corta si no trae id, y el unico llamador pasa la fila que devolvio la
+// relectura. Si alguien afloja cualquiera de los tres, esto falla.
+assert(
+  source.includes("const descargarResumen = (filaConfirmada, {"),
+  "descargarResumen ya no exige la fila confirmada como primer argumento",
+);
+assert(
+  source.includes('const idConfirmado = String(filaConfirmada?.id || "").trim()')
+    && source.includes("if (!idConfirmado) {"),
+  "descargarResumen no corta cuando la fila confirmada no trae id",
+);
+assert(
+  source.includes("descargarResumen(filaConfirmada, { bloquearDespues: false })"),
+  "el envio ya no pasa la fila releida de la base a la constancia",
+);
+assert(
+  source.includes("const filaConfirmada = await confirmarCierreGuardado({"),
+  "el envio ya no relee el cierre en la base antes de la constancia",
+);
+
+// El fallo tiene que verse, no quedarse en la linea de estado.
+assert(
+  source.includes("mostrarFalloEnvio(motivo)") && html.includes('id="falloEnvio"'),
+  "un fallo de envio ya no muestra el aviso bloqueante",
+);
+
+// La sede va explicita al comprobar si el turno ya existe. Sin esto, el RPC
+// cae a la empresa del usuario y responde por la sede equivocada: es el aviso
+// "Este turno ya fue subido" que costo quince dias de turnos de VIVA.
+assert(
+  between(source, "turno_existente", "if (error || !data?.ok)")
+    .includes("p_empresa_id: contextoTurno.empresa_id"),
+  "turno_existente vuelve a consultarse sin la sede explicita",
+);
+
 if (failures.length) {
   console.error(failures.map((failure) => `- ${failure}`).join("\n"));
   process.exit(1);

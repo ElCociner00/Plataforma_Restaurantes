@@ -36,7 +36,7 @@ import { supabase } from "./supabase.js";
 import { fetchResponsablesActivos, fetchUsuariosEmpresa } from "./responsables.js";
 import { getEmpresaPolicy, puedeEnviarDatos } from "./permisos.core.js";
 import { initApoyosPropinaManager } from "./apoyos.js";
-import { descargarResumenCierreTurno } from "./cierre_turno_pdf.js?v=20260908pdf1";
+import { descargarResumenCierreTurno } from "./cierre_turno_pdf.js?v=20260909gate1";
 import {
   WEBHOOK_LISTAR_RESPONSABLES,
   WEBHOOK_CONSULTAR_GASTOS_CATALOGO
@@ -174,6 +174,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // Contenedor del desglose de propinas y ultima traza recibida del reparto.
   // La traza se persiste como evidencia cuando el cierre queda confirmado.
   const propinasDesglose = document.getElementById("propinasDesglose");
+  const falloEnvio = document.getElementById("falloEnvio");
+  const falloEnvioMotivo = document.getElementById("falloEnvioMotivo");
+  const btnCerrarFalloEnvio = document.getElementById("cerrarFalloEnvio");
   let ultimoRepartoPropinas = null;
 
   // Version sincrona de la resolucion de nombres, para pintar. `responsables
@@ -293,11 +296,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
+      // La sede va SIEMPRE explícita. Sin ella, el RPC caía a `app_empresa_id()`
+      // —la empresa del usuario, no la sede seleccionada— y comprobaba la tabla
+      // equivocada. Un operario en contexto VIVA veía el turno de LE MERIDIEM y
+      // leía "Este turno ya fue subido": daba el cierre por hecho y no lo subía.
+      // Es el aviso que hizo perder quince días de turnos de VIVA.
+      const contextoTurno = await getContextPayload();
+      if (!contextoTurno?.empresa_id) {
+        setJornadaAviso("No se pudo identificar la sede: no se comprobó si este turno ya existe.", true);
+        return;
+      }
+
       const { data, error } = await supabase.rpc("turno_existente", {
         p_fecha: fecha.value,
-        p_numero: numeroTurno
+        p_numero: numeroTurno,
+        p_empresa_id: contextoTurno.empresa_id
       });
-      if (error || !data?.ok) return;
+      if (error || !data?.ok) {
+        console.error("[cierre_turno] turno_existente falló", { error, data });
+        setJornadaAviso("No se pudo comprobar si este turno ya estaba subido.", true);
+        return;
+      }
 
       if (!data.existe) {
         setJornadaAviso("");
@@ -1594,7 +1613,43 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
 
-  const descargarResumen = ({ bloquearDespues = false } = {}) => {
+  // Aviso de fallo imposible de pasar por alto.
+  //
+  // El problema de agosto no fue solo que el cierre no entrara: fue que nadie
+  // se enteró. El mensaje iba a una línea de estado que se confunde con las
+  // demás, así que la gente se llevaba el soporte y seguía. Esto se planta
+  // encima del formulario, dice explícitamente que el turno NO quedó guardado,
+  // y no desaparece hasta que la persona lo cierra.
+  const mostrarFalloEnvio = (motivo) => {
+    if (!falloEnvio) {
+      // Sin el contenedor no se puede fallar en silencio: se recurre al diálogo
+      // del navegador, que al menos interrumpe.
+      window.alert(`EL TURNO NO QUEDÓ GUARDADO.\n\n${motivo}\n\nNo se descargó constancia. Vuelve a intentar el envío.`);
+      return;
+    }
+    if (falloEnvioMotivo) falloEnvioMotivo.textContent = motivo;
+    falloEnvio.classList.remove("is-hidden");
+    falloEnvio.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  const ocultarFalloEnvio = () => falloEnvio?.classList.add("is-hidden");
+  btnCerrarFalloEnvio?.addEventListener("click", ocultarFalloEnvio);
+
+  // La constancia SOLO existe si existe la fila en la base.
+  //
+  // No es una convención: `filaConfirmada` es obligatoria y tiene que traer el
+  // id que devolvió la relectura de la tabla. Sin eso no se dibuja nada. Un PDF
+  // en las manos de alguien tiene que significar, sin excepción, que el turno
+  // quedó guardado — si no, vuelve a pasar lo de agosto: la gente se llevaba el
+  // soporte, daba el cierre por hecho, y la fila nunca existió.
+  const descargarResumen = (filaConfirmada, { bloquearDespues = false } = {}) => {
+    const idConfirmado = String(filaConfirmada?.id || "").trim();
+    if (!idConfirmado) {
+      console.error("[cierre_turno] se intentó generar constancia sin fila confirmada", filaConfirmada);
+      setStatus("No se genera constancia: este cierre no está confirmado en la base de datos.");
+      return false;
+    }
+
     const snapshotContext = {
       inputsFinanzas,
       inputsDiferencias,
@@ -1621,7 +1676,15 @@ document.addEventListener("DOMContentLoaded", () => {
       efectivoApertura: efectivoApertura?.value || 0,
       bolsa: bolsa?.value || 0,
       caja: caja?.value || 0,
-      comentarioUsuario: comentarios?.value || ""
+      comentarioUsuario: comentarios?.value || "",
+      // Se estampa en el pie del PDF. Con esto una constancia deja de ser un
+      // dibujo del formulario y pasa a ser el recibo de una fila concreta, que
+      // cualquiera puede ir a buscar en el histórico.
+      constancia: {
+        id: idConfirmado,
+        registradoEn: filaConfirmada?.created_at || "",
+        jornada: filaConfirmada?.numero_turno ?? ""
+      }
     };
 
     const ok = descargarResumenCierreTurno({
@@ -2233,7 +2296,7 @@ La versión anterior quedará guardada en el histórico, con tu nombre y la fech
       // Token nuevo: este cierre ya entró y el siguiente envío es otro turno.
       tokenEnvio = (crypto?.randomUUID?.() || `envio-${Date.now()}-${Math.random().toString(16).slice(2)}`);
 
-      const descargaOk = descargarResumen({ bloquearDespues: false });
+      const descargaOk = descargarResumen(filaConfirmada, { bloquearDespues: false });
       const apertura = data?.efectivo_apertura;
       const avisoApertura = apertura && Number(apertura.diferencia) !== 0
         ? ` Atención: el efectivo de apertura difiere en ${apertura.diferencia} respecto a ${apertura.origen || "el cierre anterior"}.`
@@ -2256,7 +2319,13 @@ La versión anterior quedará guardada en el histórico, con tu nombre y la fech
       revisarTurnoExistente();
     } catch (err) {
       console.error("Error subiendo cierre", err);
-      setStatus(err?.message || "Error de conexión al subir cierre.");
+      const motivo = err?.message || "Error de conexión al subir cierre.";
+      setStatus(motivo);
+      // Una línea de estado no basta: es exactamente lo que pasó en agosto,
+      // el turno no entraba y nadie se enteraba. El fallo se planta en pantalla
+      // y no se va hasta que la persona lo cierra a mano.
+      mostrarFalloEnvio(motivo);
+      confirmacionEnvio.classList.add("is-hidden");
     }
   });
 

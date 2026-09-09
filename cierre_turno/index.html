@@ -13,7 +13,7 @@
        la misma URL acaba sirviendo contenidos distintos y el navegador se
        queda con el viejo. Paso ya una vez (numeros pisados en Diferencias,
        ver docs/2026-08-23_cierre_turno_diferencias_texto_superpuesto.md). -->
-  <link rel="stylesheet" href="../css/cierre_turno.css?v=20260823d">
+  <link rel="stylesheet" href="../css/cierre_turno.css?v=20260909gate1">
   <link rel="stylesheet" href="../css/cierre_turno_contabilidad.css?v=20260823d">
   <link rel="stylesheet" href="../css/cierre_turno_propinas.css?v=20260908prop1">
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
@@ -124,7 +124,7 @@
         <button id="consultarGastos" type="button">Consultar gastos</button>
         <button id="verificar" disabled>Verificar</button>
         <button id="enviar" disabled>Subir cierre</button>
-        <span class="hint-icon" title="Al subir cierre exitosamente se descargará la constancia PNG automáticamente."><i class="ph ph-info" aria-hidden="true"></i></span>
+        <span class="hint-icon" title="La constancia en PDF se descarga sola, y solo si el cierre quedó guardado en la base de datos."><i class="ph ph-info" aria-hidden="true"></i></span>
         <button id="limpiarDatos" type="button">Limpiar datos</button>
       </div>
       <div class="correccion-wrap is-hidden" id="correccionWrap">
@@ -142,6 +142,22 @@
         <div class="confirmacion-acciones">
           <button id="confirmarEnvio" type="button">Sí</button>
           <button id="cancelarEnvio" type="button">No</button>
+        </div>
+      </div>
+      <!-- Aviso de fallo de envio. Se muestra SOLO cuando el turno no quedo
+           guardado en la base. Es deliberadamente imposible de pasar por alto:
+           el problema de agosto no fue solo que el cierre no entrara, sino que
+           el aviso se perdia entre los mensajes normales de estado. -->
+      <div id="falloEnvio" class="fallo-envio is-hidden" role="alert" aria-live="assertive">
+        <div class="fallo-envio-card">
+          <h3>El turno NO quedó guardado</h3>
+          <p id="falloEnvioMotivo"></p>
+          <p class="fallo-envio-detalle">
+            No se descargó constancia, porque no hay nada que respaldar. Vuelve a
+            intentar el envío. Si el error se repite, avisa antes de cerrar la
+            página: los datos del formulario se pierden al recargar.
+          </p>
+          <button id="cerrarFalloEnvio" type="button">Entendido</button>
         </div>
       </div>
       <div id="status"></div>
@@ -321,7 +337,7 @@
     </section>
   </div>
 
-  <script type="module" src="../js/cierre_turno.js?v=20260908pdf1"></script>
+  <script type="module" src="../js/cierre_turno.js?v=20260909gate1"></script>
   <script type="module" src="../js/cierre_turno_contabilidad_visual.js?v=20260823d"></script>
 
   <script type="module" src="../js/footer.js"></script>

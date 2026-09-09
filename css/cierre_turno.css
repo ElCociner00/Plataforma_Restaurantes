@@ -731,3 +731,69 @@ input:not([readonly]) {
   margin-top: var(--ek-sp-2, 8px);
   min-height: 1.2em;
 }
+
+/* ── Aviso de fallo de envio ────────────────────────────────────────────────
+   Se muestra SOLO cuando el turno no quedo guardado en la base. Tapa el
+   formulario a proposito: en agosto el aviso iba a la linea de estado, se
+   confundia con los mensajes normales, y la gente daba el cierre por hecho. */
+
+.fallo-envio {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(24, 24, 27, 0.55);
+}
+
+.fallo-envio.is-hidden { display: none; }
+
+.fallo-envio-card {
+  max-width: 520px;
+  width: 100%;
+  background: #ffffff;
+  border-top: 6px solid #dc2626;
+  border-radius: 12px;
+  padding: 24px 26px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.3);
+}
+
+.fallo-envio-card h3 {
+  margin: 0 0 10px;
+  color: #991b1b;
+  font-size: 21px;
+}
+
+.fallo-envio-card p {
+  margin: 0 0 10px;
+  color: #27272a;
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+
+#falloEnvioMotivo {
+  font-weight: 600;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #991b1b;
+  overflow-wrap: anywhere;
+}
+
+.fallo-envio-detalle { color: #52525b; font-size: 13.5px; }
+
+.fallo-envio-card button {
+  margin-top: 6px;
+  padding: 9px 20px;
+  border: 0;
+  border-radius: 8px;
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fallo-envio-card button:hover { background: #b91c1c; }
