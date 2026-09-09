@@ -12,7 +12,33 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const apoyos = await readFile(path.join(root, "js/apoyos.js"), "utf8");
 const edge = await readFile(path.join(root, "supabase/functions/consultar-propina-apoyos/index.ts"), "utf8");
 const visual = await readFile(path.join(root, "js/cierre_turno_propinas_visual.js"), "utf8");
+const ventas = await readFile(path.join(root, "supabase/functions/consultar-ventas/index.ts"), "utf8");
+const simulador = await readFile(path.join(root, "js/simulador_propinas.js"), "utf8");
 const failures = [];
+
+// ── La ventana de consulta a Loggro tiene que ser la MISMA en las dos
+// Edge Functions. Esta era la causa real, más de fondo que las huérfanas:
+// consultar-ventas (el total que ve el usuario primero) consulta hasta el
+// fin del día; consultar-propina-apoyos cortaba en hora_fin del turno. Dos
+// ventanas de tiempo distintas nunca iban a dar el mismo total, sin importar
+// quién estuviera presente. ──────────────────────────────────────────────
+
+assert(
+  ventas.includes("const hasta = finDelDia(fecha)"),
+  "consultar-ventas cambió su límite de consulta; revisa que siga igual antes de comparar",
+);
+assert(
+  edge.includes("finResponsable = Math.max(finResponsable, finDelDia(fecha).getTime())"),
+  "consultar-propina-apoyos ya no extiende al responsable hasta el fin del día: volverá a dar un total distinto al de consultar-ventas",
+);
+assert(
+  edge.includes('import { esFechaValida, finDelDia, instanteLocal } from "../_shared/fechas.ts"'),
+  "consultar-propina-apoyos dejó de importar finDelDia",
+);
+assert(
+  simulador.includes("finDelDiaIso") && between(simulador, "const personas = [{", "}];").includes("finDia"),
+  "el simulador ya no extiende al responsable hasta el fin del día: su recálculo local divergirá de la Edge Function",
+);
 
 // ── js/apoyos.js: la propina real nunca se pisa en silencio ────────────────
 

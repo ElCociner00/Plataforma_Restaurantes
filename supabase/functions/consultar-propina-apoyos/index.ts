@@ -26,7 +26,7 @@ import { corsHeaders, json } from "../_shared/cors.ts";
 import { errores, leerCuerpo, responderError } from "../_shared/errores.ts";
 import { resolverContexto } from "../_shared/tenant.ts";
 import { comoLista, obtenerSesionLoggro, pedirLoggro } from "../_shared/loggro.ts";
-import { esFechaValida, instanteLocal } from "../_shared/fechas.ts";
+import { esFechaValida, finDelDia, instanteLocal } from "../_shared/fechas.ts";
 import { filtrarPorNegocio } from "../_shared/ventas.ts";
 
 const ETIQUETA = "consultar-propina-apoyos";
@@ -93,6 +93,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const inicioResponsable = instanteLocal(fecha, inicioResponsableTexto).getTime();
     let finResponsable = instanteLocal(fecha, finResponsableTexto).getTime();
     if (finResponsable <= inicioResponsable) finResponsable += 24 * 60 * 60 * 1000;
+
+    // El responsable cubre, como mínimo, hasta el fin del día -exactamente el
+    // mismo límite que usa consultar-ventas para el total que ya se le
+    // mostró al usuario ("Consultar Loggro"). Sin esto, esta función
+    // consultaba a Loggro solo hasta hora_fin del turno mientras que
+    // consultar-ventas seguía hasta medianoche: dos ventanas de tiempo
+    // distintas, así que los dos totales JAMÁS iban a coincidir, sin importar
+    // quién estuviera presente. (Si el turno cruza medianoche, lo de arriba ya
+    // corrió finResponsable al día siguiente; ese caso sigue mandando aquí.)
+    finResponsable = Math.max(finResponsable, finDelDia(fecha).getTime());
 
     // El responsable y cada apoyo participan únicamente dentro de su franja.
     const personas: Persona[] = [{
