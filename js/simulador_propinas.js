@@ -116,6 +116,9 @@ const horaLocalAIso = (fecha, hhmm, referenciaInicio = null) => {
   return base.toISOString();
 };
 
+/** 23:59:59.999 de `fecha`, hora Colombia. Mismo límite que usa consultar-ventas. */
+const finDelDiaIso = (fecha) => new Date(`${fecha}T23:59:59.999-05:00`).toISOString();
+
 const setLoading = (activo) => loadingOverlay?.classList.toggle("is-hidden", !activo);
 const setStatus = (mensaje, esError = false) => {
   if (!status) return;
@@ -247,12 +250,19 @@ const cargarPersonas = async ({ empresaId, esLocal, fecha, jornada }) => {
   const nombre = (id) => (usuarios || []).find((u) => String(u.id) === String(id))?.nombre_completo || String(id || "Sin nombre");
 
   const inicioResp = horaLocalAIso(fecha, fila.hora_inicio);
+  const finRespTurno = horaLocalAIso(fecha, fila.hora_fin, Date.parse(inicioResp));
+  // El responsable cubre, como mínimo, hasta el fin del día -mismo límite que
+  // usa consultar-ventas para el total que ya se mostró en el cierre real, y
+  // que ahora también respeta la Edge Function del reparto. Sin esto, mover
+  // rangos aquí podía "huerfanar" propinas tardías que la Edge Function sí
+  // cuenta al cargar el turno la primera vez.
+  const finDia = finDelDiaIso(fecha);
   const personas = [{
     id: String(fila.responsable_id),
     tipo: "responsable",
     nombre: nombre(fila.responsable_id),
     inicio: inicioResp,
-    fin: horaLocalAIso(fecha, fila.hora_fin, Date.parse(inicioResp)),
+    fin: Date.parse(finRespTurno) >= Date.parse(finDia) ? finRespTurno : finDia,
   }];
 
   (apoyos || []).forEach((a) => {
