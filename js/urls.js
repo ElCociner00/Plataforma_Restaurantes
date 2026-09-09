@@ -50,6 +50,7 @@ export const APP_URLS = {
   cierreTurno: buildAppPath("/cierre_turno/"),
   historicoCierreTurno: buildAppPath("/cierre_turno/historico_cierre_turno.html"),
   auditoriaTurnos: buildAppPath("/cierre_turno/auditoria_turnos.html"),
+  simuladorPropinas: buildAppPath("/cierre_turno/simulador_propinas.html"),
   libroDescuadres: buildAppPath("/cierre_turno/libro_descuadres.html"),
   cierreInventarios: buildAppPath("/cierre_inventarios/"),
   historicoCierreInventarios: buildAppPath("/cierre_inventarios/historico_cierre_inventarios.html"),
