@@ -31,12 +31,27 @@ assert(
   "consultar-ventas cambió su límite de consulta; revisa que siga igual antes de comparar",
 );
 assert(
-  edge.includes("finConsultaLoggro = Math.max(finResponsable, finDelDia(fecha).getTime())"),
+  edge.includes("Math.max(finResponsable, finDelDia(fecha).getTime())"),
   "consultar-propina-apoyos ya no extiende la CONSULTA hasta el fin del día: volverá a dar un total distinto al de consultar-ventas",
 );
 assert(
   edge.includes("dateEnd: new Date(finConsultaLoggro).toISOString()"),
   "la consulta a Loggro ya no usa el límite extendido",
+);
+
+// ── La consulta no debe pasarse al siguiente turno del mismo día. Sin esto,
+// un turno de mañana que termina a las 14:30 "veía" las propinas de la tarde
+// o la noche -nadie de la mañana estaba presente a esa hora, así que
+// aparecían como huérfanas, dando a entender que había un error o que la
+// propina del turno era mayor de lo que fue-. ──────────────────────────────
+
+assert(
+  edge.includes(".from(ctx.t.cierres)") && edge.includes('.eq("fecha_turno", fecha)'),
+  "consultar-propina-apoyos ya no consulta los otros turnos del mismo día para acotar la ventana",
+);
+assert(
+  edge.includes("siguienteTurnoInicio") && edge.includes("Math.min(Math.max(finResponsable, finDelDia(fecha).getTime()), siguienteTurnoInicio)"),
+  "la consulta a Loggro ya no se acota por el inicio del siguiente turno registrado ese día",
 );
 assert(
   between(edge, "const personas: Persona[] = [{", "}];").includes("fin: finResponsable,"),
