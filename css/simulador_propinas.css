@@ -2,6 +2,14 @@
    El desglose en si usa css/cierre_turno_propinas.css; esto es solo lo propio
    del simulador (selector, tabla hora/propina y rangos editables). */
 
+/* Sin esto, .main hereda el max-width:420px de main.css (pensado para
+   formularios angostos) y la pantalla se ve como vista de celular incluso en
+   escritorio. Mismo ancho que auditoria_turnos.css, la pantalla hermana de
+   este módulo: hace falta espacio para la línea de tiempo y la tabla. */
+.main {
+  max-width: 1400px;
+}
+
 .intro {
   max-width: 78ch;
   color: #52525b;

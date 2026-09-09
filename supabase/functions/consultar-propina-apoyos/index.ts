@@ -96,9 +96,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     // OJO, esto NO se usa para decidir quién estuvo presente -eso sigue
     // siendo el rango literal que se registró, igual para el responsable que
-    // para cualquier apoyo-. Es SOLO el límite de la consulta a Loggro:
-    // mismo fin del día que ya usa consultar-ventas, para que los dos totales
-    // (el que ve el usuario al abrir el turno y el que calcula esta función)
+    // para cualquier apoyo-. Es SOLO el límite de la consulta a Loggro: mismo
+    // fin del día que ya usa consultar-ventas, para que los dos totales (el
+    // que ve el usuario al abrir el turno y el que calcula esta función)
     // salgan de la misma ventana de tiempo.
     //
     // La primera versión de este arreglo extendía finResponsable mismo, y con
@@ -108,7 +108,33 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // comportamientos distintos según quién lo llevara-. Una propina fuera
     // del horario de todos ahora aparece como huérfana (ver más abajo), en
     // vez de atribuírsele al responsable en silencio.
-    const finConsultaLoggro = Math.max(finResponsable, finDelDia(fecha).getTime());
+    //
+    // Pero extender siempre hasta medianoche tiene su propio problema: en un
+    // negocio con varios turnos el mismo día, un turno de mañana (7:39-14:30)
+    // terminaba "viendo" las propinas del turno de la tarde o de la noche, y
+    // como no había nadie de la mañana presente a esa hora, aparecían como
+    // huérfanas -pareciendo un error, cuando en realidad ni siquiera son de
+    // este turno-. Si ya existe otro turno registrado ese mismo día que
+    // empieza después de este, la consulta no debe pasar de ahí.
+    const { data: otrosTurnos } = await ctx.clienteAdmin()
+      .from(ctx.t.cierres)
+      .select("hora_inicio")
+      .eq("empresa_id", ctx.empresaId)
+      .eq("fecha_turno", fecha);
+
+    let siguienteTurnoInicio: number | null = null;
+    for (const fila of (otrosTurnos ?? []) as Array<{ hora_inicio: unknown }>) {
+      const horaTxt = texto(fila.hora_inicio);
+      if (!horaTxt) continue;
+      const instante = instanteLocal(fecha, horaTxt).getTime();
+      if (instante > inicioResponsable && (siguienteTurnoInicio === null || instante < siguienteTurnoInicio)) {
+        siguienteTurnoInicio = instante;
+      }
+    }
+
+    const finConsultaLoggro = siguienteTurnoInicio !== null
+      ? Math.min(Math.max(finResponsable, finDelDia(fecha).getTime()), siguienteTurnoInicio)
+      : Math.max(finResponsable, finDelDia(fecha).getTime());
 
     // El responsable y cada apoyo participan únicamente dentro de su franja.
     const personas: Persona[] = [{
