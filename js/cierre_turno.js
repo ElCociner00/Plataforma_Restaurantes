@@ -1268,7 +1268,26 @@ document.addEventListener("DOMContentLoaded", () => {
       );
     }
   });
-  const apoyoConfirmado = () => Boolean(apoyosPropinaManager?.isConsultaConfirmada?.());
+  const actualizarRepartoPropinasVista = () => {
+    if (!propinasDesglose) return;
+    const propinaTotal = Number(inputsSoloVista.propina?.value || 0);
+    const huboApoyos = apoyoHubo?.value === "si";
+
+    if (huboApoyos && ultimoRepartoPropinas) {
+      renderRepartoPropinas(
+        propinasDesglose,
+        ultimoRepartoPropinas,
+        (id) => nombrePorResponsableId(id)
+      );
+      return;
+    }
+
+    if (huboApoyos) {
+      propinasDesglose.innerHTML = `
+        <div class="propinas-cuadre">
+          <div class="propinas-tarjeta">
+            <span class="propinas-tarjeta-titulo">Propinas en el turno</span>
+            <strong class="propinas-tarjeta-valor">${propinaTotal > 0 ? '
   const syncApoyosConsultaVisibility = () => {
     const enabled = apoyoHubo?.value === "si";
     const cantidad = Number(apoyoCantidad?.value || 0);
@@ -1547,6 +1566,7 @@ document.addEventListener("DOMContentLoaded", () => {
       renderApoyoRows(Number(apoyoCantidad?.value || 0));
     }
     syncApoyosConsultaVisibility();
+    actualizarRepartoPropinasVista();
     marcarComoNoVerificado();
   });
   apoyoCantidad?.addEventListener("change", () => {
@@ -1805,6 +1825,7 @@ document.addEventListener("DOMContentLoaded", () => {
       inputsFinanzas.transferencias.sistema.value = resolveTransferenciasSistema(data);
       inputsFinanzas.bono_regalo.sistema.value = data.bono_regalo_sistema ?? "";
       inputsSoloVista.propina.value = data.propina ?? "";
+      actualizarRepartoPropinasVista();
       apoyosPropinaManager?.reset?.();
       actualizarDomiciliosDesdeExtras();
       limpiarDiferencias();

@@ -222,6 +222,7 @@ function buildMenu({ context, environmentForMenu, localContexts = [] }) {
         <div class="nav-dropdown-menu">
           <a href="${APP_URLS.cierreTurno}">Cierre turno</a>
           <a href="${APP_URLS.historicoCierreTurno}">Histórico</a>
+          <a href="${APP_URLS.simuladorPropinas}">Auditoría de propinas</a>
           ${context?.rol === "admin" || context?.rol === "admin_root"
             ? `<a href="${APP_URLS.auditoriaTurnos}">Auditoría de turnos</a>
                <a href="${APP_URLS.libroDescuadres}">Libro de descuadres</a>

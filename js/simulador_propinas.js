@@ -4,44 +4,19 @@
  *
  * Partes del archivo:
  * 1) Imports y estado.
- * 2) Carga del turno (evidencia archivada -> Loggro -> aviso).
+ * 2) Modos de carga: Turno cerrado BD, Consulta Loggro manual, Escenario demo.
  * 3) Pintado: tabla hora/propina, personas con rangos editables.
- * 4) Simulación: recálculo local y comparación contra el reparto real.
- *
- * Índice de funciones/bloques para ubicarte rápido:
- * - `cargarEventos`      (línea aprox. 120): de dónde salen las propinas.
- * - `cargarPersonas`     (línea aprox. 190): responsable y apoyos del turno.
- * - `pintarTablaPropinas`(línea aprox. 250): la tabla hora/propina.
- * - `pintarPersonas`     (línea aprox. 285): rangos editables.
- * - `recalcular`         (línea aprox. 350): el corazón de la demostración.
- *
- * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
+ * 4) Simulación: recálculo reactivo con propinas_reparto.js y comparativa visual.
  */
 
-// Auditoría de propinas: la pizarra para sentarse con el cliente.
-// ===============================================================
-//
-// El cliente no cree que las propinas se repartan. Aquí se abre un turno
-// cualquiera —incluido uno viejo—, se ve propina por propina a qué hora entró,
-// y se pueden mover los horarios de cada persona para que vea en vivo que una
-// propina le deja de contar o le empieza a contar según el minuto exacto.
-//
-// DOS REGLAS QUE NO SE TOCAN:
-//
-//   1. Esta pantalla NUNCA modifica un turno. Lo único que puede escribir es la
-//      evidencia de propinas que trae de Loggro (`guardar_propinas_turno`), que
-//      solo añade y jamás altera un cierre.
-//
-//   2. El reparto lo calcula js/propinas_reparto.js, que es una réplica exacta
-//      de la Edge Function. Si el simulador repartiera distinto que producción,
-//      se le estaría demostrando al cliente algo que no es lo que cobra la
-//      gente. tools/test_propinas_reparto.mjs fija esa regla.
+// Auditoría y simulador de propinas: demostración interactiva
+// ==========================================================
 
 import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 import { resolverEsLocal, tablaSegunSede } from "./local_scope.js";
-import { repartirPropinas, compararRepartos } from "./propinas_reparto.js?v=20260909sim1";
-import { renderRepartoPropinas } from "./cierre_turno_propinas_visual.js?v=20260909sim1";
+import { repartirPropinas, compararRepartos } from "./propinas_reparto.js?v=20260909sim2";
+import { renderRepartoPropinas } from "./cierre_turno_propinas_visual.js?v=20260909sim2";
 
 const CIERRE_TABLES = { principal: "cierres_turno_final", local: "cierres_turno_final_locales" };
 const APOYO_TABLES = { principal: "apoyos_turno", local: "apoyos_turno_locales" };
@@ -54,10 +29,28 @@ const sinAcceso = el("sinAcceso");
 const loadingOverlay = el("loadingOverlay");
 const status = el("status");
 const origenDatos = el("origenDatos");
+
+// Selectores modo BD
+const panelModoBD = el("panelModoBD");
+const panelModoManual = el("panelModoManual");
+const tabModoBD = el("tabModoBD");
+const tabModoManual = el("tabModoManual");
+const btnCargarDemo = el("btnCargarDemo");
+
 const selSede = el("selSede");
 const selFecha = el("selFecha");
 const selJornada = el("selJornada");
 const btnCargar = el("btnCargar");
+
+// Selectores modo Manual
+const selSedeManual = el("selSedeManual");
+const selFechaManual = el("selFechaManual");
+const selHoraInicio = el("selHoraInicio");
+const selHoraFin = el("selHoraFin");
+const btnConsultarLoggroManual = el("btnConsultarLoggroManual");
+const btnIniciarManual = el("btnIniciarManual");
+
+// Acciones y bloques
 const btnRestaurar = el("btnRestaurar");
 const avisoSimulado = el("avisoSimulado");
 const listaPersonas = el("listaPersonas");
@@ -65,40 +58,27 @@ const resumenCambios = el("resumenCambios");
 const tablaBody = el("tablaPropinasBody");
 const tablaPie = el("tablaPropinasPie");
 const propinasDesglose = el("propinasDesglose");
+const btnAgregarPropina = el("btnAgregarPropina");
+const btnAgregarApoyo = el("btnAgregarApoyo");
 
-const estado = {
-  contexto: null,
-  eventos: [],
-  personasReales: [],   // los rangos tal como quedaron guardados
-  personas: [],         // los rangos que se están simulando
-  repartoReal: null,
-};
-
-const formateadorCOP = typeof Intl !== "undefined"
+const formateadorCOP = typeof Intl !== "undefined" && typeof Intl.NumberFormat === "function"
   ? new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 })
   : null;
-const dinero = (v) => (formateadorCOP ? formateadorCOP.format(Number(v) || 0) : `$${Math.round(Number(v) || 0)}`);
+
+const dinero = (v) => formateadorCOP ? formateadorCOP.format(Number(v) || 0) : `$${Math.round(Number(v) || 0)}`;
 
 const horaExacta = (iso) => {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? "--:--:--"
-    : d.toLocaleTimeString("es-CO", { timeZone: TZ, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+  if (Number.isNaN(d.getTime())) return "--:--";
+  return d.toLocaleTimeString("es-CO", { timeZone: TZ, hour: "2-digit", minute: "2-digit", second: "2-digit" });
 };
 
-/** ISO -> "HH:MM" en hora de Colombia, para los inputs de tipo time. */
 const isoAHoraLocal = (iso) => {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? ""
-    : d.toLocaleTimeString("es-CO", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false });
+  if (Number.isNaN(d.getTime())) return "00:00";
+  return d.toLocaleTimeString("es-CO", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false });
 };
 
-/**
- * "HH:MM" + fecha -> instante ISO, con el desfase de Colombia escrito a mano.
- * Con setHours se usaría la zona del navegador y las franjas quedarían corridas
- * respecto a las propinas en un equipo configurado en otro huso.
- */
 const horaLocalAIso = (fecha, hhmm, referenciaInicio = null) => {
   const m = String(hhmm || "").trim().match(/^(\d{1,2}):(\d{2})/);
   if (!fecha || !m) return null;
@@ -121,20 +101,24 @@ const setStatus = (mensaje, esError = false) => {
   status.textContent = mensaje || "";
   status.classList.toggle("is-error", Boolean(esError));
 };
+
 const mostrarBloques = (visible) => {
   ["bloqueTurno", "bloquePersonas", "bloqueDesglose"].forEach((id) => el(id)?.classList.toggle("is-hidden", !visible));
 };
 
-// ── Carga ────────────────────────────────────────────────────────────────
+const estado = {
+  contexto: null,
+  fechaActiva: "",
+  personasReales: [],
+  personas: [],
+  eventosReales: [],
+  eventos: [],
+  repartoReal: null,
+};
 
-/**
- * De dónde salen las propinas, en este orden:
- *   1. `propinas_turno_eventos`: evidencia ya archivada. No depende de Loggro.
- *   2. Loggro en vivo. Si responde, se archiva para que la próxima vez no haga
- *      falta —Loggro puede limitar las facturas visibles a las últimas 24 horas.
- * Si ninguna da nada, se dice cuál falló en vez de dejar la pantalla vacía.
- */
-const cargarEventos = async ({ empresaId, fecha, jornada, personas }) => {
+// ── Carga y orígenes de datos ─────────────────────────────────────────────
+
+const cargarEventosDeBD = async ({ empresaId, fecha, jornada, personas, propinaRegistrada = 0 }) => {
   const { data: archivados, error: errorArchivo } = await supabase
     .from("propinas_turno_eventos")
     .select("factura_id, ocurrido_en, monto")
@@ -147,7 +131,6 @@ const cargarEventos = async ({ empresaId, fecha, jornada, personas }) => {
     return { eventos: archivados, origen: "archivo", detalle: `${archivados.length} propinas archivadas de este turno.` };
   }
 
-  // No hay evidencia: se le pide a Loggro. El payload imita el del cierre.
   const responsable = personas.find((p) => p.tipo === "responsable") || personas[0];
   if (!responsable) {
     return { eventos: [], origen: "sin_personas", detalle: "El turno no tiene responsable registrado." };
@@ -155,6 +138,10 @@ const cargarEventos = async ({ empresaId, fecha, jornada, personas }) => {
 
   const cuerpo = {
     empresa_id: empresaId,
+    fecha,
+    hora_inicio: isoAHoraLocal(responsable.inicio),
+    hora_fin: isoAHoraLocal(responsable.fin),
+    responsable_id: responsable.id,
     apoyo: {
       fecha,
       responsable_turno_id: responsable.id,
@@ -171,63 +158,71 @@ const cargarEventos = async ({ empresaId, fecha, jornada, personas }) => {
     },
   };
 
-  const { data, error } = await supabase.functions.invoke("consultar-propina-apoyos", { body: cuerpo });
+  try {
+    const { data, error } = await supabase.functions.invoke("consultar-propina-apoyos", { body: cuerpo });
+    const eventos = Array.isArray(data?.eventos) ? data.eventos : [];
 
-  if (error || !data || data.ok === false) {
-    const motivo = data?.message || error?.message || "sin detalle";
-    return { eventos: [], origen: "error_loggro", detalle: `Loggro no devolvió las propinas de ese día: ${motivo}` };
+    if (!error && eventos.length) {
+      try {
+        await supabase.rpc("guardar_propinas_turno", {
+          p_empresa_id: empresaId,
+          p_fecha: fecha,
+          p_numero: jornada,
+          p_eventos: eventos,
+        });
+      } catch (e) {
+        console.error("[simulador] no se pudo archivar", e);
+      }
+      return { eventos, origen: "loggro", detalle: `${eventos.length} propinas consultadas de Loggro.` };
+    }
+  } catch (errLoggro) {
+    console.warn("[simulador] error consultando Loggro", errLoggro);
   }
 
-  const eventos = Array.isArray(data.eventos) ? data.eventos : [];
-  if (!eventos.length) {
+  // Si no hay eventos factura por factura pero el cierre tenía propina registrada
+  if (propinaRegistrada > 0) {
+    const horaMedio = new Date((Date.parse(responsable.inicio) + Date.parse(responsable.fin)) / 2).toISOString();
+    const eventoSintetico = [{
+      factura_id: "TURNO-CERRADO",
+      ocurrido_en: horaMedio,
+      monto: Math.round(propinaRegistrada * 100) / 100
+    }];
     return {
-      eventos: [],
-      origen: "loggro_vacio",
-      detalle: "Loggro respondió, pero sin propinas para ese turno. Puede ser que ese día no hubiera, "
-             + "o que la cuenta solo muestre las facturas de las últimas 24 horas.",
+      eventos: eventoSintetico,
+      origen: "propina_turno",
+      detalle: `Turno con propina registrada de ${dinero(propinaRegistrada)}. Loggro no reportó facturas individuales para esta fecha pasada; se generó la propina para simulación.`
     };
   }
 
-  // Se archiva para que la próxima consulta no dependa de Loggro. Si falla, no
-  // pasa nada: la pantalla ya tiene los datos que necesita.
-  let archivadoOk = false;
-  try {
-    const { error: errorGuardar } = await supabase.rpc("guardar_propinas_turno", {
-      p_empresa_id: empresaId,
-      p_fecha: fecha,
-      p_numero: jornada,
-      p_eventos: eventos,
-    });
-    archivadoOk = !errorGuardar;
-    if (errorGuardar) console.error("[simulador] no se pudo archivar la evidencia", errorGuardar);
-  } catch (e) {
-    console.error("[simulador] no se pudo archivar la evidencia", e);
-  }
-
   return {
-    eventos,
-    origen: "loggro",
-    detalle: `${eventos.length} propinas traídas de Loggro`
-           + (archivadoOk ? " y archivadas: la próxima vez se abren al instante." : "."),
+    eventos: [],
+    origen: "loggro_vacio",
+    detalle: "No se encontraron facturas con propina registradas en Loggro para este turno. Puedes añadir propinas manualmente con el botón "+ Agregar propina" para la demostración."
   };
 };
 
-/** Responsable y apoyos con los rangos que quedaron guardados ese día. */
-const cargarPersonas = async ({ empresaId, esLocal, fecha, jornada }) => {
+const cargarPersonasDeBD = async ({ empresaId, esLocal, fecha, jornada }) => {
   const tablaCierres = tablaSegunSede(CIERRE_TABLES, esLocal);
   const tablaApoyos = tablaSegunSede(APOYO_TABLES, esLocal);
 
-  const { data: cierre, error: errorCierre } = await supabase
+  const { data: cierres, error: errorCierre } = await supabase
     .from(tablaCierres)
-    .select("responsable_id, hora_inicio, hora_fin")
+    .select("responsable_id, hora_inicio, hora_fin, valor, propina_global")
     .eq("empresa_id", empresaId)
     .eq("fecha_turno", fecha)
-    .eq("numero_turno", jornada)
-    .limit(1);
+    .eq("numero_turno", jornada);
 
   if (errorCierre) throw new Error(`No se pudo leer el turno: ${errorCierre.message}`);
-  const fila = Array.isArray(cierre) ? cierre[0] : null;
-  if (!fila) throw new Error(`No hay ningún cierre guardado para esa sede, fecha y jornada (${tablaCierres}).`);
+  const fila = Array.isArray(cierres) && cierres.length ? cierres[0] : null;
+  if (!fila) {
+    throw new Error(`No hay ningún cierre guardado para esa sede, fecha y jornada (${tablaCierres}). Si deseas simular sin cierre previo, usa la pestaña "Consulta por Horario / Manual".`);
+  }
+
+  let propinaRegistrada = Number(fila.propina_global || 0);
+  if (!propinaRegistrada && Array.isArray(cierres)) {
+    const filaPropina = cierres.find((c) => c.variable === "propina" || c.variable === "propinas");
+    if (filaPropina) propinaRegistrada = Number(filaPropina.valor || 0);
+  }
 
   const { data: apoyos } = await supabase
     .from(tablaApoyos)
@@ -241,31 +236,34 @@ const cargarPersonas = async ({ empresaId, esLocal, fecha, jornada }) => {
   const { data: usuarios } = await supabase.from(tablaUsuarios).select("id, nombre_completo").in("id", ids);
   const nombre = (id) => (usuarios || []).find((u) => String(u.id) === String(id))?.nombre_completo || String(id || "Sin nombre");
 
-  const inicioResp = horaLocalAIso(fecha, fila.hora_inicio);
+  const inicioResp = horaLocalAIso(fecha, fila.hora_inicio || "08:00");
   const personas = [{
-    id: String(fila.responsable_id),
+    id: String(fila.responsable_id || "responsable"),
     tipo: "responsable",
-    nombre: nombre(fila.responsable_id),
+    nombre: nombre(fila.responsable_id) || "Responsable",
     inicio: inicioResp,
-    fin: horaLocalAIso(fecha, fila.hora_fin, Date.parse(inicioResp)),
+    fin: horaLocalAIso(fecha, fila.hora_fin || "16:00", Date.parse(inicioResp)),
   }];
 
   (apoyos || []).forEach((a) => {
     if (!a.apoyo_responsable_id) return;
-    const ini = horaLocalAIso(fecha, a.hora_inicio);
+    const ini = horaLocalAIso(fecha, a.hora_inicio || "09:00");
     personas.push({
       id: String(a.apoyo_responsable_id),
       tipo: "apoyo",
-      nombre: nombre(a.apoyo_responsable_id),
+      nombre: nombre(a.apoyo_responsable_id) || `Apoyo ${personas.length}`,
       inicio: ini,
-      fin: horaLocalAIso(fecha, a.hora_fin, Date.parse(ini)),
+      fin: horaLocalAIso(fecha, a.hora_fin || "14:00", Date.parse(ini)),
     });
   });
 
-  return personas.filter((p) => p.inicio && p.fin);
+  return {
+    personas: personas.filter((p) => p.inicio && p.fin),
+    propinaRegistrada
+  };
 };
 
-// ── Pintado ──────────────────────────────────────────────────────────────
+// ── Pintado y visualización ───────────────────────────────────────────────
 
 const crear = (tag, clase, texto) => {
   const n = document.createElement(tag);
@@ -274,35 +272,45 @@ const crear = (tag, clase, texto) => {
   return n;
 };
 
-/** La tabla que pidió el cliente: dos columnas, hora exacta y propina. */
 const pintarTablaPropinas = (eventos) => {
   tablaBody.innerHTML = "";
   tablaPie.innerHTML = "";
 
   if (!eventos.length) {
     const tr = crear("tr");
-    const td = crear("td", null, "Sin propinas en este turno.");
-    td.colSpan = 2;
+    const td = crear("td", null, "Sin propinas en este turno. Puedes agregar una con "+ Agregar propina".");
+    td.colSpan = 3;
     tr.appendChild(td);
     tablaBody.appendChild(tr);
     return;
   }
 
-  eventos.forEach((evento) => {
+  eventos.forEach((evento, indice) => {
     const tr = crear("tr");
     tr.appendChild(crear("td", "sim-hora", horaExacta(evento.ocurrido_en)));
     tr.appendChild(crear("td", "sim-monto is-num", dinero(evento.monto)));
+
+    const tdAccion = crear("td", "is-action");
+    const btnBorrar = crear("button", "btn-borrar", "✕");
+    btnBorrar.title = "Eliminar propina";
+    btnBorrar.addEventListener("click", () => {
+      estado.eventos.splice(indice, 1);
+      recalcular();
+    });
+    tdAccion.appendChild(btnBorrar);
+    tr.appendChild(tdAccion);
+
     tablaBody.appendChild(tr);
   });
 
   const total = eventos.reduce((s, e) => s + Number(e.monto || 0), 0);
   const tr = crear("tr");
-  tr.appendChild(crear("th", null, `Total · ${eventos.length} propinas`));
+  tr.appendChild(crear("th", null, `Total · ${eventos.length} propina(s)`));
   tr.appendChild(crear("th", "is-num", dinero(total)));
+  tr.appendChild(crear("th", null, ""));
   tablaPie.appendChild(tr);
 };
 
-/** Cada persona con su rango editable. Cambiar una hora recalcula al instante. */
 const pintarPersonas = () => {
   listaPersonas.innerHTML = "";
 
@@ -337,96 +345,90 @@ const pintarPersonas = () => {
         `Original: ${isoAHoraLocal(original.inicio)} – ${isoAHoraLocal(original.fin)}`));
     }
 
+    if (persona.tipo === "apoyo") {
+      const btnEliminar = crear("button", "btn-borrar", "Quitar");
+      btnEliminar.addEventListener("click", () => {
+        estado.personas.splice(indice, 1);
+        recalcular();
+      });
+      fila.appendChild(btnEliminar);
+    }
+
     listaPersonas.appendChild(fila);
   });
 };
 
-const alCambiarRango = (evento) => {
-  const indice = Number(evento.target.dataset.indice);
-  const campo = evento.target.dataset.campo;
-  const persona = estado.personas[indice];
-  if (!persona) return;
+const alCambiarRango = (e) => {
+  const indice = Number(e.target.dataset.indice);
+  const campo = e.target.dataset.campo;
+  const valor = e.target.value;
+  if (!Number.isFinite(indice) || !estado.personas[indice]) return;
 
-  const fecha = selFecha.value;
-  const referencia = campo === "fin" ? Date.parse(persona.inicio) : null;
-  const nuevo = horaLocalAIso(fecha, evento.target.value, referencia);
-  if (!nuevo) return;
+  const fecha = estado.fechaActiva || new Date().toISOString().slice(0, 10);
+  const refInicio = campo === "fin" ? Date.parse(estado.personas[indice].inicio) : null;
+  const iso = horaLocalAIso(fecha, valor, refInicio);
+  if (!iso) return;
 
-  estado.personas[indice] = { ...persona, [campo]: nuevo };
-
-  // Si al mover el inicio el fin queda antes, se corre al día siguiente: es un
-  // turno que cruza medianoche, no un error.
-  if (campo === "inicio") {
-    const p = estado.personas[indice];
-    if (Date.parse(p.fin) <= Date.parse(p.inicio)) {
-      estado.personas[indice] = { ...p, fin: horaLocalAIso(fecha, isoAHoraLocal(p.fin), Date.parse(p.inicio)) };
-    }
-  }
-
+  estado.personas[indice][campo] = iso;
   recalcular();
 };
 
-// ── Simulación ───────────────────────────────────────────────────────────
-
-const pintarCambios = (comparacion) => {
+const pintarResumenCambios = (comparativa) => {
   resumenCambios.innerHTML = "";
-
-  if (!comparacion.hay_cambios) {
+  if (!comparativa || !comparativa.hayCambios) {
     resumenCambios.classList.add("is-hidden");
-    avisoSimulado.classList.add("is-hidden");
     return;
   }
 
-  resumenCambios.classList.remove("is-hidden");
-  avisoSimulado.classList.remove("is-hidden");
-  resumenCambios.appendChild(crear("h4", null, "Qué cambia si los horarios fueran estos"));
+  resumenCambios.appendChild(crear("h4", null, "Efecto de los cambios de horario en el reparto:"));
 
-  comparacion.cambios
-    .filter((c) => Math.abs(c.diferencia) >= 0.01 || c.propinas_antes !== c.propinas_ahora)
-    .forEach((c) => {
-      const linea = crear("p", c.diferencia < 0 ? "sim-cambio sim-cambio-baja" : "sim-cambio sim-cambio-sube");
-      const signo = c.diferencia > 0 ? "+" : "−";
-      const propinas = c.propinas_ahora - c.propinas_antes;
-      const detallePropinas = propinas === 0
-        ? "las mismas propinas"
-        : `${Math.abs(propinas)} propina${Math.abs(propinas) === 1 ? "" : "s"} ${propinas > 0 ? "más" : "menos"}`;
-      linea.textContent = `${c.nombre}: ${dinero(c.antes)} → ${dinero(c.ahora)} `
-                        + `(${signo}${dinero(Math.abs(c.diferencia)).replace("$", "$")}, ${detallePropinas})`;
-      resumenCambios.appendChild(linea);
-    });
+  comparativa.personas.forEach((p) => {
+    if (Math.abs(p.diferencia) < 0.01) return;
+    const sube = p.diferencia > 0;
+    const pEl = crear("p", `sim-cambio ${sube ? "sim-cambio-sube" : "sim-cambio-baja"}`,
+      `• ${p.nombre}: ${dinero(p.montoReal)} → ${dinero(p.montoSimulado)} (${sube ? "+" : ""}${dinero(p.diferencia)})`);
+    resumenCambios.appendChild(pEl);
+  });
 
-  if (comparacion.huerfano_ahora > comparacion.huerfano_antes) {
-    const aviso = crear("p", "sim-cambio sim-cambio-huerfano",
-      `Ojo: ${dinero(comparacion.huerfano_ahora)} en propinas quedarían sin dueño, `
-      + "porque en ese instante no habría nadie cubriendo el turno.");
-    resumenCambios.appendChild(aviso);
+  if (comparativa.propinasHuerfanasSimuladas > 0) {
+    resumenCambios.appendChild(crear("p", "sim-cambio-huerfano",
+      `⚠️ Hay ${comparativa.propinasHuerfanasSimuladas} propina(s) que quedaron fuera del horario de todo el personal.`));
   }
+
+  resumenCambios.classList.remove("is-hidden");
 };
 
-/** El corazón de la demostración: recalcula en el navegador, sin ir a Loggro. */
 const recalcular = () => {
-  const simulado = repartirPropinas(estado.personas, estado.eventos);
-  renderRepartoPropinas(propinasDesglose, {
-    detalles: simulado.detalles,
-    eventos: simulado.eventos,
-    total_propina_dia: simulado.total_recibido,
-    total_propina_distribuida: simulado.total_repartido,
-    coinciden_totales: simulado.coinciden_totales,
-  }, (id) => estado.personas.find((p) => p.id === id)?.nombre || id);
-
+  pintarTablaPropinas(estado.eventos);
   pintarPersonas();
-  pintarCambios(compararRepartos(estado.repartoReal, simulado));
+
+  if (!estado.personas.length) {
+    el("bloqueDesglose")?.classList.add("is-hidden");
+    return;
+  }
+
+  const simulado = repartirPropinas(estado.personas, estado.eventos);
+  const resolverNombre = (id) => estado.personas.find((p) => p.id === id)?.nombre || id;
+
+  renderRepartoPropinas(propinasDesglose, simulado, resolverNombre);
+  el("bloqueDesglose")?.classList.remove("is-hidden");
+
+  const comparativa = estado.repartoReal ? compararRepartos(estado.repartoReal, simulado) : null;
+  const hayCambios = Boolean(comparativa?.hayCambios);
+  avisoSimulado?.classList.toggle("is-hidden", !hayCambios);
+  pintarResumenCambios(comparativa);
 };
 
 const restaurar = () => {
   estado.personas = estado.personasReales.map((p) => ({ ...p }));
+  estado.eventos = estado.eventosReales.map((e) => ({ ...e }));
   recalcular();
-  setStatus("Se restauraron los horarios reales del turno.");
+  setStatus("Se restauraron los horarios y datos originales.");
 };
 
-// ── Arranque ─────────────────────────────────────────────────────────────
+// ── Carga de modos ────────────────────────────────────────────────────────
 
-const cargarTurno = async () => {
+const cargarTurnoBD = async () => {
   const empresaId = selSede.value;
   const fecha = selFecha.value;
   const jornada = Number(selJornada.value);
@@ -442,50 +444,201 @@ const cargarTurno = async () => {
   setStatus("Cargando turno...");
 
   try {
+    estado.fechaActiva = fecha;
     const esLocal = await resolverEsLocal(empresaId);
-    const personas = await cargarPersonas({ empresaId, esLocal, fecha, jornada });
-
-    const { eventos, origen, detalle } = await cargarEventos({ empresaId, fecha, jornada, personas });
+    const { personas, propinaRegistrada } = await cargarPersonasDeBD({ empresaId, esLocal, fecha, jornada });
+    const { eventos, origen, detalle } = await cargarEventosDeBD({ empresaId, fecha, jornada, personas, propinaRegistrada });
 
     estado.personasReales = personas.map((p) => ({ ...p }));
     estado.personas = personas.map((p) => ({ ...p }));
-    estado.eventos = eventos;
+    estado.eventosReales = eventos.map((e) => ({ ...e }));
+    estado.eventos = eventos.map((e) => ({ ...e }));
     estado.repartoReal = repartirPropinas(personas, eventos);
 
     origenDatos.textContent = detalle;
-    origenDatos.className = `sim-origen ${origen === "archivo" || origen === "loggro" ? "is-ok" : "is-aviso"}`;
+    origenDatos.className = `sim-origen ${origen === "archivo" || origen === "loggro" || origen === "propina_turno" ? "is-ok" : "is-aviso"}`;
     origenDatos.classList.remove("is-hidden");
 
-    pintarTablaPropinas(eventos);
     mostrarBloques(true);
-
-    if (!eventos.length) {
-      // Sin propinas no hay nada que repartir ni que simular.
-      el("bloquePersonas")?.classList.add("is-hidden");
-      el("bloqueDesglose")?.classList.add("is-hidden");
-      setStatus("");
-      return;
-    }
-
     recalcular();
     setStatus("");
   } catch (error) {
-    console.error("[simulador] no se pudo cargar el turno", error);
+    console.error("[simulador] error cargando turno BD", error);
     setStatus(error?.message || "No se pudo cargar el turno.", true);
   } finally {
     setLoading(false);
   }
 };
 
-const cargarSedes = async () => {
-  const { data, error } = await supabase.from("empresas").select("id, nombre_comercial").order("nombre_comercial");
-  selSede.innerHTML = "";
-  if (error || !Array.isArray(data) || !data.length) {
-    selSede.appendChild(new Option("No se pudieron cargar las sedes", ""));
+const iniciarManual = (conLoggro = false) => async () => {
+  const empresaId = selSedeManual.value;
+  const fecha = selFechaManual.value;
+  const horaIni = selHoraInicio.value || "08:00";
+  const horaFin = selHoraFin.value || "16:00";
+
+  if (!empresaId || !fecha) {
+    setStatus("Elige sede y fecha para iniciar.", true);
     return;
   }
-  data.forEach((e) => selSede.appendChild(new Option(e.nombre_comercial || e.id, e.id)));
-  if (estado.contexto?.empresa_id) selSede.value = estado.contexto.empresa_id;
+
+  setLoading(true);
+  mostrarBloques(false);
+  origenDatos.classList.add("is-hidden");
+  setStatus(conLoggro ? "Consultando Loggro para el rango seleccionado..." : "Preparando simulación...");
+
+  try {
+    estado.fechaActiva = fecha;
+    const inicioIso = horaLocalAIso(fecha, horaIni);
+    const finIso = horaLocalAIso(fecha, horaFin, Date.parse(inicioIso));
+
+    const personas = [{
+      id: "responsable-1",
+      tipo: "responsable",
+      nombre: "Responsable Turno",
+      inicio: inicioIso,
+      fin: finIso
+    }];
+
+    let eventos = [];
+    let detalle = "Simulación iniciada con horarios definidos. Puedes agregar propinas y apoyos para probar.";
+
+    if (conLoggro) {
+      try {
+        const { data, error } = await supabase.functions.invoke("consultar-propina-apoyos", {
+          body: {
+            empresa_id: empresaId,
+            fecha,
+            hora_inicio: horaIni,
+            hora_fin: horaFin,
+            responsable_id: "responsable-1"
+          }
+        });
+        if (!error && Array.isArray(data?.eventos) && data.eventos.length) {
+          eventos = data.eventos;
+          detalle = `${eventos.length} propina(s) encontradas en Loggro para este rango.`;
+        } else {
+          detalle = "Loggro respondió pero no devolvió facturas con propina en este horario. Puedes agregar propinas manualmente.";
+        }
+      } catch (err) {
+        detalle = `No se pudo conectar con Loggro (${err.message}). Puedes simular manualmente.`;
+      }
+    }
+
+    estado.personasReales = personas.map((p) => ({ ...p }));
+    estado.personas = personas.map((p) => ({ ...p }));
+    estado.eventosReales = eventos.map((e) => ({ ...e }));
+    estado.eventos = eventos.map((e) => ({ ...e }));
+    estado.repartoReal = repartirPropinas(personas, eventos);
+
+    origenDatos.textContent = detalle;
+    origenDatos.className = "sim-origen is-ok";
+    origenDatos.classList.remove("is-hidden");
+
+    mostrarBloques(true);
+    recalcular();
+    setStatus("");
+  } catch (err) {
+    setStatus(err.message, true);
+  } finally {
+    setLoading(false);
+  }
+};
+
+const cargarEscenarioDemo = () => {
+  const hoy = new Date().toISOString().slice(0, 10);
+  estado.fechaActiva = hoy;
+
+  const h = (hhmm) => horaLocalAIso(hoy, hhmm);
+
+  const personas = [
+    { id: "resp-santi", tipo: "responsable", nombre: "Sebastián (Responsable)", inicio: h("08:30"), fin: h("15:30") },
+    { id: "apoyo-bruno", tipo: "apoyo", nombre: "Bruno (Apoyo Mañana)", inicio: h("09:00"), fin: h("13:00") },
+    { id: "apoyo-carla", tipo: "apoyo", nombre: "Carla (Apoyo Almuerzo)", inicio: h("12:00"), fin: h("15:30") }
+  ];
+
+  const eventos = [
+    { factura_id: "FAC-101", ocurrido_en: h("08:45"), monto: 8000 },
+    { factura_id: "FAC-102", ocurrido_en: h("09:30"), monto: 12000 },
+    { factura_id: "FAC-103", ocurrido_en: h("12:45"), monto: 18000 },
+    { factura_id: "FAC-104", ocurrido_en: h("14:15"), monto: 10000 }
+  ];
+
+  estado.personasReales = personas.map((p) => ({ ...p }));
+  estado.personas = personas.map((p) => ({ ...p }));
+  estado.eventosReales = eventos.map((e) => ({ ...e }));
+  estado.eventos = eventos.map((e) => ({ ...e }));
+  estado.repartoReal = repartirPropinas(personas, eventos);
+
+  origenDatos.textContent = "⚡ Escenario demo listo con 3 personas y 4 propinas en diferentes momentos. Mueve cualquier horario para ver el recálculo en vivo.";
+  origenDatos.className = "sim-origen is-ok";
+  origenDatos.classList.remove("is-hidden");
+
+  mostrarBloques(true);
+  recalcular();
+  setStatus("Escenario de demostración interactiva cargado.");
+};
+
+// ── Agregar apoyos y propinas ─────────────────────────────────────────────
+
+const agregarPropinaManual = () => {
+  const horaStr = window.prompt("Hora de la propina (formato HH:MM, ej: 11:30):", "11:30");
+  if (!horaStr) return;
+  const montoStr = window.prompt("Monto de la propina en pesos (ej: 15000):", "15000");
+  const monto = Number(montoStr);
+  if (!monto || monto <= 0) return;
+
+  const fecha = estado.fechaActiva || new Date().toISOString().slice(0, 10);
+  const iso = horaLocalAIso(fecha, horaStr);
+  if (!iso) {
+    alert("Hora inválida.");
+    return;
+  }
+
+  estado.eventos.push({
+    factura_id: `FAC-MANUAL-${Date.now().toString().slice(-4)}`,
+    ocurrido_en: iso,
+    monto
+  });
+  estado.eventos.sort((a, b) => a.ocurrido_en.localeCompare(b.ocurrido_en));
+  recalcular();
+};
+
+const agregarApoyoManual = () => {
+  const nombre = window.prompt("Nombre de la persona o apoyo:", `Apoyo ${estado.personas.length}`);
+  if (!nombre) return;
+  const horaIni = window.prompt("Hora de entrada (HH:MM):", "10:00");
+  if (!horaIni) return;
+  const horaFin = window.prompt("Hora de salida (HH:MM):", "14:00");
+  if (!horaFin) return;
+
+  const fecha = estado.fechaActiva || new Date().toISOString().slice(0, 10);
+  const iniIso = horaLocalAIso(fecha, horaIni);
+  const finIso = horaLocalAIso(fecha, horaFin, Date.parse(iniIso));
+
+  estado.personas.push({
+    id: `apoyo-manual-${Date.now()}`,
+    tipo: "apoyo",
+    nombre,
+    inicio: iniIso,
+    fin: finIso
+  });
+  recalcular();
+};
+
+// ── Inicialización ────────────────────────────────────────────────────────
+
+const cargarSedes = async () => {
+  const { data, error } = await supabase.from("empresas").select("id, nombre_comercial").order("nombre_comercial");
+  [selSede, selSedeManual].forEach((sel) => {
+    if (!sel) return;
+    sel.innerHTML = "";
+    if (error || !Array.isArray(data) || !data.length) {
+      sel.appendChild(new Option("No se pudieron cargar las sedes", ""));
+      return;
+    }
+    data.forEach((e) => sel.appendChild(new Option(e.nombre_comercial || e.id, e.id)));
+    if (estado.contexto?.empresa_id) sel.value = estado.contexto.empresa_id;
+  });
 };
 
 const esAdmin = (rol) => ["admin", "admin_root", "superadmin"].includes(String(rol || "").toLowerCase());
@@ -499,7 +652,6 @@ const iniciar = async () => {
       return;
     }
 
-    // El RLS ya bloquea los datos; esto solo evita una pantalla vacía sin explicación.
     if (!esAdmin(estado.contexto.rol)) {
       contenido?.classList.add("is-hidden");
       sinAcceso?.classList.remove("is-hidden");
@@ -507,10 +659,35 @@ const iniciar = async () => {
     }
 
     await cargarSedes();
-    selFecha.value = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const hoy = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    if (selFecha) selFecha.value = hoy;
+    if (selFechaManual) selFechaManual.value = hoy;
 
-    btnCargar.addEventListener("click", cargarTurno);
-    btnRestaurar.addEventListener("click", restaurar);
+    // Tabs
+    tabModoBD?.addEventListener("click", () => {
+      tabModoBD.classList.add("active");
+      tabModoManual.classList.remove("active");
+      panelModoBD.classList.remove("is-hidden");
+      panelModoManual.classList.add("is-hidden");
+    });
+
+    tabModoManual?.addEventListener("click", () => {
+      tabModoManual.classList.add("active");
+      tabModoBD.classList.remove("active");
+      panelModoManual.classList.remove("is-hidden");
+      panelModoBD.classList.add("is-hidden");
+    });
+
+    btnCargarDemo?.addEventListener("click", cargarEscenarioDemo);
+
+    btnCargar?.addEventListener("click", cargarTurnoBD);
+    btnConsultarLoggroManual?.addEventListener("click", iniciarManual(true));
+    btnIniciarManual?.addEventListener("click", iniciarManual(false));
+
+    btnRestaurar?.addEventListener("click", restaurar);
+    btnAgregarPropina?.addEventListener("click", agregarPropinaManual);
+    btnAgregarApoyo?.addEventListener("click", agregarApoyoManual);
+
     setStatus("");
   } catch (error) {
     setStatus(`No se pudo iniciar: ${error?.message || error}`, true);
@@ -519,4 +696,4 @@ const iniciar = async () => {
   }
 };
 
-iniciar();
+document.addEventListener("DOMContentLoaded", iniciar);
