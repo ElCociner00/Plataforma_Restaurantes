@@ -128,6 +128,43 @@ const mostrarBloques = (visible) => {
 
 // ── Carga ────────────────────────────────────────────────────────────────
 
+/** Fin del día en hora de Colombia, como instante (ms). */
+const finDeDiaLocalMs = (fecha) => {
+  const d = new Date(`${fecha}T23:59:59-05:00`);
+  return Number.isNaN(d.getTime()) ? null : d.getTime();
+};
+
+/**
+ * El mismo límite que calcula consultar-propina-apoyos/index.ts para acotar
+ * la consulta a Loggro: hasta el fin del día, salvo que exista otro turno
+ * después ese mismo día -ahí se corta justo antes, para no comerse sus
+ * propinas-. Replicado aquí porque hace falta aplicarlo también a la
+ * evidencia YA ARCHIVADA (ver más abajo): un archivo guardado antes de que
+ * este filtro existiera puede traer facturas del turno siguiente pegadas.
+ */
+const limiteConsultaSiguienteTurno = async ({ empresaId, esLocal, fecha, jornada, inicioResponsable, finResponsable }) => {
+  const tablaCierres = tablaSegunSede(CIERRE_TABLES, esLocal);
+  const { data: otros } = await supabase
+    .from(tablaCierres)
+    .select("numero_turno, hora_inicio")
+    .eq("empresa_id", empresaId)
+    .eq("fecha_turno", fecha);
+
+  let siguienteInicio = null;
+  (otros || []).forEach((fila) => {
+    if (Number(fila.numero_turno) === Number(jornada)) return;
+    const instante = Date.parse(horaLocalAIso(fecha, fila.hora_inicio) || "");
+    if (Number.isFinite(instante) && instante > inicioResponsable) {
+      if (siguienteInicio === null || instante < siguienteInicio) siguienteInicio = instante;
+    }
+  });
+
+  const limiteDia = finDeDiaLocalMs(fecha) ?? finResponsable;
+  return siguienteInicio !== null
+    ? Math.min(Math.max(finResponsable, limiteDia), siguienteInicio)
+    : Math.max(finResponsable, limiteDia);
+};
+
 /**
  * De dónde salen las propinas, en este orden:
  *   1. `propinas_turno_eventos`: evidencia ya archivada. No depende de Loggro.
@@ -135,7 +172,29 @@ const mostrarBloques = (visible) => {
  *      falta —Loggro puede limitar las facturas visibles a las últimas 24 horas.
  * Si ninguna da nada, se dice cuál falló en vez de dejar la pantalla vacía.
  */
-const cargarEventos = async ({ empresaId, fecha, jornada, personas }) => {
+const cargarEventos = async ({ empresaId, esLocal, fecha, jornada, personas }) => {
+  // No hay evidencia: se le pide a Loggro. El payload imita el del cierre.
+  const responsable = personas.find((p) => p.tipo === "responsable") || personas[0];
+  if (!responsable) {
+    return { eventos: [], origen: "sin_personas", detalle: "El turno no tiene responsable registrado." };
+  }
+
+  const inicioResponsable = Date.parse(responsable.inicio);
+  const finResponsable = Date.parse(responsable.fin);
+  const limite = Number.isFinite(inicioResponsable) && Number.isFinite(finResponsable)
+    ? await limiteConsultaSiguienteTurno({ empresaId, esLocal, fecha, jornada, inicioResponsable, finResponsable })
+    : null;
+
+  // Filtro propio, independiente de cuándo se haya guardado la evidencia: no
+  // basta con que la Edge Function filtrara bien al archivar -si ese archivo
+  // es de antes de que existiera ese filtro, o si Loggro igual se coló con
+  // algo fuera de rango, esto lo saca de este turno de todas formas-.
+  const dentroDelRango = (ocurridoEn) => {
+    if (!Number.isFinite(inicioResponsable) || limite === null) return true;
+    const marca = Date.parse(ocurridoEn);
+    return Number.isFinite(marca) && marca >= inicioResponsable && marca <= limite;
+  };
+
   const { data: archivados, error: errorArchivo } = await supabase
     .from("propinas_turno_eventos")
     .select("factura_id, ocurrido_en, monto")
@@ -145,13 +204,15 @@ const cargarEventos = async ({ empresaId, fecha, jornada, personas }) => {
     .order("ocurrido_en", { ascending: true });
 
   if (!errorArchivo && Array.isArray(archivados) && archivados.length) {
-    return { eventos: archivados, origen: "archivo", detalle: `${archivados.length} propinas archivadas de este turno.` };
-  }
-
-  // No hay evidencia: se le pide a Loggro. El payload imita el del cierre.
-  const responsable = personas.find((p) => p.tipo === "responsable") || personas[0];
-  if (!responsable) {
-    return { eventos: [], origen: "sin_personas", detalle: "El turno no tiene responsable registrado." };
+    const filtrados = archivados.filter((e) => dentroDelRango(e.ocurrido_en));
+    const descartadas = archivados.length - filtrados.length;
+    return {
+      eventos: filtrados,
+      origen: "archivo",
+      detalle: descartadas > 0
+        ? `${filtrados.length} propinas archivadas de este turno (${descartadas} de otro turno se excluyeron de esta vista).`
+        : `${filtrados.length} propinas archivadas de este turno.`,
+    };
   }
 
   const cuerpo = {
@@ -183,7 +244,9 @@ const cargarEventos = async ({ empresaId, fecha, jornada, personas }) => {
     return { eventos: [], origen: "error_loggro", detalle: `No se pudieron traer las propinas de ese turno: ${motivo}` };
   }
 
-  const eventos = Array.isArray(data.eventos) ? data.eventos : [];
+  // Mismo filtro propio que sobre el archivo: la Edge Function ya filtra,
+  // pero esta pantalla no depende de que ese filtro nunca cambie ni falle.
+  const eventos = (Array.isArray(data.eventos) ? data.eventos : []).filter((e) => dentroDelRango(e.ocurrido_en));
   if (!eventos.length) {
     return {
       eventos: [],
@@ -458,7 +521,7 @@ const cargarTurno = async () => {
     const esLocal = await resolverEsLocal(empresaId);
     const personas = await cargarPersonas({ empresaId, esLocal, fecha, jornada });
 
-    const { eventos, origen, detalle } = await cargarEventos({ empresaId, fecha, jornada, personas });
+    const { eventos, origen, detalle } = await cargarEventos({ empresaId, esLocal, fecha, jornada, personas });
 
     estado.personasReales = personas.map((p) => ({ ...p }));
     estado.personas = personas.map((p) => ({ ...p }));
@@ -490,8 +553,33 @@ const cargarTurno = async () => {
   }
 };
 
+/**
+ * Solo las sedes que este usuario puede realmente tocar (él mismo, su madre y
+ * sus hermanas si es un local; sus locales si es la madre; todas si es
+ * superadmin de la plataforma).
+ *
+ * `empresas` tiene lectura pública en RLS (su nombre se muestra en varias
+ * pantallas sin depender del grupo del usuario), así que filtrar aquí SÍ hace
+ * falta: sin esto, este selector -a diferencia de cualquier otro selector de
+ * sede en la plataforma- ofrecía literalmente todas las empresas de todos los
+ * clientes, prueba incluidas. `app_empresas_visibles()` es la misma función
+ * que ya usan las políticas RLS de las tablas de turnos, así que el selector
+ * nunca puede mostrar más de lo que luego se puede abrir de verdad.
+ */
 const cargarSedes = async () => {
-  const { data, error } = await supabase.from("empresas").select("id, nombre_comercial").order("nombre_comercial");
+  const { data: visibles, error: errorVisibles } = await supabase.rpc("app_empresas_visibles");
+  if (errorVisibles || !Array.isArray(visibles) || !visibles.length) {
+    selSede.innerHTML = "";
+    selSede.appendChild(new Option("No se pudieron cargar las sedes", ""));
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("empresas")
+    .select("id, nombre_comercial")
+    .in("id", visibles)
+    .order("nombre_comercial");
+
   selSede.innerHTML = "";
   if (error || !Array.isArray(data) || !data.length) {
     selSede.appendChild(new Option("No se pudieron cargar las sedes", ""));

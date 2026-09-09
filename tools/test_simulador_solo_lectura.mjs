@@ -18,7 +18,10 @@ const assert = (cond, msg) => { if (!cond) fallos.push(msg); };
 
 // Los RPC permitidos. Cualquier otro seria una escritura inesperada.
 const rpcs = [...fuente.matchAll(/\.rpc\(\s*["'`]([^"'`]+)["'`]/g)].map((m) => m[1]);
-const permitidos = new Set(["guardar_propinas_turno", "app_es_local"]);
+// app_empresas_visibles() es de solo lectura (SETOF uuid, sin efectos
+// secundarios): acota el selector de sede a lo que el usuario puede tocar,
+// nunca escribe nada.
+const permitidos = new Set(["guardar_propinas_turno", "app_es_local", "app_empresas_visibles"]);
 rpcs.forEach((nombre) => {
   assert(permitidos.has(nombre), `El simulador llama a un RPC no permitido: ${nombre}`);
 });
