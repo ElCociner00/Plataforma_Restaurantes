@@ -194,6 +194,11 @@
   font-size: 12px;
 }
 
+/* Propina sin nadie presente en ese instante: no se reparte, y se marca
+   distinto para que no se lea como "se dividió entre 1 persona". */
+.propinas-fila-huerfana { background: #fef2f2; }
+.propinas-chip-huerfana { background: #fee2e2; color: #991b1b; font-style: italic; }
+
 /* ── Acumulado y bloques ──────────────────────────────────────────────── */
 
 .propinas-fila-persona { margin-bottom: 14px; }

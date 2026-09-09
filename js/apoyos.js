@@ -85,13 +85,21 @@ const extractWebhookTotals = (webhookPayload) => {
   const normalized = normalizeResponseData(webhookPayload);
   let totalDia = 0;
   let totalDistribuida = 0;
+  let totalRecibido = 0;
+  let totalHuerfano = 0;
 
   normalized.forEach((row) => {
     totalDia = Math.max(totalDia, asInt(row?.total_propina_dia));
     totalDistribuida = Math.max(totalDistribuida, asInt(row?.total_propina_distribuida));
+    // `total_recibido`/`total_huerfano`: toda la propina de la consulta, y la
+    // parte de esa propina que no cayó en el horario de nadie registrado.
+    // Pueden faltar en una Edge Function desplegada antes de este cambio; el
+    // resto del código ya asume 0 cuando no vienen.
+    totalRecibido = Math.max(totalRecibido, asInt(row?.total_recibido));
+    totalHuerfano = Math.max(totalHuerfano, asInt(row?.total_huerfano));
   });
 
-  return { totalDia, totalDistribuida };
+  return { totalDia, totalDistribuida, totalRecibido, totalHuerfano };
 };
 
 const rebalanceIfExceedsTotal = (items, totalDia) => {
@@ -176,7 +184,7 @@ export function initApoyosPropinaManager({
     const apoyo = consultaPayload?.apoyo || {};
     const responsableId = String(apoyo?.responsable_turno_id || "");
     const detalleRows = parseWebhookDetalleRows(webhookPayload);
-    const { totalDia, totalDistribuida } = extractWebhookTotals(webhookPayload);
+    const { totalDia, totalDistribuida, totalRecibido, totalHuerfano } = extractWebhookTotals(webhookPayload);
 
     const apoyoRows = getApoyoRows();
     const responsableRow = detalleRows.find((row) => row.tipo === "responsable" && (!responsableId || row.id === responsableId));
@@ -199,7 +207,15 @@ export function initApoyosPropinaManager({
     });
 
     const responsableTip = asInt(tipsById.get(responsableId) || 0);
-    const totalTurno = asInt(totalDia || totalDistribuida || propinaInput.value || responsableTip);
+
+    // La propina real del turno (la que trajo "Consultar Loggro", si ya se
+    // había hecho) NUNCA se sobreescribe con lo que la consulta de apoyos
+    // alcanzó a repartir. Antes se pisaba con `totalDia`/`totalDistribuida`
+    // -que es SOLO la parte que cayó en el horario de alguien registrado- y
+    // eso es lo que hacía que la propina "cambiara sola" al confirmar apoyos:
+    // no cambiaba, una parte se estaba perdiendo de la vista en silencio.
+    const propinaRealPrevia = asInt(propinaInput.value);
+    const totalTurno = propinaRealPrevia || asInt(totalRecibido || totalDia || totalDistribuida || responsableTip);
     propinaInput.value = String(totalTurno);
     propinaInput.dataset.propinaResponsable = String(responsableTip);
 
@@ -209,8 +225,22 @@ export function initApoyosPropinaManager({
 
     const supportTotal = apoyoRows.reduce((acc, row) => acc + asInt(row.querySelector('[data-field="propina"]')?.value || 0), 0);
     const sumaRepartida = responsableTip + supportTotal;
+    // Si la Edge Function ya avisa de un hueco (`totalHuerfano`), o si el
+    // reparto simplemente no alcanza a cubrir la propina real conocida,
+    // se informa: hay plata que no quedó asignada a nadie porque no coincide
+    // con el horario de ningún registrado, y hay que revisar los rangos.
+    const huerfano = Math.max(asInt(totalHuerfano), totalTurno - sumaRepartida);
 
-    setStatus(`Propina aplicada desde BD/webhook. Total turno: ${totalTurno}. Responsable: ${responsableTip}. Apoyos: ${supportTotal}. Suma reparto: ${sumaRepartida}.`);
+    if (huerfano > 0) {
+      setStatus(
+        `⚠ Propina real del turno: ${totalTurno}. Solo se repartieron ${sumaRepartida} `
+        + `(responsable: ${responsableTip}, apoyos: ${supportTotal}). `
+        + `${huerfano} en propinas no coinciden con el horario de responsable ni apoyos registrado — `
+        + "revisa los rangos antes de confirmar."
+      );
+    } else {
+      setStatus(`Propina aplicada desde BD/webhook. Total turno: ${totalTurno}. Responsable: ${responsableTip}. Apoyos: ${supportTotal}. Suma reparto: ${sumaRepartida}.`);
+    }
   };
 
   btnConsultarPropina.addEventListener("click", async () => {

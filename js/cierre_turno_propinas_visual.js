@@ -241,10 +241,26 @@ const pintarPropinaAPropina = (eventos, personasPorId) => {
   const tbody = el("tbody");
   eventos.forEach((evento) => {
     const fila = el("tr");
+    const entre = evento.presentes.length || evento.reparto.length;
+
+    // Sin nadie presente en ese instante: no se reparte, y decirlo tal cual
+    // es mejor que dividir entre 1 y dar a entender que alguien la recibió.
+    if (!entre) {
+      fila.classList.add("propinas-fila-huerfana");
+      fila.appendChild(el("td", "propinas-celda-hora", horaConSegundos(evento.ocurrido_en)));
+      fila.appendChild(el("td", "propinas-celda-monto", dinero(evento.monto)));
+      const celdaVacia = el("td");
+      celdaVacia.appendChild(el("span", "propinas-chip propinas-chip-huerfana", "Sin nadie presente"));
+      fila.appendChild(celdaVacia);
+      fila.appendChild(el("td", "propinas-celda-division", "No se repartió"));
+      fila.appendChild(el("td", "propinas-celda-parte", dinero(0)));
+      tbody.appendChild(fila);
+      return;
+    }
+
     fila.appendChild(el("td", "propinas-celda-hora", horaConSegundos(evento.ocurrido_en)));
     fila.appendChild(el("td", "propinas-celda-monto", dinero(evento.monto)));
 
-    const entre = evento.presentes.length || evento.reparto.length || 1;
     const celdaPersonas = el("td");
     const nombres = (evento.presentes.length ? evento.presentes : evento.reparto)
       .map((p) => personasPorId.get(String(p?.id || ""))?.nombre || String(p?.id || "desconocido"));
@@ -351,10 +367,20 @@ const pintarPorBloques = (eventos) => {
 // ── Cuadre ─────────────────────────────────────────────────────────────────
 
 const pintarCuadre = (respuesta, eventos) => {
-  const recibido = Number(respuesta?.total_propina_dia) || 0;
+  // `total_recibido` es TODA la propina de la traza, haya o no alguien
+  // presente. `total_propina_dia` (nombre heredado) es solo la parte
+  // repartible: si no viene `total_recibido` (traza vieja, archivo previo a
+  // este cambio), se cae a ese para no romper turnos ya guardados.
+  const recibido = Number(respuesta?.total_recibido ?? respuesta?.total_propina_dia) || 0;
   const repartido = Number(respuesta?.total_propina_distribuida) || 0;
+  const huerfano = Number(respuesta?.total_huerfano) || 0;
   const sumaTraza = eventos.reduce((acc, evento) => acc + evento.monto, 0);
-  const cuadra = respuesta?.coinciden_totales === true || Math.abs(recibido - repartido) < 0.01;
+  // "Cuadra" ahora exige ADEMÁS que no haya quedado nada sin repartir. Antes
+  // comparaba el reparto contra sí mismo (recibido y repartido salían del
+  // mismo subconjunto ya filtrado) y por eso siempre daba bien, incluso
+  // cuando una parte de la propina real se había quedado fuera en silencio.
+  const cuadra = huerfano < 0.01
+    && (respuesta?.coinciden_totales === true || Math.abs((recibido - huerfano) - repartido) < 0.01);
 
   const bloque = el("div", `propinas-cuadre ${cuadra ? "propinas-cuadre-ok" : "propinas-cuadre-alerta"}`);
 
@@ -367,10 +393,16 @@ const pintarCuadre = (respuesta, eventos) => {
 
   bloque.appendChild(tarjeta("Propinas recibidas en el turno", dinero(recibido)));
   bloque.appendChild(tarjeta("Repartido entre el equipo", dinero(repartido)));
+  if (huerfano > 0.01) {
+    bloque.appendChild(tarjeta("Sin nadie presente (no repartida)", dinero(huerfano)));
+  }
   bloque.appendChild(tarjeta(`Suma del detalle (${eventos.length})`, dinero(sumaTraza)));
   bloque.appendChild(el("p", "propinas-veredicto", cuadra
     ? "Todo lo recibido quedó repartido: las cifras cuadran."
-    : `Atención: se recibieron ${dinero(recibido)} y se repartieron ${dinero(repartido)}. Revísalo antes de cerrar.`));
+    : huerfano > 0.01
+      ? `Atención: ${dinero(huerfano)} de los ${dinero(recibido)} recibidos no coinciden con el horario de nadie `
+        + "registrado (responsable ni apoyos) y no se repartieron. Revisa los rangos antes de cerrar el turno."
+      : `Atención: se recibieron ${dinero(recibido)} y se repartieron ${dinero(repartido)}. Revísalo antes de cerrar.`));
 
   return bloque;
 };
@@ -412,12 +444,12 @@ export function renderRepartoPropinas(contenedor, respuesta, resolverNombre = (i
     // vez de mostrar secciones vacías que parecerían un reparto en cero.
     contenedor.appendChild(el("p", "propinas-vacio",
       "No se recibió el detalle propina a propina para este turno. Los totales de arriba siguen siendo válidos."));
-    contenedor.appendChild(pintarPorPersona(personas, respuesta?.total_propina_dia));
+    contenedor.appendChild(pintarPorPersona(personas, respuesta?.total_recibido ?? respuesta?.total_propina_dia));
     return;
   }
 
   contenedor.appendChild(pintarLineaTiempo(personas, eventos));
   contenedor.appendChild(pintarPropinaAPropina(eventos, personasPorId));
-  contenedor.appendChild(pintarPorPersona(personas, respuesta?.total_propina_dia));
+  contenedor.appendChild(pintarPorPersona(personas, respuesta?.total_recibido ?? respuesta?.total_propina_dia));
   contenedor.appendChild(pintarPorBloques(eventos));
 }
