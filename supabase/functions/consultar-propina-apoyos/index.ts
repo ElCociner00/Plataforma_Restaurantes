@@ -139,18 +139,34 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const propias = filtrarPorNegocio(comoLista(crudo), sesion.tenantId);
 
     // ── Reparto ───────────────────────────────────────────────────────────
+    // Dos totales, a propósito no son el mismo:
+    //   totalRecibido   = TODA la propina que aparece en las facturas del
+    //                     rango consultado, haya o no alguien registrado en
+    //                     ese instante.
+    //   totalRealPropinas (repartible) = la parte de arriba que sí cayó
+    //                     dentro del tramo de alguien y por tanto se reparte.
+    // Antes solo existía el segundo, con el nombre `total_propina_dia`: una
+    // propina sin nadie presente se descartaba en silencio, sin aparecer ni
+    // en el total ni en la traza. Eso es lo que hacía parecer, al confirmar
+    // apoyos, que "la propina real" encogía de golpe: no encogía, una parte
+    // dejaba de contarse porque los rangos de responsable/apoyos no la
+    // cubrían, y no había forma de verlo.
     let totalRealPropinas = 0;
+    let totalRecibido = 0;
+    let totalHuerfano = 0;
 
     // Traza propina por propina. La regla de reparto NO cambia; lo único nuevo
     // es que se anota cada paso para poder enseñarlo. El cliente veía solo el
     // total por persona y no podía comprobar de dónde salía, de ahí la
-    // sospecha de que no se repartía.
+    // sospecha de que no se repartía. Las huérfanas (sin nadie presente)
+    // también quedan en la traza, marcadas, en vez de desaparecer.
     const eventos: Array<{
       factura_id: string;
       ocurrido_en: string;
       monto: number;
       presentes: Array<{ id: string; tipo: string }>;
       reparto: Array<{ id: string; tipo: string; parte: number }>;
+      huerfana: boolean;
     }> = [];
 
     for (const factura of propias) {
@@ -166,8 +182,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const marca = Date.parse(texto(pago.createdOn ?? pago.created_on ?? pago.date ?? factura.createdOn ?? factura.created_on ?? factura.date));
         if (!Number.isFinite(marca)) continue;
 
+        totalRecibido += propina;
         const activas = personas.filter((p) => marca >= p.inicio && marca <= p.fin);
-        if (activas.length === 0) continue;
+
+        if (activas.length === 0) {
+          totalHuerfano += propina;
+          eventos.push({
+            factura_id: texto(factura.id ?? factura.number ?? factura.invoiceNumber ?? ""),
+            ocurrido_en: new Date(marca).toISOString(),
+            monto: Math.round(propina * 100) / 100,
+            presentes: [],
+            reparto: [],
+            huerfana: true,
+          });
+          continue;
+        }
 
         totalRealPropinas += propina;
         const porPersona = propina / activas.length;
@@ -185,6 +214,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
             tipo: p.tipo,
             parte: Math.round(porPersona * 100) / 100,
           })),
+          huerfana: false,
         });
       }
     }
@@ -224,6 +254,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
     });
 
     const totalDia = Math.round(totalRealPropinas * 100) / 100;
+    const totalRecibidoRedondeado = Math.round(totalRecibido * 100) / 100;
+    const totalHuerfanoRedondeado = Math.round(totalHuerfano * 100) / 100;
+
+    if (totalHuerfanoRedondeado > 0.01) {
+      // No es un error -es información que alguien debe poder ver antes de
+      // confiarse del total-, pero sí vale la pena que quede en los logs:
+      // esta es la firma exacta de "la propina cambió al confirmar apoyos".
+      console.info(
+        `[${ETIQUETA}] empresa=${ctx.empresaId} fecha=${fecha} ` +
+        `${totalHuerfanoRedondeado} en propinas sin nadie presente (de ${totalRecibidoRedondeado} recibidas)`,
+      );
+    }
 
     console.info(
       `[${ETIQUETA}] empresa=${ctx.empresaId} fecha=${fecha} personas=${personas.length} ` +
@@ -242,6 +284,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       total_propina_dia: totalDia,
       total_propina_distribuida: Math.round(totalAsignado * 100) / 100,
       coinciden_totales: Math.abs(totalRealPropinas - totalAsignado) < 0.01,
+      // Añadido también. `total_propina_dia` de arriba es SOLO lo repartible
+      // (lo que cayó en el tramo de alguien) -por eso "coinciden_totales" da
+      // bien incluso cuando falta cubrir propinas: compara el reparto contra
+      // sí mismo, no contra lo recibido de verdad. Estos dos campos son la
+      // comparación honesta:
+      total_recibido: totalRecibidoRedondeado,
+      total_huerfano: totalHuerfanoRedondeado,
       consulta: {
         negocio: sesion.tenantId,
         facturas_empresa: propias.length,

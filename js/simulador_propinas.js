@@ -41,7 +41,7 @@ import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 import { resolverEsLocal, tablaSegunSede } from "./local_scope.js";
 import { repartirPropinas, compararRepartos } from "./propinas_reparto.js?v=20260909sim1";
-import { renderRepartoPropinas } from "./cierre_turno_propinas_visual.js?v=20260909sim1";
+import { renderRepartoPropinas } from "./cierre_turno_propinas_visual.js?v=20260909prop2";
 import { mensajeDeError } from "./edge_function_error.js";
 
 const CIERRE_TABLES = { principal: "cierres_turno_final", local: "cierres_turno_final_locales" };
