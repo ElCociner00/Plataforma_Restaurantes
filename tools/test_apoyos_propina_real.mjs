@@ -192,6 +192,29 @@ assert(
   "cargarSedes ya no filtra la tabla empresas por las visibles para este usuario",
 );
 
+// ── El responsable no puede quedar contado dos veces ────────────────────
+//
+// Algunos turnos guardan al responsable como su propia fila en
+// apoyos_turno(_locales) -así queda anotada su parte cuando trabajó solo-.
+// Si esa fila se suma como una persona más, la misma persona queda presente
+// dos veces con el mismo id: cada propina se reparte entre "un presente de
+// más", y si de verdad había otro apoyo distinto al mismo tiempo, ese otro
+// recibe menos de lo que le tocaba. Confirmado en vivo con un turno real:
+// responsable + 1 apoyo repartía cada propina ÷3 en vez de ÷2 mientras
+// coincidían, y "repartido entre el equipo" salía el doble de lo recibido.
+
+const cargarPersonasBlock = between(simulador, "const cargarPersonas = async", "return personas.filter");
+assert(
+  cargarPersonasBlock.includes('if (String(a.apoyo_responsable_id) === String(fila.responsable_id)) return;'),
+  "cargarPersonas ya no descarta la fila de apoyo que es el propio responsable: vuelve a contarlo dos veces",
+);
+
+const registrosBlock = between(edge, "for (const registro of registros)", "const admin = ctx.clienteAdmin();");
+assert(
+  registrosBlock.includes("apoyoId === responsableId"),
+  "consultar-propina-apoyos ya no descarta el registro de apoyo que es el propio responsable: vuelve a contarlo dos veces",
+);
+
 if (failures.length) {
   console.error(failures.map((failure) => `- ${failure}`).join("\n"));
   process.exit(1);
