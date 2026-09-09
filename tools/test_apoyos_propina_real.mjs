@@ -215,6 +215,35 @@ assert(
   "consultar-propina-apoyos ya no descarta el registro de apoyo que es el propio responsable: vuelve a contarlo dos veces",
 );
 
+// ── "Sin nadie presente" sin turno siguiente registrado: avisar por qué ────
+//
+// Reportado en vivo con BATUT VIVA: un turno de mañana sin ningún otro turno
+// guardado ese día mostraba propinas de la tarde como "Sin nadie presente" y
+// se leía como el mismo bug de contaminación entre turnos ya corregido -pero
+// no lo era: sencillamente no había ningún turno siguiente con el que acotar
+// la consulta, así que el resguardo (hasta medianoche) sí las traía, y esas
+// horas después de la salida del responsable casi siempre son un turno de
+// ese mismo día que nunca se guardó. limiteConsultaSiguienteTurno ahora
+// también devuelve si encontró ese turno siguiente, para poder avisarlo en
+// vez de dejar la huérfana sin más contexto.
+
+assert(
+  simulador.includes("return { limite, siguienteInicio };"),
+  "limiteConsultaSiguienteTurno ya no informa si encontró un turno siguiente registrado",
+);
+assert(
+  simulador.includes("const avisoTurnoFaltante"),
+  "el simulador ya no explica por qué una huérfana puede ser un turno sin guardar",
+);
+assert(
+  /if \(limiteInfo\?\.siguienteInicio != null\) return "";/.test(simulador),
+  "avisoTurnoFaltante ya no comprueba si de verdad no hay un turno siguiente registrado",
+);
+assert(
+  simulador.includes("avisoTurnoFaltante(filtrados)") && simulador.includes("avisoTurnoFaltante(eventos)"),
+  "avisoTurnoFaltante ya no se aplica tanto al archivo como a lo recién traído de Loggro",
+);
+
 if (failures.length) {
   console.error(failures.map((failure) => `- ${failure}`).join("\n"));
   process.exit(1);
