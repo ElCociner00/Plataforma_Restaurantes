@@ -19,7 +19,7 @@ import { corsHeaders, json } from "../_shared/cors.ts";
 import { errores, leerCuerpo, responderError } from "../_shared/errores.ts";
 import { resolverContexto } from "../_shared/tenant.ts";
 import { comoLista, obtenerSesionLoggro, pedirLoggro } from "../_shared/loggro.ts";
-import { esFechaValida, finDelDia, instanteLocal } from "../_shared/fechas.ts";
+import { esFechaValida, finDelDia, instanteLocal, rangoTurno } from "../_shared/fechas.ts";
 import { filtrarPorNegocio, resumirVentas } from "../_shared/ventas.ts";
 
 const ETIQUETA = "consultar-ventas";
@@ -64,13 +64,41 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const turno = (cuerpo.turno ?? {}) as Record<string, unknown>;
     const horaInicio = aHora24(String(turno.inicio ?? ""), String(turno.inicio_momento ?? ""));
+    const horaFinCruda = String(turno.fin ?? "").trim();
+    const horaFin = horaFinCruda
+      ? aHora24(horaFinCruda, String(turno.fin_momento ?? ""))
+      : "";
 
-    // dateInit = inicio del turno en hora local.
-    // dateEnd  = fin del día local, igual que hacía n8n sumando 29 horas a la
-    //            medianoche UTC de la fecha. El turno de noche cruza medianoche,
-    //            así que acotar por hora_fin dejaría ventas fuera.
-    const desde = instanteLocal(fecha, horaInicio);
-    const hasta = finDelDia(fecha);
+    // El turno va de su hora de inicio a su hora de fin. Punto.
+    //
+    // Hasta ahora dateEnd era el fin del DÍA, no el del turno, heredado de n8n
+    // (sumaba 29 horas a la medianoche UTC). El comentario que lo justificaba
+    // decía que acotar por hora_fin "dejaría ventas fuera" en el turno de
+    // noche; eso solo era cierto sin tratar el cruce de medianoche, que es
+    // justo lo que rangoTurno() sí resuelve (si fin <= inicio, termina al día
+    // siguiente) y lo que consultar-inventarios ya venía usando.
+    //
+    // El fallo estaba enmascarado porque Loggro solo puede devolver facturas
+    // que YA EXISTEN al momento de consultar: quien cierra su turno al
+    // terminarlo no ve las de después porque todavía no se han emitido, y "el
+    // ahora" hacía de tope de facto. Comprobado con BATUT VIVA 2026-09-08
+    // turno 1 (08:53-14:55): lo guardado ese día coincide al peso con la
+    // ventana real del turno (627.320), pero esa MISMA consulta repetida hoy
+    // devuelve el día entero (1.129.230) porque ya existen las facturas de la
+    // tarde.
+    //
+    // Es decir: el dato histórico está bien, la consulta no. Y revienta en
+    // cuanto se cierra tarde o se reconstruye un día pasado. Reproducido el
+    // 2026-09-09 en VIVA con un turno de 01:00 a 12:00 cerrado por la noche:
+    // arrastraba 43 facturas y 1.886.729 en ventas del día completo cuando en
+    // su ventana solo hubo 10 facturas y 444.916. Eso es también lo que hacía
+    // aparecer 68.413 de propina "sin nadie presente": eran de otros turnos.
+    //
+    // Sin hora_fin (llamadas viejas) se conserva el comportamiento anterior,
+    // para no romper a quien todavía no la mande. El formulario sí la manda.
+    const { desde, hasta } = horaFin
+      ? rangoTurno(fecha, horaInicio, horaFin)
+      : { desde: instanteLocal(fecha, horaInicio), hasta: finDelDia(fecha) };
 
     const admin = ctx.clienteAdmin();
     const sesion = await obtenerSesionLoggro(admin, ctx.empresaId);
@@ -100,6 +128,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       consulta: {
         fecha,
         hora_inicio: horaInicio,
+        hora_fin: horaFin || null,
+        acotado_por_fin_de_turno: Boolean(horaFin),
         date_init: desde.toISOString(),
         date_end: hasta.toISOString(),
         negocio: sesion.tenantId,
