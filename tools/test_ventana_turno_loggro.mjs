@@ -150,6 +150,20 @@ assert(
   /ubicarApoyoEnTurno\(/.test(validar) && /if\s*\(\s*!tramo\.dentro\s*\)/.test(validar),
   "validateApoyoRows ya no rechaza un apoyo cuyo horario se sale del turno.",
 );
+// Cierre y auditoria muestran los mismos pesos enteros que se guardan. Antes la
+// auditoria redondeaba a cada persona por su cuenta: 7.801 en pantalla contra
+// 7.800 guardados.
+const simuladorJs = sinComentarios(await leer("js/simulador_propinas.js"));
+assert(
+  /const simulado = enPesos\(repartirPropinas\(/.test(simuladorJs)
+    && /estado\.repartoReal = enPesos\(repartirPropinas\(/.test(simuladorJs),
+  "La auditoria vuelve a mostrar el reparto con centavos redondeados por persona, distinto de lo guardado.",
+);
+assert(
+  /repartirEnPesosEnteros\(items\)/.test(sinComentarios(await leer("js/apoyos.js"))),
+  "Confirmar apoyo ya no pasa el reparto a pesos con repartirEnPesosEnteros.",
+);
+
 // Confirmar apoyo (js/apoyos.js) no puede pisar ese motivo con uno generico:
 // pasaba, y la persona veia "Completa los datos de apoyos" sin saber que el
 // problema era el horario de uno de ellos.

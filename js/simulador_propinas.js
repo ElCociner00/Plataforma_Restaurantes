@@ -40,7 +40,7 @@
 import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 import { resolverEsLocal, tablaSegunSede } from "./local_scope.js";
-import { repartirPropinas, compararRepartos } from "./propinas_reparto.js?v=20260910tramo2";
+import { repartirPropinas, compararRepartos, repartirEnPesosEnteros } from "./propinas_reparto.js?v=20260910tramo2";
 import { renderRepartoPropinas } from "./cierre_turno_propinas_visual.js?v=20260910prop3";
 import { mensajeDeError } from "./edge_function_error.js";
 
@@ -520,9 +520,19 @@ const pintarCambios = (comparacion) => {
   }
 };
 
+/**
+ * El reparto en los mismos pesos enteros que se guardan en el cierre (ver
+ * repartirEnPesosEnteros). Sin esto la auditoría redondeaba a cada persona por
+ * su cuenta y podía mostrar un peso distinto del que de verdad cobró.
+ */
+const enPesos = (reparto) => {
+  const pesos = repartirEnPesosEnteros(reparto.detalles.map((d) => ({ id: d.id, tipo: d.tipo, propina: d.propina_correspondiente })));
+  return { ...reparto, detalles: reparto.detalles.map((d, i) => ({ ...d, propina_correspondiente: pesos[i].propina })) };
+};
+
 /** El corazón de la demostración: recalcula en el navegador, sin ir a Loggro. */
 const recalcular = () => {
-  const simulado = repartirPropinas(estado.personas, estado.eventos);
+  const simulado = enPesos(repartirPropinas(estado.personas, estado.eventos));
   renderRepartoPropinas(propinasDesglose, {
     detalles: simulado.detalles,
     eventos: simulado.eventos,
@@ -567,7 +577,7 @@ const cargarTurno = async () => {
     estado.personasReales = personas.map((p) => ({ ...p }));
     estado.personas = personas.map((p) => ({ ...p }));
     estado.eventos = eventos;
-    estado.repartoReal = repartirPropinas(personas, eventos);
+    estado.repartoReal = enPesos(repartirPropinas(personas, eventos));
 
     origenDatos.textContent = detalle;
     origenDatos.className = `sim-origen ${origen === "archivo" || origen === "loggro" ? "is-ok" : "is-aviso"}`;
