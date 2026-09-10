@@ -26,7 +26,7 @@ import { corsHeaders, json } from "../_shared/cors.ts";
 import { errores, leerCuerpo, responderError } from "../_shared/errores.ts";
 import { resolverContexto } from "../_shared/tenant.ts";
 import { comoLista, obtenerSesionLoggro, pedirLoggro } from "../_shared/loggro.ts";
-import { esFechaValida, finDelDia, instanteLocal } from "../_shared/fechas.ts";
+import { esFechaValida, instanteLocal } from "../_shared/fechas.ts";
 import { filtrarPorNegocio } from "../_shared/ventas.ts";
 
 const ETIQUETA = "consultar-propina-apoyos";
@@ -94,48 +94,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
     let finResponsable = instanteLocal(fecha, finResponsableTexto).getTime();
     if (finResponsable <= inicioResponsable) finResponsable += 24 * 60 * 60 * 1000;
 
-    // OJO, esto NO se usa para decidir quién estuvo presente -eso sigue
-    // siendo el rango literal que se registró, igual para el responsable que
-    // para cualquier apoyo-. Es SOLO el límite de la consulta a Loggro: mismo
-    // fin del día que ya usa consultar-ventas, para que los dos totales (el
-    // que ve el usuario al abrir el turno y el que calcula esta función)
-    // salgan de la misma ventana de tiempo.
-    //
-    // La primera versión de este arreglo extendía finResponsable mismo, y con
-    // eso el responsable pasaba a "cubrir" el resto del día sin importar lo
-    // que se hubiera escrito, mientras que un apoyo con el MISMO horario
-    // escrito se quedaba en su rango literal -el mismo horario dando dos
-    // comportamientos distintos según quién lo llevara-. Una propina fuera
-    // del horario de todos ahora aparece como huérfana (ver más abajo), en
-    // vez de atribuírsele al responsable en silencio.
-    //
-    // Pero extender siempre hasta medianoche tiene su propio problema: en un
-    // negocio con varios turnos el mismo día, un turno de mañana (7:39-14:30)
-    // terminaba "viendo" las propinas del turno de la tarde o de la noche, y
-    // como no había nadie de la mañana presente a esa hora, aparecían como
-    // huérfanas -pareciendo un error, cuando en realidad ni siquiera son de
-    // este turno-. Si ya existe otro turno registrado ese mismo día que
-    // empieza después de este, la consulta no debe pasar de ahí.
-    const { data: otrosTurnos } = await ctx.clienteAdmin()
-      .from(ctx.t.cierres)
-      .select("hora_inicio")
-      .eq("empresa_id", ctx.empresaId)
-      .eq("fecha_turno", fecha);
-
-    let siguienteTurnoInicio: number | null = null;
-    for (const fila of (otrosTurnos ?? []) as Array<{ hora_inicio: unknown }>) {
-      const horaTxt = texto(fila.hora_inicio);
-      if (!horaTxt) continue;
-      const instante = instanteLocal(fecha, horaTxt).getTime();
-      if (instante > inicioResponsable && (siguienteTurnoInicio === null || instante < siguienteTurnoInicio)) {
-        siguienteTurnoInicio = instante;
-      }
-    }
-
-    const finConsultaLoggro = siguienteTurnoInicio !== null
-      ? Math.min(Math.max(finResponsable, finDelDia(fecha).getTime()), siguienteTurnoInicio)
-      : Math.max(finResponsable, finDelDia(fecha).getTime());
-
     // El responsable y cada apoyo participan únicamente dentro de su franja.
     const personas: Persona[] = [{
       id: responsableId,
@@ -176,13 +134,62 @@ Deno.serve(async (req: Request): Promise<Response> => {
       personas.push({ id: apoyoId, tipo: "apoyo", inicio, fin, propinaAsignada: 0 });
     }
 
+    // ── Ventana de consulta ───────────────────────────────────────────────
+    // Exactamente el tramo en el que hubo alguien de ESTE turno: del primero
+    // en entrar al último en salir. Nada más.
+    //
+    // Esto NO decide quién estuvo presente en cada propina -eso sigue siendo
+    // el rango literal de cada persona-. Es solo qué se le pide a Loggro.
+    //
+    // Antes la ventana se estiraba hasta el fin del DÍA
+    // (Math.max(finResponsable, finDelDia)). Con eso, un turno traía las
+    // propinas de todos los turnos posteriores de la misma fecha y, como
+    // nadie de este turno estaba presente a esas horas, salían todas como
+    // "sin nadie presente". El tope por siguienteTurnoInicio solo tapaba el
+    // caso en que el OTRO turno ya estuviera guardado; el primero que se
+    // cierra cada día -el caso normal- se quedaba sin tope.
+    //
+    // Reproducido en VIVA el 2026-09-09 con un turno de 01:00 a 12:00 cerrado
+    // de noche: 17 propinas de 09:15 a 20:08, de las que 12 (68.413 de 94.429)
+    // eran de turnos posteriores y aparecían como huérfanas de este.
+    //
+    // Se toma el mínimo/máximo sobre TODAS las personas, no solo el
+    // responsable: un apoyo puede entrar antes o salir después que él, y con
+    // el corte anterior en inicioResponsable ese tramo suyo se descartaba en
+    // silencio.
+    const inicioVentana = Math.min(...personas.map((p) => p.inicio));
+    let finVentana = Math.max(...personas.map((p) => p.fin));
+
+    // Red de seguridad para rangos mal escritos: si ya hay otro turno guardado
+    // ese día que empieza después de este, la consulta no pasa de ahí.
+    const { data: otrosTurnos } = await ctx.clienteAdmin()
+      .from(ctx.t.cierres)
+      .select("hora_inicio")
+      .eq("empresa_id", ctx.empresaId)
+      .eq("fecha_turno", fecha);
+
+    let siguienteTurnoInicio: number | null = null;
+    for (const fila of (otrosTurnos ?? []) as Array<{ hora_inicio: unknown }>) {
+      const horaTxt = texto(fila.hora_inicio);
+      if (!horaTxt) continue;
+      const instante = instanteLocal(fecha, horaTxt).getTime();
+      if (instante > inicioResponsable && (siguienteTurnoInicio === null || instante < siguienteTurnoInicio)) {
+        siguienteTurnoInicio = instante;
+      }
+    }
+    if (siguienteTurnoInicio !== null && siguienteTurnoInicio > inicioVentana) {
+      finVentana = Math.min(finVentana, siguienteTurnoInicio);
+    }
+
+    const finConsultaLoggro = finVentana;
+
     // ── Facturas del día ──────────────────────────────────────────────────
     const admin = ctx.clienteAdmin();
     const sesion = await obtenerSesionLoggro(admin, ctx.empresaId);
 
     const consulta = new URLSearchParams({
       status: "Pagada",
-      dateInit: new Date(inicioResponsable).toISOString(),
+      dateInit: new Date(inicioVentana).toISOString(),
       dateEnd: new Date(finConsultaLoggro).toISOString(),
     });
 
@@ -242,7 +249,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         // como huérfana de ESTE turno cuando en realidad ni siquiera es de
         // este turno. No confiar en que el proveedor filtró: filtrar aquí
         // siempre, con el mismo rango que se le pidió.
-        if (marca < inicioResponsable || marca > finConsultaLoggro) continue;
+        if (marca < inicioVentana || marca > finConsultaLoggro) continue;
 
         totalRecibido += propina;
         const activas = personas.filter((p) => marca >= p.inicio && marca <= p.fin);

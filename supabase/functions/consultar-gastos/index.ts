@@ -19,7 +19,7 @@ import { corsHeaders, json } from "../_shared/cors.ts";
 import { errores, leerCuerpo, responderError } from "../_shared/errores.ts";
 import { resolverContexto } from "../_shared/tenant.ts";
 import { comoLista, obtenerSesionLoggro, pedirLoggro } from "../_shared/loggro.ts";
-import { esFechaValida, finDelDia, instanteLocal, rangoRelativo } from "../_shared/fechas.ts";
+import { esFechaValida, finDelDia, instanteLocal, rangoRelativo, rangoTurno } from "../_shared/fechas.ts";
 import { filtrarPorNegocio } from "../_shared/ventas.ts";
 
 const ETIQUETA = "consultar-gastos";
@@ -129,8 +129,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
       const turno = (cuerpo.turno ?? {}) as Record<string, unknown>;
       const horaInicio = texto(turno.inicio) || "00:00";
-      desde = instanteLocal(fecha, horaInicio);
-      hasta = finDelDia(fecha);
+      const horaFin = texto(turno.fin);
+
+      // Mismo criterio que consultar-ventas: el turno acaba a su hora de fin,
+      // no a medianoche. Con el fin del día, un turno cerrado tarde se traía
+      // los gastos de los turnos posteriores de esa fecha y se los apuntaba
+      // como suyos. rangoTurno() resuelve además el cruce de medianoche del
+      // turno de noche. Sin hora_fin se conserva el comportamiento anterior.
+      if (horaFin) {
+        ({ desde, hasta } = rangoTurno(fecha, horaInicio, horaFin));
+      } else {
+        desde = instanteLocal(fecha, horaInicio);
+        hasta = finDelDia(fecha);
+      }
     } else {
       const rango = rangoRelativo(DIAS_ATRAS, DIAS_ADELANTE);
       desde = rango.desde;

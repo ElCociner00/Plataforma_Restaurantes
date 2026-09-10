@@ -135,14 +135,22 @@ const finDeDiaLocalMs = (fecha) => {
 };
 
 /**
- * El mismo límite que calcula consultar-propina-apoyos/index.ts para acotar
- * la consulta a Loggro: hasta el fin del día, salvo que exista otro turno
- * después ese mismo día -ahí se corta justo antes, para no comerse sus
- * propinas-. Replicado aquí porque hace falta aplicarlo también a la
- * evidencia YA ARCHIVADA (ver más abajo): un archivo guardado antes de que
- * este filtro existiera puede traer facturas del turno siguiente pegadas.
+ * El mismo límite que calcula consultar-propina-apoyos/index.ts: hasta donde
+ * llegó la cobertura real de la gente de ESTE turno -del primero en entrar al
+ * último en salir-, y en ningún caso más allá del comienzo del turno
+ * siguiente si ya está registrado.
+ *
+ * Antes esto se estiraba hasta el fin del día. Con eso, un turno mostraba las
+ * propinas de todos los turnos posteriores de la misma fecha y, como nadie de
+ * este turno estaba presente a esas horas, salían todas como "Sin nadie
+ * presente" -pareciendo un fallo del reparto cuando ni siquiera eran de este
+ * turno-.
+ *
+ * Replicado aquí, y no solo en la Edge Function, porque hace falta aplicarlo
+ * también a la evidencia YA ARCHIVADA: un archivo guardado antes de que este
+ * filtro existiera trae facturas del turno siguiente pegadas.
  */
-const limiteConsultaSiguienteTurno = async ({ empresaId, esLocal, fecha, jornada, inicioResponsable, finResponsable }) => {
+const limiteConsultaSiguienteTurno = async ({ empresaId, esLocal, fecha, jornada, inicioResponsable, finCobertura }) => {
   const tablaCierres = tablaSegunSede(CIERRE_TABLES, esLocal);
   const { data: otros } = await supabase
     .from(tablaCierres)
@@ -159,19 +167,20 @@ const limiteConsultaSiguienteTurno = async ({ empresaId, esLocal, fecha, jornada
     }
   });
 
-  const limiteDia = finDeDiaLocalMs(fecha) ?? finResponsable;
-  const limite = siguienteInicio !== null
-    ? Math.min(Math.max(finResponsable, limiteDia), siguienteInicio)
-    : Math.max(finResponsable, limiteDia);
+  // Nunca más allá del fin del día, por si un rango mal escrito dispara la
+  // cobertura: es un tope, no el límite por defecto.
+  const topeDia = finDeDiaLocalMs(fecha) ?? finCobertura;
+  let limite = Math.min(finCobertura, topeDia);
+  if (siguienteInicio !== null && siguienteInicio > inicioResponsable) {
+    limite = Math.min(limite, siguienteInicio);
+  }
 
-  // `siguienteInicio` no es solo un número interno: dice si el límite de
-  // arriba viene de un turno de verdad registrado ese día, o si es el
-  // resguardo de "hasta medianoche" porque no hay ningún otro turno con el
-  // que acotar. En el segundo caso, una propina huérfana después del fin del
-  // responsable no es necesariamente un error de reparto: puede ser, con la
-  // misma probabilidad, un turno posterior que sencillamente nunca se
-  // guardó. La pantalla necesita distinguir los dos casos para no sugerir
-  // "aquí hay un bug" cuando lo que hay es un turno faltante.
+  // `siguienteInicio` no es solo un número interno: dice si existe o no otro
+  // turno de verdad registrado ese día. Cuando NO existe y aun así aparecen
+  // propinas fuera de esta ventana, lo más probable no es un error de
+  // reparto: es un turno posterior que sencillamente nunca se guardó. La
+  // pantalla necesita distinguir los dos casos para no sugerir "aquí hay un
+  // bug" cuando lo que hay es un turno faltante.
   return { limite, siguienteInicio };
 };
 
@@ -189,10 +198,17 @@ const cargarEventos = async ({ empresaId, esLocal, fecha, jornada, personas }) =
     return { eventos: [], origen: "sin_personas", detalle: "El turno no tiene responsable registrado." };
   }
 
-  const inicioResponsable = Date.parse(responsable.inicio);
   const finResponsable = Date.parse(responsable.fin);
-  const limiteInfo = Number.isFinite(inicioResponsable) && Number.isFinite(finResponsable)
-    ? await limiteConsultaSiguienteTurno({ empresaId, esLocal, fecha, jornada, inicioResponsable, finResponsable })
+
+  // La ventana es la cobertura de TODAS las personas del turno, no solo la
+  // del responsable: un apoyo puede entrar antes o salir después que él, y su
+  // tramo cuenta igual. Mismo criterio que consultar-propina-apoyos.
+  const marcas = (inicio) => personas.map((p) => Date.parse(inicio ? p.inicio : p.fin)).filter(Number.isFinite);
+  const inicioResponsable = Math.min(...(marcas(true).length ? marcas(true) : [Date.parse(responsable.inicio)]));
+  const finCobertura = Math.max(...(marcas(false).length ? marcas(false) : [finResponsable]));
+
+  const limiteInfo = Number.isFinite(inicioResponsable) && Number.isFinite(finCobertura)
+    ? await limiteConsultaSiguienteTurno({ empresaId, esLocal, fecha, jornada, inicioResponsable, finCobertura })
     : null;
   const limite = limiteInfo?.limite ?? null;
 
@@ -206,23 +222,16 @@ const cargarEventos = async ({ empresaId, esLocal, fecha, jornada, personas }) =
     return Number.isFinite(marca) && marca >= inicioResponsable && marca <= limite;
   };
 
-  // No hay ningún otro turno registrado ese día con el que acotar la
-  // consulta -el límite de arriba es el resguardo de "hasta medianoche",
-  // no un turno de verdad-. Si además queda alguna propina después del fin
-  // del responsable, lo más probable no es un error de reparto: es que ese
-  // turno siguiente existió de verdad pero nunca se guardó en el sistema.
-  // Se avisa así en vez de dejar que "Sin nadie presente" solo, sin más
-  // contexto, se lea como un fallo del cálculo.
-  const avisoTurnoFaltante = (eventos) => {
-    if (limiteInfo?.siguienteInicio != null) return "";
-    const hayTrasFin = eventos.some((e) => {
-      const marca = Date.parse(e.ocurrido_en);
-      return Number.isFinite(marca) && marca > finResponsable;
-    });
-    return hayTrasFin
-      ? " Las que quedan después de su hora de salida probablemente son de otro turno de ese mismo día que nunca se guardó -no hay ninguno registrado con el que compararlas-."
-      : "";
-  };
+  // Quedaron propinas fuera de la ventana de este turno Y no hay ningún otro
+  // turno registrado ese día al que puedan pertenecer. Lo más probable no es
+  // un error de reparto: es que ese turno siguiente existió de verdad pero
+  // nunca se guardó en el sistema. Se dice así, en vez de dejar que el hueco
+  // se lea como un fallo del cálculo.
+  const avisoTurnoFaltante = (descartadas) => (
+    descartadas > 0 && limiteInfo?.siguienteInicio == null
+      ? " Las excluidas son de después de la hora de salida del turno y no hay ningún otro turno guardado ese día al que pertenezcan: probablemente sea un turno que nunca se cerró."
+      : ""
+  );
 
   const { data: archivados, error: errorArchivo } = await supabase
     .from("propinas_turno_eventos")
@@ -240,7 +249,7 @@ const cargarEventos = async ({ empresaId, esLocal, fecha, jornada, personas }) =
       origen: "archivo",
       detalle: (descartadas > 0
         ? `${filtrados.length} propinas archivadas de este turno (${descartadas} de otro turno se excluyeron de esta vista).`
-        : `${filtrados.length} propinas archivadas de este turno.`) + avisoTurnoFaltante(filtrados),
+        : `${filtrados.length} propinas archivadas de este turno.`) + avisoTurnoFaltante(descartadas),
     };
   }
 
@@ -275,7 +284,9 @@ const cargarEventos = async ({ empresaId, esLocal, fecha, jornada, personas }) =
 
   // Mismo filtro propio que sobre el archivo: la Edge Function ya filtra,
   // pero esta pantalla no depende de que ese filtro nunca cambie ni falle.
-  const eventos = (Array.isArray(data.eventos) ? data.eventos : []).filter((e) => dentroDelRango(e.ocurrido_en));
+  const crudos = Array.isArray(data.eventos) ? data.eventos : [];
+  const eventos = crudos.filter((e) => dentroDelRango(e.ocurrido_en));
+  const descartadasLoggro = crudos.length - eventos.length;
   if (!eventos.length) {
     return {
       eventos: [],
@@ -306,7 +317,8 @@ const cargarEventos = async ({ empresaId, esLocal, fecha, jornada, personas }) =
     origen: "loggro",
     detalle: `${eventos.length} propinas traídas de Loggro`
            + (archivadoOk ? " y archivadas: la próxima vez se abren al instante." : ".")
-           + avisoTurnoFaltante(eventos),
+           + (descartadasLoggro > 0 ? ` ${descartadasLoggro} quedaron fuera de esta vista por ser de otro turno.` : "")
+           + avisoTurnoFaltante(descartadasLoggro),
   };
 };
 

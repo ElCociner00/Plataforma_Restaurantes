@@ -17,40 +17,56 @@ const simulador = await readFile(path.join(root, "js/simulador_propinas.js"), "u
 const failures = [];
 
 // ── La ventana de CONSULTA a Loggro tiene que ser la MISMA en las dos Edge
-// Functions -eso fue la causa real del 78k → 15k, más de fondo que las
-// huérfanas: consultar-ventas consulta hasta el fin del día; consultar-
-// propina-apoyos cortaba en hora_fin del turno-. Pero esa extensión es SOLO
-// para la consulta: quién estuvo PRESENTE sigue siendo el rango literal, el
-// mismo mecanismo para el responsable que para un apoyo. La primera versión
-// de este arreglo extendía también la presencia del responsable, y eso hacía
-// que el mismo horario escrito para el responsable y para un apoyo se
-// comportara distinto (reportado probando con el mismo rango en los dos). ──
+// Functions, y esa ventana es EL TURNO, no el día.
+//
+// Historia, porque el arreglo pasó por dos versiones equivocadas antes de
+// esta y conviene no repetir ninguna:
+//   1. consultar-propina-apoyos cortaba en hora_fin y consultar-ventas iba al
+//      fin del día. Dos totales distintos para el mismo turno (el 78k → 15k).
+//   2. Se igualaron... estirando LAS DOS hasta el fin del día. Con eso, un
+//      turno se traía las ventas y las propinas de todos los turnos
+//      posteriores de la misma fecha, y como nadie de este turno estaba
+//      presente a esas horas salían todas como "sin nadie presente".
+//      Reproducido en VIVA el 2026-09-09: un turno de 01:00 a 12:00 traía 43
+//      facturas y 1.886.729 del día entero cuando en su ventana solo hubo 10
+//      y 444.916; 68.413 de 94.429 de propina quedaban huérfanas.
+//   3. La correcta: las dos se acotan al turno.
+//
+// Estuvo enmascarado porque Loggro solo devuelve facturas que YA EXISTEN al
+// consultar, así que quien cierra al terminar su turno no ve las de después.
+// El detalle fino de la ventana lo fija tools/test_ventana_turno_loggro.mjs.
+//
+// Lo que sigue valiendo igual: esa ventana es SOLO para la consulta. Quién
+// estuvo PRESENTE sigue siendo el rango literal, con el mismo mecanismo para
+// el responsable que para un apoyo. Una versión anterior extendía también la
+// presencia del responsable, y eso hacía que el mismo horario escrito para
+// responsable y para apoyo se comportara distinto. ─────────────────────────
 
 assert(
-  ventas.includes("const hasta = finDelDia(fecha)"),
-  "consultar-ventas cambió su límite de consulta; revisa que siga igual antes de comparar",
+  ventas.includes("rangoTurno(fecha, horaInicio, horaFin)"),
+  "consultar-ventas ya no se acota al turno: vuelve a arrastrar las ventas de los turnos posteriores del mismo día",
 );
 assert(
-  edge.includes("Math.max(finResponsable, finDelDia(fecha).getTime())"),
-  "consultar-propina-apoyos ya no extiende la CONSULTA hasta el fin del día: volverá a dar un total distinto al de consultar-ventas",
+  // Sin el "no usa finDelDia": el comentario del propio arreglo lo cita al
+  // explicar qué se quitó. Eso lo comprueba test_ventana_turno_loggro.mjs,
+  // que descarta las líneas comentadas antes de mirar.
+  edge.includes("Math.max(...personas.map((p) => p.fin))"),
+  "consultar-propina-apoyos ya no se acota a la cobertura real de las personas del turno: volverá a marcar como huérfanas las propinas de otros turnos",
 );
 assert(
   edge.includes("dateEnd: new Date(finConsultaLoggro).toISOString()"),
-  "la consulta a Loggro ya no usa el límite extendido",
+  "la consulta a Loggro ya no usa la ventana calculada",
 );
 
-// ── La consulta no debe pasarse al siguiente turno del mismo día. Sin esto,
-// un turno de mañana que termina a las 14:30 "veía" las propinas de la tarde
-// o la noche -nadie de la mañana estaba presente a esa hora, así que
-// aparecían como huérfanas, dando a entender que había un error o que la
-// propina del turno era mayor de lo que fue-. ──────────────────────────────
+// ── Red de seguridad: aunque los rangos se escriban mal, la consulta no debe
+// pasarse al siguiente turno del mismo día. ────────────────────────────────
 
 assert(
   edge.includes(".from(ctx.t.cierres)") && edge.includes('.eq("fecha_turno", fecha)'),
   "consultar-propina-apoyos ya no consulta los otros turnos del mismo día para acotar la ventana",
 );
 assert(
-  edge.includes("siguienteTurnoInicio") && edge.includes("Math.min(Math.max(finResponsable, finDelDia(fecha).getTime()), siguienteTurnoInicio)"),
+  edge.includes("siguienteTurnoInicio") && edge.includes("finVentana = Math.min(finVentana, siguienteTurnoInicio)"),
   "la consulta a Loggro ya no se acota por el inicio del siguiente turno registrado ese día",
 );
 
@@ -60,16 +76,12 @@ assert(
 // siquiera pertenece-. Esto tiene que valer pase lo que pase con Loggro. ───
 
 assert(
-  edge.includes("if (marca < inicioResponsable || marca > finConsultaLoggro) continue;"),
+  edge.includes("if (marca < inicioVentana || marca > finConsultaLoggro) continue;"),
   "consultar-propina-apoyos ya no filtra localmente las facturas fuera de rango: si Loggro devuelve algo fuera de fecha, va a contarse igual",
 );
 assert(
   between(edge, "const personas: Persona[] = [{", "}];").includes("fin: finResponsable,"),
   "el responsable ya no participa en su franja literal: volvió a cubrir el día completo sin importar lo registrado, distinto de como se trata a un apoyo",
-);
-assert(
-  edge.includes('import { esFechaValida, finDelDia, instanteLocal } from "../_shared/fechas.ts"'),
-  "consultar-propina-apoyos dejó de importar finDelDia",
 );
 assert(
   !simulador.includes("finDelDiaIso") && !simulador.includes("finDia"),
@@ -168,8 +180,14 @@ assert(
   "la evidencia archivada ya no se filtra contra el límite del turno: un archivo viejo puede volver a mostrar propinas de otro turno",
 );
 assert(
-  /const eventos = \(Array\.isArray\(data\.eventos\) \? data\.eventos : \[\]\)\.filter\(\(e\) => dentroDelRango\(e\.ocurrido_en\)\)/.test(simulador),
+  /const eventos = crudos\.filter\(\(e\) => dentroDelRango\(e\.ocurrido_en\)\)/.test(simulador),
   "los eventos recién traídos de Loggro ya no se filtran contra el límite del turno en el propio simulador",
+);
+assert(
+  simulador.includes("const finCobertura = Math.max("),
+  "el simulador ya no acota por la cobertura real de TODAS las personas del turno: "
+  + "volvería a mostrar como huérfanas las propinas de los turnos posteriores del mismo día, "
+  + "y a discrepar del total que calcula el cierre",
 );
 
 // ── El selector de sede solo debe ofrecer lo que el usuario puede tocar ────
@@ -218,14 +236,13 @@ assert(
 // ── "Sin nadie presente" sin turno siguiente registrado: avisar por qué ────
 //
 // Reportado en vivo con BATUT VIVA: un turno de mañana sin ningún otro turno
-// guardado ese día mostraba propinas de la tarde como "Sin nadie presente" y
-// se leía como el mismo bug de contaminación entre turnos ya corregido -pero
-// no lo era: sencillamente no había ningún turno siguiente con el que acotar
-// la consulta, así que el resguardo (hasta medianoche) sí las traía, y esas
-// horas después de la salida del responsable casi siempre son un turno de
-// ese mismo día que nunca se guardó. limiteConsultaSiguienteTurno ahora
-// también devuelve si encontró ese turno siguiente, para poder avisarlo en
-// vez de dejar la huérfana sin más contexto.
+// guardado ese día mostraba propinas de la tarde como "Sin nadie presente".
+// Ahora esas propinas ya no entran en la vista -la ventana se acota al turno-,
+// pero el hecho de que EXISTAN sigue siendo información útil: si quedaron
+// fuera y no hay ningún otro turno guardado ese día al que pertenezcan, lo más
+// probable es que sea un turno que nunca se cerró. Por eso el aviso se
+// dispara con el NÚMERO de descartadas, no con la lista mostrada: si se le
+// pasara la lista ya filtrada nunca podría saberlo.
 
 assert(
   simulador.includes("return { limite, siguienteInicio };"),
@@ -233,14 +250,15 @@ assert(
 );
 assert(
   simulador.includes("const avisoTurnoFaltante"),
-  "el simulador ya no explica por qué una huérfana puede ser un turno sin guardar",
+  "el simulador ya no explica por qué una propina excluida puede ser un turno sin guardar",
 );
 assert(
-  /if \(limiteInfo\?\.siguienteInicio != null\) return "";/.test(simulador),
-  "avisoTurnoFaltante ya no comprueba si de verdad no hay un turno siguiente registrado",
+  /descartadas > 0 && limiteInfo\?\.siguienteInicio == null/.test(simulador),
+  "avisoTurnoFaltante ya no exige las dos condiciones (hubo descartes Y no hay turno siguiente registrado): "
+  + "avisará de un turno faltante donde no lo hay, o dejará de avisar donde sí",
 );
 assert(
-  simulador.includes("avisoTurnoFaltante(filtrados)") && simulador.includes("avisoTurnoFaltante(eventos)"),
+  simulador.includes("avisoTurnoFaltante(descartadas)") && simulador.includes("avisoTurnoFaltante(descartadasLoggro)"),
   "avisoTurnoFaltante ya no se aplica tanto al archivo como a lo recién traído de Loggro",
 );
 
