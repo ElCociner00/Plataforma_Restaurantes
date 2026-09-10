@@ -173,9 +173,42 @@ const pintarLineaTiempo = (personas, eventos) => {
   const span = Math.max(hasta - desde, 1);
   const porcentaje = (instante) => ((instante - desde) / span) * 100;
 
+  const duracionHoras = (hasta - desde) / (3600 * 1000);
+  const pasoHoras = duracionHoras <= 8 ? 1 : duracionHoras <= 16 ? 2 : 3;
+
+  const HORA_MS = 3600 * 1000;
+  const marcasHoras = [];
+  let tPunto = Math.floor(desde / HORA_MS) * HORA_MS;
+  while (tPunto <= hasta + HORA_MS) {
+    if (tPunto > desde && tPunto < hasta) {
+      const fecha = new Date(tPunto);
+      const horaBogota = (fecha.getUTCHours() - 5 + 24) % 24;
+      if (horaBogota % pasoHoras === 0) {
+        marcasHoras.push({
+          instante: tPunto,
+          pct: porcentaje(tPunto),
+          etiqueta: hora(fecha.toISOString())
+        });
+      }
+    }
+    tPunto += HORA_MS;
+  }
+
   const escala = el("div", "propinas-escala");
-  escala.appendChild(el("span", null, hora(new Date(desde).toISOString())));
-  escala.appendChild(el("span", null, hora(new Date(hasta).toISOString())));
+  const spanInicio = el("span", "propinas-escala-extremo propinas-escala-inicio", hora(new Date(desde).toISOString()));
+  escala.appendChild(spanInicio);
+
+  marcasHoras.forEach((m) => {
+    const marcaEl = el("span", "propinas-escala-intermedia", m.etiqueta);
+    marcaEl.style.left = `${m.pct}%`;
+    if (m.pct < 5 || m.pct > 95) {
+      marcaEl.classList.add("is-hidden");
+    }
+    escala.appendChild(marcaEl);
+  });
+
+  const spanFin = el("span", "propinas-escala-extremo propinas-escala-fin", hora(new Date(hasta).toISOString()));
+  escala.appendChild(spanFin);
   bloque.appendChild(escala);
 
   personas.forEach((persona) => {
@@ -191,6 +224,14 @@ const pintarLineaTiempo = (personas, eventos) => {
     fila.appendChild(etiqueta);
 
     const carril = el("div", "propinas-carril");
+
+    // Líneas guía verticales tenues para cada hora intermedia
+    marcasHoras.forEach((m) => {
+      const guia = el("span", "propinas-guia-carril");
+      guia.style.left = `${m.pct}%`;
+      carril.appendChild(guia);
+    });
+
     const tieneFranja = Number.isFinite(persona.inicio) && Number.isFinite(persona.fin);
 
     if (tieneFranja) {

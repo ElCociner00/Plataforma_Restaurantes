@@ -42,7 +42,7 @@ import {
   WEBHOOK_CONSULTAR_GASTOS_CATALOGO
 } from "./webhooks.js";
 import { resolverEsLocal, tablaSegunSede } from "./local_scope.js";
-import { renderRepartoPropinas, limpiarRepartoPropinas } from "./cierre_turno_propinas_visual.js?v=20260910prop3";
+import { renderRepartoPropinas, limpiarRepartoPropinas } from "./cierre_turno_propinas_visual.js?v=20260910prop4";
 
 // ../js/cierre_turno.js
 

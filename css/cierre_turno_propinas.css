@@ -81,11 +81,34 @@
 /* ── Linea de tiempo ──────────────────────────────────────────────────── */
 
 .propinas-escala {
-  display: flex;
-  justify-content: space-between;
+  position: relative;
+  height: 16px;
   font-size: 11px;
   color: #71717a;
-  margin: 0 0 6px 200px;
+  margin: 0 120px 6px 200px;
+}
+
+.propinas-escala-extremo {
+  position: absolute;
+  top: 0;
+}
+
+.propinas-escala-inicio {
+  left: 0;
+}
+
+.propinas-escala-fin {
+  right: 0;
+  text-align: right;
+}
+
+.propinas-escala-intermedia {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 10.5px;
+  color: #71717a;
+  white-space: nowrap;
 }
 
 .propinas-fila-tiempo {
@@ -119,11 +142,22 @@
   overflow: visible;
 }
 
+.propinas-guia-carril {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(139, 92, 246, 0.25);
+  pointer-events: none;
+  z-index: 0;
+}
+
 .propinas-barra {
   position: absolute;
   top: 6px;
   height: 14px;
   border-radius: 999px;
+  z-index: 1;
 }
 
 .propinas-barra-responsable { background: #8b5cf6; }
@@ -140,6 +174,7 @@
   background: #f59e0b;
   border: 2px solid #ffffff;
   cursor: help;
+  z-index: 2;
 }
 
 .propinas-nota-tramo { font-size: 10.5px; color: #b45309; }
@@ -254,7 +289,7 @@
 
 @media (max-width: 720px) {
   .propinas-fila-tiempo { grid-template-columns: 1fr; gap: 4px; }
-  .propinas-escala { margin-left: 0; }
+  .propinas-escala { margin-left: 0; margin-right: 0; }
   .propinas-total-persona { text-align: left; }
   .propinas-fila-bloque { grid-template-columns: 52px 1fr 90px; }
   .propinas-fila-bloque .propinas-cuenta { display: none; }
