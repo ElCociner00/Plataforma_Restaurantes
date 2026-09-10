@@ -7,8 +7,9 @@
  * superadmin y usuario normal.
  *
  * Regla de reparto (idéntica al nodo `Code in JavaScript4` de n8n):
- *   · El responsable cubre la franja real de inicio/fin del turno.
- *   · Cada apoyo cubre su propio tramo.
+ *   · El responsable cubre TODO el turno, de su inicio a su fin, siempre.
+ *   · Cada apoyo cubre su propio tramo, recortado al turno: nadie puede
+ *     estar fuera de él, así que ningún apoyo supera al responsable.
  *   · Cada propina se divide a partes iguales entre quienes estaban presentes
  *     en el instante de la factura (`createdOn`).
  *   · Se redondea a 2 decimales por persona.
@@ -48,7 +49,53 @@ type Persona = {
   inicio: number;
   fin: number;
   propinaAsignada: number;
+  /** El tramo registrado se salía del turno y se recortó a él. */
+  recortado?: boolean;
+  /** El tramo registrado quedaba entero fuera del turno: no participa. */
+  fueraDeTurno?: boolean;
 };
+
+const DIA_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Coloca el tramo de un apoyo dentro del turno y lo recorta a él.
+ *
+ * REGLA: el responsable está presente en TODO el turno, siempre -no hay otro
+ * escenario-, y un apoyo solo puede estar dentro de ese mismo rango. Por eso
+ * ningún apoyo puede terminar con más propina que el responsable: en cada
+ * propina en la que el apoyo está presente, el responsable también.
+ *
+ * Antes el tramo de un apoyo se tomaba tal cual, aunque se saliera del turno.
+ * Caso real (VIVA, 2026-09-10): turno de 01:00 a 12:00 y una apoyo registrada
+ * "de 3:00 PM a 12:00 PM". Como las 12:00 PM es mediodía y queda antes de las
+ * 3:00 PM, el tramo se leyó como "hasta el mediodía del día siguiente": 21
+ * horas, casi todas fuera del turno. Resultado: la apoyo recibió 50.100 y el
+ * responsable 13.008, y la línea de tiempo parecía mostrar un responsable que
+ * no había estado en todo el turno.
+ *
+ * En un turno que cruza medianoche (18:00-02:00), un tramo que empieza antes
+ * de la hora de inicio del turno pertenece a la madrugada: se corre un día.
+ */
+function ubicarEnTurno(
+  turnoInicio: number,
+  turnoFin: number,
+  desde: number,
+  hasta: number,
+): { inicio: number; fin: number; recortado: boolean; fueraDeTurno: boolean } {
+  let d = desde;
+  let h = hasta;
+  if (h <= d) h += DIA_MS;
+  if (d < turnoInicio && d + DIA_MS < turnoFin) {
+    d += DIA_MS;
+    h += DIA_MS;
+  }
+  const inicio = Math.max(d, turnoInicio);
+  const fin = Math.min(h, turnoFin);
+  if (fin < inicio) {
+    return { inicio: d, fin: h, recortado: true, fueraDeTurno: true };
+  }
+  return { inicio, fin, recortado: inicio !== d || fin !== h, fueraDeTurno: false };
+}
 
 function texto(valor: unknown): string {
   return typeof valor === "string" ? valor : (valor == null ? "" : String(valor));
@@ -125,40 +172,44 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
       if (!desdeTexto || !hastaTexto) continue;
 
-      const fechaRegistro = texto(registro.fecha) || fecha;
-      const inicio = instanteLocal(fechaRegistro, desdeTexto).getTime();
-      let fin = instanteLocal(fechaRegistro, hastaTexto).getTime();
-      // Tramo que cruza medianoche: el turno de noche es el caso normal.
-      if (fin <= inicio) fin += 24 * 60 * 60 * 1000;
+      // El tramo se lee siempre sobre la fecha del turno: `registro.fecha`
+      // viene del navegador y no aporta nada que la fecha del turno no dé.
+      const tramo = ubicarEnTurno(
+        inicioResponsable,
+        finResponsable,
+        instanteLocal(fecha, desdeTexto).getTime(),
+        instanteLocal(fecha, hastaTexto).getTime(),
+      );
 
-      personas.push({ id: apoyoId, tipo: "apoyo", inicio, fin, propinaAsignada: 0 });
+      personas.push({
+        id: apoyoId,
+        tipo: "apoyo",
+        inicio: tramo.inicio,
+        fin: tramo.fin,
+        propinaAsignada: 0,
+        recortado: tramo.recortado,
+        fueraDeTurno: tramo.fueraDeTurno,
+      });
     }
 
     // ── Ventana de consulta ───────────────────────────────────────────────
-    // Exactamente el tramo en el que hubo alguien de ESTE turno: del primero
-    // en entrar al último en salir. Nada más.
-    //
-    // Esto NO decide quién estuvo presente en cada propina -eso sigue siendo
-    // el rango literal de cada persona-. Es solo qué se le pide a Loggro.
+    // Exactamente el turno: de su hora de inicio a su hora de fin, la misma
+    // ventana que usa consultar-ventas. Así "la propina del turno" y "lo
+    // repartido" salen siempre del mismo rango de facturas.
     //
     // Antes la ventana se estiraba hasta el fin del DÍA
-    // (Math.max(finResponsable, finDelDia)). Con eso, un turno traía las
-    // propinas de todos los turnos posteriores de la misma fecha y, como
-    // nadie de este turno estaba presente a esas horas, salían todas como
-    // "sin nadie presente". El tope por siguienteTurnoInicio solo tapaba el
-    // caso en que el OTRO turno ya estuviera guardado; el primero que se
-    // cierra cada día -el caso normal- se quedaba sin tope.
+    // (Math.max(finResponsable, finDelDia)): un turno traía las propinas de
+    // todos los turnos posteriores de la misma fecha, y salían como "sin
+    // nadie presente". Reproducido en VIVA el 2026-09-09: 12 de 17 propinas
+    // (68.413 de 94.429) eran de turnos posteriores.
     //
-    // Reproducido en VIVA el 2026-09-09 con un turno de 01:00 a 12:00 cerrado
-    // de noche: 17 propinas de 09:15 a 20:08, de las que 12 (68.413 de 94.429)
-    // eran de turnos posteriores y aparecían como huérfanas de este.
-    //
-    // Se toma el mínimo/máximo sobre TODAS las personas, no solo el
-    // responsable: un apoyo puede entrar antes o salir después que él, y con
-    // el corte anterior en inicioResponsable ese tramo suyo se descartaba en
-    // silencio.
-    const inicioVentana = Math.min(...personas.map((p) => p.inicio));
-    let finVentana = Math.max(...personas.map((p) => p.fin));
+    // Y una versión intermedia la estiraba a la cobertura de todas las
+    // personas -del primero en entrar al último en salir-. Con eso bastaba un
+    // apoyo con un tramo mal escrito para arrastrar horas de otro turno, o del
+    // día siguiente. Ya no hace falta: ningún apoyo puede quedar fuera del
+    // turno (ver ubicarEnTurno), así que el turno cubre a todos.
+    const inicioVentana = inicioResponsable;
+    let finVentana = finResponsable;
 
     // Red de seguridad para rangos mal escritos: si ya hay otro turno guardado
     // ese día que empieza después de este, la consulta no pasa de ahí.
@@ -252,7 +303,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         if (marca < inicioVentana || marca > finConsultaLoggro) continue;
 
         totalRecibido += propina;
-        const activas = personas.filter((p) => marca >= p.inicio && marca <= p.fin);
+        const activas = personas.filter((p) => !p.fueraDeTurno && marca >= p.inicio && marca <= p.fin);
 
         if (activas.length === 0) {
           totalHuerfano += propina;
@@ -315,10 +366,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
         id: persona.id,
         tipo: persona.tipo,
         propina_correspondiente: redondeada,
-        periodo: {
+        // El tramo con el que de verdad participó, ya dentro del turno. Si
+        // quedó entero fuera, no hay tramo: no se dibuja barra, y así un
+        // tramo mal escrito tampoco estira la línea de tiempo.
+        periodo: persona.fueraDeTurno ? null : {
           inicio: new Date(persona.inicio).toISOString(),
           fin: new Date(persona.fin).toISOString(),
         },
+        recortado: Boolean(persona.recortado),
+        fuera_de_turno: Boolean(persona.fueraDeTurno),
       };
     });
 

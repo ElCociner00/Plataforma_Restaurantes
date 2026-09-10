@@ -113,6 +113,10 @@ const construirPersonas = (detalles, eventos, resolverNombre) => {
       total: Number(detalle?.propina_correspondiente) || 0,
       inicio: Date.parse(detalle?.periodo?.inicio),
       fin: Date.parse(detalle?.periodo?.fin),
+      // El motor recorta al turno el tramo de un apoyo que se salía de él
+      // (el responsable cubre todo el turno y nadie puede estar fuera).
+      recortado: Boolean(detalle?.recortado),
+      fueraDeTurno: Boolean(detalle?.fuera_de_turno),
       propinas: 0
     });
   });
@@ -181,6 +185,9 @@ const pintarLineaTiempo = (personas, eventos) => {
     etiqueta.appendChild(el("strong", null, persona.nombre));
     etiqueta.appendChild(el("span", `propinas-rol propinas-rol-${persona.tipo}`,
       persona.tipo === "responsable" ? "Responsable" : "Apoyo"));
+    if (persona.recortado && !persona.fueraDeTurno) {
+      etiqueta.appendChild(el("small", "propinas-nota-tramo", "Horario ajustado al del turno"));
+    }
     fila.appendChild(etiqueta);
 
     const carril = el("div", "propinas-carril");
@@ -193,7 +200,9 @@ const pintarLineaTiempo = (personas, eventos) => {
       barra.title = `${persona.nombre}: ${hora(new Date(persona.inicio).toISOString())} a ${hora(new Date(persona.fin).toISOString())}`;
       carril.appendChild(barra);
     } else {
-      carril.appendChild(el("span", "propinas-sin-franja", "Sin franja horaria registrada"));
+      carril.appendChild(el("span", "propinas-sin-franja", persona.fueraDeTurno
+        ? "Su horario registrado queda fuera del turno: no participa"
+        : "Sin franja horaria registrada"));
     }
 
     // Solo se marcan las propinas en las que esta persona participó: así se ve

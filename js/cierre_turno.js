@@ -42,7 +42,7 @@ import {
   WEBHOOK_CONSULTAR_GASTOS_CATALOGO
 } from "./webhooks.js";
 import { resolverEsLocal, tablaSegunSede } from "./local_scope.js";
-import { renderRepartoPropinas, limpiarRepartoPropinas } from "./cierre_turno_propinas_visual.js?v=20260909prop2";
+import { renderRepartoPropinas, limpiarRepartoPropinas } from "./cierre_turno_propinas_visual.js?v=20260910prop3";
 
 // ../js/cierre_turno.js
 
@@ -1231,6 +1231,12 @@ document.addEventListener("DOMContentLoaded", () => {
       return false;
     }
 
+    const turno = rangoTurnoMinutos();
+    if (!turno) {
+      setStatus("Completa la hora de inicio y de fin del turno antes de confirmar los apoyos.");
+      return false;
+    }
+
     for (let i = 0; i < rows.length; i += 1) {
       const row = rows[i];
       const responsableApoyo = row.querySelector('[data-field="responsable"]')?.value || "";
@@ -1239,8 +1245,68 @@ document.addEventListener("DOMContentLoaded", () => {
         setStatus(`Completa todos los campos del apoyo #${i + 1}.`);
         return false;
       }
+
+      // El responsable está presente en TODO el turno y un apoyo solo puede
+      // estar dentro de él: si no, un apoyo acabaría con más propina que el
+      // responsable, que no existe. Caso real: turno de 1:00 AM a 12:00 PM y
+      // una apoyo "de 3:00 PM a 12:00 PM" -creyendo que 12:00 PM era la
+      // medianoche- que se leyó como 21 horas hasta el día siguiente.
+      const tramo = ubicarApoyoEnTurno(turno, horaAMinutos(range.inicioHora24), horaAMinutos(range.finHora24));
+      if (!tramo.dentro) {
+        const nombre = row.querySelector('[data-field="responsable"] option:checked')?.textContent?.trim() || `#${i + 1}`;
+        const doce = [range.inicioHora, range.finHora].includes("12") || turno.finTexto.startsWith("12:")
+          ? " Ojo: 12:00 PM es mediodía; la medianoche es 12:00 AM."
+          : "";
+        setStatus(
+          `El apoyo ${nombre} (${range.inicioTexto} a ${range.finTexto}) se sale del turno `
+          + `(${turno.inicioTexto} a ${turno.finTexto}). Un apoyo solo puede estar dentro del horario `
+          + `del turno: el responsable cubre todo el turno.${doce}`
+        );
+        return false;
+      }
     }
     return true;
+  };
+
+  /** "14:05" → 845. */
+  const horaAMinutos = (hhmm) => {
+    const [h, m] = String(hhmm || "").split(":").map(Number);
+    return Number.isFinite(h) && Number.isFinite(m) ? (h * 60) + m : null;
+  };
+
+  /** 845 → "2:05 PM". */
+  const minutosATexto12 = (minutos) => {
+    const enDia = ((minutos % 1440) + 1440) % 1440;
+    const h24 = Math.floor(enDia / 60);
+    const m = enDia % 60;
+    const h12 = (h24 % 12) || 12;
+    return `${h12}:${String(m).padStart(2, "0")} ${h24 < 12 ? "AM" : "PM"}`;
+  };
+
+  /** Rango del turno en minutos; si el fin no supera al inicio, cruza medianoche. */
+  const rangoTurnoMinutos = () => {
+    const inicio = horaAMinutos(horaInicio?.value);
+    let fin = horaAMinutos(horaFin?.value);
+    if (inicio === null || fin === null) return null;
+    if (fin <= inicio) fin += 1440;
+    return { inicio, fin, inicioTexto: minutosATexto12(inicio), finTexto: minutosATexto12(fin) };
+  };
+
+  /**
+   * Misma regla que ubicarEnTurno() en consultar-propina-apoyos: el tramo que
+   * no supera su inicio cruza medianoche, y en un turno de noche un tramo que
+   * empieza antes de la hora de inicio del turno es de la madrugada.
+   */
+  const ubicarApoyoEnTurno = (turno, desde, hasta) => {
+    if (desde === null || hasta === null) return { dentro: false };
+    let d = desde;
+    let h = hasta;
+    if (h <= d) h += 1440;
+    if (d < turno.inicio && d + 1440 < turno.fin) {
+      d += 1440;
+      h += 1440;
+    }
+    return { dentro: d >= turno.inicio && h <= turno.fin };
   };
 
 

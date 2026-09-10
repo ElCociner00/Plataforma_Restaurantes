@@ -40,8 +40,8 @@
 import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 import { resolverEsLocal, tablaSegunSede } from "./local_scope.js";
-import { repartirPropinas, compararRepartos } from "./propinas_reparto.js?v=20260909sim1";
-import { renderRepartoPropinas } from "./cierre_turno_propinas_visual.js?v=20260909prop2";
+import { repartirPropinas, compararRepartos } from "./propinas_reparto.js?v=20260910tramo1";
+import { renderRepartoPropinas } from "./cierre_turno_propinas_visual.js?v=20260910prop3";
 import { mensajeDeError } from "./edge_function_error.js";
 
 const CIERRE_TABLES = { principal: "cierres_turno_final", local: "cierres_turno_final_locales" };
@@ -128,17 +128,10 @@ const mostrarBloques = (visible) => {
 
 // ── Carga ────────────────────────────────────────────────────────────────
 
-/** Fin del día en hora de Colombia, como instante (ms). */
-const finDeDiaLocalMs = (fecha) => {
-  const d = new Date(`${fecha}T23:59:59-05:00`);
-  return Number.isNaN(d.getTime()) ? null : d.getTime();
-};
-
 /**
- * El mismo límite que calcula consultar-propina-apoyos/index.ts: hasta donde
- * llegó la cobertura real de la gente de ESTE turno -del primero en entrar al
- * último en salir-, y en ningún caso más allá del comienzo del turno
- * siguiente si ya está registrado.
+ * El mismo límite que calcula consultar-propina-apoyos/index.ts: el fin del
+ * turno -el tramo del responsable, que cubre todo el turno-, y en ningún caso
+ * más allá del comienzo del turno siguiente si ya está registrado.
  *
  * Antes esto se estiraba hasta el fin del día. Con eso, un turno mostraba las
  * propinas de todos los turnos posteriores de la misma fecha y, como nadie de
@@ -150,7 +143,7 @@ const finDeDiaLocalMs = (fecha) => {
  * también a la evidencia YA ARCHIVADA: un archivo guardado antes de que este
  * filtro existiera trae facturas del turno siguiente pegadas.
  */
-const limiteConsultaSiguienteTurno = async ({ empresaId, esLocal, fecha, jornada, inicioResponsable, finCobertura }) => {
+const limiteConsultaSiguienteTurno = async ({ empresaId, esLocal, fecha, jornada, inicioResponsable, finTurno }) => {
   const tablaCierres = tablaSegunSede(CIERRE_TABLES, esLocal);
   const { data: otros } = await supabase
     .from(tablaCierres)
@@ -167,10 +160,9 @@ const limiteConsultaSiguienteTurno = async ({ empresaId, esLocal, fecha, jornada
     }
   });
 
-  // Nunca más allá del fin del día, por si un rango mal escrito dispara la
-  // cobertura: es un tope, no el límite por defecto.
-  const topeDia = finDeDiaLocalMs(fecha) ?? finCobertura;
-  let limite = Math.min(finCobertura, topeDia);
+  // El fin del turno, tal cual (ya corrido un día si cruza medianoche). Sin
+  // tope de "fin del día": cortaría a medianoche un turno de noche.
+  let limite = finTurno;
   if (siguienteInicio !== null && siguienteInicio > inicioResponsable) {
     limite = Math.min(limite, siguienteInicio);
   }
@@ -198,17 +190,15 @@ const cargarEventos = async ({ empresaId, esLocal, fecha, jornada, personas }) =
     return { eventos: [], origen: "sin_personas", detalle: "El turno no tiene responsable registrado." };
   }
 
-  const finResponsable = Date.parse(responsable.fin);
+  // La ventana es el turno, que es el tramo del responsable: él está presente
+  // en todo el turno y ningún apoyo puede estar fuera de él (propinas_reparto
+  // los recorta). Mismo criterio que consultar-propina-apoyos: un apoyo con un
+  // tramo mal escrito ya no puede estirar la consulta a horas de otro turno.
+  const inicioResponsable = Date.parse(responsable.inicio);
+  const finTurno = Date.parse(responsable.fin);
 
-  // La ventana es la cobertura de TODAS las personas del turno, no solo la
-  // del responsable: un apoyo puede entrar antes o salir después que él, y su
-  // tramo cuenta igual. Mismo criterio que consultar-propina-apoyos.
-  const marcas = (inicio) => personas.map((p) => Date.parse(inicio ? p.inicio : p.fin)).filter(Number.isFinite);
-  const inicioResponsable = Math.min(...(marcas(true).length ? marcas(true) : [Date.parse(responsable.inicio)]));
-  const finCobertura = Math.max(...(marcas(false).length ? marcas(false) : [finResponsable]));
-
-  const limiteInfo = Number.isFinite(inicioResponsable) && Number.isFinite(finCobertura)
-    ? await limiteConsultaSiguienteTurno({ empresaId, esLocal, fecha, jornada, inicioResponsable, finCobertura })
+  const limiteInfo = Number.isFinite(inicioResponsable) && Number.isFinite(finTurno)
+    ? await limiteConsultaSiguienteTurno({ empresaId, esLocal, fecha, jornada, inicioResponsable, finTurno })
     : null;
   const limite = limiteInfo?.limite ?? null;
 

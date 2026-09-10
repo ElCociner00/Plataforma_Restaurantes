@@ -46,28 +46,68 @@ function aInstante(valor) {
   return Date.parse(String(valor ?? ""));
 }
 
+const DIA_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Coloca el tramo de un apoyo dentro del turno y lo recorta a él. Réplica de
+ * ubicarEnTurno() en la Edge Function.
+ *
+ * REGLA: el responsable está presente en TODO el turno -su tramo ES el
+ * turno- y un apoyo solo puede estar dentro de ese rango. Así ningún apoyo
+ * termina con más propina que el responsable: en cada propina en la que el
+ * apoyo está, el responsable también. En un turno que cruza medianoche, un
+ * tramo que empieza antes del inicio del turno es de la madrugada.
+ */
+export function ubicarEnTurno(turnoInicio, turnoFin, desde, hasta) {
+  let d = desde;
+  let h = hasta;
+  if (h <= d) h += DIA_MS;
+  if (d < turnoInicio && d + DIA_MS < turnoFin) {
+    d += DIA_MS;
+    h += DIA_MS;
+  }
+  const inicio = Math.max(d, turnoInicio);
+  const fin = Math.min(h, turnoFin);
+  if (fin < inicio) {
+    return { inicio: d, fin: h, recortado: true, fueraDeTurno: true };
+  }
+  return { inicio, fin, recortado: inicio !== d || fin !== h, fueraDeTurno: false };
+}
+
 /**
  * Personas con su tramo. Un fin anterior o igual al inicio se entiende como
  * tramo que cruza medianoche y se corre un día, igual que en la Edge Function.
+ * Los apoyos se recortan al tramo del responsable (el turno).
  */
 function normalizarPersonas(personas) {
-  return (Array.isArray(personas) ? personas : [])
+  const gente = (Array.isArray(personas) ? personas : [])
     .map((p) => {
       const id = String(p?.id ?? "").trim();
       if (!id) return null;
       const inicio = aInstante(p?.inicio);
       let fin = aInstante(p?.fin);
       if (!Number.isFinite(inicio) || !Number.isFinite(fin)) return null;
-      if (fin <= inicio) fin += 24 * 60 * 60 * 1000;
+      if (fin <= inicio) fin += DIA_MS;
       return {
         id,
         tipo: p?.tipo === "responsable" ? "responsable" : "apoyo",
         nombre: String(p?.nombre ?? id),
         inicio,
         fin,
+        recortado: false,
+        fueraDeTurno: false,
       };
     })
     .filter(Boolean);
+
+  const responsable = gente.find((p) => p.tipo === "responsable");
+  if (!responsable) return gente;
+
+  return gente.map((p) => {
+    if (p.tipo === "responsable") return p;
+    const tramo = ubicarEnTurno(responsable.inicio, responsable.fin, p.inicio, p.fin);
+    return { ...p, ...tramo };
+  });
 }
 
 /** Eventos de propina ordenados por hora, descartando lo que no sea usable. */
@@ -116,7 +156,7 @@ export function repartirPropinas(personas, eventos) {
   const detallados = lista.map((evento) => {
     totalRecibido += evento.monto;
 
-    const activas = gente.filter((p) => evento.instante >= p.inicio && evento.instante <= p.fin);
+    const activas = gente.filter((p) => !p.fueraDeTurno && evento.instante >= p.inicio && evento.instante <= p.fin);
 
     if (activas.length === 0) {
       totalHuerfano += evento.monto;
@@ -170,10 +210,12 @@ export function repartirPropinas(personas, eventos) {
       nombre: p.nombre,
       propina_correspondiente: redondeada,
       propinas: conteo.get(p.id),
-      periodo: {
+      periodo: p.fueraDeTurno ? null : {
         inicio: new Date(p.inicio).toISOString(),
         fin: new Date(p.fin).toISOString(),
       },
+      recortado: p.recortado,
+      fuera_de_turno: p.fueraDeTurno,
     };
   });
 
