@@ -150,6 +150,14 @@ assert(
   /ubicarApoyoEnTurno\(/.test(validar) && /if\s*\(\s*!tramo\.dentro\s*\)/.test(validar),
   "validateApoyoRows ya no rechaza un apoyo cuyo horario se sale del turno.",
 );
+// Confirmar apoyo (js/apoyos.js) no puede pisar ese motivo con uno generico:
+// pasaba, y la persona veia "Completa los datos de apoyos" sin saber que el
+// problema era el horario de uno de ellos.
+const apoyosJs = sinComentarios(await leer("js/apoyos.js"));
+assert(
+  /if\s*\(\s*!validateApoyoRows\(\)\s*\)\s*return\s*;/.test(apoyosJs),
+  "js/apoyos.js vuelve a reemplazar el motivo de validateApoyoRows por un mensaje generico.",
+);
 assert(
   /12:00 PM es mediodía/.test(cierre),
   "El aviso ya no aclara que 12:00 PM es mediodía: es justo la confusion que produjo el caso real.",

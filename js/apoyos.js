@@ -249,10 +249,10 @@ export function initApoyosPropinaManager({
       return;
     }
 
-    if (!validateApoyoRows()) {
-      setStatus("Completa los datos de apoyos antes de consultar propina (responsable y horario). No se llena propina manual.");
-      return;
-    }
+    // validateApoyoRows ya deja escrito el motivo concreto (qué apoyo falta
+    // o cuál se sale del horario del turno). Pisarlo aquí con un mensaje
+    // genérico dejaba a la persona sin saber qué corregir.
+    if (!validateApoyoRows()) return;
 
     const consultaPayload = await buildConsultaPayload();
     if (!consultaPayload) return;
