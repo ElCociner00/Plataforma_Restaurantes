@@ -115,6 +115,51 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const resumen = resumirVentas(propias);
 
+    // ── Ventas después del fin del turno ─────────────────────────────────
+    // Acotar al turno tiene una contracara: si la hora de fin se escribe mal,
+    // lo que quede después se sale del cierre SIN AVISO. Caso típico: poner
+    // "12:00 PM" creyendo que es medianoche -12:00 PM es mediodía-. Un turno
+    // de 1:00 AM "a 12:00 PM" dejaba fuera toda la tarde y la noche (en VIVA
+    // 2026-09-09: 444.916 de 1.886.729). Antes esto no se veía porque la
+    // consulta llegaba siempre al fin del día y tapaba el error.
+    //
+    // No se corrige solo -un turno de mañana que termina a mediodía existe-:
+    // se cuenta lo que hay entre el fin del turno y el comienzo del siguiente
+    // turno guardado ese día (o el fin del día), y el formulario lo avisa.
+    // Al cerrar a tiempo esto sale en cero, porque esas facturas aún no
+    // existen; solo aparece cuando de verdad hay ventas que nadie cubre.
+    let despuesDelTurno: { facturas: number; total: number; desde: string; hasta: string } | null = null;
+    if (horaFin) {
+      let limite = finDelDia(fecha).getTime();
+      const { data: otrosTurnos } = await admin
+        .from(ctx.t.cierres)
+        .select("hora_inicio")
+        .eq("empresa_id", ctx.empresaId)
+        .eq("fecha_turno", fecha);
+      for (const fila of (otrosTurnos ?? []) as Array<{ hora_inicio: unknown }>) {
+        const horaTxt = String(fila.hora_inicio ?? "").trim();
+        if (!horaTxt) continue;
+        const instante = instanteLocal(fecha, horaTxt).getTime();
+        if (instante > desde.getTime() && instante < limite) limite = instante;
+      }
+
+      if (hasta.getTime() < limite) {
+        const consultaDespues = new URLSearchParams({
+          status: "Pagada",
+          dateInit: new Date(hasta.getTime() + 1).toISOString(),
+          dateEnd: new Date(limite).toISOString(),
+        });
+        const crudoDespues = await pedirLoggro(admin, ctx.empresaId, `/invoices?${consultaDespues.toString()}`);
+        const propiasDespues = filtrarPorNegocio(comoLista(crudoDespues), sesion.tenantId);
+        despuesDelTurno = {
+          facturas: propiasDespues.length,
+          total: Number(resumirVentas(propiasDespues).total_general_valor) || 0,
+          desde: new Date(hasta.getTime() + 1).toISOString(),
+          hasta: new Date(limite).toISOString(),
+        };
+      }
+    }
+
     console.info(
       `[${ETIQUETA}] empresa=${ctx.empresaId} negocio=${sesion.tenantId ?? "n/d"} ` +
       `facturas=${todas.length} propias=${propias.length}`,
@@ -136,6 +181,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
         facturas_totales: todas.length,
         facturas_empresa: propias.length,
       },
+      // Ventas que quedan entre el fin de este turno y el siguiente turno
+      // guardado (o el fin del día). null cuando no aplica.
+      despues_del_turno: despuesDelTurno,
       ...resumen,
       ...(DEBUG ? { _crudo: todas.slice(0, 3) } : {}),
     }, 200, origin);

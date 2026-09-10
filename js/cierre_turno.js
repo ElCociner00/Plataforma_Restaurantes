@@ -1634,8 +1634,80 @@ document.addEventListener("DOMContentLoaded", () => {
     marcarComoNoVerificado();
   });
   responsable.addEventListener("change", marcarComoNoVerificado);
-  horaInicio.addEventListener("change", marcarComoNoVerificado);
-  horaFin.addEventListener("change", marcarComoNoVerificado);
+
+  // ── Cómo se está leyendo el turno ───────────────────────────────────────
+  // "12:00 PM" es mediodía, pero es muy común escribirlo pensando en la
+  // medianoche. Con la consulta acotada al turno, ese error deja fuera del
+  // cierre toda la tarde y la noche. Escribirlo en palabras debajo de las
+  // horas hace visible cómo lo va a tomar el sistema antes de consultar.
+  const turnoInterpretacion = document.getElementById("turnoInterpretacion");
+  const avisoDespuesTurno = document.getElementById("avisoDespuesTurno");
+
+  const horaEnPalabras = (minutos) => {
+    const enDia = ((minutos % 1440) + 1440) % 1440;
+    const texto = minutosATexto12(minutos);
+    if (enDia === 0) return `${texto} (medianoche)`;
+    if (enDia === 720) return `${texto} (mediodía)`;
+    return texto;
+  };
+
+  const pintarInterpretacionTurno = () => {
+    if (!turnoInterpretacion) return;
+    const turno = rangoTurnoMinutos();
+    if (!turno) {
+      turnoInterpretacion.textContent = "";
+      return;
+    }
+    const duracion = turno.fin - turno.inicio;
+    const horas = Math.floor(duracion / 60);
+    const minutos = duracion % 60;
+    const delSiguiente = turno.fin > 1440 ? " del día siguiente" : "";
+    turnoInterpretacion.textContent =
+      `Turno de ${horaEnPalabras(turno.inicio)} a ${horaEnPalabras(turno.fin)}${delSiguiente} · `
+      + `${horas} h${minutos ? ` ${minutos} min` : ""}`;
+  };
+
+  const ocultarAvisoDespuesTurno = () => {
+    avisoDespuesTurno?.classList.add("is-hidden");
+    if (avisoDespuesTurno) avisoDespuesTurno.textContent = "";
+  };
+
+  /**
+   * consultar-ventas cuenta lo vendido entre el fin del turno y el siguiente
+   * turno guardado (o el fin del día). Si hay algo, casi siempre es una hora
+   * de fin mal escrita: se dice, sin bloquear, porque un turno de mañana que
+   * termina a mediodía también existe.
+   */
+  const mostrarAvisoDespuesTurno = (despues) => {
+    if (!avisoDespuesTurno || !despues || !(Number(despues.facturas) > 0)) {
+      ocultarAvisoDespuesTurno();
+      return "";
+    }
+    const turno = rangoTurnoMinutos();
+    const fin = turno ? horaEnPalabras(turno.fin) : horaFin.value;
+    const esDoce = /^12:/.test(horaFin.value || "");
+    const texto =
+      `Ojo: después de las ${fin}, la hora de fin de este turno, Loggro tiene `
+      + `${despues.facturas} factura${despues.facturas === 1 ? "" : "s"} por ${formatCOP(despues.total)} `
+      + "que no entran en este cierre ni en ningún turno guardado después. "
+      + (esDoce
+        ? "Si el turno terminó a medianoche, la hora de fin es 12:00 AM: 12:00 PM es mediodía."
+        : "Si el turno terminó más tarde, corrige la hora de fin y vuelve a consultar.");
+    avisoDespuesTurno.textContent = texto;
+    avisoDespuesTurno.classList.remove("is-hidden");
+    return texto;
+  };
+
+  const alCambiarHorasTurno = () => {
+    pintarInterpretacionTurno();
+    ocultarAvisoDespuesTurno();
+    marcarComoNoVerificado();
+  };
+  horaInicio.addEventListener("change", alCambiarHorasTurno);
+  horaFin.addEventListener("change", alCambiarHorasTurno);
+  horaInicio.addEventListener("input", pintarInterpretacionTurno);
+  horaFin.addEventListener("input", pintarInterpretacionTurno);
+  pintarInterpretacionTurno();
   horaLlegadaHora?.addEventListener("change", marcarComoNoVerificado);
   horaLlegadaMinuto?.addEventListener("change", marcarComoNoVerificado);
   horaLlegadaMomento?.addEventListener("change", marcarComoNoVerificado);
@@ -1900,7 +1972,8 @@ document.addEventListener("DOMContentLoaded", () => {
         inputsSoloVista.domicilios.value = "0";
       }
 
-      setStatus(data.message || "Datos consultados.");
+      const aviso = mostrarAvisoDespuesTurno(data.despues_del_turno);
+      setStatus(`${data.message || "Datos consultados."}${aviso ? ` ${aviso}` : ""}`);
       consultaCompletada = true;
       toggleButtons({ verificar: true });
       refreshEstadoBotonSubir();
@@ -2271,7 +2344,13 @@ document.addEventListener("DOMContentLoaded", () => {
     verificado = true;
 
     const estado = obtenerEstadoGlobalDiferencias();
-    mensajeEnvio.textContent = obtenerMensajeEnvio(estado);
+    // Último punto antes de guardar: si quedaron ventas después del fin del
+    // turno que nadie cubre, se repite aquí. Es justo cuando todavía se puede
+    // corregir la hora de fin sin perder nada.
+    const avisoPendiente = avisoDespuesTurno && !avisoDespuesTurno.classList.contains("is-hidden")
+      ? ` ${avisoDespuesTurno.textContent}`
+      : "";
+    mensajeEnvio.textContent = `${obtenerMensajeEnvio(estado)}${avisoPendiente}`;
     confirmacionEnvio.classList.remove("is-hidden");
   });
 

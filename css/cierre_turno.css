@@ -797,3 +797,21 @@ input:not([readonly]) {
 }
 
 .fallo-envio-card button:hover { background: #b91c1c; }
+
+/* Cómo se lee el turno, y aviso de ventas después de su hora de fin
+   (js/cierre_turno.js · pintarInterpretacionTurno / mostrarAvisoDespuesTurno). */
+.turno-interpretacion {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  color: var(--ek-ink-2, #334155);
+}
+.aviso-despues-turno {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+}

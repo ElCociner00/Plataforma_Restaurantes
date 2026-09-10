@@ -55,11 +55,19 @@ assert(
 );
 
 // finDelDia solo puede sobrevivir como respaldo para llamadas sin hora_fin.
+// finDelDia solo puede aparecer en dos sitios: el respaldo para llamadas que
+// no manden hora_fin, y el tope del aviso de ventas DESPUES del turno (que no
+// entran al cierre, solo se cuentan para avisar). Nunca en la ventana del
+// cierre cuando hay hora_fin.
 const usosFinDelDiaVentas = [...codigoVentas.matchAll(/finDelDia\s*\(/g)].length;
+const usosPermitidos = [
+  /hasta:\s*finDelDia\(fecha\)\s*\}/.test(codigoVentas),      // respaldo sin hora_fin
+  /let limite = finDelDia\(fecha\)\.getTime\(\);/.test(codigoVentas), // tope del aviso
+].filter(Boolean).length;
 assert(
-  usosFinDelDiaVentas <= 1,
-  `consultar-ventas usa finDelDia() ${usosFinDelDiaVentas} veces. Solo se admite `
-  + "una, la del respaldo para llamadas que no manden hora_fin.",
+  usosFinDelDiaVentas === usosPermitidos,
+  `consultar-ventas usa finDelDia() ${usosFinDelDiaVentas} veces y solo ${usosPermitidos} son las `
+  + "permitidas (respaldo sin hora_fin, y tope del aviso de ventas despues del turno).",
 );
 
 // ── consultar-gastos (modo turno) ──────────────────────────────────────────
@@ -150,6 +158,28 @@ assert(
   /ubicarApoyoEnTurno\(/.test(validar) && /if\s*\(\s*!tramo\.dentro\s*\)/.test(validar),
   "validateApoyoRows ya no rechaza un apoyo cuyo horario se sale del turno.",
 );
+// ── Una hora de fin mal escrita ya no puede recortar el cierre en silencio ──
+// Caso real: turno "de 1:00 AM a 12:00 PM" pensando en la medianoche. Con la
+// consulta acotada al turno, la tarde y la noche quedaban fuera del cierre sin
+// ningun aviso cuando no habia un apoyo de tarde que disparara el bloqueo.
+assert(
+  /despues_del_turno:\s*despuesDelTurno/.test(codigoVentas)
+    && /dateInit:\s*new Date\(hasta\.getTime\(\)\s*\+\s*1\)/.test(codigoVentas),
+  "consultar-ventas ya no informa las ventas entre el fin del turno y el siguiente turno guardado.",
+);
+assert(
+  /mostrarAvisoDespuesTurno\(data\.despues_del_turno\)/.test(cierre),
+  "El formulario ya no avisa de ventas despues de la hora de fin del turno al consultar Loggro.",
+);
+assert(
+  /avisoPendiente/.test(cierre) && /mensajeEnvio\.textContent = `\$\{obtenerMensajeEnvio\(estado\)\}\$\{avisoPendiente\}`/.test(cierre),
+  "La confirmacion final ya no repite el aviso de ventas despues del turno.",
+);
+assert(
+  /\(mediodía\)/.test(cierre) && /\(medianoche\)/.test(cierre) && /pintarInterpretacionTurno\(\)/.test(cierre),
+  "El formulario ya no escribe en palabras como lee el turno (mediodía / medianoche).",
+);
+
 // Cierre y auditoria muestran los mismos pesos enteros que se guardan. Antes la
 // auditoria redondeaba a cada persona por su cuenta: 7.801 en pantalla contra
 // 7.800 guardados.
