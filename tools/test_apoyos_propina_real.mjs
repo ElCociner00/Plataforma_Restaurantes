@@ -50,8 +50,8 @@ assert(
   // Sin el "no usa finDelDia": el comentario del propio arreglo lo cita al
   // explicar qué se quitó. Eso lo comprueba test_ventana_turno_loggro.mjs,
   // que descarta las líneas comentadas antes de mirar.
-  edge.includes("Math.max(...personas.map((p) => p.fin))"),
-  "consultar-propina-apoyos ya no se acota a la cobertura real de las personas del turno: volverá a marcar como huérfanas las propinas de otros turnos",
+  edge.includes("let finVentana = finResponsable;"),
+  "consultar-propina-apoyos ya no se acota al turno: volverá a marcar como huérfanas las propinas de otros turnos",
 );
 assert(
   edge.includes("dateEnd: new Date(finConsultaLoggro).toISOString()"),
@@ -184,10 +184,9 @@ assert(
   "los eventos recién traídos de Loggro ya no se filtran contra el límite del turno en el propio simulador",
 );
 assert(
-  simulador.includes("const finCobertura = Math.max("),
-  "el simulador ya no acota por la cobertura real de TODAS las personas del turno: "
-  + "volvería a mostrar como huérfanas las propinas de los turnos posteriores del mismo día, "
-  + "y a discrepar del total que calcula el cierre",
+  simulador.includes("const finTurno = Date.parse(responsable.fin);") && simulador.includes("let limite = finTurno;"),
+  "el simulador ya no acota al turno del responsable: volvería a discrepar del total que calcula el cierre, "
+  + "o a cortar a medianoche un turno de noche",
 );
 
 // ── El selector de sede solo debe ofrecer lo que el usuario puede tocar ────

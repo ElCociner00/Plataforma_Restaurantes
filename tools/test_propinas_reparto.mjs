@@ -125,10 +125,94 @@ const sucio = repartirPropinas(
 casi(sucio.total_repartido, 38000, "los registros invalidos se descartan sin alterar el reparto");
 assert(sucio.detalles.length === 3, "una persona sin id no entra al reparto");
 
+// ── 9 · El responsable cubre TODO el turno; ningun apoyo puede salirse ─────
+// Caso real, BATUT VIVA 2026-09-10. Turno (= responsable) de 01:00 a 12:00.
+//   Carolina 02:00-08:00   -> dentro, pero sin propinas en su tramo
+//   Daily    09:00-14:00   -> se sale: se recorta a 09:00-12:00
+//   Jenny    15:00-12:00PM -> "12 PM" es mediodia y queda antes de las 3 PM:
+//                             se leia como 21 horas hasta el dia siguiente y
+//                             se llevaba 50.100 contra 13.008 del responsable.
+//                             Queda entera fuera del turno: no participa.
+// Las 5 propinas del turno (09:15 a 11:45, 26.016) caen con el responsable y
+// Daily presentes: 13.008 cada uno. La de las 16:30 no es de este turno: no
+// se la lleva nadie.
+const d10 = (hora, min = 0, seg = 0) => new Date(Date.UTC(2026, 8, 9, hora + 5, min, seg)).toISOString();
+const turnoReal = [
+  { id: "seb", tipo: "responsable", nombre: "Sebastian", inicio: d10(1),  fin: d10(12) },
+  { id: "car", tipo: "apoyo",       nombre: "Carolina",  inicio: d10(2),  fin: d10(8) },
+  { id: "dai", tipo: "apoyo",       nombre: "Daily",     inicio: d10(9),  fin: d10(14) },
+  { id: "jen", tipo: "apoyo",       nombre: "Jenny",     inicio: d10(15), fin: d10(12) },
+];
+const propinasReales = [
+  { factura_id: "a", ocurrido_en: d10(9, 15, 33),  monto: 6342 },
+  { factura_id: "b", ocurrido_en: d10(10, 15, 43), monto: 9259 },
+  { factura_id: "c", ocurrido_en: d10(11, 45, 0),  monto: 3287 },
+  { factura_id: "d", ocurrido_en: d10(11, 45, 22), monto: 5740 },
+  { factura_id: "e", ocurrido_en: d10(11, 45, 36), monto: 1388 },
+  { factura_id: "f", ocurrido_en: d10(16, 30, 22), monto: 8000 },
+];
+const real = repartirPropinas(turnoReal, propinasReales);
+casi(de(real, "seb").propina_correspondiente, 13008, "caso VIVA: el responsable se lleva su parte de las 5 propinas");
+casi(de(real, "dai").propina_correspondiente, 13008, "caso VIVA: Daily comparte las 5 (su tramo recortado a 09:00-12:00)");
+casi(de(real, "car").propina_correspondiente, 0, "caso VIVA: Carolina no tiene propinas en su tramo");
+casi(de(real, "jen").propina_correspondiente, 0, "caso VIVA: Jenny queda fuera del turno y no participa");
+assert(de(real, "dai").recortado === true, "caso VIVA: el tramo de Daily se marca como recortado");
+assert(de(real, "jen").fuera_de_turno === true && de(real, "jen").periodo === null,
+  "caso VIVA: Jenny se marca fuera de turno y sin tramo que dibujar");
+assert(de(real, "dai").periodo.fin === d10(12), "caso VIVA: el tramo de Daily termina con el turno");
+casi(real.total_huerfano, 8000, "caso VIVA: la propina de las 16:30 no es de nadie del turno");
+
+// ── 10 · Turno de noche: un apoyo de madrugada es del dia siguiente ────────
+// Turno 18:00 -> 02:00. Apoyo registrado 01:00 -> 02:00: sobre la fecha del
+// turno eso seria la madrugada ANTERIOR; pertenece a la de este turno.
+const nocheConApoyo = repartirPropinas(
+  [
+    { id: R,  tipo: "responsable", nombre: "Ana",   inicio: h(18), fin: h(2) },
+    { id: A1, tipo: "apoyo",       nombre: "Bruno", inicio: h(1),  fin: h(2) },
+  ],
+  [{ factura_id: "M", ocurrido_en: h(25, 30), monto: 6000 }], // 01:30 del dia siguiente
+);
+casi(de(nocheConApoyo, A1).propina_correspondiente, 3000, "turno de noche: el apoyo de madrugada comparte la propina de las 01:30");
+casi(de(nocheConApoyo, R).propina_correspondiente, 3000, "turno de noche: el responsable tambien");
+
+// ── 11 · Invariante: ningun apoyo por encima del responsable ───────────────
+// Pase lo que pase con los tramos escritos -dentro, fuera, cruzando la
+// medianoche, al reves-. Generador determinista para que un fallo se repita.
+let semilla = 20260910;
+const azar = () => { semilla = (semilla * 1103515245 + 12345) % 2147483648; return semilla / 2147483648; };
+const hora24 = (n) => h(Math.floor(n), Math.floor((n % 1) * 60));
+let violaciones = 0;
+for (let i = 0; i < 400; i += 1) {
+  const ini = azar() * 23;
+  const dur = 2 + azar() * 12;
+  const gente = [{ id: "r", tipo: "responsable", nombre: "R", inicio: hora24(ini), fin: hora24((ini + dur) % 24) }];
+  const n = 1 + Math.floor(azar() * 4);
+  for (let k = 0; k < n; k += 1) {
+    gente.push({ id: `a${k}`, tipo: "apoyo", nombre: `A${k}`, inicio: hora24(azar() * 24), fin: hora24(azar() * 24) });
+  }
+  // Las propinas caen dentro del turno TAL COMO QUEDO escrito (horas y
+  // minutos enteros), no del turno sin redondear: si no, alguna cae unos
+  // segundos despues del fin y la prueba culparia al codigo de su propio error.
+  const turnoIni = Date.parse(gente[0].inicio);
+  let turnoFin = Date.parse(gente[0].fin);
+  if (turnoFin <= turnoIni) turnoFin += 24 * 3600000;
+  const eventosAzar = Array.from({ length: 12 }, (_, k) => ({
+    factura_id: `z${k}`,
+    ocurrido_en: new Date(turnoIni + azar() * (turnoFin - turnoIni)).toISOString(),
+    monto: 1000 + Math.floor(azar() * 9000),
+  }));
+  const r = repartirPropinas(gente, eventosAzar);
+  const resp = de(r, "r").propina_correspondiente;
+  if (r.detalles.some((d) => d.tipo === "apoyo" && d.propina_correspondiente > resp + 0.01)) violaciones += 1;
+  if (r.total_huerfano > 0.01) violaciones += 1; // todo lo del turno lo cubre el responsable
+}
+assert(violaciones === 0, `invariante: ${violaciones} de 400 turnos al azar dejaron un apoyo por encima del responsable o propinas del turno sin dueno`);
+
 if (fallos.length) {
   console.error("FALLOS:");
   fallos.forEach((f) => console.error("  -", f));
   process.exit(1);
 }
 
-console.log("Reparto de propinas OK: 8 escenarios, incluidos centavos, medianoche y propinas sin dueno.");
+console.log("Reparto de propinas OK: 11 escenarios, incluidos centavos, medianoche, propinas sin dueno, "
+  + "apoyos recortados al turno y 400 turnos al azar sin ningun apoyo por encima del responsable.");

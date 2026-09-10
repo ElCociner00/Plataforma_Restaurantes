@@ -83,18 +83,35 @@ assert(
   + "posteriores y las marcara como huerfanas suyas.",
 );
 
+// La ventana es EL TURNO (el tramo del responsable), no la cobertura de todas
+// las personas. Una version anterior la estiraba del primero en entrar al
+// ultimo en salir, y bastaba un apoyo con un tramo mal escrito -"de 3:00 PM a
+// 12:00 PM", leido como 21 horas hasta el dia siguiente- para arrastrar horas
+// de otro turno. Ahora ningun apoyo puede quedar fuera del turno.
 assert(
-  /const\s+inicioVentana\s*=\s*Math\.min\(\s*\.\.\.personas\.map/.test(codigoApoyos),
-  "consultar-propina-apoyos ya no calcula inicioVentana como el minimo sobre "
-  + "TODAS las personas. Un apoyo que entra antes que el responsable perderia "
-  + "su primer tramo en silencio.",
+  /const\s+inicioVentana\s*=\s*inicioResponsable\s*;/.test(codigoApoyos),
+  "consultar-propina-apoyos ya no empieza la ventana en el inicio del turno.",
+);
+assert(
+  /let\s+finVentana\s*=\s*finResponsable\s*;/.test(codigoApoyos),
+  "consultar-propina-apoyos ya no termina la ventana en el fin del turno: un apoyo "
+  + "mal escrito podria volver a estirarla.",
+);
+assert(
+  !/Math\.(min|max)\(\s*\.\.\.personas\.map/.test(codigoApoyos),
+  "consultar-propina-apoyos volvio a calcular la ventana sobre la cobertura de "
+  + "todas las personas.",
 );
 
+// Todo apoyo pasa por ubicarEnTurno: se recorta al turno.
 assert(
-  /let\s+finVentana\s*=\s*Math\.max\(\s*\.\.\.personas\.map/.test(codigoApoyos),
-  "consultar-propina-apoyos ya no calcula finVentana como el maximo sobre TODAS "
-  + "las personas. Un apoyo que sale despues que el responsable perderia su "
-  + "ultimo tramo.",
+  /ubicarEnTurno\(\s*\n?\s*inicioResponsable\s*,\s*\n?\s*finResponsable/.test(codigoApoyos),
+  "consultar-propina-apoyos ya no recorta el tramo de cada apoyo al turno "
+  + "(ubicarEnTurno). Un apoyo podria volver a tener mas propina que el responsable.",
+);
+assert(
+  /!p\.fueraDeTurno\s*&&\s*marca\s*>=\s*p\.inicio/.test(codigoApoyos),
+  "Un apoyo entero fuera del turno vuelve a poder participar del reparto.",
 );
 
 // El filtro propio debe usar la ventana, no el rango del responsable.
@@ -105,14 +122,37 @@ assert(
   + "fuera del rango pedido se cuela y aparece como huerfana de este turno.",
 );
 
-// La ventana se calcula DESPUES de construir personas: si no, el min/max no
-// puede ver a los apoyos.
-const posPersonas = codigoApoyos.indexOf("const personas: Persona[]");
-const posVentana = codigoApoyos.indexOf("const inicioVentana");
+// ── Misma regla de recorte en la Edge Function y en el simulador ───────────
+// Se compara el cuerpo de ubicarEnTurno() en los dos lados, sin tipos ni
+// espacios: si alguien cambia uno sin el otro, la auditoria dejaria de
+// mostrar lo mismo que cobra la gente.
+const reparto = await leer("js/propinas_reparto.js");
+// Del primer statement al ultimo return: eso es la regla, sin la firma (que
+// en TypeScript lleva tipos y en el navegador no).
+const cuerpoDe = (fuente) => {
+  const codigo = sinComentarios(fuente);
+  const i = codigo.indexOf("function ubicarEnTurno(");
+  if (i === -1) return null;
+  const desde = codigo.indexOf("let d = desde;", i);
+  const hasta = codigo.indexOf("fueraDeTurno: false };", desde);
+  return desde === -1 || hasta === -1 ? null : codigo.slice(desde, hasta).replace(/\s+/g, "");
+};
+const cuerpoEdge = cuerpoDe(apoyos);
+const cuerpoNav = cuerpoDe(reparto);
+assert(cuerpoEdge && cuerpoNav && cuerpoEdge === cuerpoNav,
+  "ubicarEnTurno() ya no es identica en consultar-propina-apoyos y en js/propinas_reparto.js: "
+  + "el simulador recortaria los apoyos distinto que produccion.");
+
+// ── El formulario no deja confirmar un apoyo fuera del turno ───────────────
+const cierre = sinComentarios(await leer("js/cierre_turno.js"));
+const validar = cierre.slice(cierre.indexOf("const validateApoyoRows"), cierre.indexOf("const horaAMinutos"));
 assert(
-  posPersonas !== -1 && posVentana !== -1 && posVentana > posPersonas,
-  "inicioVentana se calcula antes de construir `personas`: el Math.min/max no "
-  + "veria a los apoyos y la ventana volveria a ser solo la del responsable.",
+  /ubicarApoyoEnTurno\(/.test(validar) && /if\s*\(\s*!tramo\.dentro\s*\)/.test(validar),
+  "validateApoyoRows ya no rechaza un apoyo cuyo horario se sale del turno.",
+);
+assert(
+  /12:00 PM es mediodía/.test(cierre),
+  "El aviso ya no aclara que 12:00 PM es mediodía: es justo la confusion que produjo el caso real.",
 );
 
 if (fallos.length) {
