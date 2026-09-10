@@ -8,7 +8,7 @@
  *
  * Los casos estan calculados a mano, no copiados de la salida del codigo.
  */
-import { repartirPropinas, compararRepartos } from "../js/propinas_reparto.js";
+import { repartirPropinas, compararRepartos, repartirEnPesosEnteros } from "../js/propinas_reparto.js";
 
 const fallos = [];
 const assert = (cond, msg) => { if (!cond) fallos.push(msg); };
@@ -182,6 +182,7 @@ let semilla = 20260910;
 const azar = () => { semilla = (semilla * 1103515245 + 12345) % 2147483648; return semilla / 2147483648; };
 const hora24 = (n) => h(Math.floor(n), Math.floor((n % 1) * 60));
 let violaciones = 0;
+let violacionesPesos = 0;
 for (let i = 0; i < 400; i += 1) {
   const ini = azar() * 23;
   const dur = 2 + azar() * 12;
@@ -205,8 +206,37 @@ for (let i = 0; i < 400; i += 1) {
   const resp = de(r, "r").propina_correspondiente;
   if (r.detalles.some((d) => d.tipo === "apoyo" && d.propina_correspondiente > resp + 0.01)) violaciones += 1;
   if (r.total_huerfano > 0.01) violaciones += 1; // todo lo del turno lo cubre el responsable
+
+  // Y lo mismo despues de pasar a pesos enteros, que es lo que se guarda.
+  const enPesos = repartirEnPesosEnteros(r.detalles.map((d) => ({ id: d.id, tipo: d.tipo, propina: d.propina_correspondiente })));
+  const respPesos = enPesos.find((d) => d.id === "r").propina;
+  const sumaPesos = enPesos.reduce((s, d) => s + d.propina, 0);
+  if (enPesos.some((d) => d.tipo === "apoyo" && d.propina > respPesos)) violacionesPesos += 1;
+  if (sumaPesos !== Math.round(r.total_repartido)) violacionesPesos += 1;
+  if (enPesos.some((d, k) => r.detalles[k].propina_correspondiente === 0 && d.propina !== 0)) violacionesPesos += 1;
+  if (enPesos.some((d, k) => Math.abs(d.propina - r.detalles[k].propina_correspondiente) >= 1)) violacionesPesos += 1;
 }
 assert(violaciones === 0, `invariante: ${violaciones} de 400 turnos al azar dejaron un apoyo por encima del responsable o propinas del turno sin dueno`);
+assert(violacionesPesos === 0, `pesos enteros: ${violacionesPesos} fallos en 400 turnos al azar (total alterado, plata a quien tenia 0, `
+  + "un apoyo por encima del responsable, o alguien movido un peso o mas de lo suyo)");
+
+// ── 12 · Paso a pesos enteros: caso real ────────────────────────────────────
+// VIVA 2026-09-10, turno 09:00-15:00. El motor devuelve con centavos:
+// Sebastian 22.164,5 · Daily 14.364 · Carolina 7.800,5 · Jenny 0 = 44.329.
+// Antes: cada uno redondeado por su lado (44.330), y el "rebalanceo" le echaba
+// el sobrante al ultimo -Jenny, que no estuvo en ninguna propina, quedaba con
+// $2 y a Daily le quitaban $1-. Ahora: el peso que falta va a la fraccion mayor
+// (empate: el primero, que es el responsable).
+const pesos = repartirEnPesosEnteros([
+  { id: "seb", tipo: "responsable", propina: 22164.5 },
+  { id: "car", tipo: "apoyo", propina: 7800.5 },
+  { id: "dai", tipo: "apoyo", propina: 14364 },
+  { id: "jen", tipo: "apoyo", propina: 0 },
+]);
+const p = (id) => pesos.find((x) => x.id === id).propina;
+assert(p("seb") === 22165 && p("car") === 7800 && p("dai") === 14364 && p("jen") === 0,
+  `pesos enteros, caso real: esperaba 22165/7800/14364/0 y dio ${p("seb")}/${p("car")}/${p("dai")}/${p("jen")}`);
+assert(pesos.reduce((s, x) => s + x.propina, 0) === 44329, "pesos enteros, caso real: el total debe seguir siendo 44.329");
 
 if (fallos.length) {
   console.error("FALLOS:");
@@ -214,5 +244,5 @@ if (fallos.length) {
   process.exit(1);
 }
 
-console.log("Reparto de propinas OK: 11 escenarios, incluidos centavos, medianoche, propinas sin dueno, "
-  + "apoyos recortados al turno y 400 turnos al azar sin ningun apoyo por encima del responsable.");
+console.log("Reparto de propinas OK: 12 escenarios, incluidos centavos, medianoche, propinas sin dueno, "
+  + "apoyos recortados al turno y 400 turnos al azar sin ningun apoyo por encima del responsable, ni en centavos ni en pesos enteros.");

@@ -40,7 +40,7 @@
 import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 import { resolverEsLocal, tablaSegunSede } from "./local_scope.js";
-import { repartirPropinas, compararRepartos } from "./propinas_reparto.js?v=20260910tramo1";
+import { repartirPropinas, compararRepartos } from "./propinas_reparto.js?v=20260910tramo2";
 import { renderRepartoPropinas } from "./cierre_turno_propinas_visual.js?v=20260910prop3";
 import { mensajeDeError } from "./edge_function_error.js";
 

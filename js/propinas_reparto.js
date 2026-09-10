@@ -233,6 +233,43 @@ export function repartirPropinas(personas, eventos) {
   };
 }
 
+/**
+ * Pasa el reparto exacto (con centavos) a pesos enteros sin cambiar el total
+ * y sin inventarle plata a nadie.
+ *
+ * Mayor residuo: cada quien recibe la parte entera de lo suyo, y los pesos que
+ * faltan para llegar al total (redondeado) van, de uno en uno, a quienes tienen
+ * la fracción más grande. Quien tiene 0 no tiene fracción, así que nunca recibe
+ * un peso que no le tocó.
+ *
+ * Lo que había antes redondeaba a cada uno por su cuenta -la suma podía quedar
+ * un peso por encima del total- y luego "rebalanceaba" con floor proporcional
+ * echándole todo el sobrante AL ÚLTIMO de la lista. Caso real (VIVA,
+ * 2026-09-10): una apoyo que no estuvo en ninguna propina quedó con $2 y a otra
+ * se le quitó $1.
+ */
+export const repartirEnPesosEnteros = (items) => {
+  const exactos = items.map((item) => {
+    const n = Number(item.propina);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  });
+  const base = exactos.map((n) => Math.floor(n));
+  const objetivo = Math.round(exactos.reduce((acc, n) => acc + n, 0));
+  let faltan = objetivo - base.reduce((acc, n) => acc + n, 0);
+
+  exactos
+    .map((n, indice) => ({ indice, fraccion: n - Math.floor(n) }))
+    .filter((item) => item.fraccion > 0)
+    .sort((a, b) => b.fraccion - a.fraccion || a.indice - b.indice)
+    .forEach((item) => {
+      if (faltan <= 0) return;
+      base[item.indice] += 1;
+      faltan -= 1;
+    });
+
+  return items.map((item, indice) => ({ ...item, propina: base[indice] }));
+};
+
 /** Diferencia entre dos repartos, para explicar qué cambió al mover un rango. */
 export function compararRepartos(base, simulado) {
   const porId = new Map((base?.detalles || []).map((d) => [d.id, d]));

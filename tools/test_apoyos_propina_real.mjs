@@ -120,7 +120,7 @@ assert(
   "el aviso de propina sin repartir dejó de ser visible en el status",
 );
 
-const totalsBlock = between(apoyos, "const extractWebhookTotals", "const rebalanceIfExceedsTotal");
+const totalsBlock = between(apoyos, "const extractWebhookTotals", "export function initApoyosPropinaManager");
 assert(
   totalsBlock.includes("row?.total_recibido") && totalsBlock.includes("row?.total_huerfano"),
   "extractWebhookTotals ya no lee total_recibido/total_huerfano de la Edge Function",

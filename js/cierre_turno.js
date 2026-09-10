@@ -35,7 +35,7 @@ import { getUserContext } from "./session.js";
 import { supabase } from "./supabase.js";
 import { fetchResponsablesActivos, fetchUsuariosEmpresa } from "./responsables.js";
 import { getEmpresaPolicy, puedeEnviarDatos } from "./permisos.core.js";
-import { initApoyosPropinaManager } from "./apoyos.js?v=20260910tramo2";
+import { initApoyosPropinaManager } from "./apoyos.js?v=20260910tramo3";
 import { descargarResumenCierreTurno } from "./cierre_turno_pdf.js?v=20260909gate1";
 import {
   WEBHOOK_LISTAR_RESPONSABLES,

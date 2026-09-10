@@ -26,6 +26,7 @@
  */
 import { supabase } from "./supabase.js";
 import { mensajeDeError } from "./edge_function_error.js";
+import { repartirEnPesosEnteros } from "./propinas_reparto.js?v=20260910tramo2";
 
 const asInt = (value) => {
   const n = Number(value);
@@ -75,7 +76,10 @@ const parseWebhookDetalleRows = (webhookPayload) => {
     .map((row) => {
       const tipo = String(row?.tipo || '').toLowerCase();
       const id = String(row?.id || row?.apoyo_responsable_id || '');
-      const propina = asInt(row?.propina_correspondiente ?? row?.total_propina_periodo);
+      // Se conserva exacta (con centavos): el paso a pesos enteros se hace
+      // una sola vez, para todos a la vez, en repartirEnPesosEnteros.
+      const exacta = Number(row?.propina_correspondiente ?? row?.total_propina_periodo);
+      const propina = Number.isFinite(exacta) && exacta > 0 ? exacta : 0;
       return { id, tipo, propina };
     })
     .filter((row) => row.id);
@@ -102,20 +106,6 @@ const extractWebhookTotals = (webhookPayload) => {
   return { totalDia, totalDistribuida, totalRecibido, totalHuerfano };
 };
 
-const rebalanceIfExceedsTotal = (items, totalDia) => {
-  const total = asInt(totalDia);
-  const suma = items.reduce((acc, item) => acc + asInt(item.propina), 0);
-  if (!total || suma <= total) return items.map((item) => ({ ...item, propina: asInt(item.propina) }));
-
-  let remaining = total;
-  return items.map((item, index) => {
-    const value = index === items.length - 1
-      ? remaining
-      : Math.floor((asInt(item.propina) * total) / suma);
-    remaining -= value;
-    return { ...item, propina: Math.max(0, value) };
-  });
-};
 
 export function initApoyosPropinaManager({
   apoyoHubo,
@@ -196,7 +186,7 @@ export function initApoyosPropinaManager({
         propina: detalleRows.find((detalle) => detalle.id === String(row.querySelector('[data-field="responsable"]')?.value || ""))?.propina ?? 0
       }))
     ];
-    const adjustedItems = rebalanceIfExceedsTotal(items, totalDia || totalDistribuida);
+    const adjustedItems = repartirEnPesosEnteros(items);
     const tipsById = new Map(adjustedItems.map((row) => [row.id, row.propina]));
 
     apoyoRows.forEach((row) => {
@@ -241,6 +231,24 @@ export function initApoyosPropinaManager({
     } else {
       setStatus(`Propina aplicada desde BD/webhook. Total turno: ${totalTurno}. Responsable: ${responsableTip}. Apoyos: ${supportTotal}. Suma reparto: ${sumaRepartida}.`);
     }
+
+    return tipsById;
+  };
+
+  /**
+   * La respuesta con cada total ya en los mismos pesos enteros que quedan en
+   * el formulario (y en la base). Sin esto la vista redondeaba por su cuenta
+   * a cada persona y mostraba un total un peso distinto del que se guarda.
+   */
+  const respuestaEnPesos = (respuesta, tipsById) => {
+    if (!respuesta || !Array.isArray(respuesta.detalles) || !tipsById) return respuesta;
+    return {
+      ...respuesta,
+      detalles: respuesta.detalles.map((detalle) => {
+        const id = String(detalle?.id || "");
+        return tipsById.has(id) ? { ...detalle, propina_correspondiente: tipsById.get(id) } : detalle;
+      }),
+    };
   };
 
   btnConsultarPropina.addEventListener("click", async () => {
@@ -268,12 +276,12 @@ export function initApoyosPropinaManager({
         return;
       }
 
-      applyDistribucion({ consultaPayload, webhookPayload: data });
+      const tipsById = applyDistribucion({ consultaPayload, webhookPayload: data });
 
       // La vista de reparto es un espectador: si falla al pintarse, el reparto
       // ya está aplicado y el cierre no se ve afectado.
       try {
-        onReparto?.({ consultaPayload, respuesta: data });
+        onReparto?.({ consultaPayload, respuesta: respuestaEnPesos(data, tipsById) });
       } catch (errorVista) {
         console.error("[apoyos] no se pudo pintar el desglose de propinas", errorVista);
       }
