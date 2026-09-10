@@ -34,7 +34,7 @@ import { buildRequestHeaders, getUserContext } from "./session.js";
 import { fetchResponsablesActivos } from "./responsables.js";
 import { supabase } from "./supabase.js";
 import { resolverEsLocal, tablaSegunSede } from "./local_scope.js";
-import { renderRepartoPropinas } from "./cierre_turno_propinas_visual.js?v=20260910prop3";
+import { renderRepartoPropinas } from "./cierre_turno_propinas_visual.js?v=20260910prop4";
 
 const head = document.getElementById("historicoHead");
 const body = document.getElementById("historicoBody");
