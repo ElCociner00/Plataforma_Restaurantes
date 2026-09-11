@@ -202,3 +202,15 @@ Otros dos hallazgos del mismo retest:
 Evidencia tras la corrección: la orden 1702645662 llegó a las 01:43:57 UTC y quedó `TAKEN` a las 01:43:58. El sandbox no genera eventos de repartidor; el resto del ciclo se probó con eventos sintéticos marcados `PRUEBA-ENKRATO-CICLO-*`.
 
 Detalle completo: `docs/2026-09-10_rappi_aceptacion_seguimiento_cuadre.md`.
+
+## 12. 11 de septiembre: `total_to_pay` es lo que cobra el local
+
+Prueba con el simulador (mismo producto de $6.500, envío $3.000, tarifa $5.900, cliente paga $15.400), en efectivo:
+
+| Modalidad | `delivery_method` | `total_order` | `total_to_pay` |
+|---|---|---:|---:|
+| Full delivery | `delivery` | 6.500 | 0 |
+| Pickup | `pickup` | 6.500 | 15.400 |
+| Marketplace | `marketplace` | 15.400 | 15.400 |
+
+Regla reutilizable: `total_to_pay` = lo que el aliado debe cobrarle al cliente. En Full delivery el efectivo lo recibe el repartidor de Rappi y el aliado no cobra nada. Los cargos (envío, tarifa) llegan en `totals.charges`. En Marketplace `delivery_information` trae la dirección del cliente (PII: no se guarda en `rappi_orders`).

@@ -64,6 +64,35 @@ Migración `20260911012528_rappi_aceptacion_seguimiento_cuadre.sql`:
 
 Versiones desplegadas: `rappi-worker` v8, `rappi-webhook` v8, `rappi-data` v8, `rappi-sync` v6, `rappi-admin` v12.
 
+## Prueba en vivo con la cuenta de Restaurante Prueba (11 de septiembre)
+
+Santiago pidió repetir la prueba de forma "real": sesión de Enkrato abierta con `admin@prueba.com` en restaurantes.enkrato.com y pedidos creados en el simulador del Integrations Manager (Órdenes → Simulador). Sin eventos sintéticos.
+
+| Pedido | Modalidad / pago | Qué se probó | Resultado |
+|---|---|---|---|
+| 829716891 | Full delivery · efectivo | Aceptación automática | Llegó 2,6 s después de crearlo, aceptado en 0,67 s; Rappi envió `taken_visible_order` |
+| 787143806 | Pickup · efectivo | Quién cobra | Aceptado en 0,58 s; `total_to_pay` = 15.400 |
+| 1377522450 | Marketplace · efectivo | Quién cobra | Aceptado en 0,61 s; `total_to_pay` = 15.400 |
+| 269741519 | Full delivery · tarjeta | Aceptación apagada + botón "Aceptar ahora" | Aceptado desde Enkrato; Rappi lo muestra `TAKEN` |
+| 1861049045 | Full delivery · Rappi Pay | Nadie lo acepta | Rappi: OCC TIMEOUT. Enkrato: "Vencido" a los ~9 min, "nada que cobrar" |
+| 5550001234 | — | Verificador con número falso | "No existe un pedido Rappi… no lo despaches ni lo des por pagado" |
+
+**Error encontrado y corregido en la misma sesión:** `total_to_pay` es lo que cobra el LOCAL (0 en Full delivery, total de la app en Pickup y Marketplace). Enkrato decía "lo cobra el repartidor, nadie del local cobra" también en Pickup y Marketplace, lo que habría llevado a entregar sin cobrar. Corregido en `veredictos.js` (veredicto por modalidad), en la lista y en el cuadre (`cobrado_por_local`, migración `20260911212050`).
+
+### Qué puede simular Santiago y qué debe ver
+
+Desde Integrations Manager → Órdenes → Simulador (elegir producto, modalidad y pago, "Crear orden"), con Pedidos Rappi abierto en Enkrato:
+
+1. **Full delivery + tarjeta o Rappi Pay** → en segundos aparece, pasa a "Aceptado, en preparación" y el chip dice "Pagado en Rappi". En Rappi queda `TAKEN`.
+2. **Full delivery + efectivo** → "Efectivo · lo cobra Rappi"; el local no cobra nada.
+3. **Pickup o Marketplace + efectivo** → "Cobra el local · $X" con el total que pagó el cliente; la barra tiene solo 4 pasos.
+4. **Apagar "Aceptar pedidos automáticamente"** (Integración Rappi) y crear un pedido → queda "Por aceptar" con el botón "Aceptar ahora"; al pulsarlo pasa a aceptado y Rappi lo muestra `TAKEN`.
+5. **Con la aceptación apagada, no hacer nada** → a los 6 min Rappi lo vence (OCC TIMEOUT) y Enkrato lo marca "Vencido" en menos de 10 min.
+6. **Verificar un número inventado** → "No existe un pedido Rappi…".
+7. **Cuadre** (solo admin) → los pedidos del día aparecen en la fila de hoy.
+
+Lo que el sandbox **no** permite simular: repartidor asignado, "en camino", "llegó", "entregado" y cancelaciones del cliente. Los muestreos del menú Webhooks usan IDs `SAMPLE-*`, que Enkrato ignora a propósito. Esos pasos se verán con el primer pedido real en producción.
+
 ## Datos sintéticos que quedaron en DEV
 
 En `rappi_webhook_events`, 5 filas con `idempotency_key` que empieza por `PRUEBA-ENKRATO-CICLO-1702645662-`, `signature_valid = false` y `selected_headers.synthetic = true`. Solo afectan a la empresa de prueba. Para borrarlas si se quiere:
