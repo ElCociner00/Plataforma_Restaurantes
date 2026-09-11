@@ -187,3 +187,18 @@ node tools/run_rappi_dev_onboarding.mjs test-webhooks
 # Resume salud, firmas y errores abiertos
 node tools/run_rappi_dev_onboarding.mjs diagnose
 ```
+
+## 11. 10 de septiembre: NEW_ORDER llegaba pero nadie tomaba la orden
+
+Síntoma: la orden 1676746142 quedó "recibida" en Enkrato y `TIMEOUT` en Rappi.
+
+Causa: con webhooks activos Rappi deja la orden en `SENT` y exige `PUT orders/{id}/take/{cookingTime}` antes de 6 minutos. Enkrato no hacía el take. Rappi **no envía webhook** cuando la orden vence, así que el único modo de enterarse es consultar `GET orders/{id}/events` o `GET orders/status/sent`.
+
+Otros dos hallazgos del mismo retest:
+
+- `ORDER_OTHER_EVENT` usa nombres propios (`taken_visible_order`, `ready_for_pick_up`, `domiciliary_in_store`, `hand_to_domiciliary`, `arrive`, `close_order`, `replace_storekeeper`). No sirven heurísticas de texto: hay que mapearlos uno a uno.
+- `event_time` llega como hora local sin zona con `T` (`2026-09-10T20:44:03`), distinto del formato con espacio de `NEW_ORDER`. Hay que aplicar -05:00 a ambos.
+
+Evidencia tras la corrección: la orden 1702645662 llegó a las 01:43:57 UTC y quedó `TAKEN` a las 01:43:58. El sandbox no genera eventos de repartidor; el resto del ciclo se probó con eventos sintéticos marcados `PRUEBA-ENKRATO-CICLO-*`.
+
+Detalle completo: `docs/2026-09-10_rappi_aceptacion_seguimiento_cuadre.md`.

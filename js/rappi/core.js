@@ -106,7 +106,9 @@ export function formatTime(value) {
 }
 
 const STATUS_LABELS = Object.freeze({
-  NEW: "Recibido", RECEIVED: "Recibido", IN_PROGRESS: "En preparación", TAKEN: "Pedido tomado",
+  NEW: "Recibido", RECEIVED: "Por aceptar", IN_PROGRESS: "En preparación", TAKEN: "Pedido tomado",
+  READY: "Listo para recoger", COURIER_AT_STORE: "Repartidor en el local", IN_DELIVERY: "En camino",
+  ARRIVED: "Llegó donde el cliente", NOT_ACCEPTED: "Vencido sin aceptar",
   COURIER_ASSIGNED: "Repartidor asignado", ON_THE_WAY: "En entrega", COMPLETED: "Entregado",
   DELIVERED: "Entregado", CANCELLED: "Cancelado", INCIDENT: "Requiere atención",
   CONNECTED: "Conectada", ONLINE: "Conectada", ENABLE: "Activa", ENABLED: "Activa", ACTIVE: "Activa",

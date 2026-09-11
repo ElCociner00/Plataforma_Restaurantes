@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Enkrato | Cuadre Rappi</title>
+  <link rel="stylesheet" href="../css/variables.css?v=20260829v4">
+  <link rel="stylesheet" href="../css/main.css?v=20260829v4">
+  <link rel="stylesheet" href="../css/rappi.css?v=20260911rappi3">
+</head>
+<body class="rappi-page" data-rappi-page="cuadre" style="display:none">
+  <script type="module" src="../js/router.js?v=20260829v4"></script>
+  <script type="module" src="../js/header.js?v=20260909hdr1"></script>
+
+  <main class="rappi-main">
+    <nav class="rappi-subnav" aria-label="Secciones de Rappi">
+      <a href="operacion.html" data-rappi-nav="operation">Pedidos</a>
+      <a href="cuadre.html" data-rappi-nav="cuadre" data-admin-link>Cuadre</a>
+      <a href="integracion.html" data-rappi-nav="integration" data-admin-link>Integración Rappi</a>
+    </nav>
+
+    <section class="rappi-hero">
+      <div><p class="eyebrow">Rappi</p><h1>Cuadre Rappi</h1><p class="muted">Lo que Rappi dice que se entregó, comparado día por día con lo que registraron los cierres de turno.</p></div>
+    </section>
+
+    <section class="card">
+      <form class="toolbar" id="cuadre-form">
+        <div class="toolbar-fields">
+          <div class="field"><label for="cuadre-from">Desde</label><input id="cuadre-from" name="from" type="date" required></div>
+          <div class="field"><label for="cuadre-to">Hasta</label><input id="cuadre-to" name="to" type="date" required></div>
+        </div>
+        <div class="action-row">
+          <button class="button" type="submit">Calcular</button>
+          <button class="button secondary" id="cuadre-csv" type="button" disabled>Descargar CSV</button>
+          <button class="button secondary" id="cuadre-print" type="button">Imprimir</button>
+        </div>
+      </form>
+      <p class="notice">Cómo leerlo: <strong>Total entregado</strong> es la suma de los pedidos que Rappi confirmó como recibidos por el cliente. <strong>Cierres</strong> es lo que se registró como Rappi al cerrar cada turno (sistema = Loggro, contado = lo que reportó el responsable). Una diferencia no siempre es un error (descuentos o pedidos que cruzan la medianoche), pero es por donde empezar: un cierre con Rappi y sin pedidos entregados ese día no tiene respaldo en Rappi.</p>
+    </section>
+
+    <p class="notice" id="cuadre-scope" hidden></p>
+
+    <section class="metrics-grid cuadre-metrics" aria-label="Totales del periodo">
+      <article class="metric"><span class="metric-label">Pedidos</span><strong id="m-pedidos">—</strong></article>
+      <article class="metric"><span class="metric-label">Entregados</span><strong id="m-entregados">—</strong></article>
+      <article class="metric"><span class="metric-label">Total entregado (Rappi)</span><strong id="m-total">—</strong></article>
+      <article class="metric"><span class="metric-label">Rappi en cierres (sistema)</span><strong id="m-cierres">—</strong></article>
+      <article class="metric"><span class="metric-label">Diferencia</span><strong id="m-diferencia">—</strong></article>
+      <article class="metric"><span class="metric-label">No vendido (cancelado o vencido)</span><strong id="m-perdido">—</strong></article>
+    </section>
+
+    <section class="card">
+      <div class="section-heading"><div><h2>Día por día</h2><p class="helper" id="cuadre-summary">Elige un periodo y pulsa Calcular.</p></div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Día</th><th>Pedidos</th><th>Entregados</th><th>Cancelados</th><th>Vencidos</th><th>Total entregado</th><th>Efectivo que cobró el repartidor</th><th>Cierres: sistema</th><th>Cierres: contado</th><th>Diferencia</th></tr></thead>
+          <tbody id="cuadre-body"><tr><td class="empty-cell" colspan="10">Sin datos todavía.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-heading"><div><h2>Entregados por forma de pago</h2><p class="helper">Los pagos en línea los liquida Rappi; el efectivo lo cobra el repartidor. En ningún caso el cliente le paga al local.</p></div></div>
+      <div class="table-wrap"><table><thead><tr><th>Forma de pago</th><th>Pedidos</th><th>Total</th></tr></thead><tbody id="metodos-body"><tr><td class="empty-cell" colspan="3">Sin datos todavía.</td></tr></tbody></table></div>
+    </section>
+  </main>
+
+  <script type="module" src="../js/rappi/cuadre.js?v=20260911rappi3"></script>
+</body>
+</html>

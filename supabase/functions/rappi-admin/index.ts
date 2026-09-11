@@ -87,6 +87,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
       case "map_store":
         result = await mapStore(ctx, body);
         break;
+      case "store_settings":
+        result = await storeSettings(ctx, body);
+        break;
       case "remote_webhooks":
         result = await remoteWebhooks(ctx, body);
         break;
@@ -319,7 +322,7 @@ async function status(ctx: Contexto, body: Record<string, unknown>) {
         connection.id,
       ),
       admin.from("rappi_stores").select(
-        "id, rappi_store_id, integration_store_id, store_name, store_type, enkrato_empresa_id, connectivity_status, last_ping_at, last_ping_ok, menu_approval_status, menu_updated_at, active",
+        "id, rappi_store_id, integration_store_id, store_name, store_type, enkrato_empresa_id, connectivity_status, last_ping_at, last_ping_ok, menu_approval_status, menu_updated_at, active, auto_accept",
       )
         .eq("connection_id", connection.id).order("store_name"),
       admin.from("rappi_webhook_configs").select(
@@ -794,6 +797,28 @@ async function mapStore(ctx: Contexto, body: Record<string, unknown>) {
     ]);
   }
   return { mapped: true, requeued_events: eventIds.length };
+}
+
+/**
+ * Aceptación automática por tienda. Encendida, Enkrato toma cada pedido
+ * apenas llega; apagada, la tienda debe aceptarlo por otro medio (tablet de
+ * Rappi) dentro de los 6 minutos o Rappi lo vence.
+ */
+async function storeSettings(ctx: Contexto, body: Record<string, unknown>) {
+  const storeId = text(body.store_id);
+  if (!storeId || typeof body.auto_accept !== "boolean") {
+    throw errores.datosIncompletos("store_id, auto_accept");
+  }
+  const connection = await getConnection(ctx, body) as RappiConnection;
+  const { data, error } = await ctx.clienteAdmin().from("rappi_stores")
+    .update({ auto_accept: body.auto_accept })
+    .eq("id", storeId).eq("connection_id", connection.id)
+    .select("id, auto_accept").maybeSingle();
+  if (error) throw errores.baseDeDatos(error.message);
+  if (!data) {
+    throw new ErrorFuncion("STORE_NOT_FOUND", "La tienda no pertenece a esta conexión.", 404);
+  }
+  return data;
 }
 
 async function remoteWebhooks(ctx: Contexto, body: Record<string, unknown>) {

@@ -16,13 +16,19 @@ export const numberOrNull = (value: unknown): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+/**
+ * Rappi manda la hora local de la tienda sin zona en varias formas:
+ * "2026-09-10 20:43:54" (NEW_ORDER), "2026-09-10T20:44:03" (ORDER_OTHER_EVENT)
+ * y "10/10/2023 12:00:20" (tracking). Sin zona, JavaScript la leería como UTC
+ * y la correría 5 horas. Las que traen "Z" u offset se respetan tal cual.
+ */
 export function parseDate(value: unknown): string | null {
   const raw = text(value);
   if (!raw) return null;
   const dayFirst = raw.match(/^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}:\d{2}:\d{2})$/);
   const normalized = dayFirst
     ? `${dayFirst[3]}-${dayFirst[2]}-${dayFirst[1]}T${dayFirst[4]}-05:00`
-    : /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw)
+    : /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(raw)
     ? `${raw.replace(" ", "T")}-05:00`
     : raw;
   const date = new Date(normalized);
@@ -112,6 +118,42 @@ export async function buildIdempotencyKey(
   return `${identity}|${hash}`;
 }
 
+/**
+ * Nombres oficiales de Rappi, tanto los eventos de ORDER_OTHER_EVENT /
+ * GET orders/{id}/events como los estados de la orden. Van antes que las
+ * heurísticas de texto porque sus nombres no las cumplen: `close_order` no
+ * dice "DELIVERED", `hand_to_domiciliary` no dice "PICKED" y el estado
+ * `READY` significa "lista para enviarse a la tienda", no "lista para
+ * recoger". Sin este mapa la orden se quedaba con el nombre crudo y nunca
+ * llegaba a "Entregado".
+ */
+const OFFICIAL_ORDER_STATUS: Record<string, string> = {
+  CREATED: "RECEIVED",
+  WEBHOOK: "RECEIVED",
+  READY: "RECEIVED",
+  SENT: "RECEIVED",
+  TAKEN: "IN_PROGRESS",
+  REJECTED: "REJECTED",
+  TIMEOUT: "NOT_ACCEPTED",
+  READY_FOR_PICKUP: "READY",
+  TAKEN_VISIBLE_ORDER: "IN_PROGRESS",
+  REPLACE_STOREKEEPER: "IN_PROGRESS",
+  READY_FOR_PICK_UP: "READY",
+  DOMICILIARY_IN_STORE: "COURIER_AT_STORE",
+  HAND_TO_DOMICILIARY: "IN_DELIVERY",
+  ARRIVE: "ARRIVED",
+  CLOSE_ORDER: "COMPLETED",
+};
+
+/**
+ * Eventos que solo informan (otro repartidor, nueva ETA) y no deben mover el
+ * estado: `replace_storekeeper` puede llegar con la orden ya lista y, tratado
+ * como estado, la devolvería a "en preparación".
+ */
+export function isInformationalOrderEvent(providerEvent: unknown): boolean {
+  return text(providerEvent).toUpperCase() === "REPLACE_STOREKEEPER";
+}
+
 export function normalizeOperationalStatus(
   eventType: string,
   providerStatus: unknown,
@@ -120,6 +162,7 @@ export function normalizeOperationalStatus(
   if (eventType === "ORDER_EVENT_CANCEL" || status.includes("CANCEL")) {
     return "CANCELLED";
   }
+  if (OFFICIAL_ORDER_STATUS[status]) return OFFICIAL_ORDER_STATUS[status];
   if (/DELIVER|COMPLET|FINISH/.test(status)) return "COMPLETED";
   if (/ON_THE_WAY|COURIER|PICKED|HANDOFF/.test(status)) return "IN_DELIVERY";
   if (/READY/.test(status)) return "READY";
@@ -237,6 +280,34 @@ export function parseTracking(payload: JsonRecord): JsonRecord {
     eta_type: text(payload.eta_type ?? payload.etaType) || null,
     tracked_at: extractProviderTime(payload) ?? new Date().toISOString(),
   };
+}
+
+/**
+ * `additional_information` de los eventos de orden trae los datos del
+ * repartidor. El nombre sí se conserva: es lo que le permite al empleado
+ * comprobar que quien recoge es el repartidor que Rappi asignó. Teléfono,
+ * foto y documentos se descartan, igual que la PII del cliente.
+ */
+export function sanitizeEventInformation(value: unknown): JsonRecord {
+  const info = record(value);
+  const output: JsonRecord = {};
+  for (const [key, candidate] of Object.entries(info)) {
+    if (key === "courier_data") continue;
+    if (/phone|email|document|address|profile_pic|identification/i.test(key)) continue;
+    if (
+      candidate === null || typeof candidate === "string" ||
+      typeof candidate === "number" || typeof candidate === "boolean"
+    ) {
+      output[key] = candidate;
+    }
+  }
+  const courier = record(info.courier_data);
+  const courierName = text(courier.full_name) ||
+    [text(courier.first_name), text(courier.last_name)].filter(Boolean).join(" ");
+  if (courierName || text(courier.id)) {
+    output.courier = { id: text(courier.id) || null, name: courierName || null };
+  }
+  return output;
 }
 
 export function parseConnectivity(

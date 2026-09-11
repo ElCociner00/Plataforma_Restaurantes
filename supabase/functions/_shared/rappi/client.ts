@@ -139,6 +139,25 @@ export async function rappiRequest(
   pathOrUrl: string,
   init: RequestInit = {},
 ): Promise<unknown> {
+  const response = await rappiRequestWithStatus(admin, connection, scope, pathOrUrl, init);
+  if (response.status < 200 || response.status >= 300) {
+    throwRappiHttp(response.status, pathOrUrl);
+  }
+  return response.body;
+}
+
+/**
+ * Igual que rappiRequest, pero entrega el código HTTP en vez de lanzar. Lo
+ * necesitan las acciones donde un 4xx es una respuesta de negocio: al tomar
+ * una orden, 400 significa "ya no está esperando aceptación".
+ */
+export async function rappiRequestWithStatus(
+  admin: SupabaseClient,
+  connection: RappiConnection,
+  scope: RappiScope,
+  pathOrUrl: string,
+  init: RequestInit = {},
+): Promise<{ status: number; body: unknown }> {
   let session = await getRappiToken(admin, connection, scope);
   let response = await call(connection, scope, pathOrUrl, session.token, init);
   if (response.status === 401 || response.status === 403) {
@@ -146,10 +165,7 @@ export async function rappiRequest(
     session = await getRappiToken(admin, connection, scope, true);
     response = await call(connection, scope, pathOrUrl, session.token, init);
   }
-  if (response.status < 200 || response.status >= 300) {
-    throwRappiHttp(response.status, pathOrUrl);
-  }
-  return response.body;
+  return response;
 }
 
 async function call(

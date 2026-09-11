@@ -58,6 +58,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
       throw new ErrorFuncion("RAPPI_FINANCIAL_STANDBY", "Rappi Financial permanece en standby.", 409);
     }
     const range = dateRange(body);
+    // Una ejecución que el runtime cortó queda en RUNNING para siempre y
+    // ensucia el diagnóstico: pasados 10 minutos se da por interrumpida.
+    await admin.from("rappi_sync_runs").update({
+      status: "FAILED",
+      finished_at: new Date().toISOString(),
+      error_code: "SYNC_INTERRUPTED",
+      error_message: "La ejecución se interrumpió antes de terminar.",
+    }).eq("connection_id", connection.id).eq("status", "RUNNING")
+      .lt("started_at", new Date(Date.now() - 10 * 60_000).toISOString());
     const { data: syncRun, error: runError } = await admin.from("rappi_sync_runs").insert({
       connection_id: connection.id,
       empresa_id: empresaId,
@@ -92,8 +101,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }).eq("id", connection.id);
     return json({ ok: true, data: { sync_run_id: syncRunId, status, ...counters } }, 200, origin);
   } catch (error) {
-    const message = error instanceof Error ? error.message.slice(0, 500) : "Error desconocido";
-    const errorCode = error instanceof ErrorFuncion ? error.codigo : "SYNC_FAILED";
+    // supabase-js entrega sus errores como objetos planos, no como Error: sin
+    // leer su `message` el diagnóstico decía "Error desconocido" cuando la
+    // causa real era, por ejemplo, un Gateway Timeout transitorio.
+    const detail = error instanceof Error ? error.message : text(record(error).message);
+    const message = (detail || "Error desconocido").slice(0, 500);
+    const errorCode = error instanceof ErrorFuncion
+      ? error.codigo
+      : /timeout/i.test(message) ? "RAPPI_TIMEOUT" : "SYNC_FAILED";
     if (admin && syncRunId) {
       await admin.from("rappi_sync_runs").update({
         status: "FAILED", finished_at: new Date().toISOString(), error_code: errorCode, error_message: message,
@@ -171,10 +186,10 @@ async function syncOrders(admin: SupabaseClient, connection: RappiConnection, co
     const nextStatus = normalizeOperationalStatus("NEW_ORDER", detail.status);
     const nextAt = parseDate(detail.updated_at ?? detail.created_at) ?? new Date().toISOString();
     const { data: existing, error: existingError } = await admin.from("rappi_orders")
-      .select("operational_status, rappi_status, last_event_at")
+      .select("operational_status, rappi_status, last_event_at, acceptance_status")
       .eq("connection_id", connection.id)
       .eq("rappi_order_id", rappiOrderId)
-      .maybeSingle<{ operational_status: string; rappi_status: string | null; last_event_at: string | null }>();
+      .maybeSingle<{ operational_status: string; rappi_status: string | null; last_event_at: string | null; acceptance_status: string }>();
     if (existingError) throw existingError;
     const applyState = !existing || shouldApplyOrderState(existing.operational_status, existing.last_event_at, nextStatus, nextAt);
     const { error } = await admin.from("rappi_orders").upsert({
@@ -204,6 +219,9 @@ async function syncOrders(admin: SupabaseClient, connection: RappiConnection, co
       },
       provider_created_at: parseDate(detail.created_at),
       last_event_at: applyState ? nextAt : existing?.last_event_at,
+      // Una orden que entra por aquí también espera aceptación; el barrido
+      // del worker la toma mientras la ventana de 6 minutos siga abierta.
+      acceptance_status: existing?.acceptance_status ?? (storeRow.auto_accept === false ? "MANUAL" : "PENDING"),
     }, { onConflict: "connection_id,rappi_order_id" });
     if (error) throw error;
     counters.written += 1;
@@ -428,10 +446,10 @@ async function findOrCreateStore(
   connection: RappiConnection,
   rappiStoreId: string,
   source: Record<string, unknown>,
-): Promise<{ id: string; enkrato_empresa_id: string | null } | null> {
+): Promise<{ id: string; enkrato_empresa_id: string | null; auto_accept: boolean } | null> {
   if (!rappiStoreId) return null;
   const { data: existing, error: findError } = await admin.from("rappi_stores")
-    .select("id, enkrato_empresa_id")
+    .select("id, enkrato_empresa_id, auto_accept")
     .eq("connection_id", connection.id).eq("rappi_store_id", rappiStoreId).maybeSingle();
   if (findError) throw findError;
   if (existing) {
@@ -451,7 +469,7 @@ async function findOrCreateStore(
     integration_store_id: text(source.external_id ?? source.integrationId) || rappiStoreId,
     store_name: text(source.name) || null,
     active: true,
-  }).select("id, enkrato_empresa_id").single();
+  }).select("id, enkrato_empresa_id, auto_accept").single();
   if (error) throw error;
   return data;
 }

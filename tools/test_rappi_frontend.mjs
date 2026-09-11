@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const pages = ["rappi/index.html", "rappi/operacion.html", "rappi/integracion.html"];
+const pages = ["rappi/index.html", "rappi/operacion.html", "rappi/cuadre.html", "rappi/integracion.html"];
 const expectedEvents = [
   "NEW_ORDER", "ORDER_EVENT_CANCEL", "ORDER_OTHER_EVENT", "MENU_APPROVED",
   "MENU_REJECTED", "PING", "STORE_CONNECTIVITY", "ORDER_RT_TRACKING",
