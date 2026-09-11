@@ -1,11 +1,11 @@
 import {
   bootRappiShell, closeDialogOnBackdrop, emptyRow, escapeHtml, formatDate, formatMoney,
   formatTime, invokeRappi, setBusy, statusBadge, toast, todayRange,
-} from "./core.js?v=20260911rappi3";
+} from "./core.js?v=20260911rappi4";
 import {
-  DELIVERY_STEPS, deliveryProgress, deliveryVerdict, eventLabel, notFoundVerdict,
-  paymentMethodLabel, paymentVerdict,
-} from "./veredictos.js?v=20260911rappi3";
+  deliveryProgress, deliverySteps, deliveryVerdict, eventLabel, fulfillment, fulfillmentLabel,
+  notFoundVerdict, paymentMethodLabel, paymentVerdict,
+} from "./veredictos.js?v=20260911rappi4";
 
 // Mientras haya pedidos en curso, la lista se refresca sola: quien atiende
 // no debería tener que acordarse de pulsar "Actualizar".
@@ -105,22 +105,16 @@ function orderRow(order) {
     <article class="order-row tone-${delivery.tone}">
       <div class="order-row-id"><strong>${escapeHtml(order.rappi_order_id)}</strong><span class="helper">${meta}</span></div>
       <div class="order-row-state">${statusBadge(order.operational_status)}<span class="helper">${escapeHtml(delivery.title)}</span></div>
-      <div class="order-row-pay"><span class="chip tone-${payment.tone}">${escapeHtml(shortPayment(order, payment))}</span></div>
+      <div class="order-row-pay"><span class="chip tone-${payment.tone}">${escapeHtml(payment.short)}</span></div>
       <div class="order-row-total">${formatMoney(order.total_order)}</div>
       <button class="button secondary compact" type="button" data-order-id="${escapeHtml(order.id)}">Ver</button>
       ${stepper(order, true)}
     </article>`;
 }
 
-function shortPayment(order, payment) {
-  if (payment.tone === "neutral") return "Nada que cobrar";
-  if (payment.tone === "ok") return "Pagado en Rappi";
-  return order.payment_method ? `Efectivo · lo cobra el repartidor` : "Pago sin dato";
-}
-
 function stepper(order, compact = false) {
   const { reached, stopped } = deliveryProgress(order);
-  const steps = DELIVERY_STEPS.map((step, index) => {
+  const steps = deliverySteps(order).map((step, index) => {
     const css = index < reached || (index === reached && !stopped) ? "done" : "";
     const current = index === reached && !stopped && !TERMINAL.has(order.operational_status) ? " current" : "";
     return `<li class="${css}${current}"><span>${escapeHtml(step.label)}</span></li>`;
@@ -210,7 +204,8 @@ function renderDetail(detail) {
       ${detailItem("Total del pedido", formatMoney(order.total_order))}
       ${detailItem("Forma de pago", paymentMethodLabel(order.payment_method))}
       ${detailItem("Descuentos", formatMoney(order.total_discounts))}
-      ${detailItem("Repartidor", order.courier_name || "Sin asignar todavía")}
+      ${detailItem("Entrega", fulfillmentLabel(order))}
+      ${fulfillment(order) === "RAPPI_DELIVERY" ? detailItem("Repartidor", order.courier_name || "Sin asignar todavía") : ""}
       ${detailItem(eta ? "Llegada estimada" : "Tienda", eta ? `≈ ${eta} min ${latestTrack.eta_type === "DELIVERY" ? "al cliente" : "al local"}` : order.rappi_stores?.store_name || "Tienda Rappi")}
     </div>
     <h3>Productos</h3>
@@ -287,7 +282,7 @@ async function loadOrders() {
   document.querySelector("#orders-next").disabled = state.page >= state.totalPages;
   body.innerHTML = result.entries.length ? result.entries.map((order) => {
     const payment = paymentVerdict(order, formatMoney);
-    return `<tr><td><strong>${escapeHtml(order.rappi_order_id)}</strong></td><td>${escapeHtml(order.rappi_stores?.store_name || "Tienda Rappi")}</td><td>${formatDate(order.provider_created_at || order.first_received_at)}</td><td>${statusBadge(order.operational_status)}</td><td><span class="chip tone-${payment.tone}">${escapeHtml(shortPayment(order, payment))}</span></td><td>${formatMoney(order.total_order)}</td><td><button class="button secondary compact" type="button" data-order-id="${escapeHtml(order.id)}">Ver</button></td></tr>`;
+    return `<tr><td><strong>${escapeHtml(order.rappi_order_id)}</strong></td><td>${escapeHtml(order.rappi_stores?.store_name || "Tienda Rappi")}</td><td>${formatDate(order.provider_created_at || order.first_received_at)}</td><td>${statusBadge(order.operational_status)}</td><td><span class="chip tone-${payment.tone}">${escapeHtml(payment.short)}</span></td><td>${formatMoney(order.total_order)}</td><td><button class="button secondary compact" type="button" data-order-id="${escapeHtml(order.id)}">Ver</button></td></tr>`;
   }).join("") : emptyRow(7, "No hay pedidos para los filtros seleccionados.");
   body.querySelectorAll("[data-order-id]").forEach((button) => button.addEventListener("click", () => openOrder(button.dataset.orderId)));
 }
