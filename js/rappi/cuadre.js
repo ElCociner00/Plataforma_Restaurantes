@@ -1,8 +1,8 @@
 import {
   bootRappiShell, emptyRow, escapeHtml, formatDate, formatMoney, invokeRappi, isAdminContext,
   setBusy, toast,
-} from "./core.js?v=20260911rappi3";
-import { paymentMethodLabel } from "./veredictos.js?v=20260911rappi3";
+} from "./core.js?v=20260911rappi4";
+import { paymentMethodLabel } from "./veredictos.js?v=20260911rappi4";
 import { APP_URLS } from "../urls.js";
 
 // Diferencias menores a esto se consideran redondeo o descuentos pequeños.
@@ -101,7 +101,7 @@ function render(result) {
     return `<tr class="${flag ? `row-${flag.tone}` : ""}">
       <td><strong>${formatDate(`${day.dia}T12:00:00-05:00`, false)}</strong>${flag ? `<br><span class="helper">${escapeHtml(flag.text)}</span>` : ""}</td>
       <td>${day.pedidos}</td><td>${day.entregados}</td><td>${day.cancelados}</td><td>${day.vencidos}</td>
-      <td>${formatMoney(day.total_entregado)}</td><td>${formatMoney(day.efectivo_repartidor)}</td>
+      <td>${formatMoney(day.total_entregado)}</td><td>${formatMoney(day.cobrado_por_local)}</td>
       <td>${day.rappi_sistema === null ? "Sin cierre" : formatMoney(day.rappi_sistema)}</td>
       <td>${day.rappi_real === null ? "—" : formatMoney(day.rappi_real)}</td>
       <td>${diff === null || !result.integracion_desde || day.dia < result.integracion_desde ? "—" : `<strong>${formatMoney(diff)}</strong>`}</td>
@@ -116,10 +116,10 @@ function render(result) {
 
 function downloadCsv() {
   if (!lastResult?.dias?.length) return;
-  const header = ["dia", "pedidos", "entregados", "cancelados", "vencidos", "total_entregado", "efectivo_repartidor", "cierres_rappi_sistema", "cierres_rappi_contado", "diferencia", "revisar"];
+  const header = ["dia", "pedidos", "entregados", "cancelados", "vencidos", "total_entregado", "cobrado_por_local", "cierres_rappi_sistema", "cierres_rappi_contado", "diferencia", "revisar"];
   const rows = lastResult.dias.map((day) => [
     day.dia, day.pedidos, day.entregados, day.cancelados, day.vencidos, day.total_entregado,
-    day.efectivo_repartidor, day.rappi_sistema ?? "", day.rappi_real ?? "", difference(day) ?? "", dayFlag(day)?.text ?? "",
+    day.cobrado_por_local, day.rappi_sistema ?? "", day.rappi_real ?? "", difference(day) ?? "", dayFlag(day)?.text ?? "",
   ]);
   const csv = [header, ...rows]
     .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(";"))

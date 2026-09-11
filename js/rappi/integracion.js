@@ -1,7 +1,7 @@
 import {
   bootRappiShell, emptyRow, escapeHtml, formatDate, invokeRappi, isAdminContext,
   setBusy, statusBadge, toast,
-} from "./core.js?v=20260911rappi3";
+} from "./core.js?v=20260911rappi4";
 import { APP_URLS } from "../urls.js";
 
 try {
@@ -86,7 +86,7 @@ function renderStatus(result) {
 async function toggleAutoAccept(event) {
   const input = event.currentTarget;
   const enabled = input.checked;
-  if (!enabled && !window.confirm("Si apagas la aceptación automática, alguien debe aceptar cada pedido desde la tablet de Rappi en menos de 6 minutos o Rappi lo cancela. ¿Apagarla?")) {
+  if (!enabled && !window.confirm("Si apagas la aceptación automática, alguien debe aceptar cada pedido en menos de 6 minutos (con «Aceptar ahora» en Pedidos Rappi o desde la tablet de Rappi) o Rappi lo cancela. ¿Apagarla?")) {
     input.checked = true;
     return;
   }
@@ -94,7 +94,7 @@ async function toggleAutoAccept(event) {
   try {
     await invokeRappi("rappi-admin", { action: "store_settings", environment: "DEV", store_id: input.dataset.autoAccept, auto_accept: enabled });
     input.nextElementSibling.textContent = enabled ? "Encendida" : "Apagada";
-    toast(enabled ? "Enkrato aceptará los pedidos de esta tienda." : "Los pedidos de esta tienda deberán aceptarse desde la tablet de Rappi.");
+    toast(enabled ? "Enkrato aceptará los pedidos de esta tienda." : "Los pedidos de esta tienda deberán aceptarse a mano: «Aceptar ahora» en Pedidos Rappi o la tablet de Rappi.");
   } catch (error) {
     input.checked = !enabled;
     toast(error.message, "error");
