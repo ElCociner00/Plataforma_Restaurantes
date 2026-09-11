@@ -6,7 +6,7 @@
   <title>Enkrato | Integración Rappi</title>
   <link rel="stylesheet" href="../css/variables.css?v=20260829v4">
   <link rel="stylesheet" href="../css/main.css?v=20260829v4">
-  <link rel="stylesheet" href="../css/rappi.css?v=20260829v4">
+  <link rel="stylesheet" href="../css/rappi.css?v=20260911rappi3">
 </head>
 <body class="rappi-page" data-rappi-page="integration" style="display:none">
   <script type="module" src="../js/router.js?v=20260829v4"></script>
@@ -14,7 +14,8 @@
 
   <main class="rappi-main">
     <nav class="rappi-subnav" aria-label="Secciones de Rappi">
-      <a href="operacion.html" data-rappi-nav="operation">Rappi</a>
+      <a href="operacion.html" data-rappi-nav="operation">Pedidos</a>
+      <a href="cuadre.html" data-rappi-nav="cuadre">Cuadre</a>
       <a href="integracion.html" data-rappi-nav="integration">Integración Rappi</a>
     </nav>
 
@@ -56,7 +57,8 @@
 
       <section class="card">
         <div class="section-heading"><div><h2>Tiendas</h2><p class="helper">Tiendas encontradas en la cuenta conectada.</p></div></div>
-        <div class="table-wrap"><table><thead><tr><th>Tienda</th><th>Estado</th><th>Última actualización</th><th>Menú</th></tr></thead><tbody id="integration-stores"><tr><td class="empty-cell" colspan="4">Conecta Rappi para identificar las tiendas.</td></tr></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>Tienda</th><th>Estado</th><th>Última actualización</th><th>Menú</th><th>Aceptar pedidos automáticamente</th></tr></thead><tbody id="integration-stores"><tr><td class="empty-cell" colspan="5">Conecta Rappi para identificar las tiendas.</td></tr></tbody></table></div>
+        <p class="helper">Rappi cancela un pedido si nadie lo acepta en 6 minutos. Con la aceptación automática, Enkrato lo acepta apenas llega. Apágala solo si esa tienda acepta los pedidos desde la tablet de Rappi.</p>
       </section>
 
       <section class="card">
@@ -74,6 +76,6 @@
     </div>
   </main>
 
-  <script type="module" src="../js/rappi/integracion.js?v=20260901rappi2"></script>
+  <script type="module" src="../js/rappi/integracion.js?v=20260911rappi3"></script>
 </body>
 </html>

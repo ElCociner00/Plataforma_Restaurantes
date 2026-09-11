@@ -2,10 +2,13 @@ import {
   buildIdempotencyKey,
   effectiveMenuApprovalStatus,
   extractStoreId,
+  isInformationalOrderEvent,
   isRappiTesterSample,
   normalizeOperationalStatus,
   parseConnectivity,
+  parseDate,
   parseTracking,
+  sanitizeEventInformation,
   sanitizeFinancialRecord,
   sanitizeOrder,
 } from "./payload.ts";
@@ -95,6 +98,65 @@ Deno.test("Operational and connectivity statuses are normalized", () => {
     parseConnectivity({ store_id: "1" }, "PING").is_online === true,
     "A valid ping means online",
   );
+});
+
+Deno.test("Official Rappi order events reach the delivery states", () => {
+  // Nombres de dev-portal "Eventos de Ordenes". Antes close_order quedaba como
+  // estado crudo y un pedido entregado nunca aparecía como "Entregado".
+  const expected: Record<string, string> = {
+    taken_visible_order: "IN_PROGRESS",
+    ready_for_pick_up: "READY",
+    domiciliary_in_store: "COURIER_AT_STORE",
+    hand_to_domiciliary: "IN_DELIVERY",
+    arrive: "ARRIVED",
+    close_order: "COMPLETED",
+  };
+  for (const [event, status] of Object.entries(expected)) {
+    const normalized = normalizeOperationalStatus("ORDER_OTHER_EVENT", event);
+    assert(normalized === status, `${event} debe ser ${status}, fue ${normalized}`);
+  }
+  for (const event of ["cancel_by_user", "canceled_with_charge", "canceled_by_fraud_automation"]) {
+    assert(normalizeOperationalStatus("ORDER_OTHER_EVENT", event) === "CANCELLED", `${event} debe cancelar`);
+  }
+});
+
+Deno.test("Rappi order states: READY is not ready-for-pickup and TIMEOUT means not accepted", () => {
+  assert(normalizeOperationalStatus("NEW_ORDER", "READY") === "RECEIVED", "READY es lista para enviarse a la tienda");
+  assert(normalizeOperationalStatus("NEW_ORDER", "SENT") === "RECEIVED", "SENT espera aceptación");
+  assert(normalizeOperationalStatus("NEW_ORDER", "READY_FOR_PICKUP") === "READY", "READY_FOR_PICKUP es lista para recoger");
+  assert(normalizeOperationalStatus("NEW_ORDER", "TIMEOUT") === "NOT_ACCEPTED", "TIMEOUT es vencida sin aceptar");
+  assert(normalizeOperationalStatus("NEW_ORDER", "") === "RECEIVED", "NEW_ORDER sin estado es recibida");
+});
+
+Deno.test("Rappi local times without zone are read as Colombia time", () => {
+  // Formatos reales recibidos del sandbox el 2026-09-10.
+  assert(parseDate("2026-09-10 20:43:54") === "2026-09-11T01:43:54.000Z", "NEW_ORDER created_at");
+  assert(parseDate("2026-09-10T20:44:03") === "2026-09-11T01:44:03.000Z", "ORDER_OTHER_EVENT event_time");
+  assert(parseDate("2020-05-28T12:31:12.501Z") === "2020-05-28T12:31:12.501Z", "GET events trae UTC explícito");
+});
+
+Deno.test("Courier replacement is informational, not a state change", () => {
+  assert(isInformationalOrderEvent("replace_storekeeper"), "replace_storekeeper no mueve el estado");
+  assert(!isInformationalOrderEvent("close_order"), "close_order sí mueve el estado");
+});
+
+Deno.test("Event information keeps the courier name and drops contact data", () => {
+  const info = sanitizeEventInformation({
+    courier_data: {
+      id: 729365,
+      phone: "3118012176",
+      full_name: "Daletzi Karina Olmedo Plata",
+      profile_pic: "https://example.com/pic.png",
+    },
+    eta_to_store: 147,
+    storekeeper_name: "Daletzi Karina Olmedo Plata",
+    customer_phone: "3000000000",
+  });
+  const serialized = JSON.stringify(info);
+  assert(serialized.includes("Daletzi Karina Olmedo Plata"), "El nombre del repartidor se conserva");
+  assert(!serialized.includes("3118012176") && !serialized.includes("3000000000"), "Los teléfonos se descartan");
+  assert(!serialized.includes("example.com"), "La foto se descarta");
+  assert(info.eta_to_store === 147, "La ETA a tienda se conserva");
 });
 
 Deno.test("Official STORE_CONNECTIVITY payload resolves store and enabled flag", () => {

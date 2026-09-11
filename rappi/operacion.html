@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Enkrato | Rappi</title>
+  <title>Enkrato | Pedidos Rappi</title>
   <link rel="stylesheet" href="../css/variables.css?v=20260829v4">
   <link rel="stylesheet" href="../css/main.css?v=20260829v4">
-  <link rel="stylesheet" href="../css/rappi.css?v=20260829v4">
+  <link rel="stylesheet" href="../css/rappi.css?v=20260911rappi3">
 </head>
 <body class="rappi-page" data-rappi-page="operation" style="display:none">
   <script type="module" src="../js/router.js?v=20260829v4"></script>
@@ -14,60 +14,84 @@
 
   <main class="rappi-main">
     <nav class="rappi-subnav" aria-label="Secciones de Rappi">
-      <a href="operacion.html" data-rappi-nav="operation">Rappi</a>
+      <a href="operacion.html" data-rappi-nav="operation">Pedidos</a>
+      <a href="cuadre.html" data-rappi-nav="cuadre" data-admin-link>Cuadre</a>
       <a href="integracion.html" data-rappi-nav="integration" data-admin-link>Integración Rappi</a>
     </nav>
 
     <section class="rappi-hero">
-      <div><p class="eyebrow">Integración Rappi</p><h1>Rappi</h1><p class="muted">Consulta los pedidos, tiendas y menús de tu operación.</p></div>
-      <button class="button secondary" id="refresh-operation" type="button">Actualizar</button>
-    </section>
-
-    <section class="metrics-grid" aria-label="Resumen operativo">
-      <article class="metric"><span class="metric-label">Pedidos</span><strong id="metric-orders">—</strong></article>
-      <article class="metric"><span class="metric-label">Requieren atención</span><strong id="metric-incidents">—</strong></article>
-      <article class="metric"><span class="metric-label">Tiendas</span><strong id="metric-stores">—</strong></article>
-    </section>
-
-    <section class="card">
-      <div class="section-heading"><div><h2>Pedidos</h2><p class="helper">Selecciona un pedido para consultar su historial.</p></div></div>
-      <form class="toolbar" id="order-filters">
-        <div class="toolbar-fields">
-          <div class="field"><label for="order-search">Pedido</label><input id="order-search" name="search" autocomplete="off" placeholder="Buscar pedido"></div>
-          <div class="field"><label for="order-status">Estado</label><select id="order-status" name="status"><option value="">Todos</option><option value="NEW">Recibido</option><option value="IN_PROGRESS">En preparación</option><option value="COMPLETED">Entregado</option><option value="CANCELLED">Cancelado</option><option value="INCIDENT">Requiere atención</option></select></div>
-          <div class="field"><label for="order-store">Tienda</label><select id="order-store" name="store_id"><option value="">Todas</option></select></div>
-          <div class="field"><label for="order-from">Desde</label><input id="order-from" name="from" type="date"></div>
-          <div class="field"><label for="order-to">Hasta</label><input id="order-to" name="to" type="date"></div>
-        </div>
-        <button class="button" type="submit">Filtrar</button>
-      </form>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Pedido</th><th>Tienda</th><th>Hora</th><th>Estado</th><th>Total</th><th>Forma de pago</th><th>Último cambio</th><th></th></tr></thead>
-          <tbody id="orders-body"><tr><td class="empty-cell" colspan="8">Cargando pedidos…</td></tr></tbody>
-        </table>
+      <div><p class="eyebrow">Rappi</p><h1>Pedidos Rappi</h1><p class="muted">Qué pedidos entraron, si están pagos y si llegaron al cliente. La lista se actualiza sola.</p></div>
+      <div class="action-row">
+        <div class="field"><label for="board-date">Día</label><input id="board-date" type="date"></div>
+        <button class="button secondary" id="refresh-operation" type="button">Actualizar</button>
       </div>
-      <div class="pagination"><button class="button secondary compact" id="orders-prev" type="button">Anterior</button><span id="orders-page">Página 1</span><button class="button secondary compact" id="orders-next" type="button">Siguiente</button></div>
+    </section>
+
+    <section class="card verify-card">
+      <div class="section-heading"><div><h2>Verificar un pedido</h2><p class="helper">Antes de despachar un domicilio o darlo por pagado, escribe el número de pedido de Rappi y confírmalo aquí.</p></div></div>
+      <form class="verify-form" id="verify-form">
+        <div class="field"><label for="verify-number">Número de pedido Rappi</label><input id="verify-number" name="rappi_order_id" inputmode="numeric" autocomplete="off" placeholder="Ej: 1702645662" required></div>
+        <button class="button" type="submit">Verificar</button>
+      </form>
+      <div id="verify-result" aria-live="polite" hidden></div>
+    </section>
+
+    <section class="metrics-grid board-metrics" aria-label="Resumen del día">
+      <article class="metric"><span class="metric-label">Pedidos</span><strong id="kpi-pedidos">—</strong></article>
+      <article class="metric"><span class="metric-label">Por aceptar</span><strong id="kpi-por-aceptar">—</strong></article>
+      <article class="metric"><span class="metric-label">En curso</span><strong id="kpi-en-curso">—</strong></article>
+      <article class="metric"><span class="metric-label">Entregados</span><strong id="kpi-entregados">—</strong></article>
+      <article class="metric"><span class="metric-label">Cancelados o vencidos</span><strong id="kpi-perdidos">—</strong></article>
+      <article class="metric"><span class="metric-label">Total entregado</span><strong id="kpi-total">—</strong></article>
     </section>
 
     <section class="card">
-      <div class="section-heading"><div><h2>Tiendas</h2><p class="helper">Estado actual según la información recibida de Rappi.</p></div></div>
-      <div class="table-wrap"><table><thead><tr><th>Tienda</th><th>Estado</th><th>Última actualización</th><th>Menú</th></tr></thead><tbody id="stores-body"><tr><td class="empty-cell" colspan="4">Cargando…</td></tr></tbody></table></div>
+      <div class="section-heading"><div><h2 id="board-title">Pedidos de hoy</h2><p class="helper" id="board-updated">Cargando…</p></div></div>
+      <div class="order-list" id="board-list"><p class="empty-cell">Cargando pedidos…</p></div>
     </section>
 
     <section class="card">
-      <div class="section-heading"><div><h2>Estado del menú</h2><p class="helper">Menú recibido y validado según la información disponible en Rappi.</p></div></div>
-      <div class="table-wrap"><table><thead><tr><th>Tienda</th><th>Estado</th><th>Productos</th><th>Recibido</th></tr></thead><tbody id="menus-body"><tr><td class="empty-cell" colspan="4">Cargando…</td></tr></tbody></table></div>
+      <details class="history-block">
+        <summary><h2>Buscar en el historial</h2><p class="helper">Pedidos de otros días por número, estado o fechas.</p></summary>
+        <form class="toolbar" id="order-filters">
+          <div class="toolbar-fields">
+            <div class="field"><label for="order-search">Pedido</label><input id="order-search" name="search" autocomplete="off" placeholder="Número de pedido"></div>
+            <div class="field"><label for="order-status">Estado</label><select id="order-status" name="status"><option value="">Todos</option><option value="RECEIVED">Por aceptar</option><option value="ACTIVE">En curso</option><option value="COMPLETED">Entregados</option><option value="CANCELLED">Cancelados</option><option value="NOT_ACCEPTED">Vencidos sin aceptar</option></select></div>
+            <div class="field"><label for="order-store">Tienda</label><select id="order-store" name="store_id"><option value="">Todas</option></select></div>
+            <div class="field"><label for="order-from">Desde</label><input id="order-from" name="from" type="date"></div>
+            <div class="field"><label for="order-to">Hasta</label><input id="order-to" name="to" type="date"></div>
+          </div>
+          <button class="button" type="submit">Buscar</button>
+        </form>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Pedido</th><th>Tienda</th><th>Fecha</th><th>Estado</th><th>Pago</th><th>Total</th><th></th></tr></thead>
+            <tbody id="orders-body"><tr><td class="empty-cell" colspan="7">Usa los filtros para buscar.</td></tr></tbody>
+          </table>
+        </div>
+        <div class="pagination"><button class="button secondary compact" id="orders-prev" type="button">Anterior</button><span id="orders-page">Página 1</span><button class="button secondary compact" id="orders-next" type="button">Siguiente</button></div>
+      </details>
+    </section>
+
+    <section class="split-grid">
+      <section class="card">
+        <div class="section-heading"><div><h2>Tiendas</h2><p class="helper">Si una tienda aparece sin señal, Rappi no le está enviando pedidos.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Tienda</th><th>Estado</th><th>Última señal</th></tr></thead><tbody id="stores-body"><tr><td class="empty-cell" colspan="3">Cargando…</td></tr></tbody></table></div>
+      </section>
+      <section class="card">
+        <div class="section-heading"><div><h2>Estado del menú</h2><p class="helper">Menú que Rappi tiene publicado para cada tienda.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Tienda</th><th>Estado</th><th>Productos</th></tr></thead><tbody id="menus-body"><tr><td class="empty-cell" colspan="3">Cargando…</td></tr></tbody></table></div>
+      </section>
     </section>
   </main>
 
   <dialog id="order-dialog" aria-labelledby="order-dialog-title">
     <div class="dialog-content">
-      <div class="dialog-heading"><div><p class="eyebrow">Historial del pedido</p><h2 id="order-dialog-title">Detalle del pedido</h2></div><button class="button secondary compact" type="button" data-close-dialog>Cerrar</button></div>
+      <div class="dialog-heading"><div><p class="eyebrow">Pedido Rappi</p><h2 id="order-dialog-title">Detalle del pedido</h2></div><button class="button secondary compact" type="button" data-close-dialog>Cerrar</button></div>
       <div id="order-detail"><p class="muted">Selecciona un pedido.</p></div>
     </div>
   </dialog>
 
-  <script type="module" src="../js/rappi/operacion.js?v=20260829v4"></script>
+  <script type="module" src="../js/rappi/operacion.js?v=20260911rappi3"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 import {
   bootRappiShell, emptyRow, escapeHtml, formatDate, invokeRappi, isAdminContext,
   setBusy, statusBadge, toast,
-} from "./core.js?v=20260901rappi2";
+} from "./core.js?v=20260911rappi3";
 import { APP_URLS } from "../urls.js";
 
 try {
@@ -55,9 +55,11 @@ function renderStatus(result) {
   setStep("step-webhooks", activeHooks === 8, activeHooks === 8 ? "Lista" : `${activeHooks} de 8`);
   setStep("step-data", Boolean(lastReceived), lastReceived ? "Recibida" : "Esperando prueba");
 
-  document.querySelector("#integration-stores").innerHTML = stores.length
-    ? stores.map((store) => `<tr><td><strong>${escapeHtml(store.store_name || "Tienda Rappi")}</strong></td><td>${statusBadge(store.connectivity_status || (connected ? "CONNECTED" : "UNKNOWN"))}</td><td>${formatDate(store.last_ping_at || store.menu_updated_at)}</td><td>${statusBadge(store.menu_approval_status || "PENDING")}</td></tr>`).join("")
-    : emptyRow(4, "Conecta Rappi para identificar las tiendas.");
+  const storesBody = document.querySelector("#integration-stores");
+  storesBody.innerHTML = stores.length
+    ? stores.map((store) => `<tr><td><strong>${escapeHtml(store.store_name || "Tienda Rappi")}</strong></td><td>${statusBadge(store.connectivity_status || (connected ? "CONNECTED" : "UNKNOWN"))}</td><td>${formatDate(store.last_ping_at || store.menu_updated_at)}</td><td>${statusBadge(store.menu_approval_status || "PENDING")}</td><td><label class="switch"><input type="checkbox" data-auto-accept="${escapeHtml(store.id)}" ${store.auto_accept !== false ? "checked" : ""}><span>${store.auto_accept !== false ? "Encendida" : "Apagada"}</span></label></td></tr>`).join("")
+    : emptyRow(5, "Conecta Rappi para identificar las tiendas.");
+  storesBody.querySelectorAll("[data-auto-accept]").forEach((input) => input.addEventListener("change", toggleAutoAccept));
   const menuStore = document.querySelector("#menu-store");
   const selectedStore = menuStore.value;
   menuStore.innerHTML = stores.length
@@ -79,6 +81,26 @@ function renderStatus(result) {
   message.textContent = connected && activeHooks === 8
     ? (lastReceived ? "Conexión activa. Enkrato está recibiendo información de Rappi." : "Conexión configurada. Falta recibir una prueba desde Rappi.")
     : result.configured ? "La conexión aún requiere completar su configuración." : "Ingresa tus credenciales de pruebas para comenzar.";
+}
+
+async function toggleAutoAccept(event) {
+  const input = event.currentTarget;
+  const enabled = input.checked;
+  if (!enabled && !window.confirm("Si apagas la aceptación automática, alguien debe aceptar cada pedido desde la tablet de Rappi en menos de 6 minutos o Rappi lo cancela. ¿Apagarla?")) {
+    input.checked = true;
+    return;
+  }
+  input.disabled = true;
+  try {
+    await invokeRappi("rappi-admin", { action: "store_settings", environment: "DEV", store_id: input.dataset.autoAccept, auto_accept: enabled });
+    input.nextElementSibling.textContent = enabled ? "Encendida" : "Apagada";
+    toast(enabled ? "Enkrato aceptará los pedidos de esta tienda." : "Los pedidos de esta tienda deberán aceptarse desde la tablet de Rappi.");
+  } catch (error) {
+    input.checked = !enabled;
+    toast(error.message, "error");
+  } finally {
+    input.disabled = false;
+  }
 }
 
 function setStep(id, complete, label) {

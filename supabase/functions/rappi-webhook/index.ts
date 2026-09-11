@@ -200,8 +200,32 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   await touchConfig(admin, config, true);
+  if (ORDER_EVENTS.has(config.event_type)) kickWorker();
   return successResponse(config.event_type, { accepted: true });
 });
+
+const ORDER_EVENTS = new Set(["NEW_ORDER", "ORDER_EVENT_CANCEL", "ORDER_OTHER_EVENT"]);
+
+/**
+ * Despierta al worker en segundo plano en vez de esperar al cron. Rappi da
+ * 6 minutos para aceptar una orden; con el cron por minuto la aceptación
+ * podía tardar hasta un minuto de más. La respuesta a Rappi no espera esto,
+ * y si la llamada falla el cron procesa el evento igual.
+ */
+function kickWorker() {
+  const secret = Deno.env.get("RAPPI_CRON_SECRET") ?? Deno.env.get("CRON_SECRET") ?? "";
+  const base = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
+  if (!secret || !base) return;
+  const task = fetch(`${base}/functions/v1/rappi-worker`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-cron-secret": secret },
+    body: JSON.stringify({ kick: true, limit: 10 }),
+  }).then((response) => response.body?.cancel())
+    .catch((error) => console.warn(`[${LABEL}] no se pudo despertar al worker:`, error?.message ?? error));
+  // deno-lint-ignore no-explicit-any
+  const runtime = (globalThis as any).EdgeRuntime;
+  if (runtime?.waitUntil) runtime.waitUntil(task);
+}
 
 async function touchConfig(
   admin: ReturnType<typeof clienteServicio>,
