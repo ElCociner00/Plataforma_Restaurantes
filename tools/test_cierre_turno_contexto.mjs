@@ -40,6 +40,30 @@ assert(
   previousCashBlock.includes("fechaAnterior") && !previousCashBlock.includes("fecha_turno.lt."),
   "La caja anterior todavía puede saltar a una fecha antigua en vez del día anterior",
 );
+// 2026-09-12: en un día de tres turnos, quien cerraba el turno 2 veía la caja
+// del último turno de AYER rotulada como suya. Pasaba porque las dos opciones
+// -turno previo de hoy y cierre de ayer- iban en un mismo OR: si el turno 1 de
+// hoy aún no estaba subido, la de ayer ganaba en silencio. El turno previo del
+// mismo día tiene que consultarse aparte y primero, y lo de ayer sólo puede
+// aparecer marcado como respaldo.
+assert(
+  previousCashBlock.includes('.eq("fecha_turno", fecha.value).lt("numero_turno", numeroTurno)'),
+  "El turno previo del mismo día ya no se consulta por separado",
+);
+assert(
+  !previousCashBlock.includes("and(fecha_turno.eq."),
+  "La caja anterior volvió al OR que dejaba ganar al cierre de ayer",
+);
+assert(
+  previousCashBlock.includes("esRespaldo = numeroTurno > 1")
+    && previousCashBlock.includes("NO es la caja que te entregaron"),
+  "La caja de respaldo no queda advertida como tal",
+);
+assert(
+  source.includes("if (aperturaEsRespaldo)")
+    && source.includes("No se puede comparar: falta subir el turno anterior de hoy."),
+  "La diferencia sigue dando veredicto sobre una caja de respaldo",
+);
 
 const submitStateBlock = between(
   source,

@@ -361,7 +361,11 @@ document.addEventListener("DOMContentLoaded", () => {
   // El esperado lo calcula el servidor. Aquí solo se muestra y se compara,
   // porque el dato que cuenta para el descuadre se vuelve a calcular al
   // guardar: si se fiara de esta pantalla, bastaría con editarla.
+
+  /** true cuando lo mostrado NO es el turno inmediatamente anterior. */
+  let aperturaEsRespaldo = false;
   function limpiarEfectivoApertura() {
+    aperturaEsRespaldo = false;
     if (efectivoAperturaEsperado) efectivoAperturaEsperado.value = "";
     if (efectivoAperturaDiferencia) {
       efectivoAperturaDiferencia.value = "";
@@ -386,6 +390,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const diferencia = declarado - esperado;
     efectivoAperturaDiferencia.value = String(diferencia);
+
+    // Con una caja de respaldo (la del día anterior porque el turno previo de
+    // hoy no está subido) la resta no significa nada: comparar contra ella
+    // marcaba "Recibiste de menos" por cientos de miles y hacía dudar a quien
+    // sí había recibido lo correcto. Se muestra el número, pero sin veredicto.
+    if (aperturaEsRespaldo) {
+      if (efectivoAperturaNota) {
+        efectivoAperturaNota.textContent = "No se puede comparar: falta subir el turno anterior de hoy.";
+      }
+      return;
+    }
 
     // Tolerancia cero: cualquier valor distinto de 0 es un descuadre. Se
     // señala con el mismo indicador que las filas de Datos Financieros, para
@@ -485,10 +500,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const tablaCierres = tablaSegunSede(CIERRE_TABLES, esLocal);
-    // Una caja de semanas atrás no debe presentarse como si fuera la recibida
-    // ayer. Para el primer turno sólo se admite el último cierre del día
-    // inmediatamente anterior; para turnos posteriores se prioriza un turno
-    // previo del mismo día y, si no existe, el día anterior.
+    // Quien entra recibe la caja del turno INMEDIATAMENTE anterior. Para el
+    // turno 2 o 3 ese turno es del MISMO día; sólo el turno 1 hereda del día
+    // anterior.
+    //
+    // Antes las dos opciones viajaban en un único OR ordenado por fecha y
+    // número. Bastaba con que el turno previo de hoy no estuviera subido
+    // todavía —o con haber consultado con la jornada equivocada seleccionada—
+    // para que la consulta cayera en silencio al último cierre de ayer y lo
+    // rotulara como si fuera el suyo: "Caja del 11/09/2026 turno 2". La
+    // persona veía una diferencia de cientos de miles contra lo que de verdad
+    // había recibido y no tenía forma de saber que la referencia no era la
+    // suya. Ahora se pregunta primero por el turno previo del mismo día y, si
+    // no está, lo que se muestra queda marcado como respaldo.
     const fechaSeleccionada = new Date(`${fecha.value}T12:00:00`);
     fechaSeleccionada.setDate(fechaSeleccionada.getDate() - 1);
     const fechaAnterior = [
@@ -496,22 +520,34 @@ document.addEventListener("DOMContentLoaded", () => {
       String(fechaSeleccionada.getMonth() + 1).padStart(2, "0"),
       String(fechaSeleccionada.getDate()).padStart(2, "0")
     ].join("-");
-    const filtros = [`fecha_turno.eq.${fechaAnterior}`];
-    if (numeroTurno > 1) {
-      filtros.push(`and(fecha_turno.eq.${fecha.value},numero_turno.lt.${numeroTurno})`);
-    }
-    const filtroAnterior = filtros.join(",");
-    const { data: filas, error } = await supabase
-      .from(tablaCierres)
-      .select("empresa_id, fecha_turno, numero_turno, caja_global, created_at")
-      .eq("empresa_id", contextPayload.empresa_id)
-      .or(filtroAnterior)
-      .order("fecha_turno", { ascending: false })
-      .order("numero_turno", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(1);
 
-    if (error) {
+    const ultimaCajaDe = async (aplicarFiltro) => {
+      const { data, error } = await aplicarFiltro(
+        supabase
+          .from(tablaCierres)
+          .select("empresa_id, fecha_turno, numero_turno, caja_global, created_at")
+          .eq("empresa_id", contextPayload.empresa_id)
+      )
+        .order("numero_turno", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (error) throw error;
+      return Array.isArray(data) ? data[0] : null;
+    };
+
+    let cierreAnterior = null;
+    let esRespaldo = false;
+    try {
+      if (numeroTurno > 1) {
+        cierreAnterior = await ultimaCajaDe((consulta) =>
+          consulta.eq("fecha_turno", fecha.value).lt("numero_turno", numeroTurno));
+      }
+      if (!cierreAnterior) {
+        // Sólo para el turno 1 el día anterior ES la referencia correcta.
+        esRespaldo = numeroTurno > 1;
+        cierreAnterior = await ultimaCajaDe((consulta) => consulta.eq("fecha_turno", fechaAnterior));
+      }
+    } catch (error) {
       console.error("[cierre_turno] consulta directa de caja anterior fallo", {
         empresa_id: contextPayload.empresa_id,
         tabla: tablaCierres,
@@ -521,10 +557,14 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const cierreAnterior = Array.isArray(filas) ? filas[0] : null;
     if (!cierreAnterior) {
+      aperturaEsRespaldo = false;
       if (efectivoAperturaEsperado) efectivoAperturaEsperado.value = "";
-      if (efectivoAperturaOrigen) efectivoAperturaOrigen.textContent = "Sin cierre del día anterior registrado para esta sede";
+      if (efectivoAperturaOrigen) {
+        efectivoAperturaOrigen.textContent = numeroTurno > 1
+          ? `Falta subir el turno ${numeroTurno - 1} de hoy: no hay caja anterior con qué comparar`
+          : "Sin cierre del día anterior registrado para esta sede";
+      }
       actualizarDiferenciaApertura();
       return;
     }
@@ -535,10 +575,14 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    aperturaEsRespaldo = esRespaldo;
     if (efectivoAperturaEsperado) efectivoAperturaEsperado.value = String(cierreAnterior.caja_global ?? 0);
     if (efectivoAperturaOrigen) {
       const [year, month, day] = String(cierreAnterior.fecha_turno || "").split("-");
-      efectivoAperturaOrigen.textContent = `Caja del ${day}/${month}/${year} turno ${cierreAnterior.numero_turno}`;
+      const referencia = `Caja del ${day}/${month}/${year} turno ${cierreAnterior.numero_turno}`;
+      efectivoAperturaOrigen.textContent = esRespaldo
+        ? `${referencia}. OJO: el turno ${numeroTurno - 1} de hoy no está subido, así que esta NO es la caja que te entregaron`
+        : referencia;
     }
     actualizarDiferenciaApertura();
   };
