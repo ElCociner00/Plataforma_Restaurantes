@@ -1,11 +1,11 @@
 import {
   bootRappiShell, closeDialogOnBackdrop, emptyRow, escapeHtml, formatDate, formatMoney,
   formatTime, invokeRappi, setBusy, statusBadge, toast, todayRange,
-} from "./core.js?v=20260911rappi4";
+} from "./core.js?v=20260912rappi5";
 import {
   deliveryProgress, deliverySteps, deliveryVerdict, eventLabel, fulfillment, fulfillmentLabel,
   notFoundVerdict, paymentMethodLabel, paymentVerdict,
-} from "./veredictos.js?v=20260911rappi4";
+} from "./veredictos.js?v=20260912rappi5";
 
 // Mientras haya pedidos en curso, la lista se refresca sola: quien atiende
 // no debería tener que acordarse de pulsar "Actualizar".
@@ -184,6 +184,7 @@ function renderDetail(detail) {
   const order = detail.order;
   const items = Array.isArray(order.items) ? order.items : [];
   const canAccept = order.operational_status === "RECEIVED" && order.acceptance_status !== "ACCEPTED";
+  const canMarkReady = order.operational_status === "IN_PROGRESS";
   const latestTrack = detail.tracking?.[0];
   const eta = latestTrack?.eta && Number(latestTrack.eta) > 0 ? Math.max(1, Math.round(Number(latestTrack.eta) / 60000)) : null;
   document.querySelector("#order-dialog-title").textContent = `Pedido ${order.rappi_order_id}`;
@@ -199,6 +200,8 @@ function renderDetail(detail) {
     </div>
     ${stepper(order)}
     ${canAccept ? `<div class="notice warning accept-box"><span>Rappi cancela el pedido si nadie lo acepta en 6 minutos desde que entró (${formatTime(order.provider_created_at || order.first_received_at)}).</span><button class="button" type="button" id="accept-order">Aceptar ahora</button></div>` : ""}
+    ${canAccept ? `<div class="notice accept-box"><label class="reject-label">Si no puedes prepararlo<select id="reject-reason">${rejectOptions()}</select></label><button class="button secondary" type="button" id="reject-order">Rechazar pedido</button></div>` : ""}
+    ${canMarkReady ? `<div class="notice accept-box"><span>Cuando la cocina termine, avísale a Rappi para que venga el repartidor.</span><button class="button" type="button" id="ready-order">Marcar listo</button></div>` : ""}
     <div class="detail-grid">
       ${detailItem("Entró", formatDate(order.provider_created_at || order.first_received_at))}
       ${detailItem("Total del pedido", formatMoney(order.total_order))}
@@ -225,6 +228,48 @@ function renderDetail(detail) {
       setBusy(event.currentTarget, false);
     }
   });
+
+  document.querySelector("#reject-order")?.addEventListener("click", async (event) => {
+    const cancelType = document.querySelector("#reject-reason")?.value;
+    if (!window.confirm(`Vas a rechazar el pedido ${order.rappi_order_id} en Rappi. No se puede deshacer y el cliente no lo recibirá. ¿Rechazarlo?`)) return;
+    setBusy(event.currentTarget, true, "Rechazando…");
+    try {
+      const result = await invokeRappi("rappi-data", { action: "reject_order", order_id: order.id, cancel_type: cancelType });
+      toast("Pedido rechazado en Rappi.", "success");
+      renderDetail(result);
+      await loadBoard();
+    } catch (error) {
+      showError(error);
+      setBusy(event.currentTarget, false);
+    }
+  });
+
+  document.querySelector("#ready-order")?.addEventListener("click", async (event) => {
+    setBusy(event.currentTarget, true, "Avisando a Rappi…");
+    try {
+      const result = await invokeRappi("rappi-data", { action: "ready_for_pickup", order_id: order.id });
+      toast("Rappi ya sabe que el pedido está listo.", "success");
+      renderDetail(result);
+      await loadBoard();
+    } catch (error) {
+      showError(error);
+      setBusy(event.currentTarget, false);
+    }
+  });
+}
+
+/** Los motivos que Rappi admite al rechazar, en palabras de quien atiende. */
+const REJECT_REASONS = Object.freeze({
+  ITEM_OUT_OF_STOCK: "No hay con qué prepararlo (producto agotado)",
+  ITEM_NOT_FOUND: "El producto ya no está en la carta",
+  ORDER_MISSING_INFORMATION: "Al pedido le falta información",
+  ORDER_MISSING_ADDRESS_INFORMATION: "A la dirección le falta información",
+});
+
+function rejectOptions() {
+  return Object.entries(REJECT_REASONS)
+    .map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`)
+    .join("");
 }
 
 function historyNote(event) {
