@@ -176,6 +176,109 @@ export async function acceptOrder(
   return outcome;
 }
 
+/**
+ * Motivos de rechazo que acepta la API v2. El texto es el que ve quien
+ * atiende; la clave es la que entiende Rappi.
+ */
+export const REJECT_REASONS: Record<string, string> = {
+  ITEM_OUT_OF_STOCK: "No hay con qué prepararlo (producto agotado)",
+  ITEM_NOT_FOUND: "El producto ya no está en la carta",
+  ORDER_MISSING_INFORMATION: "Al pedido le falta información",
+  ORDER_MISSING_ADDRESS_INFORMATION: "A la dirección le falta información",
+};
+
+/**
+ * Rechaza la orden en Rappi. Solo es válido mientras la orden sigue esperando
+ * aceptación (estado SENT); después Rappi responde 400.
+ *
+ * No se envían `items_skus` ni `items_ids` a propósito: Rappi deshabilita del
+ * menú los productos que se listan al rechazar y solo su Soporte puede volver
+ * a habilitarlos. Un "no hay ingredientes" de un martes dejaría el producto
+ * fuera de la carta indefinidamente.
+ */
+export async function rejectOrder(
+  admin: SupabaseClient,
+  connection: RappiConnection,
+  order: AcceptableOrder,
+  options: { cancelType: string; reason: string },
+): Promise<{ outcome: TakeOutcome; httpStatus: number | null }> {
+  const cancelType = REJECT_REASONS[options.cancelType] ? options.cancelType : "ITEM_OUT_OF_STOCK";
+  const reason = options.reason.trim().slice(0, 200) || REJECT_REASONS[cancelType];
+  const response = await rappiRequestWithStatus(
+    admin,
+    connection,
+    "OPERATIONAL",
+    ordersUrl(connection, `/${encodeURIComponent(order.rappi_order_id)}/reject`),
+    { method: "PUT", body: JSON.stringify({ reason, cancel_type: cancelType }) },
+  );
+  const outcome = classifyTakeStatus(response.status);
+  if (outcome !== "ACCEPTED") return { outcome, httpStatus: response.status };
+
+  const now = new Date().toISOString();
+  await admin.from("rappi_orders").update({
+    operational_status: "REJECTED",
+    rappi_status: "REJECTED",
+    last_event_at: now,
+    // Sacarlo de la cola de aceptación: el cron reintenta todo lo que siga en
+    // PENDING sin mirar el estado operativo.
+    acceptance_status: "FAILED",
+    acceptance_error: `El local lo rechazó: ${reason}`,
+  }).eq("id", order.id);
+  await admin.from("rappi_order_events").insert({
+    order_id: order.id,
+    empresa_id: order.empresa_id,
+    event_type: "ENKRATO_REJECT",
+    rappi_status: "REJECTED",
+    normalized_status: "REJECTED",
+    provider_event_at: now,
+    additional_information: { source: "enkrato", cancel_type: cancelType, reason },
+  });
+  return { outcome, httpStatus: response.status };
+}
+
+/**
+ * Avisa a Rappi que el pedido está listo para que lo recojan.
+ *
+ * Un solo intento, sin reintentos: Rappi solo admite tres llamadas por orden
+ * ("cualquier intento posterior será considerado un uso incorrecto del
+ * endpoint") y se reserva el derecho de revocar el acceso. Quien llama debe
+ * comprobar antes que la orden siga en preparación.
+ */
+export async function markReadyForPickup(
+  admin: SupabaseClient,
+  connection: RappiConnection,
+  order: AcceptableOrder,
+): Promise<{ outcome: TakeOutcome; httpStatus: number | null }> {
+  const response = await rappiRequestWithStatus(
+    admin,
+    connection,
+    "OPERATIONAL",
+    ordersUrl(connection, `/${encodeURIComponent(order.rappi_order_id)}/ready-for-pickup`),
+    { method: "POST" },
+  );
+  const outcome = classifyTakeStatus(response.status);
+  if (outcome !== "ACCEPTED") return { outcome, httpStatus: response.status };
+
+  const now = new Date().toISOString();
+  if (shouldApplyOrderState(order.operational_status, order.last_event_at, "READY", now)) {
+    await admin.from("rappi_orders").update({
+      operational_status: "READY",
+      rappi_status: "READY_FOR_PICKUP",
+      last_event_at: now,
+    }).eq("id", order.id);
+  }
+  await admin.from("rappi_order_events").insert({
+    order_id: order.id,
+    empresa_id: order.empresa_id,
+    event_type: "ENKRATO_READY",
+    rappi_status: "READY_FOR_PICKUP",
+    normalized_status: "READY",
+    provider_event_at: now,
+    additional_information: { source: "enkrato" },
+  });
+  return { outcome, httpStatus: response.status };
+}
+
 /** Historial de eventos que Rappi tiene de la orden (red de seguridad de webhooks). */
 export async function fetchOrderEvents(
   admin: SupabaseClient,

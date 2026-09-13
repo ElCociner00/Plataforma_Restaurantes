@@ -7,7 +7,13 @@ import {
   text,
 } from "../_shared/rappi/payload.ts";
 import { TERMINAL_ORDER_STATUSES } from "../_shared/rappi/state.ts";
-import { acceptOrder, type AcceptableOrder } from "../_shared/rappi/orders.ts";
+import {
+  acceptOrder,
+  markReadyForPickup,
+  REJECT_REASONS,
+  rejectOrder,
+  type AcceptableOrder,
+} from "../_shared/rappi/orders.ts";
 import type { RappiConnection } from "../_shared/rappi/types.ts";
 
 const LABEL = "rappi-data";
@@ -41,6 +47,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       case "board": result = await board(ctx, body); break;
       case "verify_order": result = await verifyOrder(ctx, body); break;
       case "accept_order": result = await acceptOrderManually(ctx, body); break;
+      case "reject_order": result = await rejectOrderManually(ctx, body); break;
+      case "ready_for_pickup": result = await readyForPickup(ctx, body); break;
       case "cuadre": result = await cuadre(ctx, body); break;
       case "orders": result = await orders(ctx, body); break;
       case "order_detail": result = await orderDetail(ctx, body); break;
@@ -183,27 +191,95 @@ async function verifyOrder(ctx: Contexto, body: Record<string, unknown>) {
  * tocar "Aceptar" en la tablet de Rappi.
  */
 async function acceptOrderManually(ctx: Contexto, body: Record<string, unknown>) {
+  const { db, order, connection } = await loadOrderForAction(ctx, body);
+  if (order.operational_status !== "RECEIVED" || order.acceptance_status === "ACCEPTED") {
+    throw new ErrorFuncion("ORDER_NOT_WAITING", "Esta orden ya no está esperando aceptación.", 409);
+  }
+  const outcome = await acceptOrder(db, connection, order, {
+    maxAttempts: 2,
+    fromStatuses: ["PENDING", "FAILED", "MANUAL", "UNKNOWN"],
+    mode: "manual",
+  });
+  return { outcome, ...(await orderDetail(ctx, { order_id: order.id })) };
+}
+
+type ActionableOrder = AcceptableOrder & { connection_id: string; acceptance_status: string };
+
+async function loadOrderForAction(ctx: Contexto, body: Record<string, unknown>) {
   await exigirAccesoEscritura(ctx);
   const orderId = text(body.order_id);
   if (!orderId) throw new ErrorFuncion("ORDER_REQUIRED", "Selecciona una orden.", 400);
   const db = ctx.clienteAdmin();
   const { data: order, error } = await db.from("rappi_orders").select(
     "id, empresa_id, connection_id, rappi_order_id, operational_status, last_event_at, provider_created_at, first_received_at, delivery_summary, acceptance_status, acceptance_attempts",
-  ).eq("id", orderId).eq("empresa_id", ctx.empresaId).maybeSingle<AcceptableOrder & { connection_id: string; acceptance_status: string }>();
+  ).eq("id", orderId).eq("empresa_id", ctx.empresaId).maybeSingle<ActionableOrder>();
   if (error) throw error;
   if (!order) throw new ErrorFuncion("ORDER_NOT_FOUND", "La orden no existe o no pertenece a tu empresa.", 404);
-  if (order.operational_status !== "RECEIVED" || order.acceptance_status === "ACCEPTED") {
-    throw new ErrorFuncion("ORDER_NOT_WAITING", "Esta orden ya no está esperando aceptación.", 409);
-  }
   const { data: connection } = await db.from("rappi_connections").select(
     "id, empresa_id, environment, status, operational_base_url, orders_base_url, financial_base_url, operational_enabled, financial_enabled",
   ).eq("id", order.connection_id).maybeSingle<RappiConnection>();
   if (!connection) throw new ErrorFuncion("RAPPI_NOT_CONFIGURED", "La conexión Rappi no está configurada.", 412);
-  const outcome = await acceptOrder(db, connection, order, {
-    maxAttempts: 2,
-    fromStatuses: ["PENDING", "FAILED", "MANUAL", "UNKNOWN"],
-    mode: "manual",
+  return { db, order, connection };
+}
+
+/**
+ * Rechazo manual: la salida cuando el local no puede preparar el pedido.
+ * Rappi solo lo admite mientras la orden espera aceptación.
+ */
+async function rejectOrderManually(ctx: Contexto, body: Record<string, unknown>) {
+  const { db, order, connection } = await loadOrderForAction(ctx, body);
+  if (order.operational_status !== "RECEIVED" || order.acceptance_status === "ACCEPTED") {
+    throw new ErrorFuncion(
+      "ORDER_NOT_WAITING",
+      "Rappi solo permite rechazar mientras el pedido espera aceptación. Este ya fue aceptado, venció o lo cancelaron.",
+      409,
+    );
+  }
+  const cancelType = text(body.cancel_type).toUpperCase();
+  if (!REJECT_REASONS[cancelType]) {
+    throw new ErrorFuncion("REJECT_REASON_REQUIRED", "Elige por qué no puedes preparar el pedido.", 400);
+  }
+  const { outcome, httpStatus } = await rejectOrder(db, connection, order, {
+    cancelType,
+    reason: text(body.reason) || REJECT_REASONS[cancelType],
   });
+  if (outcome !== "ACCEPTED") {
+    throw new ErrorFuncion(
+      outcome === "NOT_WAITING" ? "ORDER_NOT_WAITING" : "RAPPI_HTTP",
+      outcome === "NOT_WAITING"
+        ? "Rappi ya no permite rechazarlo: el pedido cambió de estado."
+        : `Rappi no pudo procesar el rechazo (HTTP ${httpStatus ?? "sin respuesta"}).`,
+      outcome === "NOT_WAITING" ? 409 : 502,
+    );
+  }
+  return { outcome, ...(await orderDetail(ctx, { order_id: order.id })) };
+}
+
+/**
+ * Avisa a Rappi que el pedido ya está listo. Se exige que siga en preparación
+ * porque Rappi corta el endpoint tras tres llamadas por orden.
+ */
+async function readyForPickup(ctx: Contexto, body: Record<string, unknown>) {
+  const { db, order, connection } = await loadOrderForAction(ctx, body);
+  if (order.operational_status !== "IN_PROGRESS") {
+    throw new ErrorFuncion(
+      "ORDER_NOT_IN_PROGRESS",
+      order.operational_status === "READY"
+        ? "Este pedido ya está marcado como listo."
+        : "Solo se puede marcar listo un pedido aceptado y en preparación.",
+      409,
+    );
+  }
+  const { outcome, httpStatus } = await markReadyForPickup(db, connection, order);
+  if (outcome !== "ACCEPTED") {
+    throw new ErrorFuncion(
+      outcome === "NOT_WAITING" ? "ORDER_NOT_IN_PROGRESS" : "RAPPI_HTTP",
+      outcome === "NOT_WAITING"
+        ? "Rappi no aceptó el cambio: el pedido ya no estaba en preparación."
+        : `Rappi no pudo registrar que está listo (HTTP ${httpStatus ?? "sin respuesta"}).`,
+      outcome === "NOT_WAITING" ? 409 : 502,
+    );
+  }
   return { outcome, ...(await orderDetail(ctx, { order_id: order.id })) };
 }
 

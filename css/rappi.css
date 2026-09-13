@@ -180,6 +180,8 @@ dialog::backdrop { background: rgb(15 23 42 / 58%); }
 .steps.compact li::after { top: 5px; }
 
 .accept-box { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.reject-label { display: flex; align-items: center; flex: 1; flex-wrap: wrap; gap: 8px; }
+.reject-label select { min-height: 40px; padding: 8px 10px; border: 1px solid var(--ek-line-strong, #86939f); border-radius: var(--ek-radius-md, 10px); background: #fff; color: var(--ek-ink-2, #334155); font: inherit; }
 .history-block summary { cursor: pointer; list-style: none; }
 .history-block summary::-webkit-details-marker { display: none; }
 .history-block summary h2::after { content: " ▾"; color: var(--ek-muted, #5d6b7e); font-size: .85em; }

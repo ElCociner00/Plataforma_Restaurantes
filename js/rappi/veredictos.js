@@ -238,6 +238,8 @@ export function eventLabel(event) {
       ? "Aceptado en Rappi desde Enkrato por el equipo"
       : "Aceptado en Rappi automáticamente por Enkrato";
   }
+  if (type === "ENKRATO_REJECT") return "Rechazado en Rappi desde Enkrato por el equipo";
+  if (type === "ENKRATO_READY") return "Avisamos a Rappi que estaba listo";
   if (type === "ORDER_EVENT_CANCEL" || name.includes("cancel")) return `Cancelado: ${cancelReason(name)}`;
   return EVENT_LABELS[name] || (name ? name.replaceAll("_", " ") : "Actualización de Rappi");
 }
