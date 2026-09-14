@@ -1,7 +1,7 @@
 import {
   bootRappiShell, emptyRow, escapeHtml, formatDate, invokeRappi, isAdminContext,
   setBusy, statusBadge, toast,
-} from "./core.js?v=20260912rappi5";
+} from "./core.js?v=20260914rappi6";
 import { APP_URLS } from "../urls.js";
 
 try {

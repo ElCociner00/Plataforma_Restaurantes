@@ -1,4 +1,4 @@
-import { bootRappiShell, toast } from "./core.js?v=20260912rappi5";
+import { bootRappiShell, toast } from "./core.js?v=20260914rappi6";
 
 try {
   await bootRappiShell();

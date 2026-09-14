@@ -1,11 +1,11 @@
 import {
   bootRappiShell, closeDialogOnBackdrop, emptyRow, escapeHtml, formatDate, formatMoney,
   formatTime, invokeRappi, setBusy, statusBadge, toast, todayRange,
-} from "./core.js?v=20260912rappi5";
+} from "./core.js?v=20260914rappi6";
 import {
   deliveryProgress, deliverySteps, deliveryVerdict, eventLabel, fulfillment, fulfillmentLabel,
   notFoundVerdict, paymentMethodLabel, paymentVerdict,
-} from "./veredictos.js?v=20260912rappi5";
+} from "./veredictos.js?v=20260914rappi6";
 
 // Mientras haya pedidos en curso, la lista se refresca sola: quien atiende
 // no debería tener que acordarse de pulsar "Actualizar".
@@ -216,8 +216,12 @@ function renderDetail(detail) {
     <h3 style="margin-top:20px">Historial</h3>
     <ol class="order-timeline">${history || `<li><div><span>Sin cambios registrados.</span></div></li>`}</ol>`;
 
+  // El botón se guarda antes del await: event.currentTarget queda en null en
+  // cuanto el handler cede el control, y sin esto se queda en "Cargando…"
+  // para siempre cuando Rappi responde con un error.
   document.querySelector("#accept-order")?.addEventListener("click", async (event) => {
-    setBusy(event.currentTarget, true, "Aceptando…");
+    const boton = event.currentTarget;
+    setBusy(boton, true, "Aceptando…");
     try {
       const result = await invokeRappi("rappi-data", { action: "accept_order", order_id: order.id });
       toast(result.outcome === "ACCEPTED" ? "Pedido aceptado en Rappi." : "Rappi no permitió aceptarlo. Revisa el estado del pedido.", result.outcome === "ACCEPTED" ? "success" : "error");
@@ -225,14 +229,15 @@ function renderDetail(detail) {
       await loadBoard();
     } catch (error) {
       showError(error);
-      setBusy(event.currentTarget, false);
+      setBusy(boton, false);
     }
   });
 
   document.querySelector("#reject-order")?.addEventListener("click", async (event) => {
+    const boton = event.currentTarget;
     const cancelType = document.querySelector("#reject-reason")?.value;
     if (!window.confirm(`Vas a rechazar el pedido ${order.rappi_order_id} en Rappi. No se puede deshacer y el cliente no lo recibirá. ¿Rechazarlo?`)) return;
-    setBusy(event.currentTarget, true, "Rechazando…");
+    setBusy(boton, true, "Rechazando…");
     try {
       const result = await invokeRappi("rappi-data", { action: "reject_order", order_id: order.id, cancel_type: cancelType });
       toast("Pedido rechazado en Rappi.", "success");
@@ -240,12 +245,13 @@ function renderDetail(detail) {
       await loadBoard();
     } catch (error) {
       showError(error);
-      setBusy(event.currentTarget, false);
+      setBusy(boton, false);
     }
   });
 
   document.querySelector("#ready-order")?.addEventListener("click", async (event) => {
-    setBusy(event.currentTarget, true, "Avisando a Rappi…");
+    const boton = event.currentTarget;
+    setBusy(boton, true, "Avisando a Rappi…");
     try {
       const result = await invokeRappi("rappi-data", { action: "ready_for_pickup", order_id: order.id });
       toast("Rappi ya sabe que el pedido está listo.", "success");
@@ -253,7 +259,7 @@ function renderDetail(detail) {
       await loadBoard();
     } catch (error) {
       showError(error);
-      setBusy(event.currentTarget, false);
+      setBusy(boton, false);
     }
   });
 }
