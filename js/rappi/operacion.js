@@ -184,7 +184,7 @@ function renderDetail(detail) {
   const order = detail.order;
   const items = Array.isArray(order.items) ? order.items : [];
   const canAccept = order.operational_status === "RECEIVED" && order.acceptance_status !== "ACCEPTED";
-  const canMarkReady = order.operational_status === "IN_PROGRESS";
+  const inKitchen = order.operational_status === "IN_PROGRESS";
   const latestTrack = detail.tracking?.[0];
   const eta = latestTrack?.eta && Number(latestTrack.eta) > 0 ? Math.max(1, Math.round(Number(latestTrack.eta) / 60000)) : null;
   document.querySelector("#order-dialog-title").textContent = `Pedido ${order.rappi_order_id}`;
@@ -201,7 +201,7 @@ function renderDetail(detail) {
     ${stepper(order)}
     ${canAccept ? `<div class="notice warning accept-box"><span>Rappi cancela el pedido si nadie lo acepta en 6 minutos desde que entró (${formatTime(order.provider_created_at || order.first_received_at)}).</span><button class="button" type="button" id="accept-order">Aceptar ahora</button></div>` : ""}
     ${canAccept ? `<div class="notice accept-box"><label class="reject-label">Si no puedes prepararlo<select id="reject-reason">${rejectOptions()}</select></label><button class="button secondary" type="button" id="reject-order">Rechazar pedido</button></div>` : ""}
-    ${canMarkReady ? `<div class="notice accept-box"><span>Cuando la cocina termine, avísale a Rappi para que venga el repartidor.</span><button class="button" type="button" id="ready-order">Marcar listo</button></div>` : ""}
+    ${inKitchen ? `<div class="notice"><span>Rappi lo marca listo solo cuando se cumple el tiempo de preparación y envía al repartidor. Si falta un producto, el momento de decirlo es al aceptar: rechaza el pedido.</span></div>` : ""}
     <div class="detail-grid">
       ${detailItem("Entró", formatDate(order.provider_created_at || order.first_received_at))}
       ${detailItem("Total del pedido", formatMoney(order.total_order))}
@@ -241,20 +241,6 @@ function renderDetail(detail) {
     try {
       const result = await invokeRappi("rappi-data", { action: "reject_order", order_id: order.id, cancel_type: cancelType });
       toast("Pedido rechazado en Rappi.", "success");
-      renderDetail(result);
-      await loadBoard();
-    } catch (error) {
-      showError(error);
-      setBusy(boton, false);
-    }
-  });
-
-  document.querySelector("#ready-order")?.addEventListener("click", async (event) => {
-    const boton = event.currentTarget;
-    setBusy(boton, true, "Avisando a Rappi…");
-    try {
-      const result = await invokeRappi("rappi-data", { action: "ready_for_pickup", order_id: order.id });
-      toast("Rappi ya sabe que el pedido está listo.", "success");
       renderDetail(result);
       await loadBoard();
     } catch (error) {
