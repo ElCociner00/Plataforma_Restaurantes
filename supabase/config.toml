@@ -142,3 +142,7 @@ verify_jwt = false
 [functions.rappi-operaciones]
 enabled = true
 verify_jwt = true
+
+[functions.rappi-vincular]
+enabled = true
+verify_jwt = true

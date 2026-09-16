@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Enkrato | Vincular Rappi</title>
+  <link rel="stylesheet" href="../css/variables.css?v=20260829v4">
+  <link rel="stylesheet" href="../css/main.css?v=20260829v4">
+  <link rel="stylesheet" href="../css/rappi.css?v=20260914rappi6">
+</head>
+<body class="rappi-page" data-rappi-page="integration" style="display:none">
+  <script type="module" src="../js/router.js?v=20260829v4"></script>
+  <script type="module" src="../js/header.js?v=20260909hdr1"></script>
+
+  <main class="rappi-main">
+    <section class="rappi-hero">
+      <div><p class="eyebrow">Integración Rappi</p><h1>Vincular cuenta de Rappi</h1><p class="muted">Elige qué tiendas de Rappi se conectan a esta empresa.</p></div>
+    </section>
+
+    <section class="card" id="link-status"><p class="helper">Confirmando el inicio de sesión con Rappi…</p></section>
+
+    <section class="card" id="link-stores" hidden>
+      <div class="section-heading"><div><h2>Tiendas de la cuenta</h2><p class="helper" id="link-account"></p></div></div>
+      <div class="table-wrap"><table><thead><tr><th></th><th>Tienda</th><th>Marca</th><th>Estado</th></tr></thead><tbody id="link-store-rows"></tbody></table></div>
+      <button class="button" type="button" id="link-provision" style="margin-top:16px">Conectar tiendas elegidas</button>
+    </section>
+
+    <p><a class="button secondary compact" href="integracion.html">Volver a Integración Rappi</a></p>
+  </main>
+
+  <script type="module" src="../js/rappi/conectar.js?v=20260916rappi8"></script>
+</body>
+</html>
