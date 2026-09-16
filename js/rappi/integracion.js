@@ -1,6 +1,6 @@
 import {
-  bootRappiShell, emptyRow, escapeHtml, formatDate, invokeRappi, isAdminContext,
-  setBusy, statusBadge, toast,
+  bootRappiShell, closeDialogOnBackdrop, emptyRow, escapeHtml, formatDate, formatMoney, invokeRappi,
+  isAdminContext, setBusy, statusBadge, toast,
 } from "./core.js?v=20260914rappi6";
 import { APP_URLS } from "../urls.js";
 
@@ -81,9 +81,23 @@ function renderStatus(result) {
 
   const storesBody = document.querySelector("#integration-stores");
   storesBody.innerHTML = stores.length
-    ? stores.map((store) => `<tr><td><strong>${escapeHtml(store.store_name || "Tienda Rappi")}</strong></td><td>${statusBadge(store.connectivity_status || (connected ? "CONNECTED" : "UNKNOWN"))}</td><td>${formatDate(store.last_ping_at || store.menu_updated_at)}</td><td>${statusBadge(store.menu_approval_status || "PENDING")}</td><td><label class="switch"><input type="checkbox" data-auto-accept="${escapeHtml(store.id)}" ${store.auto_accept !== false ? "checked" : ""}><span>${store.auto_accept !== false ? "Encendida" : "Apagada"}</span></label></td></tr>`).join("")
-    : emptyRow(5, "Conecta Rappi para identificar las tiendas.");
+    ? stores.map((store) => `<tr>
+        <td><strong>${escapeHtml(store.store_name || "Tienda Rappi")}</strong></td>
+        <td><label class="switch"><input type="checkbox" data-store-open="${escapeHtml(store.id)}" disabled><span>Consultando…</span></label></td>
+        <td>${statusBadge(store.connectivity_status || (connected ? "CONNECTED" : "UNKNOWN"))}</td>
+        <td>${formatDate(store.last_ping_at || store.menu_updated_at)}</td>
+        <td><button class="link-button" type="button" data-store-menu="${escapeHtml(store.id)}" data-store-name="${escapeHtml(store.store_name || "Tienda Rappi")}" title="Ver el menú vigente en Rappi">${statusBadge(store.menu_approval_status || "PENDING")} <span class="helper">Ver menú</span></button></td>
+        <td><label class="switch"><input type="checkbox" data-auto-accept="${escapeHtml(store.id)}" ${store.auto_accept !== false ? "checked" : ""}><span>${store.auto_accept !== false ? "Encendida" : "Apagada"}</span></label></td>
+        <td><button class="button secondary compact" type="button" data-checkin="${escapeHtml(store.id)}">Ver código</button></td>
+      </tr>`).join("")
+    : emptyRow(7, "Conecta Rappi para identificar las tiendas.");
   storesBody.querySelectorAll("[data-auto-accept]").forEach((input) => input.addEventListener("change", toggleAutoAccept));
+  storesBody.querySelectorAll("[data-store-open]").forEach((input) => {
+    input.addEventListener("change", toggleStoreOpen);
+    loadStoreOpen(input);
+  });
+  storesBody.querySelectorAll("[data-store-menu]").forEach((button) => button.addEventListener("click", showStoreMenu));
+  storesBody.querySelectorAll("[data-checkin]").forEach((button) => button.addEventListener("click", showCheckinCode));
   const menuStore = document.querySelector("#menu-store");
   const selectedStore = menuStore.value;
   menuStore.innerHTML = stores.length
@@ -110,7 +124,7 @@ function renderStatus(result) {
 async function toggleAutoAccept(event) {
   const input = event.currentTarget;
   const enabled = input.checked;
-  if (!enabled && !window.confirm("Si apagas la aceptación automática, alguien debe aceptar cada pedido en menos de 6 minutos (con «Aceptar ahora» en Pedidos Rappi o desde la tablet de Rappi) o Rappi lo cancela. ¿Apagarla?")) {
+  if (!enabled && !window.confirm("Si apagas la aceptación automática, alguien debe aceptar cada pedido en menos de 6 minutos (con la tablet de Rappi) o Rappi lo cancela. ¿Apagarla?")) {
     input.checked = true;
     return;
   }
@@ -118,12 +132,87 @@ async function toggleAutoAccept(event) {
   try {
     await invokeRappi("rappi-admin", { action: "store_settings", environment: "DEV", store_id: input.dataset.autoAccept, auto_accept: enabled });
     input.nextElementSibling.textContent = enabled ? "Encendida" : "Apagada";
-    toast(enabled ? "Enkrato aceptará los pedidos de esta tienda." : "Los pedidos de esta tienda deberán aceptarse a mano: «Aceptar ahora» en Pedidos Rappi o la tablet de Rappi.");
+    toast(enabled ? "Enkrato aceptará los pedidos de esta tienda." : "Los pedidos de esta tienda deberán aceptarse desde la tablet de Rappi.");
   } catch (error) {
     input.checked = !enabled;
     toast(error.message, "error");
   } finally {
     input.disabled = false;
+  }
+}
+
+/** Abierta o cerrada en la app de Rappi: se consulta a Rappi, no se guarda en Enkrato. */
+async function loadStoreOpen(input) {
+  const label = input.nextElementSibling;
+  try {
+    const result = await invokeRappi("rappi-operaciones", { action: "store_availability", environment: "DEV", store_id: input.dataset.storeOpen });
+    input.checked = result.enabled === true;
+    label.textContent = result.enabled === null ? "Sin dato" : result.enabled ? "Abierta" : "Cerrada";
+    input.disabled = false;
+  } catch (error) {
+    label.textContent = "No disponible";
+    console.warn("[rappi-integration] disponibilidad de tienda", error);
+  }
+}
+
+async function toggleStoreOpen(event) {
+  const input = event.currentTarget;
+  const enabled = input.checked;
+  if (!enabled && !window.confirm("La tienda dejará de aparecer abierta en Rappi y no recibirá pedidos hasta que la vuelvas a abrir. ¿Cerrarla?")) {
+    input.checked = true;
+    return;
+  }
+  input.disabled = true;
+  try {
+    const result = await invokeRappi("rappi-operaciones", { action: "store_availability", environment: "DEV", store_id: input.dataset.storeOpen, enabled });
+    input.checked = result.enabled === true;
+    input.nextElementSibling.textContent = result.enabled ? "Abierta" : "Cerrada";
+    if (result.ok === false) toast(`Rappi no permitió el cambio${result.reason ? `: ${result.reason}` : "."}`, "error");
+    else toast(result.enabled ? "La tienda quedó abierta en Rappi." : "La tienda quedó cerrada en Rappi.");
+  } catch (error) {
+    input.checked = !enabled;
+    toast(error.message, "error");
+  } finally {
+    input.disabled = false;
+  }
+}
+
+const menuDialog = document.querySelector("#menu-dialog");
+closeDialogOnBackdrop(menuDialog);
+menuDialog.querySelector("[data-close-dialog]").addEventListener("click", () => menuDialog.close());
+
+async function showStoreMenu(event) {
+  const button = event.currentTarget;
+  const body = document.querySelector("#menu-dialog-body");
+  document.querySelector("#menu-dialog-title").textContent = button.dataset.storeName;
+  body.innerHTML = `<p class="helper">Consultando el menú en Rappi…</p>`;
+  menuDialog.showModal();
+  try {
+    const { products } = await invokeRappi("rappi-operaciones", { action: "store_menu", environment: "DEV", store_id: button.dataset.storeMenu });
+    body.innerHTML = products.length
+      ? `<p class="helper">${products.length} productos publicados.</p>${products.map((product) => `
+        <article class="menu-product">
+          <header><strong>${escapeHtml(product.name)}</strong><span>${formatMoney(product.price)}</span></header>
+          ${product.sku ? `<span class="helper">SKU ${escapeHtml(product.sku)}</span>` : ""}
+          ${product.toppings.length ? `<ul class="menu-toppings">${product.toppings.map((topping) => `<li>${escapeHtml(topping.name)}${topping.category ? ` · ${escapeHtml(topping.category)}` : ""}${topping.price ? ` · +${formatMoney(topping.price)}` : ""}</li>`).join("")}</ul>` : ""}
+        </article>`).join("")}`
+      : `<p class="helper">Rappi no tiene productos publicados para esta tienda.</p>`;
+  } catch (error) {
+    body.innerHTML = `<p class="notice warning">${escapeHtml(error.message)}</p>`;
+  }
+}
+
+async function showCheckinCode(event) {
+  const button = event.currentTarget;
+  setBusy(button, true, "Consultando…");
+  try {
+    const result = await invokeRappi("rappi-operaciones", { action: "store_checkin_code", environment: "DEV", store_id: button.dataset.checkin });
+    button.outerHTML = result.code
+      ? `<strong>${escapeHtml(result.code)}</strong>${result.expired_at ? `<br><span class="helper">Vence ${escapeHtml(result.expired_at)}</span>` : ""}`
+      : `<span class="helper">Rappi no asignó código</span>`;
+  } catch (error) {
+    toast("Rappi no entregó el código de check-in en este momento.", "error");
+    setBusy(button, false);
   }
 }
 

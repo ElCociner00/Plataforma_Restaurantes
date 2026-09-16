@@ -211,6 +211,15 @@ dialog::backdrop { background: rgb(15 23 42 / 58%); }
   .accept-box { align-items: stretch; flex-direction: column; }
 }
 
+.handoff-box { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.handoff-box > div { display: grid; gap: 4px; }
+.handoff-code { font-size: 2.4rem; letter-spacing: 0.3em; line-height: 1.1; }
+.handoff-qr { width: 132px; height: 132px; image-rendering: pixelated; background: #fff; border-radius: 8px; }
+.link-button { padding: 0; border: 0; background: none; cursor: pointer; font: inherit; text-align: left; }
+.menu-product { padding: 10px 0; border-bottom: 1px solid var(--ek-border, #e5e7eb); }
+.menu-product header { display: flex; justify-content: space-between; gap: 12px; }
+.menu-toppings { margin: 6px 0 0; padding-left: 18px; color: var(--ek-muted, #6b7280); font-size: 0.9rem; }
+
 @media print {
   .app-header, .rappi-subnav, .toolbar, .button, .toast-region { display: none !important; }
   .card, .metric { box-shadow: none; }

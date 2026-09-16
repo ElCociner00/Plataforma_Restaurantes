@@ -5,14 +5,14 @@ import {
 import {
   deliveryProgress, deliverySteps, deliveryVerdict, eventLabel, fulfillment, fulfillmentLabel,
   notFoundVerdict, paymentMethodLabel, paymentVerdict,
-} from "./veredictos.js?v=20260914rappi6";
+} from "./veredictos.js?v=20260916rappi9";
 
 // Mientras haya pedidos en curso, la lista se refresca sola: quien atiende
 // no debería tener que acordarse de pulsar "Actualizar".
 const REFRESH_MS = 30_000;
 const TERMINAL = new Set(["COMPLETED", "CANCELLED", "REJECTED", "NOT_ACCEPTED"]);
 
-const state = { page: 1, totalPages: 1, openOrderId: null, timer: null, historyLoaded: false };
+const state = { page: 1, totalPages: 1, openOrderId: null, timer: null, historyLoaded: false, handoffs: new Map() };
 const dialog = document.querySelector("#order-dialog");
 const boardDate = document.querySelector("#board-date");
 
@@ -183,7 +183,12 @@ async function renderOrder(orderId) {
 function renderDetail(detail) {
   const order = detail.order;
   const items = Array.isArray(order.items) ? order.items : [];
-  const canAccept = order.operational_status === "RECEIVED" && order.acceptance_status !== "ACCEPTED";
+  const waiting = order.operational_status === "RECEIVED" && order.acceptance_status !== "ACCEPTED";
+  // Enkrato acepta solo. El botón aparece únicamente si esa aceptación falló.
+  const canRetryAccept = waiting && Boolean(order.acceptance_error);
+  // El repartidor confirma este código antes de llevarse el pedido.
+  const canShowHandoff = ["IN_PROGRESS", "READY"].includes(order.operational_status);
+  const handoff = state.handoffs.get(order.id);
   const inKitchen = order.operational_status === "IN_PROGRESS";
   const latestTrack = detail.tracking?.[0];
   const eta = latestTrack?.eta && Number(latestTrack.eta) > 0 ? Math.max(1, Math.round(Number(latestTrack.eta) / 60000)) : null;
@@ -199,8 +204,9 @@ function renderDetail(detail) {
       ${verdictBox("¿Dónde va?", deliveryVerdict(order, formatTime))}
     </div>
     ${stepper(order)}
-    ${canAccept ? `<div class="notice warning accept-box"><span>Rappi cancela el pedido si nadie lo acepta en 6 minutos desde que entró (${formatTime(order.provider_created_at || order.first_received_at)}).</span><button class="button" type="button" id="accept-order">Aceptar ahora</button></div>` : ""}
-    ${canAccept ? `<div class="notice accept-box"><label class="reject-label">Si no puedes prepararlo<select id="reject-reason">${rejectOptions()}</select></label><button class="button secondary" type="button" id="reject-order">Rechazar pedido</button></div>` : ""}
+    ${canRetryAccept ? `<div class="notice warning accept-box"><span>La aceptación automática falló. Rappi cancela el pedido si nadie lo acepta en 6 minutos desde que entró (${formatTime(order.provider_created_at || order.first_received_at)}).</span><button class="button" type="button" id="accept-order">Reintentar aceptación</button></div>` : ""}
+    ${canShowHandoff ? handoffBox(handoff) : ""}
+    ${waiting ? `<div class="notice accept-box"><label class="reject-label">Si no puedes prepararlo<select id="reject-reason">${rejectOptions()}</select></label><button class="button secondary" type="button" id="reject-order">Rechazar pedido</button></div>` : ""}
     ${inKitchen ? `<div class="notice"><span>Rappi lo marca listo solo cuando se cumple el tiempo de preparación y envía al repartidor. Si falta un producto, el momento de decirlo es al aceptar: rechaza el pedido.</span></div>` : ""}
     <div class="detail-grid">
       ${detailItem("Entró", formatDate(order.provider_created_at || order.first_received_at))}
@@ -233,6 +239,18 @@ function renderDetail(detail) {
     }
   });
 
+  document.querySelector("#handoff-order")?.addEventListener("click", async (event) => {
+    const boton = event.currentTarget;
+    setBusy(boton, true, "Consultando…");
+    try {
+      state.handoffs.set(order.id, await invokeRappi("rappi-operaciones", { action: "order_handoff", order_id: order.id }));
+      renderDetail(detail);
+    } catch (error) {
+      showError(error);
+      setBusy(boton, false);
+    }
+  });
+
   document.querySelector("#reject-order")?.addEventListener("click", async (event) => {
     const boton = event.currentTarget;
     const cancelType = document.querySelector("#reject-reason")?.value;
@@ -248,6 +266,17 @@ function renderDetail(detail) {
       setBusy(boton, false);
     }
   });
+}
+
+/** Código de entrega: número de 4 dígitos y QR que el repartidor confirma en el local. */
+function handoffBox(handoff) {
+  if (!handoff) {
+    return `<div class="notice accept-box"><span>Cuando llegue el repartidor, muéstrale el código de entrega para que confirme que recibe este pedido.</span><button class="button secondary" type="button" id="handoff-order">Ver código de entrega</button></div>`;
+  }
+  const qr = handoff.qr_png_base64
+    ? `<img class="handoff-qr" alt="QR de entrega" src="data:image/png;base64,${escapeHtml(handoff.qr_png_base64)}">`
+    : "";
+  return `<div class="notice handoff-box"><div><span class="metric-label">Código de entrega</span><strong class="handoff-code">${escapeHtml(handoff.code || "—")}</strong><span class="helper">El repartidor lo confirma antes de llevarse el pedido.</span></div>${qr}</div>`;
 }
 
 /** Los motivos que Rappi admite al rechazar, en palabras de quien atiende. */
