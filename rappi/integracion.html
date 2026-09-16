@@ -6,7 +6,7 @@
   <title>Enkrato | Integración Rappi</title>
   <link rel="stylesheet" href="../css/variables.css?v=20260829v4">
   <link rel="stylesheet" href="../css/main.css?v=20260829v4">
-  <link rel="stylesheet" href="../css/rappi.css?v=20260914rappi6">
+  <link rel="stylesheet" href="../css/rappi.css?v=20260916rappi9">
 </head>
 <body class="rappi-page" data-rappi-page="integration" style="display:none">
   <script type="module" src="../js/router.js?v=20260829v4"></script>
@@ -62,7 +62,7 @@
 
       <section class="card">
         <div class="section-heading"><div><h2>Tiendas</h2><p class="helper">Tiendas encontradas en la cuenta conectada.</p></div></div>
-        <div class="table-wrap"><table><thead><tr><th>Tienda</th><th>Estado</th><th>Última actualización</th><th>Menú</th><th>Aceptar pedidos automáticamente</th></tr></thead><tbody id="integration-stores"><tr><td class="empty-cell" colspan="5">Conecta Rappi para identificar las tiendas.</td></tr></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>Tienda</th><th>Abierta en Rappi</th><th>Estado</th><th>Última actualización</th><th>Menú</th><th>Aceptar pedidos automáticamente</th><th>Check-in</th></tr></thead><tbody id="integration-stores"><tr><td class="empty-cell" colspan="7">Conecta Rappi para identificar las tiendas.</td></tr></tbody></table></div>
         <p class="helper">Rappi cancela un pedido si nadie lo acepta en 6 minutos. Con la aceptación automática, Enkrato lo acepta apenas llega. Apágala solo si esa tienda acepta los pedidos desde la tablet de Rappi.</p>
       </section>
 
@@ -81,6 +81,13 @@
     </div>
   </main>
 
-  <script type="module" src="../js/rappi/integracion.js?v=20260916rappi8"></script>
+  <dialog id="menu-dialog" aria-labelledby="menu-dialog-title">
+    <div class="dialog-content">
+      <div class="dialog-heading"><div><p class="eyebrow">Menú vigente en Rappi</p><h2 id="menu-dialog-title">Menú</h2></div><button class="button secondary compact" type="button" data-close-dialog>Cerrar</button></div>
+      <div id="menu-dialog-body"></div>
+    </div>
+  </dialog>
+
+  <script type="module" src="../js/rappi/integracion.js?v=20260916rappi9"></script>
 </body>
 </html>

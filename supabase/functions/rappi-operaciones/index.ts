@@ -23,14 +23,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
   try {
     const body = await leerCuerpo(req);
     const ctx = await resolverContexto(req, text(body.empresa_id) || null);
-    exigirAdmin(ctx, "operar la tienda en Rappi");
+    const action = text(body.action).toLowerCase();
+    // El código de entrega lo necesita quien despacha, no solo el admin.
+    if (action !== "order_handoff") exigirAdmin(ctx, "operar la tienda en Rappi");
     let result: unknown;
-    switch (text(body.action).toLowerCase()) {
+    switch (action) {
       case "store_integrated": result = await storeIntegrated(ctx, body); break;
       case "menu_approval": result = await menuApproval(ctx, body); break;
       case "items_availability": result = await itemsAvailability(ctx, body); break;
       case "store_schedule": result = await storeSchedule(ctx, body); break;
       case "self_onboarding": result = await selfOnboarding(ctx, body); break;
+      case "store_menu": result = await storeMenu(ctx, body); break;
+      case "store_availability": result = await storeAvailability(ctx, body); break;
+      case "store_checkin_code": result = await storeCheckinCode(ctx, body); break;
+      case "order_handoff": result = await orderHandoff(ctx, body); break;
       case "integration_webhooks": result = await integrationWebhooks(ctx, body); break;
       default:
         throw new ErrorFuncion("UNKNOWN_ACTION", "La acción solicitada no existe.", 400);
@@ -297,4 +303,104 @@ async function integrationWebhooks(ctx: Contexto, body: Record<string, unknown>)
     results[event] = { status: response.status, body: redactSensitive(response.body) };
   }
   return results;
+}
+
+/** Menú vigente que Rappi muestra hoy para la tienda (productos y toppings). */
+async function storeMenu(ctx: Contexto, body: Record<string, unknown>) {
+  const { connection, store } = await connectionStore(ctx, body);
+  const response = await rappiRequestWithStatus(ctx.clienteAdmin(), connection, "OPERATIONAL",
+    `${PUBLIC_API}/store/${encodeURIComponent(store.rappi_store_id)}/menu/current`);
+  const raw = rappiResult(response);
+  const root = Array.isArray(raw) ? (raw[0] ?? {}) : (raw ?? {});
+  const record = (value: unknown) => (value && typeof value === "object" ? value as Record<string, unknown> : {});
+  const item = (value: unknown) => {
+    const row = record(value);
+    return {
+      id: text(row.id),
+      name: text(row.name),
+      price: Number(row.price) || 0,
+      sku: text(row.partnerSku ?? row.sku) || null,
+      active: row.active === null || row.active === undefined ? null : row.active === true,
+      category: text(record(row.category).name) || null,
+    };
+  };
+  const products = Array.isArray(record(root).products) ? record(root).products as unknown[] : [];
+  return {
+    products: products.map((product) => ({
+      ...item(product),
+      toppings: (Array.isArray(record(product).toppings) ? record(product).toppings as unknown[] : []).map(item),
+    })),
+  };
+}
+
+/**
+ * Tienda abierta o cerrada en la app de Rappi (disponibilidad), no la
+ * integración: cerrarla deja de recibir pedidos hasta que se vuelva a abrir.
+ */
+async function storeAvailability(ctx: Contexto, body: Record<string, unknown>) {
+  const { connection, store } = await connectionStore(ctx, body);
+  const admin = ctx.clienteAdmin();
+  if (typeof body.enabled === "boolean") {
+    const response = await rappiRequestWithStatus(admin, connection, "OPERATIONAL", `${PUBLIC_API}/availability/stores/enable`, {
+      method: "PUT",
+      body: JSON.stringify({ stores: [{ store_id: store.rappi_store_id, is_enabled: body.enabled }] }),
+    });
+    const result = rappiResult(response) as Record<string, unknown>;
+    const row = (Array.isArray(result?.results) ? result.results as Record<string, unknown>[] : [])[0] ?? {};
+    return {
+      enabled: row.is_enabled === undefined ? body.enabled : row.is_enabled === true,
+      ok: row.operation_result !== false,
+      reason: text(row.suspended_reason) || text(row.operation_result_message) || null,
+    };
+  }
+  const response = await rappiRequestWithStatus(admin, connection, "OPERATIONAL", `${PUBLIC_API}/availability/stores`, {
+    method: "POST",
+    body: JSON.stringify([Number(store.rappi_store_id)]),
+  });
+  const result = rappiResult(response) as Record<string, unknown>;
+  const value = result?.[store.rappi_store_id];
+  return { enabled: value === undefined ? null : value === true };
+}
+
+/** Código de registro (check-in) que Rappi asigna a la tienda. */
+async function storeCheckinCode(ctx: Contexto, body: Record<string, unknown>) {
+  const { connection, store } = await connectionStore(ctx, body);
+  const response = await rappiRequestWithStatus(ctx.clienteAdmin(), connection, "OPERATIONAL",
+    `${PUBLIC_API}/stores-pa/${encodeURIComponent(store.rappi_store_id)}/check-in-code`);
+  const result = (rappiResult(response) ?? {}) as Record<string, unknown>;
+  return { code: text(result.code) || null, expired_at: text(result.expired_at) || null };
+}
+
+/**
+ * Código de entrega del pedido: el repartidor lo confirma en el local antes de
+ * llevárselo. Rappi entrega el número y un QR (PNG en base64).
+ */
+async function orderHandoff(ctx: Contexto, body: Record<string, unknown>) {
+  const orderId = text(body.order_id);
+  if (!orderId) throw errores.datosIncompletos("order_id");
+  const db = ctx.clienteAdmin();
+  const { data: order, error } = await db.from("rappi_orders")
+    .select("rappi_order_id, connection_id, rappi_stores(rappi_store_id)")
+    .eq("id", orderId).eq("empresa_id", ctx.empresaId)
+    .maybeSingle<{ rappi_order_id: string; connection_id: string; rappi_stores: { rappi_store_id: string } | null }>();
+  if (error) throw errores.baseDeDatos(error.message);
+  if (!order?.rappi_stores?.rappi_store_id) {
+    throw new ErrorFuncion("ORDER_NOT_FOUND", "La orden no existe o no pertenece a tu empresa.", 404);
+  }
+  const { data: connection } = await db.from("rappi_connections")
+    .select("id, empresa_id, environment, status, operational_base_url, orders_base_url, financial_base_url, operational_enabled, financial_enabled")
+    .eq("id", order.connection_id).maybeSingle<RappiConnection>();
+  if (!connection) throw new ErrorFuncion("RAPPI_NOT_CONFIGURED", "La conexión Rappi no está configurada.", 412);
+  const response = await rappiRequestWithStatus(db, connection, "OPERATIONAL",
+    `/restaurants/orders/v1/stores/${encodeURIComponent(order.rappi_stores.rappi_store_id)}/orders/${encodeURIComponent(order.rappi_order_id)}/handoff`);
+  if (response.status === 404 || response.status === 412 || response.status === 424) {
+    console.warn(`[${LABEL}] handoff ${response.status}:`, JSON.stringify(redactSensitive(response.body)).slice(0, 500));
+    throw new ErrorFuncion("HANDOFF_NOT_READY", "Rappi aún no tiene código de entrega para este pedido. Suele aparecer cuando el pedido ya fue aceptado.", 409);
+  }
+  const result = (rappiResult(response) ?? {}) as Record<string, unknown>;
+  const qr = text(result.qr_code);
+  return {
+    code: text(result.product_confirmation_code) || null,
+    qr_png_base64: /^[A-Za-z0-9+/=]+$/.test(qr) ? qr : null,
+  };
 }
