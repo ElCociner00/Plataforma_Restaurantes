@@ -138,3 +138,7 @@ verify_jwt = false
 [functions.rappi-sync]
 enabled = true
 verify_jwt = false
+
+[functions.rappi-operaciones]
+enabled = true
+verify_jwt = true

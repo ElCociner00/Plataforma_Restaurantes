@@ -235,3 +235,65 @@ export function clearRappiTokenCache(connectionId?: string): void {
   if (!connectionId) return tokenCache.clear();
   for (const key of tokenCache.keys()) if (key.startsWith(`${connectionId}:`)) tokenCache.delete(key);
 }
+
+/**
+ * Horarios de tienda viven en la API de Utils, que pide su propio token
+ * (`login/utils`) con las mismas credenciales operativas. Rappi lo emite por
+ * una semana; basta con cachearlo en memoria del isolate.
+ */
+const utilsTokenCache = new Map<string, TokenSession>();
+
+async function getRappiUtilsToken(
+  admin: SupabaseClient,
+  connection: RappiConnection,
+  force = false,
+): Promise<string> {
+  const cached = utilsTokenCache.get(connection.id);
+  if (!force && cached && cached.expiresAt - EXPIRY_MARGIN_MS > Date.now()) return cached.token;
+
+  const { data: secret, error } = await admin
+    .from("rappi_connection_secrets")
+    .select("client_id_ciphertext, client_secret_ciphertext")
+    .eq("connection_id", connection.id)
+    .eq("scope", "OPERATIONAL")
+    .maybeSingle<SecretRow>();
+  if (error) throw errores.baseDeDatos(error.message);
+  if (!secret) {
+    throw new ErrorFuncion("RAPPI_NOT_CONFIGURED", "Las credenciales operativas de Rappi aún no están configuradas.", 412);
+  }
+  const response = await fetchJson(
+    `${normalizeBaseUrl(connection.operational_base_url)}/restaurants/auth/v1/token/login/utils`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json", "accept": "application/json" },
+      body: JSON.stringify({
+        client_id: await decryptText(secret.client_id_ciphertext, masterKey()),
+        client_secret: await decryptText(secret.client_secret_ciphertext, masterKey()),
+      }),
+    },
+  );
+  const body = response.body as Record<string, unknown>;
+  const token = typeof body.access_token === "string" ? body.access_token : "";
+  if (!token) throw new ErrorFuncion("RAPPI_NO_TOKEN", "Rappi respondió sin token de Utils.", 502);
+  const expiresIn = Number(body.expires_in);
+  utilsTokenCache.set(connection.id, {
+    token,
+    tokenType: "Bearer",
+    expiresAt: Date.now() + (Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : 3600) * 1000,
+  });
+  return token;
+}
+
+/** Llamada a `/api/rest-ops-utils` con el token de Utils; entrega el código HTTP. */
+export async function rappiUtilsRequest(
+  admin: SupabaseClient,
+  connection: RappiConnection,
+  path: string,
+  init: RequestInit = {},
+): Promise<{ status: number; body: unknown }> {
+  let response = await call(connection, "OPERATIONAL", path, await getRappiUtilsToken(admin, connection), init);
+  if (response.status === 401 || response.status === 403) {
+    response = await call(connection, "OPERATIONAL", path, await getRappiUtilsToken(admin, connection, true), init);
+  }
+  return response;
+}
