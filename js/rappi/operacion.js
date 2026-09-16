@@ -183,12 +183,13 @@ async function renderOrder(orderId) {
 function renderDetail(detail) {
   const order = detail.order;
   const items = Array.isArray(order.items) ? order.items : [];
+  // La aceptación es solo automática (pactado con el cliente); si falla, el
+  // empleado acepta desde la app de Rappi. Rechazar queda para casos puntuales.
   const waiting = order.operational_status === "RECEIVED" && order.acceptance_status !== "ACCEPTED";
-  // Enkrato acepta solo. El botón aparece únicamente si esa aceptación falló.
-  const canRetryAccept = waiting && Boolean(order.acceptance_error);
-  // El repartidor confirma este código antes de llevarse el pedido.
+  // El repartidor confirma este código antes de llevarse el pedido: se consulta solo.
   const canShowHandoff = ["IN_PROGRESS", "READY"].includes(order.operational_status);
   const handoff = state.handoffs.get(order.id);
+  if (canShowHandoff && !handoff) loadHandoff(order, detail);
   const inKitchen = order.operational_status === "IN_PROGRESS";
   const latestTrack = detail.tracking?.[0];
   const eta = latestTrack?.eta && Number(latestTrack.eta) > 0 ? Math.max(1, Math.round(Number(latestTrack.eta) / 60000)) : null;
@@ -204,7 +205,6 @@ function renderDetail(detail) {
       ${verdictBox("¿Dónde va?", deliveryVerdict(order, formatTime))}
     </div>
     ${stepper(order)}
-    ${canRetryAccept ? `<div class="notice warning accept-box"><span>La aceptación automática falló. Rappi cancela el pedido si nadie lo acepta en 6 minutos desde que entró (${formatTime(order.provider_created_at || order.first_received_at)}).</span><button class="button" type="button" id="accept-order">Reintentar aceptación</button></div>` : ""}
     ${canShowHandoff ? handoffBox(handoff) : ""}
     ${waiting ? `<div class="notice accept-box"><label class="reject-label">Si no puedes prepararlo<select id="reject-reason">${rejectOptions()}</select></label><button class="button secondary" type="button" id="reject-order">Rechazar pedido</button></div>` : ""}
     ${inKitchen ? `<div class="notice"><span>Rappi lo marca listo solo cuando se cumple el tiempo de preparación y envía al repartidor. Si falta un producto, el momento de decirlo es al aceptar: rechaza el pedido.</span></div>` : ""}
@@ -225,32 +225,6 @@ function renderDetail(detail) {
   // El botón se guarda antes del await: event.currentTarget queda en null en
   // cuanto el handler cede el control, y sin esto se queda en "Cargando…"
   // para siempre cuando Rappi responde con un error.
-  document.querySelector("#accept-order")?.addEventListener("click", async (event) => {
-    const boton = event.currentTarget;
-    setBusy(boton, true, "Aceptando…");
-    try {
-      const result = await invokeRappi("rappi-data", { action: "accept_order", order_id: order.id });
-      toast(result.outcome === "ACCEPTED" ? "Pedido aceptado en Rappi." : "Rappi no permitió aceptarlo. Revisa el estado del pedido.", result.outcome === "ACCEPTED" ? "success" : "error");
-      renderDetail(result);
-      await loadBoard();
-    } catch (error) {
-      showError(error);
-      setBusy(boton, false);
-    }
-  });
-
-  document.querySelector("#handoff-order")?.addEventListener("click", async (event) => {
-    const boton = event.currentTarget;
-    setBusy(boton, true, "Consultando…");
-    try {
-      state.handoffs.set(order.id, await invokeRappi("rappi-operaciones", { action: "order_handoff", order_id: order.id }));
-      renderDetail(detail);
-    } catch (error) {
-      showError(error);
-      setBusy(boton, false);
-    }
-  });
-
   document.querySelector("#reject-order")?.addEventListener("click", async (event) => {
     const boton = event.currentTarget;
     const cancelType = document.querySelector("#reject-reason")?.value;
@@ -268,11 +242,26 @@ function renderDetail(detail) {
   });
 }
 
+/**
+ * Pide el código una sola vez por pedido y vuelve a pintar el detalle si sigue
+ * abierto. Un error también se guarda: el refresco cada 30 s no reintenta en bucle.
+ */
+async function loadHandoff(order, detail) {
+  state.handoffs.set(order.id, null);
+  let result;
+  try {
+    result = await invokeRappi("rappi-operaciones", { action: "order_handoff", order_id: order.id });
+  } catch (error) {
+    result = { error: error.message || "Rappi no entregó el código de entrega." };
+  }
+  state.handoffs.set(order.id, result);
+  if (state.openOrderId === order.id && dialog.open) renderDetail(detail);
+}
+
 /** Código de entrega: número de 4 dígitos y QR que el repartidor confirma en el local. */
 function handoffBox(handoff) {
-  if (!handoff) {
-    return `<div class="notice accept-box"><span>Cuando llegue el repartidor, muéstrale el código de entrega para que confirme que recibe este pedido.</span><button class="button secondary" type="button" id="handoff-order">Ver código de entrega</button></div>`;
-  }
+  if (!handoff) return `<div class="notice"><span>Consultando el código de entrega en Rappi…</span></div>`;
+  if (handoff.error) return `<div class="notice warning"><span>${escapeHtml(handoff.error)}</span></div>`;
   const qr = handoff.qr_png_base64
     ? `<img class="handoff-qr" alt="QR de entrega" src="data:image/png;base64,${escapeHtml(handoff.qr_png_base64)}">`
     : "";
@@ -330,9 +319,9 @@ async function loadStores() {
 }
 
 async function loadMenus() {
-  const rows = await invokeRappi("rappi-data", { action: "menu_support" });
+  const rows = await invokeRappi("rappi-operaciones", { action: "menu_status" });
   if (!rows.length) return;
-  document.querySelector("#menus-body").innerHTML = rows.map((store) => `<tr><td><strong>${escapeHtml(store.store_name || "Tienda Rappi")}</strong></td><td>${statusBadge(store.menu?.approval_status || store.menu_approval_status || "PENDING")}</td><td>${escapeHtml(store.menu?.item_count ?? "—")}</td></tr>`).join("");
+  document.querySelector("#menus-body").innerHTML = rows.map((store) => `<tr><td><strong>${escapeHtml(store.store_name || "Tienda Rappi")}</strong></td><td>${statusBadge(store.status)}</td><td>${escapeHtml(store.product_count ?? "—")}</td></tr>`).join("");
 }
 
 async function loadOrders() {
