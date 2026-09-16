@@ -11,6 +11,7 @@ try {
   } else {
     wireActions();
     await loadStatus();
+    await loadPartnerLink();
   }
 } catch (error) {
   console.error("[rappi-integration]", error);
@@ -26,6 +27,29 @@ function wireActions() {
   });
   document.querySelector("#credentials-form").addEventListener("submit", onboard);
   document.querySelector("#menu-form").addEventListener("submit", uploadMenu);
+  document.querySelector("#partner-link-start").addEventListener("click", startPartnerLink);
+}
+
+/** La vinculación solo aparece cuando Rappi entregó el client_id de Partners. */
+async function loadPartnerLink() {
+  try {
+    const config = await invokeRappi("rappi-vincular", { action: "config", environment: "DEV" });
+    document.querySelector("#partner-link-card").hidden = !config.available;
+  } catch (error) {
+    console.warn("[rappi-integration] vinculación no disponible", error);
+  }
+}
+
+async function startPartnerLink(event) {
+  const boton = event.currentTarget;
+  setBusy(boton, true, "Abriendo Rappi…");
+  try {
+    const result = await invokeRappi("rappi-vincular", { action: "start", environment: "DEV" });
+    window.location.assign(result.authorize_url);
+  } catch (error) {
+    toast(error.message, "error");
+    setBusy(boton, false);
+  }
 }
 
 async function loadStatus() {
