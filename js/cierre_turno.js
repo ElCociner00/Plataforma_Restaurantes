@@ -319,7 +319,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (!data.existe) {
-        setJornadaAviso("");
+        await avisarJornadaFueraDeOrden();
         return;
       }
 
@@ -340,6 +340,71 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  /**
+   * Jornadas de ese día que ya están subidas en esta sede. Devuelve null si no
+   * se pudo averiguar, para no confundir "no hay ninguna" con "no se sabe".
+   */
+  const jornadasSubidas = async () => {
+    if (!fecha?.value) return null;
+    try {
+      const contexto = await getContextPayload();
+      const empresaId = contexto?.empresa_id;
+      if (!empresaId) return null;
+      const esLocal = await resolverEmpresaEsLocal(empresaId);
+      const { data, error } = await supabase
+        .from(tablaSegunSede(CIERRE_TABLES, esLocal))
+        .select("numero_turno")
+        .eq("empresa_id", empresaId)
+        .eq("fecha_turno", fecha.value);
+      if (error) return null;
+      return [...new Set((data ?? []).map((fila) => Number(fila.numero_turno)))].sort();
+    } catch (_error) {
+      return null;
+    }
+  };
+
+  /**
+   * Propone la jornada que toca según lo ya subido ese día.
+   *
+   * La jornada se elegía a ojo y cerrando a las nueve de la noche es natural
+   * marcar "Turno 3 · Noche" aunque sea el segundo turno del día. Eso dejaba el
+   * turno 2 vacío, y el siguiente cierre no encontraba turno anterior con el
+   * que comparar la caja: en VIVA y LE MERIDIEM pasó ocho veces en tres semanas.
+   */
+  const sugerirJornada = async () => {
+    if (!jornadaSelect || numeroTurno) return;
+    const subidas = await jornadasSubidas();
+    if (!subidas) return;
+    const siguiente = [1, 2, 3].find((numero) => !subidas.includes(numero));
+    if (!siguiente) return;
+    jornadaSelect.value = String(siguiente);
+    seleccionarJornada(String(siguiente));
+  };
+
+  /** Avisa cuando la jornada elegida deja un hueco: turno 3 sin turno 2. */
+  const avisarJornadaFueraDeOrden = async () => {
+    if (!numeroTurno || numeroTurno === 1) {
+      setJornadaAviso("");
+      return;
+    }
+    const subidas = await jornadasSubidas();
+    if (!subidas) {
+      setJornadaAviso("");
+      return;
+    }
+    const faltan = [1, 2].filter((numero) => numero < numeroTurno && !subidas.includes(numero));
+    if (!faltan.length) {
+      setJornadaAviso("");
+      return;
+    }
+    const corresponde = [1, 2, 3].find((numero) => !subidas.includes(numero));
+    setJornadaAviso(
+      `De este día todavía no se ha subido el turno ${faltan.join(" ni el ")}. ` +
+      `Si este es el turno que sigue, marca «Turno ${corresponde}»: dejar el hueco hace que el próximo cierre no encuentre con qué caja compararse.`,
+      true,
+    );
+  };
+
   const seleccionarJornada = (valor) => {
     numeroTurno = Number(valor) || null;
     // La caja heredada depende de numero_turno tanto como de la fecha: pasar
@@ -350,11 +415,14 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   jornadaSelect?.addEventListener("change", () => seleccionarJornada(jornadaSelect.value));
+  // Si llega al desplegable sin haber elegido, se le deja marcada la que toca.
+  jornadaSelect?.addEventListener("focus", () => { sugerirJornada(); }, { once: true });
 
   fecha?.addEventListener("change", () => {
     // La caja heredada depende de la fecha, así que deja de ser válida.
     limpiarEfectivoApertura();
     revisarTurnoExistente();
+    sugerirJornada();
   });
 
   // ── Efectivo de apertura ──────────────────────────────────────────────
