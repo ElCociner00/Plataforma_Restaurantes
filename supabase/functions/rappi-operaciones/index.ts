@@ -24,8 +24,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const body = await leerCuerpo(req);
     const ctx = await resolverContexto(req, text(body.empresa_id) || null);
     const action = text(body.action).toLowerCase();
-    // El código de entrega lo necesita quien despacha, no solo el admin.
-    if (action !== "order_handoff") exigirAdmin(ctx, "operar la tienda en Rappi");
+    // Consultas que necesita quien atiende (código de entrega, menú); el resto es de admin.
+    if (!["order_handoff", "menu_status"].includes(action)) exigirAdmin(ctx, "operar la tienda en Rappi");
     let result: unknown;
     switch (action) {
       case "store_integrated": result = await storeIntegrated(ctx, body); break;
@@ -37,6 +37,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       case "store_availability": result = await storeAvailability(ctx, body); break;
       case "store_checkin_code": result = await storeCheckinCode(ctx, body); break;
       case "order_handoff": result = await orderHandoff(ctx, body); break;
+      case "menu_status": result = await menuStatus(ctx); break;
       case "integration_webhooks": result = await integrationWebhooks(ctx, body); break;
       default:
         throw new ErrorFuncion("UNKNOWN_ACTION", "La acción solicitada no existe.", 400);
@@ -403,4 +404,49 @@ async function orderHandoff(ctx: Contexto, body: Record<string, unknown>) {
     code: text(result.product_confirmation_code) || null,
     qr_png_base64: /^[A-Za-z0-9+/=]+$/.test(qr) ? qr : null,
   };
+}
+
+/**
+ * Estado del menú de cada tienda consultado a Rappi en vivo: aprobación
+ * (`menu/approved`) y cuántos productos tiene publicados (`menu/current`).
+ * Actualiza el estado guardado para que el resto de Enkrato no quede atrasado.
+ */
+async function menuStatus(ctx: Contexto) {
+  const db = ctx.clienteAdmin();
+  const { data: stores, error } = await db.from("rappi_stores")
+    .select("id, rappi_store_id, store_name, connection_id, rappi_connections(id, empresa_id, environment, status, operational_base_url, orders_base_url, financial_base_url, operational_enabled, financial_enabled)")
+    .or(`empresa_id.eq.${ctx.empresaId},enkrato_empresa_id.eq.${ctx.empresaId}`).eq("active", true)
+    .order("store_name");
+  if (error) throw errores.baseDeDatos(error.message);
+  const rows = (stores ?? []) as unknown as {
+    id: string; rappi_store_id: string; store_name: string | null; rappi_connections: RappiConnection | null;
+  }[];
+  return await Promise.all(rows.map(async (store) => {
+    const connection = store.rappi_connections;
+    if (!connection) return { store_id: store.id, store_name: store.store_name, status: "UNKNOWN", product_count: null };
+    const storePath = encodeURIComponent(store.rappi_store_id);
+    const [approval, current] = await Promise.all([
+      rappiRequestWithStatus(db, connection, "OPERATIONAL", `${PUBLIC_API}/menu/approved/${storePath}`),
+      rappiRequestWithStatus(db, connection, "OPERATIONAL", `${PUBLIC_API}/store/${storePath}/menu/current`),
+    ]);
+    const status = menuApprovalFrom(approval);
+    const currentBody = Array.isArray(current.body) ? current.body[0] : current.body;
+    const products = (currentBody as Record<string, unknown> | undefined)?.products;
+    const productCount = current.status >= 200 && current.status < 300 && Array.isArray(products) ? products.length : null;
+    if (status !== "UNKNOWN") {
+      await db.from("rappi_stores").update({ menu_approval_status: status }).eq("id", store.id);
+    }
+    return { store_id: store.id, store_name: store.store_name, status, product_count: productCount };
+  }));
+}
+
+/** `menu/approved` responde texto plano: AVAILABLE, PENDING, REJECTED… */
+function menuApprovalFrom(response: { status: number; body: unknown }): string {
+  if (response.status < 200 || response.status >= 300) return "UNKNOWN";
+  const record = (response.body ?? {}) as Record<string, unknown>;
+  const raw = text(record.raw ?? record.status ?? record.state ?? response.body).toUpperCase();
+  if (["AVAILABLE", "APPROVED", "TRUE"].includes(raw)) return "APPROVED";
+  if (raw.includes("REJECT")) return "REJECTED";
+  if (raw.includes("PENDING") || raw.includes("PROCESS")) return "PENDING";
+  return "UNKNOWN";
 }
