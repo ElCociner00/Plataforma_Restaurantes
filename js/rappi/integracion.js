@@ -165,10 +165,23 @@ async function toggleStoreOpen(event) {
   input.disabled = true;
   try {
     const result = await invokeRappi("rappi-operaciones", { action: "store_availability", environment: "DEV", store_id: input.dataset.storeOpen, enabled });
-    input.checked = result.enabled === true;
-    input.nextElementSibling.textContent = result.enabled ? "Abierta" : "Cerrada";
-    if (result.ok === false) toast(`Rappi no permitió el cambio${result.reason ? `: ${result.reason}` : "."}`, "error");
-    else toast(result.enabled ? "La tienda quedó abierta en Rappi." : "La tienda quedó cerrada en Rappi.");
+    if (result.ok === false) {
+      input.checked = !enabled;
+      toast(`Rappi no permitió el cambio${result.reason ? `: ${result.reason}` : "."}`, "error");
+      return;
+    }
+    input.checked = enabled;
+    if (!enabled) {
+      input.nextElementSibling.textContent = "Cerrada";
+      toast("La tienda quedó cerrada en Rappi.");
+      return;
+    }
+    // Encender no basta si Rappi aún no publica la tienda (p. ej. «Not ready to sell»).
+    const check = await invokeRappi("rappi-operaciones", { action: "store_availability", environment: "DEV", store_id: input.dataset.storeOpen });
+    input.nextElementSibling.textContent = check.enabled ? "Abierta" : "Encendida, sin publicar";
+    toast(check.enabled
+      ? "La tienda quedó abierta en Rappi."
+      : "La tienda quedó encendida, pero Rappi todavía no la publica para vender. Eso lo habilita Rappi.");
   } catch (error) {
     input.checked = !enabled;
     toast(error.message, "error");
