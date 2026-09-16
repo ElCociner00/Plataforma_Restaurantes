@@ -3,6 +3,7 @@ import { errores, ErrorFuncion, leerCuerpo, responderError } from "../_shared/er
 import { type Contexto, exigirAdmin, resolverContexto } from "../_shared/tenant.ts";
 import { rappiRequestWithStatus, rappiUtilsRequest } from "../_shared/rappi/client.ts";
 import type { RappiConnection } from "../_shared/rappi/types.ts";
+import { decryptText } from "../_shared/crypto.ts";
 
 /**
  * Operación de la tienda en Rappi: integrada o no, estado del menú,
@@ -29,6 +30,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       case "menu_approval": result = await menuApproval(ctx, body); break;
       case "items_availability": result = await itemsAvailability(ctx, body); break;
       case "store_schedule": result = await storeSchedule(ctx, body); break;
+      case "self_onboarding": result = await selfOnboarding(ctx, body); break;
+      case "integration_webhooks": result = await integrationWebhooks(ctx, body); break;
       default:
         throw new ErrorFuncion("UNKNOWN_ACTION", "La acción solicitada no existe.", 400);
     }
@@ -218,4 +221,80 @@ async function storeSchedule(ctx: Contexto, body: Record<string, unknown>) {
       throw new ErrorFuncion("UNKNOWN_ACTION", "Operación de horario no válida.", 400);
   }
   return { op, rappi: rappiResult(response) };
+}
+
+/**
+ * Auto-onboarding: webhook de integración (STORE_PROVISIONING_STATUS) y
+ * aprovisionamiento de la tienda con PING y eventos de cancelación activos.
+ * Devuelve el código de Rappi en vez de lanzar: el contrato de estos
+ * endpoints aún se está confirmando con Rappi.
+ */
+async function selfOnboarding(ctx: Contexto, body: Record<string, unknown>) {
+  const clientId = text(body.client_id);
+  if (!/^[A-Za-z0-9_-]{8,128}$/.test(clientId)) throw errores.datosIncompletos("client_id");
+  const { connection, store } = await connectionStore(ctx, body);
+  const admin = ctx.clienteAdmin();
+  const results: Record<string, unknown> = {};
+  if (body.webhook_url) {
+    const url = text(body.webhook_url);
+    if (!/^https:\/\//.test(url)) throw errores.datosIncompletos("webhook_url https");
+    const response = await rappiRequestWithStatus(admin, connection, "OPERATIONAL",
+      `${PUBLIC_API}/clients/${encodeURIComponent(clientId)}/webhooks`,
+      { method: "POST", body: JSON.stringify({ event: "STORE_PROVISIONING_STATUS", url }) });
+    results.webhook = { status: response.status, body: redactSensitive(response.body) };
+  }
+  const provisioning = {
+    store_id: store.rappi_store_id,
+    name: text(body.store_name) || store.rappi_store_id,
+    status: "ACTIVE",
+    store_integration_id: store.integration_store_id || store.rappi_store_id,
+    ping_active: true,
+    cancellation_events: true,
+  };
+  const perStore = await rappiRequestWithStatus(admin, connection, "OPERATIONAL",
+    `${PUBLIC_API}/stores/${encodeURIComponent(store.rappi_store_id)}/provisioning`,
+    { method: "POST", body: JSON.stringify(provisioning) });
+  results.provisioning = { status: perStore.status, body: redactSensitive(perStore.body) };
+  return results;
+}
+
+/**
+ * Registra a nivel integración (`/clients/{clientId}/webhooks`) los eventos que
+ * ya están suscritos por tienda, con la misma URL y el mismo secreto, para que
+ * Rappi los encuentre y firme igual que por tienda.
+ */
+async function integrationWebhooks(ctx: Contexto, body: Record<string, unknown>) {
+  const clientId = text(body.client_id);
+  if (!/^[A-Za-z0-9_-]{8,128}$/.test(clientId)) throw errores.datosIncompletos("client_id");
+  const events = Array.isArray(body.events) ? body.events.map((e) => text(e).toUpperCase()) : [];
+  if (!events.length) throw errores.datosIncompletos("events");
+  const connection = await getConnection(ctx, body);
+  const admin = ctx.clienteAdmin();
+  const key = Deno.env.get("MASTER_ENCRYPTION_KEY") ?? Deno.env.get("ENCRYPTION_KEY") ?? "";
+  const results: Record<string, unknown> = {};
+  for (const event of events) {
+    const { data: config } = await admin.from("rappi_webhook_configs")
+      .select("id, remote_url").eq("connection_id", connection.id).eq("event_type", event)
+      .maybeSingle<{ id: string; remote_url: string }>();
+    const { data: secretRow } = config
+      ? await admin.from("rappi_webhook_secrets").select("secret_ciphertext")
+        .eq("webhook_config_id", config.id).maybeSingle<{ secret_ciphertext: string }>()
+      : { data: null };
+    if (!config?.remote_url || !secretRow) {
+      results[event] = { status: 0, error: "sin configuración local" };
+      continue;
+    }
+    const response = await rappiRequestWithStatus(admin, connection, "OPERATIONAL",
+      `${PUBLIC_API}/clients/${encodeURIComponent(clientId)}/webhooks`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          event,
+          url: config.remote_url,
+          secret: await decryptText(secretRow.secret_ciphertext, key),
+        }),
+      });
+    results[event] = { status: response.status, body: redactSensitive(response.body) };
+  }
+  return results;
 }
