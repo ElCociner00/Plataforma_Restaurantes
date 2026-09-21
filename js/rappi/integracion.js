@@ -5,7 +5,7 @@ import {
 import { APP_URLS } from "../urls.js";
 
 const ENV = "DEV";
-const state = { status: null, menu: null };
+const state = { status: null, menu: null, resultados: new Map() };
 
 try {
   await bootRappiShell();
@@ -143,7 +143,7 @@ function render() {
       <div class="check-text">
         <strong>${escapeHtml(fila.titulo)}</strong>
         <span class="helper">${escapeHtml(fila.detalle)}</span>
-        <span class="helper check-result" hidden></span>
+        <span class="helper check-result" ${state.resultados.has(fila.id) ? "" : "hidden"}>${escapeHtml(state.resultados.get(fila.id) ?? "")}</span>
       </div>
       <div class="check-actions">
         ${fila.accion ? `<a class="button secondary compact" href="${escapeHtml(fila.accion.url)}">${escapeHtml(fila.accion.etiqueta)}</a>` : ""}
@@ -193,18 +193,14 @@ function render() {
 
 async function probar(boton, fila) {
   if (!fila) return;
-  const contenedor = boton.closest(".check-row");
-  const resultado = contenedor.querySelector(".check-result");
   setBusy(boton, true, "Probando…");
   try {
-    const mensaje = await fila.prueba();
-    resultado.hidden = false;
-    resultado.textContent = mensaje;
+    // El resultado se guarda porque al refrescar se vuelve a pintar la lista.
+    state.resultados.set(fila.id, await fila.prueba());
     await revisar();
   } catch (error) {
-    resultado.hidden = false;
-    resultado.textContent = error.message;
-    contenedor.classList.add("pending");
+    state.resultados.set(fila.id, error.message);
+    render();
     toast(error.message, "error");
   } finally {
     setBusy(boton, false);
