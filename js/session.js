@@ -147,71 +147,28 @@ const ES_TOKEN_EN_EL_FUTURO = (error) =>
   || String(error?.message || "").toLowerCase().includes("issued at future");
 
 /**
- * Cuánto tiempo, en segundos, le falta al token para que el servidor de datos
- * lo acepte. El reloj del servidor se lee de la cabecera Date de su propia
- * respuesta, así que no depende del reloj del navegador, que puede estar tan
- * desviado como el del servidor. Devuelve null si no se puede averiguar.
- */
-async function segundosHastaQueElTokenSeaValido() {
-  const { data } = await supabase.auth.getSession();
-  const token = data?.session?.access_token;
-  if (!token) return null;
-  let iat = null;
-  try {
-    const carga = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    iat = Number(JSON.parse(atob(carga)).iat);
-  } catch { return null; }
-  if (!Number.isFinite(iat)) return null;
-
-  try {
-    const respuesta = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/`, {
-      method: "HEAD",
-      headers: { apikey: SUPABASE_CONFIG.anonKey },
-    });
-    const fecha = Date.parse(respuesta.headers.get("date") || "");
-    if (!Number.isFinite(fecha)) return null;
-    return iat - Math.floor(fecha / 1000);
-  } catch { return null; }
-}
-
-/**
  * Repite una consulta mientras el fallo sea transitorio.
  *
- * El caso que de verdad importa es PGRST303: el servidor de datos ve el token
- * "emitido en el futuro" porque su reloj va atrasado respecto al de Auth. Un
- * token nuevo no arregla eso —nace con el mismo problema—, así que se mide el
- * desfase y se espera a que pase. Es feo, pero es lo único que permite entrar
- * mientras el desfase siga ahí, y queda registrado para poder reclamarlo.
+ * Con PGRST303 no se pide un token nuevo: el servidor de datos ve el token
+ * "emitido en el futuro" porque su reloj va atrasado, y uno nuevo nace con el
+ * mismo problema. Se reintenta un par de veces por si el desfase es de
+ * segundos y, si no, se deja que el llamante lo reporte sin cerrar la sesión.
  */
 async function conReintentos(consulta, etiqueta) {
   const esperas = [400, 1200, 2500];
   let ultimo = null;
-  let esperaPorDesfase = false;
-
   for (let intento = 0; intento <= esperas.length; intento += 1) {
     const resultado = await consulta();
     if (!esFalloTransitorio(resultado?.error)) return resultado;
     ultimo = resultado;
     if (intento === esperas.length) break;
 
-    if (ES_TOKEN_EN_EL_FUTURO(resultado.error) && !esperaPorDesfase) {
-      const desfase = await segundosHastaQueElTokenSeaValido();
-      if (Number.isFinite(desfase)) {
-        console.warn(`⚠️ ${etiqueta}: el servidor de datos va ${desfase} s por detrás del que emite el token.`);
-        if (desfase > 0 && desfase <= 180) {
-          esperaPorDesfase = true;
-          console.warn(`⏳ Esperando ${desfase + 2} s a que el token sea válido para el servidor…`);
-          await esperar((desfase + 2) * 1000);
-          continue;
-        }
-      }
-      // Pedir otro token no ayuda cuando el problema es el reloj.
-      await esperar(esperas[intento]);
-      continue;
+    if (ES_TOKEN_EN_EL_FUTURO(resultado.error)) {
+      console.warn(`⚠️ ${etiqueta}: el servidor de datos rechaza el token por su propio reloj (PGRST303).`);
+    } else {
+      console.warn(`⚠️ ${etiqueta}: fallo transitorio (${resultado.error.code || resultado.error.message}), reintentando…`);
+      await supabase.auth.refreshSession().catch(() => {});
     }
-
-    console.warn(`⚠️ ${etiqueta}: fallo transitorio (${resultado.error.code || resultado.error.message}), reintentando…`);
-    await supabase.auth.refreshSession().catch(() => {});
     await esperar(esperas[intento]);
   }
   return ultimo;
