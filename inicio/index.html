@@ -95,7 +95,22 @@
       setBusy(true, "Verificando acceso...");
       setStatus("Verificando tu acceso...");
 
-      const context = await getUserContext().catch(() => null);
+      let context = null;
+      try {
+        context = await getUserContext();
+      } catch (error) {
+        // No se pudo preguntar: la cuenta puede estar perfecta. Acusarla de no
+        // existir y cerrarle la sesion es lo peor que se puede hacer aqui.
+        if (error?.transitorio) {
+          setBusy(false, "Continuar con Google");
+          setStatus(
+            "Tu clave es correcta, pero el servidor no está respondiendo bien en este momento. " +
+            "Vuelve a intentarlo en un minuto; no hace falta que cambies nada.",
+            "error"
+          );
+          return;
+        }
+      }
 
       if (!context) {
         const correo = session?.user?.email || "esta cuenta";
