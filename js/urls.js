@@ -73,6 +73,7 @@ export const APP_URLS = {
   facturacion: buildAppPath("/facturacion/"),
   rappi: buildAppPath("/rappi/"),
   rappiOperacion: buildAppPath("/rappi/operacion.html"),
+  rappiMenu: buildAppPath("/rappi/menu.html"),
   rappiIntegracion: buildAppPath("/rappi/integracion.html"),
   revisionPagos: buildAppPath("/facturacion/revision_pagos.html"),
   cuentasFacturacion: buildAppPath("/facturacion/cuentas.html"),

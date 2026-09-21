@@ -2,7 +2,7 @@ import {
   bootRappiShell, emptyRow, escapeHtml, formatDate, formatMoney, invokeRappi, isAdminContext,
   setBusy, toast,
 } from "./core.js?v=20260914rappi6";
-import { paymentMethodLabel } from "./veredictos.js?v=20260916rappi9";
+import { paymentMethodLabel } from "./veredictos.js?v=20260921rappi12";
 import { APP_URLS } from "../urls.js";
 
 // Diferencias menores a esto se consideran redondeo o descuentos pequeños.

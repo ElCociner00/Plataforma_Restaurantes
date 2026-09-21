@@ -205,7 +205,7 @@ export function deliveryVerdict(order, formatTime = defaultTime) {
       if (acceptance === "FAILED") {
         return { tone: "bad", title: "No se pudo aceptar automáticamente", detail: order?.acceptance_error || "Acéptalo ya: Rappi lo cancela si nadie lo acepta en 6 minutos." };
       }
-      return { tone: "warn", title: "Esperando aceptación", detail: acceptance === "MANUAL" ? "La aceptación automática está apagada: acéptalo desde la tablet de Rappi. Si nadie lo acepta en 6 minutos, Rappi lo cancela." : "Enkrato lo está aceptando en Rappi." };
+      return { tone: "warn", title: "Esperando aceptación", detail: acceptance === "MANUAL" ? "La aceptación automática está apagada: acéptalo con «Aceptar ahora» o desde la app de Rappi. Si nadie lo acepta en 6 minutos, Rappi lo cancela." : "Enkrato lo está aceptando en Rappi." };
     case "NOT_ACCEPTED":
       return { tone: "bad", title: "Vencido: nadie lo aceptó a tiempo", detail: "Rappi lo cancela a los 6 minutos sin aceptación. No lo prepares ni lo despaches." };
     case "CANCELLED":
