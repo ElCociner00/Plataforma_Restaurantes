@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const pages = ["rappi/index.html", "rappi/operacion.html", "rappi/cuadre.html", "rappi/integracion.html"];
+const pages = ["rappi/index.html", "rappi/operacion.html", "rappi/menu.html", "rappi/cuadre.html", "rappi/integracion.html"];
 const expectedEvents = [
   "NEW_ORDER", "ORDER_EVENT_CANCEL", "ORDER_OTHER_EVENT", "MENU_APPROVED",
   "MENU_REJECTED", "PING", "STORE_CONNECTIVITY", "ORDER_RT_TRACKING",
@@ -39,12 +39,16 @@ for (const relativePage of pages) {
 }
 
 const integrationHtml = await readFile(path.join(root, "rappi/integracion.html"), "utf8");
-assert(integrationHtml.includes("Client ID de pruebas"), "Onboarding no solicita Client ID de pruebas");
-assert(integrationHtml.includes("Client Secret de pruebas"), "Onboarding no solicita Client Secret de pruebas");
-assert(integrationHtml.includes("Conectar y configurar"), "Onboarding no ofrece una acción única de conexión");
-assert(integrationHtml.includes("Validar y enviar menú"), "Onboarding no permite cargar un menú DEV por tienda");
-assert(!integrationHtml.includes('value="PROD"'), "La UI permite seleccionar producción");
+assert(integrationHtml.includes('id="credentials-form"'), "La integración no permite guardar las credenciales entregadas por Rappi");
+assert(integrationHtml.includes("Guardar y conectar"), "La integración no ofrece una acción única de conexión");
+assert(integrationHtml.includes("Estado de la conexión"), "La integración no muestra el checklist de estado");
+assert(integrationHtml.includes("aceptación automática"), "La integración no explica el comportamiento de los pedidos");
 assert(!integrationHtml.includes('name="operational_base_url"'), "La UI pide endpoints internos");
+const menuHtml = await readFile(path.join(root, "rappi/menu.html"), "utf8");
+assert(menuHtml.includes('src="../js/rappi/menu.js'), "El catálogo no carga su módulo aislado");
+assert(menuHtml.includes("Publicar en Rappi"), "El catálogo no permite publicar el menú construido en Enkrato");
+const menuScript = await readFile(path.join(root, "js/rappi/menu.js"), "utf8");
+assert(!/window\.confirm\("[^"\\]*(?:\\.[^"\\]*)*\r?\n/.test(menuScript), "El menú contiene un salto de línea dentro de una cadena entre comillas");
 
 const backendTypes = await readFile(path.join(root, "supabase/functions/_shared/rappi/types.ts"), "utf8");
 for (const event of expectedEvents) assert(backendTypes.includes(`"${event}"`), `Backend sin evento ${event}`);
@@ -62,6 +66,14 @@ assert(backendAdmin.includes("RAPPI_CLEANUP_DEV_ONLY"), "Limpieza de muestras no
 
 const backendWorker = await readFile(path.join(root, "supabase/functions/rappi-worker/index.ts"), "utf8");
 assert(backendWorker.includes("isRappiTesterSample"), "Worker no separa muestras del simulador");
+
+const menuFunction = await readFile(path.join(root, "supabase/functions/rappi-menu/index.ts"), "utf8");
+assert(menuFunction.includes("exigirAccesoEscritura"), "El menú permite escrituras sin respetar el acceso de la cuenta");
+assert(menuFunction.includes('.eq("active", true)'), "El menú permite importar o publicar sobre una tienda inactiva");
+assert(menuFunction.includes('.in("producto_id", idsProducto)'), "La publicación del menú lee enlaces de otros tenants");
+
+const menuMigration = await readFile(path.join(root, "supabase/migrations/20260921123000_rappi_menu_grupos_repetibles.sql"), "utf8");
+assert(menuMigration.includes("DROP CONSTRAINT IF EXISTS"), "La corrección de grupos repetidos no es una migración aditiva");
 
 const header = await readFile(path.join(root, "js/header.js"), "utf8");
 assert(!header.includes("Movimientos Rappi"), "Header conserva el nombre anterior");

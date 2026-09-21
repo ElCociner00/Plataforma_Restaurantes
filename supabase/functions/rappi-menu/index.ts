@@ -1,6 +1,6 @@
 import { corsHeaders, json } from "../_shared/cors.ts";
 import { errores, ErrorFuncion, leerCuerpo, responderError } from "../_shared/errores.ts";
-import { type Contexto, exigirAdmin, resolverContexto } from "../_shared/tenant.ts";
+import { type Contexto, exigirAccesoEscritura, exigirAdmin, resolverContexto } from "../_shared/tenant.ts";
 import { rappiRequestWithStatus } from "../_shared/rappi/client.ts";
 import type { RappiConnection } from "../_shared/rappi/types.ts";
 
@@ -25,8 +25,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const body = await leerCuerpo(req);
     const ctx = await resolverContexto(req, text(body.empresa_id) || null);
     exigirAdmin(ctx, "gestionar el menú de Rappi");
+    const action = text(body.action).toLowerCase();
+    // El catálogo es una consulta; todo lo demás cambia el catálogo local o
+    // publica en Rappi y debe respetar el ciclo de vida de la cuenta.
+    if (action !== "catalogo") await exigirAccesoEscritura(ctx);
     let result: unknown;
-    switch (text(body.action).toLowerCase()) {
+    switch (action) {
       case "catalogo": result = await catalogo(ctx); break;
       case "guardar_categoria": result = await guardarCategoria(ctx, body); break;
       case "borrar_categoria": result = await borrar(ctx, "rappi_menu_categorias", body); break;
@@ -357,18 +361,23 @@ type GrupoFila = { id: string; nombre: string; min_qty: number; max_qty: number;
 
 async function datosPublicacion(ctx: Contexto) {
   const db = ctx.clienteAdmin();
-  const [productos, categorias, grupos, opciones, enlaces] = await Promise.all([
+  const [productos, categorias, grupos, opciones] = await Promise.all([
     db.from("rappi_menu_productos").select("id, sku, nombre, descripcion, precio, imagen_path, categoria_id, orden")
       .eq("empresa_id", ctx.empresaId).eq("activo", true).order("orden").order("nombre"),
     db.from("rappi_menu_categorias").select("id, nombre, orden").eq("empresa_id", ctx.empresaId).order("orden"),
     db.from("rappi_menu_grupos").select("id, nombre, min_qty, max_qty, orden").eq("empresa_id", ctx.empresaId).order("orden"),
     db.from("rappi_menu_opciones").select("id, grupo_id, sku, nombre, precio, orden")
       .eq("empresa_id", ctx.empresaId).eq("activo", true).order("orden"),
-    db.from("rappi_menu_producto_grupos").select("producto_id, grupo_id, orden").order("orden"),
   ]);
-  for (const r of [productos, categorias, grupos, opciones, enlaces]) {
+  for (const r of [productos, categorias, grupos, opciones]) {
     if (r.error) throw errores.baseDeDatos(r.error.message);
   }
+  // service_role no debe leer ni siquiera enlaces de productos de otro tenant.
+  const idsProducto = (productos.data ?? []).map((p: { id: string }) => p.id);
+  const enlaces = idsProducto.length
+    ? await db.from("rappi_menu_producto_grupos").select("producto_id, grupo_id, orden").in("producto_id", idsProducto).order("orden")
+    : { data: [], error: null };
+  if (enlaces.error) throw errores.baseDeDatos(enlaces.error.message);
   const porGrupo = new Map<string, string[]>();
   for (const fila of enlaces.data ?? []) {
     const lista = porGrupo.get(fila.grupo_id) ?? [];
@@ -492,7 +501,8 @@ async function importar(ctx: Contexto, body: Record<string, unknown>) {
     .eq("empresa_id", ctx.empresaId).eq("environment", environment).maybeSingle<RappiConnection>();
   if (!connection) throw new ErrorFuncion("RAPPI_NOT_CONFIGURED", "Configura primero la conexión con Rappi.", 412);
   const { data: store } = await db.from("rappi_stores").select("id, rappi_store_id")
-    .eq("id", storeId).eq("connection_id", connection.id).maybeSingle<{ id: string; rappi_store_id: string }>();
+    .eq("id", storeId).eq("connection_id", connection.id).eq("active", true)
+    .maybeSingle<{ id: string; rappi_store_id: string }>();
   if (!store) throw new ErrorFuncion("RAPPI_STORE_NOT_FOUND", "La tienda no pertenece a esta conexión.", 404);
 
   const ruta = encodeURIComponent(store.rappi_store_id);
@@ -506,25 +516,26 @@ async function importar(ctx: Contexto, body: Record<string, unknown>) {
     throw new ErrorFuncion("MENU_RAPPI_VACIO", "Rappi no devolvió productos para esta tienda.", 404);
   }
 
-  const [{ data: categoriasExistentes }, { data: gruposExistentes }, { data: productosExistentes }] = await Promise.all([
+  const [{ data: categoriasExistentes }, { data: productosExistentes }] = await Promise.all([
     db.from("rappi_menu_categorias").select("id, nombre").eq("empresa_id", ctx.empresaId),
-    db.from("rappi_menu_grupos").select("id, nombre").eq("empresa_id", ctx.empresaId),
     db.from("rappi_menu_productos").select("id, nombre").eq("empresa_id", ctx.empresaId),
   ]);
   const clave = (valor: string) => valor.trim().toLowerCase();
   const categorias = new Map((categoriasExistentes ?? []).map((c) => [clave(c.nombre), c.id]));
-  const grupos = new Map((gruposExistentes ?? []).map((g) => [clave(g.nombre), g.id]));
+  // Los grupos se reutilizan solo si coinciden nombre Y opciones: en BATUT cada
+  // producto trae su propia lista bajo el mismo "Elige tus toppings".
+  const grupos = new Map<string, string>();
   const productos = new Set((productosExistentes ?? []).map((p) => clave(p.nombre)));
 
   let creados = 0;
   let omitidos = 0;
   for (const [indice, item] of productosRappi.entries()) {
-    const nombre = text(item.name);
+    const nombre = text(item.name).slice(0, 120);
     if (!nombre || productos.has(clave(nombre))) { omitidos += 1; continue; }
     const precio = Number(item.price);
     if (!Number.isFinite(precio) || precio <= 0) { omitidos += 1; continue; }
 
-    const nombreCategoria = text((item.category as Record<string, unknown> | undefined)?.name) || "Importados";
+    const nombreCategoria = (text((item.category as Record<string, unknown> | undefined)?.name) || "Importados").slice(0, 60);
     if (!categorias.has(clave(nombreCategoria))) {
       const { data: creada } = await db.from("rappi_menu_categorias")
         .insert({ empresa_id: ctx.empresaId, nombre: nombreCategoria, orden: categorias.size }).select("id").maybeSingle();
@@ -536,7 +547,7 @@ async function importar(ctx: Contexto, body: Record<string, unknown>) {
       categoria_id: categorias.get(clave(nombreCategoria)) ?? null,
       sku: await siguienteSku(ctx, "P"),
       nombre,
-      descripcion: text(item.description),
+      descripcion: text(item.description).slice(0, 500),
       precio,
       activo: true,
       orden: indice,
@@ -550,33 +561,40 @@ async function importar(ctx: Contexto, body: Record<string, unknown>) {
     const porGrupo = new Map<string, { min: number; max: number; opciones: Record<string, unknown>[] }>();
     for (const hijo of hijos) {
       const categoriaHijo = (hijo.category ?? {}) as Record<string, unknown>;
-      const nombreGrupo = text(categoriaHijo.name) || "Opciones";
+      const nombreGrupo = (text(categoriaHijo.name) || "Opciones").slice(0, 80);
       const actual = porGrupo.get(nombreGrupo) ??
         { min: entero(categoriaHijo.minQty), max: Math.max(1, entero(categoriaHijo.maxQty, 1)), opciones: [] };
       actual.opciones.push(hijo);
       porGrupo.set(nombreGrupo, actual);
     }
     for (const [nombreGrupo, datos] of porGrupo) {
-      if (!grupos.has(clave(nombreGrupo))) {
+      const firma = `${clave(nombreGrupo)}|${datos.min}|${datos.max}|${
+        datos.opciones.map((o) => `${clave(text(o.name))}:${Number(o.price) || 0}`).join(",")
+      }`;
+      if (!grupos.has(firma)) {
         const { data: grupoCreado } = await db.from("rappi_menu_grupos").insert({
           empresa_id: ctx.empresaId, nombre: nombreGrupo, min_qty: datos.min, max_qty: datos.max, orden: grupos.size,
         }).select("id").maybeSingle();
         if (!grupoCreado?.id) continue;
-        grupos.set(clave(nombreGrupo), grupoCreado.id);
+        grupos.set(firma, grupoCreado.id);
         for (const [posicion, opcion] of datos.opciones.entries()) {
           await db.from("rappi_menu_opciones").insert({
             empresa_id: ctx.empresaId,
             grupo_id: grupoCreado.id,
             sku: await siguienteSku(ctx, "O"),
-            nombre: text(opcion.name) || `Opción ${posicion + 1}`,
+            nombre: (text(opcion.name) || `Opción ${posicion + 1}`).slice(0, 80),
             precio: Math.max(0, Number(opcion.price) || 0),
             activo: true,
             orden: posicion,
           });
         }
       }
-      const grupoId = grupos.get(clave(nombreGrupo));
-      if (grupoId) await db.from("rappi_menu_producto_grupos").insert({ producto_id: producto.id, grupo_id: grupoId, orden: 0 });
+      const grupoId = grupos.get(firma);
+      if (grupoId) {
+        const { error } = await db.from("rappi_menu_producto_grupos")
+          .insert({ producto_id: producto.id, grupo_id: grupoId, orden: grupos.size - 1 });
+        if (error) throw errores.baseDeDatos(error.message);
+      }
     }
   }
   return { creados, omitidos, total: productosRappi.length };

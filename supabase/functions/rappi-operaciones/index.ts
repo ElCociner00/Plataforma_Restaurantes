@@ -430,6 +430,9 @@ async function menuStatus(ctx: Contexto) {
       rappiRequestWithStatus(db, connection, "OPERATIONAL", `${PUBLIC_API}/store/${storePath}/menu/current`),
     ]);
     const status = menuApprovalFrom(approval);
+    if (status === "UNKNOWN") {
+      console.warn(`[${LABEL}] menu/approved sin estado reconocible:`, approval.status, JSON.stringify(approval.body).slice(0, 300));
+    }
     const currentBody = Array.isArray(current.body) ? current.body[0] : current.body;
     const products = (currentBody as Record<string, unknown> | undefined)?.products;
     const productCount = current.status >= 200 && current.status < 300 && Array.isArray(products) ? products.length : null;

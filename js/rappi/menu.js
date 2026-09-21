@@ -293,9 +293,9 @@ async function importar(event) {
   const boton = event.currentTarget;
   const storeId = document.querySelector("#publish-store").value;
   if (!storeId) return toast("Elige una tienda.", "error");
-  if (!window.confirm("Se copiarán a Enkrato los productos que esa tienda ya tiene en Rappi. Los que ya existan aquí no se duplican.
+  if (!window.confirm(`Se copiarán a Enkrato los productos que esa tienda ya tiene en Rappi. Los que ya existan aquí no se duplican.
 
-¿Continuar?")) return;
+¿Continuar?`)) return;
   setBusy(boton, true, "Trayendo…");
   try {
     const r = await invokeRappi("rappi-menu", { action: "importar", store_id: storeId, environment: "DEV" });
