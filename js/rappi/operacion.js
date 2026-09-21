@@ -5,7 +5,7 @@ import {
 import {
   deliveryProgress, deliverySteps, deliveryVerdict, eventLabel, fulfillment, fulfillmentLabel,
   notFoundVerdict, paymentMethodLabel, paymentVerdict,
-} from "./veredictos.js?v=20260916rappi9";
+} from "./veredictos.js?v=20260921rappi12";
 
 // Mientras haya pedidos en curso, la lista se refresca sola: quien atiende
 // no debería tener que acordarse de pulsar "Actualizar".
@@ -183,8 +183,8 @@ async function renderOrder(orderId) {
 function renderDetail(detail) {
   const order = detail.order;
   const items = Array.isArray(order.items) ? order.items : [];
-  // La aceptación es solo automática (pactado con el cliente); si falla, el
-  // empleado acepta desde la app de Rappi. Rechazar queda para casos puntuales.
+  // Rappi exige poder aceptar y rechazar desde el integrador, aunque la
+  // aceptación automática esté encendida y casi siempre llegue primero.
   const waiting = order.operational_status === "RECEIVED" && order.acceptance_status !== "ACCEPTED";
   // El repartidor confirma este código antes de llevarse el pedido: se consulta solo.
   const canShowHandoff = ["IN_PROGRESS", "READY"].includes(order.operational_status);
@@ -206,6 +206,7 @@ function renderDetail(detail) {
     </div>
     ${stepper(order)}
     ${canShowHandoff ? handoffBox(handoff) : ""}
+    ${waiting ? `<div class="notice warning accept-box"><span>Rappi cancela el pedido si nadie lo acepta en 6 minutos desde que entró (${formatTime(order.provider_created_at || order.first_received_at)}).</span><button class="button" type="button" id="accept-order">Aceptar ahora</button></div>` : ""}
     ${waiting ? `<div class="notice accept-box"><label class="reject-label">Si no puedes prepararlo<select id="reject-reason">${rejectOptions()}</select></label><button class="button secondary" type="button" id="reject-order">Rechazar pedido</button></div>` : ""}
     ${inKitchen ? `<div class="notice"><span>Rappi lo marca listo solo cuando se cumple el tiempo de preparación y envía al repartidor. Si falta un producto, el momento de decirlo es al aceptar: rechaza el pedido.</span></div>` : ""}
     <div class="detail-grid">
@@ -225,6 +226,20 @@ function renderDetail(detail) {
   // El botón se guarda antes del await: event.currentTarget queda en null en
   // cuanto el handler cede el control, y sin esto se queda en "Cargando…"
   // para siempre cuando Rappi responde con un error.
+  document.querySelector("#accept-order")?.addEventListener("click", async (event) => {
+    const boton = event.currentTarget;
+    setBusy(boton, true, "Aceptando…");
+    try {
+      const result = await invokeRappi("rappi-data", { action: "accept_order", order_id: order.id });
+      toast(result.outcome === "ACCEPTED" ? "Pedido aceptado en Rappi." : "Rappi no permitió aceptarlo. Revisa el estado del pedido.", result.outcome === "ACCEPTED" ? "success" : "error");
+      renderDetail(result);
+      await loadBoard();
+    } catch (error) {
+      showError(error);
+      setBusy(boton, false);
+    }
+  });
+
   document.querySelector("#reject-order")?.addEventListener("click", async (event) => {
     const boton = event.currentTarget;
     const cancelType = document.querySelector("#reject-reason")?.value;
