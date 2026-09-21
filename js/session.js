@@ -99,6 +99,16 @@ function mapContextPayload(data, fallbackUser) {
   };
 }
 
+/** El contexto no se pudo consultar; no significa que el usuario no exista. */
+export class ErrorDeConsulta extends Error {
+  constructor(causa) {
+    super(causa?.message || "No se pudo consultar el contexto del usuario.");
+    this.name = "ErrorDeConsulta";
+    this.causa = causa;
+    this.transitorio = true;
+  }
+}
+
 function ensureAuthCacheInvalidation() {
   if (authListenerInitialized) return;
   authListenerInitialized = true;
@@ -110,8 +120,52 @@ function ensureAuthCacheInvalidation() {
   });
 }
 
+/**
+ * Errores que no dicen nada del usuario: el token acaba de emitirse y el
+ * servidor aún lo ve "en el futuro" (PGRST303, unos segundos de desfase de
+ * reloj entre Auth y PostgREST), se venció mientras se cargaba la página, o
+ * la red falló. Tratarlos como "este usuario no tiene contexto" cierra la
+ * sesión y deja al cliente sin poder entrar.
+ */
+function esFalloTransitorio(error) {
+  if (!error) return false;
+  const codigo = String(error.code || "").toUpperCase();
+  if (["PGRST301", "PGRST303", "PGRST000", "PGRST002"].includes(codigo)) return true;
+  const mensaje = String(error.message || "").toLowerCase();
+  return mensaje.includes("jwt")
+    || mensaje.includes("issued at future")
+    || mensaje.includes("failed to fetch")
+    || mensaje.includes("networkerror")
+    || mensaje.includes("load failed");
+}
+
+const esperar = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Repite una consulta mientras el fallo sea transitorio. Ante un token que el
+ * servidor rechaza por tiempo se pide uno nuevo antes de reintentar, que es lo
+ * único que puede destrabarlo desde el navegador.
+ */
+async function conReintentos(consulta, etiqueta) {
+  const esperas = [400, 1200, 2500];
+  let ultimo = null;
+  for (let intento = 0; intento <= esperas.length; intento += 1) {
+    const resultado = await consulta();
+    if (!esFalloTransitorio(resultado?.error)) return resultado;
+    ultimo = resultado;
+    if (intento === esperas.length) break;
+    console.warn(`⚠️ ${etiqueta}: fallo transitorio (${resultado.error.code || resultado.error.message}), reintentando…`);
+    await supabase.auth.refreshSession().catch(() => {});
+    await esperar(esperas[intento]);
+  }
+  return ultimo;
+}
+
 async function getContextFromRpc() {
-  const { data, error } = await supabase.rpc("get_my_context");
+  const { data, error } = await conReintentos(
+    () => supabase.rpc("get_my_context"),
+    "get_my_context",
+  );
   if (error) {
     console.warn("⚠️ RPC get_my_context no disponible, se intentará fallback por tablas:", error.message || error);
     return null;
@@ -123,11 +177,21 @@ async function getContextFromRpc() {
 }
 
 async function getContextFromTables(user) {
-  const { data: usuarioSistema, error: usuarioError } = await supabase
-    .from("usuarios_sistema")
-    .select("id, empresa_id, nombre_completo, rol, activo")
-    .eq("id", user.id)
-    .maybeSingle();
+  const { data: usuarioSistema, error: usuarioError } = await conReintentos(
+    () => supabase
+      .from("usuarios_sistema")
+      .select("id, empresa_id, nombre_completo, rol, activo")
+      .eq("id", user.id)
+      .maybeSingle(),
+    "usuarios_sistema",
+  );
+
+  // Si ni siquiera se pudo preguntar, no se concluye nada sobre el usuario:
+  // se avisa al llamante para que conserve la sesión en vez de cerrarla.
+  if (esFalloTransitorio(usuarioError)) {
+    console.error("No se pudo consultar usuarios_sistema (fallo transitorio):", usuarioError);
+    throw new ErrorDeConsulta(usuarioError);
+  }
 
   if (usuarioError || !usuarioSistema) {
     const email = String(user?.email || "").trim().toLowerCase();
@@ -464,7 +528,22 @@ export async function getUserContext() {
   }
 
   const payload = await getContextFromRpc();
-  const fallbackPayload = payload || await getContextFromTables(user);
+  let fallbackPayload = payload;
+  if (!fallbackPayload) {
+    try {
+      fallbackPayload = await getContextFromTables(user);
+    } catch (error) {
+      // Servidor o token: la sesión sigue siendo válida y se conserva. Quien
+      // llama vuelve a intentarlo; cerrar sesión aquí dejaría al usuario
+      // rebotando contra la pantalla de ingreso.
+      // Se propaga: "no se pudo preguntar" no es "este usuario no existe", y
+      // solo quien protege la página puede decidir sin cerrar la sesión.
+      if (error instanceof ErrorDeConsulta) {
+        console.error("Contexto no disponible por ahora; se conserva la sesión:", error.causa);
+      }
+      throw error;
+    }
+  }
   if (!fallbackPayload) return null;
 
   const baseContext = mapContextPayload(fallbackPayload, user);

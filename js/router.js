@@ -117,7 +117,19 @@ export async function protectCurrentPage({ loginUrl = LOGIN_URL, publicPaths = [
     return false;
   }
 
-  const context = await getUserContext().catch(() => null);
+  let context = null;
+  try {
+    context = await getUserContext();
+  } catch (error) {
+    // El servidor no respondió o rechazó el token por tiempo. La sesión es
+    // válida: cerrarla aquí deja al usuario rebotando contra el ingreso sin
+    // poder hacer nada. Se conserva y se le ofrece reintentar.
+    if (error?.transitorio) {
+      mostrarFalloTemporal();
+      return false;
+    }
+    context = null;
+  }
   if (!context) {
     rememberRequestedPath();
     await supabase.auth.signOut().catch(() => {});
@@ -131,6 +143,24 @@ export async function protectCurrentPage({ loginUrl = LOGIN_URL, publicPaths = [
   const deferReveal = document?.body?.dataset?.deferReveal === "true";
   if (!deferReveal) revealPage();
   return true;
+}
+
+/** Pantalla mínima para un fallo del servidor, sin tocar la sesión. */
+function mostrarFalloTemporal() {
+  if (!document?.body) return;
+  document.body.style.display = "";
+  document.body.innerHTML = `
+    <main style="min-height:100vh;display:grid;place-items:center;padding:2rem;font-family:system-ui,sans-serif;text-align:center">
+      <div style="max-width:32rem">
+        <h1 style="font-size:1.25rem;margin-bottom:.5rem">No pudimos cargar tus datos</h1>
+        <p style="color:#555;margin-bottom:1.5rem">El servidor no respondió a tiempo. Tu sesión sigue abierta.</p>
+        <button type="button" id="reintentar-carga"
+          style="padding:.7rem 1.4rem;border:0;border-radius:.5rem;background:#111;color:#fff;font-size:1rem;cursor:pointer">
+          Reintentar
+        </button>
+      </div>
+    </main>`;
+  document.querySelector("#reintentar-carga")?.addEventListener("click", () => window.location.reload());
 }
 
 export function initAuthRouter({ loginUrl = LOGIN_URL, publicPaths = [] } = {}) {
