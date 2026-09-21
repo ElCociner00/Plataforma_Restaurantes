@@ -226,6 +226,15 @@ dialog::backdrop { background: rgb(15 23 42 / 58%); }
 .option-row { display: grid; grid-template-columns: 1fr 140px auto; gap: 10px; margin-bottom: 8px; align-items: center; }
 @media (max-width: 640px) { .option-row { grid-template-columns: 1fr; } }
 
+.checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.check-row { display: grid; grid-template-columns: 14px 1fr auto; gap: 14px; align-items: center; padding: 12px 14px; border: 1px solid var(--ek-border, #e5e7eb); border-radius: 12px; }
+.check-row .check-light { width: 14px; height: 14px; border-radius: 50%; background: var(--ek-warn, #f59e0b); }
+.check-row.ok .check-light { background: var(--ek-ok, #16a34a); }
+.check-row.ok { border-color: color-mix(in srgb, var(--ek-ok, #16a34a) 40%, transparent); }
+.check-text { display: grid; gap: 2px; }
+.check-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 720px) { .check-row { grid-template-columns: 14px 1fr; } .check-actions { grid-column: 2; } }
+
 @media print {
   .app-header, .rappi-subnav, .toolbar, .button, .toast-region { display: none !important; }
   .card, .metric { box-shadow: none; }

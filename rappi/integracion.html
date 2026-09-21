@@ -6,7 +6,7 @@
   <title>Enkrato | Integración Rappi</title>
   <link rel="stylesheet" href="../css/variables.css?v=20260829v4">
   <link rel="stylesheet" href="../css/main.css?v=20260829v4">
-  <link rel="stylesheet" href="../css/rappi.css?v=20260921rappi12">
+  <link rel="stylesheet" href="../css/rappi.css?v=20260921rappi13">
 </head>
 <body class="rappi-page" data-rappi-page="integration" style="display:none">
   <script type="module" src="../js/router.js?v=20260829v4"></script>
@@ -21,59 +21,45 @@
     </nav>
 
     <section class="rappi-hero">
-      <div><p class="eyebrow">Entorno de pruebas</p><h1>Integración Rappi</h1><p class="muted">Conecta tu cuenta y Enkrato configurará automáticamente lo necesario.</p></div>
-      <button class="button secondary compact" id="refresh-status" type="button">Actualizar estado</button>
+      <div><p class="eyebrow">Conexión con Rappi</p><h1>Integración</h1><p class="muted">Aquí se conecta tu cuenta de Rappi con Enkrato. Cuando todo esté en verde, los pedidos entran solos.</p></div>
+      <button class="button secondary compact" id="refresh-status" type="button">Revisar todo</button>
     </section>
 
     <section id="admin-required" class="notice warning" hidden>Esta sección requiere un usuario administrador. Puedes consultar la operación desde Rappi.</section>
+
     <div id="integration-content" data-admin-only>
-      <section class="status-grid" aria-label="Estado de la conexión">
-        <article class="metric"><span class="metric-label">Conexión con Rappi</span><strong id="connection-status">—</strong></article>
-        <article class="metric"><span class="metric-label">Tiendas conectadas</span><strong id="connected-stores">—</strong></article>
-        <article class="metric"><span class="metric-label">Última actualización</span><strong class="metric-text" id="last-update">—</strong></article>
-        <article class="metric"><span class="metric-label">Estado de configuración</span><strong class="metric-text" id="configuration-status">—</strong></article>
+      <section class="card" id="checklist-card">
+        <div class="section-heading">
+          <div><h2>Estado de la conexión</h2><p class="helper" id="checklist-summary">Revisando…</p></div>
+        </div>
+        <ul class="checklist" id="checklist"></ul>
       </section>
 
-      <section class="split-grid" style="margin-top:20px">
-        <article class="card">
-          <div class="section-heading"><div><h2>Conectar Rappi</h2><p class="helper">Usa las credenciales entregadas por Rappi para el entorno de pruebas. Los datos se cifran y nunca vuelven a mostrarse.</p></div></div>
-          <form id="credentials-form" class="form-grid" autocomplete="off">
-            <div class="field"><label for="test-client-id">Client ID de pruebas</label><input id="test-client-id" name="client_id" autocomplete="off" placeholder="Dejar vacío para conservar"></div>
-            <div class="field"><label for="test-client-secret">Client Secret de pruebas</label><input id="test-client-secret" name="client_secret" type="password" autocomplete="new-password" placeholder="Dejar vacío para conservar"></div>
-            <div class="field full"><button class="button" type="submit">Conectar y configurar</button></div>
-          </form>
-        </article>
-
-        <article class="card">
-          <div class="section-heading"><div><h2>Proceso de conexión</h2><p class="helper">Enkrato valida y prepara automáticamente la integración.</p></div></div>
-          <ol class="onboarding-list">
-            <li id="step-credentials"><span>Credenciales válidas</span><strong>—</strong></li>
-            <li id="step-stores"><span>Tiendas identificadas</span><strong>—</strong></li>
-            <li id="step-webhooks"><span>Recepción de información configurada</span><strong>—</strong></li>
-            <li id="step-data"><span>Información recibida</span><strong>—</strong></li>
-          </ol>
-          <div id="connection-message" class="notice" hidden></div>
-        </article>
-      </section>
-
-      <section class="card" id="partner-link-card" hidden>
-        <div class="section-heading"><div><h2>Vincular cuenta de Rappi Partners</h2><p class="helper">Inicia sesión con la cuenta de Rappi del restaurante para conectar sus tiendas a esta empresa. No se crea ninguna cuenta nueva en Enkrato.</p></div></div>
-        <button class="button" type="button" id="partner-link-start">Vincular con Rappi</button>
-      </section>
-
-      <section class="card">
-        <div class="section-heading"><div><h2>Tiendas</h2><p class="helper">Tiendas encontradas en la cuenta conectada.</p></div></div>
-        <div class="table-wrap"><table><thead><tr><th>Tienda</th><th>Abierta en Rappi</th><th>Estado</th><th>Última actualización</th><th>Menú</th><th>Aceptar pedidos automáticamente</th><th>Check-in</th></tr></thead><tbody id="integration-stores"><tr><td class="empty-cell" colspan="7">Conecta Rappi para identificar las tiendas.</td></tr></tbody></table></div>
-        <p class="helper">Rappi cancela un pedido si nadie lo acepta en 6 minutos. Con la aceptación automática, Enkrato lo acepta apenas llega. Apágala solo si esa tienda acepta los pedidos desde la tablet de Rappi.</p>
-      </section>
-
-      <section class="card">
-        <div class="section-heading"><div><h2>Menú de pruebas</h2><p class="helper">Carga el archivo JSON de una tienda. Enkrato validará su estructura antes de enviarlo al entorno de pruebas.</p></div></div>
-        <form id="menu-form" class="form-grid">
-          <div class="field"><label for="menu-store">Tienda</label><select id="menu-store" name="store_id" required><option value="">Conecta Rappi primero</option></select></div>
-          <div class="field"><label for="menu-file">Archivo del menú</label><input id="menu-file" name="menu_file" type="file" accept="application/json,.json" required></div>
-          <div class="field full"><button class="button" type="submit">Validar y enviar menú</button></div>
+      <section class="card" id="credentials-card">
+        <div class="section-heading">
+          <div><h2>Datos que entrega Rappi</h2><p class="helper">Rappi te envía dos claves por correo cuando habilita tu integración. Pégalas aquí una sola vez: quedan cifradas y no se vuelven a mostrar.</p></div>
+        </div>
+        <form id="credentials-form" class="form-grid" autocomplete="off">
+          <div class="field">
+            <label for="test-client-id">Client ID</label>
+            <input id="test-client-id" name="client_id" autocomplete="off" placeholder="Lo envía Rappi. Déjalo vacío para conservar el actual">
+          </div>
+          <div class="field">
+            <label for="test-client-secret">Client Secret</label>
+            <input id="test-client-secret" name="client_secret" type="password" autocomplete="new-password" placeholder="Lo envía Rappi. Déjalo vacío para conservar el actual">
+          </div>
+          <div class="field full">
+            <button class="button" type="submit">Guardar y conectar</button>
+            <span class="helper">Enkrato valida las claves, busca tus tiendas y deja listos los avisos de Rappi.</span>
+          </div>
         </form>
+        <div id="connection-message" class="notice" hidden></div>
+      </section>
+
+      <section class="card">
+        <div class="section-heading"><div><h2>Tiendas</h2><p class="helper">Tus locales tal como los ve Rappi.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Tienda</th><th>Abierta en Rappi</th><th>Conexión</th><th>Última señal</th><th>Menú</th><th>Aceptar pedidos automáticamente</th><th>Check-in</th></tr></thead><tbody id="integration-stores"><tr><td class="empty-cell" colspan="7">Conecta Rappi para identificar las tiendas.</td></tr></tbody></table></div>
+        <p class="helper">Rappi cancela un pedido si nadie lo acepta en 6 minutos. Con la aceptación automática, Enkrato lo acepta apenas llega; si se apaga, alguien debe aceptarlo desde Pedidos o desde la app de Rappi.</p>
       </section>
 
       <section class="card" id="incident-card" hidden>
@@ -89,6 +75,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="../js/rappi/integracion.js?v=20260916rappi10"></script>
+  <script type="module" src="../js/rappi/integracion.js?v=20260921rappi13"></script>
 </body>
 </html>

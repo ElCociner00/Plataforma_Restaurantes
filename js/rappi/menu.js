@@ -54,7 +54,7 @@ function render() {
   const nombreGrupo = new Map(grupos.map((g) => [g.id, g.nombre]));
 
   document.querySelector("#products-count").textContent = productos.length
-    ? `${productos.length} producto${productos.length === 1 ? "" : "s"} · ${productos.filter((p) => p.activo).length} se venden en Rappi`
+    ? `${productos.length} producto${productos.length === 1 ? "" : "s"} · ${productos.filter((p) => p.activo).length} a la venta en Rappi`
     : "Todavía no has creado productos.";
 
   document.querySelector("#products-body").innerHTML = productos.length

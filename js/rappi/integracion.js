@@ -4,14 +4,16 @@ import {
 } from "./core.js?v=20260914rappi6";
 import { APP_URLS } from "../urls.js";
 
+const ENV = "DEV";
+const state = { status: null, menu: null };
+
 try {
   await bootRappiShell();
   if (!isAdminContext()) {
     window.location.replace(APP_URLS.rappiOperacion);
   } else {
     wireActions();
-    await loadStatus();
-    await loadPartnerLink();
+    await revisar();
   }
 } catch (error) {
   console.error("[rappi-integration]", error);
@@ -20,119 +22,207 @@ try {
 
 function wireActions() {
   document.querySelector("#refresh-status").addEventListener("click", async (event) => {
-    setBusy(event.currentTarget, true, "Actualizando…");
-    try { await loadStatus(); }
+    setBusy(event.currentTarget, true, "Revisando…");
+    try { await revisar(); toast("Revisión terminada."); }
     catch (error) { toast(error.message, "error"); }
     finally { setBusy(event.currentTarget, false); }
   });
   document.querySelector("#credentials-form").addEventListener("submit", onboard);
-  document.querySelector("#menu-form").addEventListener("submit", uploadMenu);
-  document.querySelector("#partner-link-start").addEventListener("click", startPartnerLink);
 }
 
-/** La vinculación solo aparece cuando Rappi entregó el client_id de Partners. */
-async function loadPartnerLink() {
-  try {
-    const config = await invokeRappi("rappi-vincular", { action: "config", environment: "DEV" });
-    document.querySelector("#partner-link-card").hidden = !config.available;
-  } catch (error) {
-    console.warn("[rappi-integration] vinculación no disponible", error);
-  }
+async function revisar() {
+  state.status = await invokeRappi("rappi-admin", { action: "status", environment: ENV });
+  state.menu = await invokeRappi("rappi-operaciones", { action: "menu_status" }).catch(() => null);
+  render();
 }
 
-async function startPartnerLink(event) {
-  const boton = event.currentTarget;
-  setBusy(boton, true, "Abriendo Rappi…");
-  try {
-    const result = await invokeRappi("rappi-vincular", { action: "start", environment: "DEV" });
-    window.location.assign(result.authorize_url);
-  } catch (error) {
-    toast(error.message, "error");
-    setBusy(boton, false);
-  }
+/**
+ * El checklist habla en resultados, no en jerga: cada punto dice qué significa
+ * para el negocio y ofrece una prueba que se ejecuta contra Rappi en vivo.
+ */
+function comprobaciones() {
+  const s = state.status ?? {};
+  const stores = s.stores ?? [];
+  const webhooks = s.webhooks ?? [];
+  const activos = webhooks.filter((hook) => hook.state === "ENABLE");
+  const firmados = webhooks.filter((hook) => hook.last_valid_signature_at);
+  const pedidos = webhooks.find((hook) => hook.event_type === "NEW_ORDER");
+  const tokenOperativo = (s.tokens ?? []).some((token) => token.scope === "OPERATIONAL" && token.valid);
+  const menuAprobado = (state.menu ?? []).filter((fila) => fila.status === "APPROVED");
+  const productos = (state.menu ?? []).reduce((total, fila) => total + (fila.product_count ?? 0), 0);
+
+  return [
+    {
+      id: "credenciales",
+      titulo: "Rappi reconoce tus claves",
+      detalle: s.credentials?.operational
+        ? (tokenOperativo ? "Enkrato entra a Rappi con tus claves." : "Las claves están guardadas, falta confirmar el acceso.")
+        : "Todavía no has guardado las claves que te dio Rappi.",
+      ok: Boolean(s.credentials?.operational && tokenOperativo),
+      prueba: async () => {
+        const r = await invokeRappi("rappi-admin", { action: "test_operational", environment: ENV });
+        return r.auth_ok ? "Rappi aceptó tus claves." : "Rappi no aceptó las claves.";
+      },
+    },
+    {
+      id: "tiendas",
+      titulo: "Tus tiendas están identificadas",
+      detalle: stores.length ? `${stores.length} tienda(s): ${stores.map((t) => t.store_name || t.rappi_store_id).join(", ")}` : "Aún no vemos tiendas en tu cuenta de Rappi.",
+      ok: stores.length > 0,
+      prueba: async () => {
+        const r = await invokeRappi("rappi-admin", { action: "test_operational", environment: ENV });
+        return `Rappi reporta ${r.stores_found ?? stores.length} tienda(s).`;
+      },
+    },
+    {
+      id: "avisos",
+      titulo: "Rappi nos avisa de cada pedido",
+      detalle: `${activos.length} de 8 avisos configurados${activos.length === 8 ? "." : ": falta terminar la configuración."}`,
+      ok: activos.length === 8,
+      prueba: async () => {
+        const r = await invokeRappi("rappi-admin", { action: "remote_webhooks", environment: ENV });
+        const eventos = Array.isArray(r) ? r.length : (r?.data?.length ?? 0);
+        return `Rappi tiene ${eventos} aviso(s) registrados para tu cuenta.`;
+      },
+    },
+    {
+      id: "firma",
+      titulo: "Cada aviso llega firmado",
+      detalle: firmados.length
+        ? `Último aviso verificado: ${formatDate(firmados.map((h) => h.last_valid_signature_at).sort().at(-1))}`
+        : "Todavía no hemos recibido un aviso firmado de Rappi.",
+      ok: firmados.length > 0,
+      prueba: async () => {
+        await revisar();
+        const verificados = (state.status.webhooks ?? []).filter((h) => h.last_valid_signature_at).length;
+        return verificados ? `${verificados} aviso(s) con firma verificada.` : "Sin avisos firmados todavía.";
+      },
+    },
+    {
+      id: "pedidos",
+      titulo: "Los pedidos entran a Enkrato",
+      detalle: pedidos?.last_received_at
+        ? `Último pedido recibido: ${formatDate(pedidos.last_received_at)}`
+        : "Todavía no ha entrado ningún pedido de Rappi.",
+      ok: Boolean(pedidos?.last_received_at),
+      prueba: async () => {
+        const r = await invokeRappi("rappi-data", { action: "operation_summary" });
+        return `${r.total_orders ?? 0} pedido(s) registrados en Enkrato.`;
+      },
+    },
+    {
+      id: "menu",
+      titulo: "Tu menú está publicado en Rappi",
+      detalle: state.menu
+        ? (menuAprobado.length ? `Aprobado en ${menuAprobado.length} tienda(s) · ${productos} productos publicados` : "Rappi todavía no aprueba tu menú.")
+        : "No pudimos consultar el menú en Rappi.",
+      ok: menuAprobado.length > 0,
+      accion: { etiqueta: "Ir a Menú", url: APP_URLS.rappiMenu },
+      prueba: async () => {
+        state.menu = await invokeRappi("rappi-operaciones", { action: "menu_status" });
+        const aprobadas = state.menu.filter((fila) => fila.status === "APPROVED").length;
+        return aprobadas ? `Menú aprobado en ${aprobadas} tienda(s).` : "Rappi aún no aprueba el menú.";
+      },
+    },
+  ];
 }
 
-async function loadStatus() {
-  const result = await invokeRappi("rappi-admin", { action: "status", environment: "DEV" });
-  renderStatus(result);
-}
+function render() {
+  const s = state.status ?? {};
+  const stores = s.stores ?? [];
+  const lista = comprobaciones();
+  const listos = lista.filter((fila) => fila.ok).length;
 
-function renderStatus(result) {
-  const stores = result.stores || [];
-  const activeHooks = (result.webhooks || []).filter((hook) => hook.state === "ENABLE").length;
-  const hasCredentials = result.credentials?.operational === true;
-  const tokenValid = (result.tokens || []).some((token) => token.scope === "OPERATIONAL" && token.valid);
-  const receivedDates = [
-    ...stores.map((store) => store.last_ping_at || store.menu_updated_at),
-    ...(result.webhooks || []).map((hook) => hook.last_received_at),
-  ].filter(Boolean).sort();
-  const lastReceived = receivedDates.at(-1) || null;
-  const connected = result.configured && result.connection?.status === "CONNECTED" && tokenValid;
+  document.querySelector("#checklist-summary").textContent = listos === lista.length
+    ? "Todo listo: la integración con Rappi está funcionando."
+    : `${listos} de ${lista.length} puntos listos. Lo que falta está marcado abajo.`;
 
-  document.querySelector("#connection-status").innerHTML = statusBadge(connected ? "CONNECTED" : result.configured ? result.connection?.status : "NOT_CONFIGURED");
-  document.querySelector("#connected-stores").textContent = String(stores.length);
-  document.querySelector("#last-update").textContent = formatDate(lastReceived);
-  document.querySelector("#configuration-status").textContent = activeHooks === 8 ? "Lista" : result.configured ? "En proceso" : "Pendiente";
+  document.querySelector("#checklist").innerHTML = lista.map((fila) => `
+    <li class="check-row ${fila.ok ? "ok" : "pending"}" data-check="${escapeHtml(fila.id)}">
+      <span class="check-light" aria-hidden="true"></span>
+      <div class="check-text">
+        <strong>${escapeHtml(fila.titulo)}</strong>
+        <span class="helper">${escapeHtml(fila.detalle)}</span>
+        <span class="helper check-result" hidden></span>
+      </div>
+      <div class="check-actions">
+        ${fila.accion ? `<a class="button secondary compact" href="${escapeHtml(fila.accion.url)}">${escapeHtml(fila.accion.etiqueta)}</a>` : ""}
+        <button class="button secondary compact" type="button" data-test="${escapeHtml(fila.id)}">Probar</button>
+      </div>
+    </li>`).join("");
 
-  setStep("step-credentials", hasCredentials && tokenValid, hasCredentials ? "Validada" : "Pendiente");
-  setStep("step-stores", stores.length > 0, stores.length ? `${stores.length} encontradas` : "Pendiente");
-  setStep("step-webhooks", activeHooks === 8, activeHooks === 8 ? "Lista" : `${activeHooks} de 8`);
-  setStep("step-data", Boolean(lastReceived), lastReceived ? "Recibida" : "Esperando prueba");
+  document.querySelectorAll("[data-test]").forEach((boton) => {
+    boton.addEventListener("click", () => probar(boton, lista.find((fila) => fila.id === boton.dataset.test)));
+  });
 
   const storesBody = document.querySelector("#integration-stores");
   storesBody.innerHTML = stores.length
     ? stores.map((store) => `<tr>
         <td><strong>${escapeHtml(store.store_name || "Tienda Rappi")}</strong></td>
         <td><label class="switch"><input type="checkbox" data-store-open="${escapeHtml(store.id)}" disabled><span>Consultando…</span></label></td>
-        <td>${statusBadge(store.connectivity_status || (connected ? "CONNECTED" : "UNKNOWN"))}</td>
+        <td>${statusBadge(store.connectivity_status || "UNKNOWN")}</td>
         <td>${formatDate(store.last_ping_at || store.menu_updated_at)}</td>
-        <td><button class="link-button" type="button" data-store-menu="${escapeHtml(store.id)}" data-store-name="${escapeHtml(store.store_name || "Tienda Rappi")}" title="Ver el menú vigente en Rappi">${statusBadge(store.menu_approval_status || "PENDING")} <span class="helper">Ver menú</span></button></td>
+        <td><button class="link-button" type="button" data-store-menu="${escapeHtml(store.id)}" data-store-name="${escapeHtml(store.store_name || "Tienda Rappi")}">${statusBadge(store.menu_approval_status || "PENDING")} <span class="helper">Ver menú</span></button></td>
         <td><label class="switch"><input type="checkbox" data-auto-accept="${escapeHtml(store.id)}" ${store.auto_accept !== false ? "checked" : ""}><span>${store.auto_accept !== false ? "Encendida" : "Apagada"}</span></label></td>
         <td><button class="button secondary compact" type="button" data-checkin="${escapeHtml(store.id)}">Ver código</button></td>
       </tr>`).join("")
     : emptyRow(7, "Conecta Rappi para identificar las tiendas.");
+
   storesBody.querySelectorAll("[data-auto-accept]").forEach((input) => input.addEventListener("change", toggleAutoAccept));
   storesBody.querySelectorAll("[data-store-open]").forEach((input) => {
     input.addEventListener("change", toggleStoreOpen);
     loadStoreOpen(input);
   });
-  storesBody.querySelectorAll("[data-store-menu]").forEach((button) => button.addEventListener("click", showStoreMenu));
-  storesBody.querySelectorAll("[data-checkin]").forEach((button) => button.addEventListener("click", showCheckinCode));
-  const menuStore = document.querySelector("#menu-store");
-  const selectedStore = menuStore.value;
-  menuStore.innerHTML = stores.length
-    ? `<option value="">Selecciona una tienda</option>${stores.map((store) => `<option value="${escapeHtml(store.id)}">${escapeHtml(store.store_name || "Tienda Rappi")}</option>`).join("")}`
-    : `<option value="">Conecta Rappi primero</option>`;
-  if (stores.some((store) => store.id === selectedStore)) menuStore.value = selectedStore;
+  storesBody.querySelectorAll("[data-store-menu]").forEach((b) => b.addEventListener("click", showStoreMenu));
+  storesBody.querySelectorAll("[data-checkin]").forEach((b) => b.addEventListener("click", showCheckinCode));
 
-  const openErrors = result.errors || [];
+  const abiertos = s.errors ?? [];
   const incidentCard = document.querySelector("#incident-card");
-  incidentCard.hidden = openErrors.length === 0;
-  if (openErrors.length) {
-    const latest = openErrors[0];
-    document.querySelector("#incident-message").textContent = `${latest.public_message || "Se detectó un problema con la conexión."} Última detección: ${formatDate(latest.last_occurred_at)}.`;
+  incidentCard.hidden = abiertos.length === 0;
+  if (abiertos.length) {
+    const ultimo = abiertos[0];
+    document.querySelector("#incident-message").textContent =
+      `${ultimo.public_message || "Se detectó un problema con la conexión."} Última vez: ${formatDate(ultimo.last_occurred_at)}.`;
   }
 
-  const message = document.querySelector("#connection-message");
-  message.hidden = false;
-  message.classList.toggle("warning", !(connected && activeHooks === 8));
-  message.textContent = connected && activeHooks === 8
-    ? (lastReceived ? "Conexión activa. Enkrato está recibiendo información de Rappi." : "Conexión configurada. Falta recibir una prueba desde Rappi.")
-    : result.configured ? "La conexión aún requiere completar su configuración." : "Ingresa tus credenciales de pruebas para comenzar.";
+  const mensaje = document.querySelector("#connection-message");
+  mensaje.hidden = Boolean(s.configured);
+  mensaje.classList.add("warning");
+  mensaje.textContent = "Ingresa las claves que te entregó Rappi para comenzar.";
+}
+
+async function probar(boton, fila) {
+  if (!fila) return;
+  const contenedor = boton.closest(".check-row");
+  const resultado = contenedor.querySelector(".check-result");
+  setBusy(boton, true, "Probando…");
+  try {
+    const mensaje = await fila.prueba();
+    resultado.hidden = false;
+    resultado.textContent = mensaje;
+    await revisar();
+  } catch (error) {
+    resultado.hidden = false;
+    resultado.textContent = error.message;
+    contenedor.classList.add("pending");
+    toast(error.message, "error");
+  } finally {
+    setBusy(boton, false);
+  }
 }
 
 async function toggleAutoAccept(event) {
   const input = event.currentTarget;
   const enabled = input.checked;
-  if (!enabled && !window.confirm("Si apagas la aceptación automática, alguien debe aceptar cada pedido en menos de 6 minutos (con la tablet de Rappi) o Rappi lo cancela. ¿Apagarla?")) {
+  if (!enabled && !window.confirm("Si apagas la aceptación automática, cada pedido debe aceptarse a mano en menos de 6 minutos o Rappi lo cancela. ¿Apagarla?")) {
     input.checked = true;
     return;
   }
   input.disabled = true;
   try {
-    await invokeRappi("rappi-admin", { action: "store_settings", environment: "DEV", store_id: input.dataset.autoAccept, auto_accept: enabled });
+    await invokeRappi("rappi-admin", { action: "store_settings", environment: ENV, store_id: input.dataset.autoAccept, auto_accept: enabled });
     input.nextElementSibling.textContent = enabled ? "Encendida" : "Apagada";
-    toast(enabled ? "Enkrato aceptará los pedidos de esta tienda." : "Los pedidos de esta tienda deberán aceptarse desde la tablet de Rappi.");
+    toast(enabled ? "Enkrato aceptará los pedidos de esta tienda." : "Los pedidos deberán aceptarse a mano.");
   } catch (error) {
     input.checked = !enabled;
     toast(error.message, "error");
@@ -145,7 +235,7 @@ async function toggleAutoAccept(event) {
 async function loadStoreOpen(input) {
   const label = input.nextElementSibling;
   try {
-    const result = await invokeRappi("rappi-operaciones", { action: "store_availability", environment: "DEV", store_id: input.dataset.storeOpen });
+    const result = await invokeRappi("rappi-operaciones", { action: "store_availability", environment: ENV, store_id: input.dataset.storeOpen });
     input.checked = result.enabled === true;
     label.textContent = result.enabled === null ? "Sin dato" : result.enabled ? "Abierta" : "Cerrada";
     input.disabled = false;
@@ -164,7 +254,7 @@ async function toggleStoreOpen(event) {
   }
   input.disabled = true;
   try {
-    const result = await invokeRappi("rappi-operaciones", { action: "store_availability", environment: "DEV", store_id: input.dataset.storeOpen, enabled });
+    const result = await invokeRappi("rappi-operaciones", { action: "store_availability", environment: ENV, store_id: input.dataset.storeOpen, enabled });
     if (result.ok === false) {
       input.checked = !enabled;
       toast(`Rappi no permitió el cambio${result.reason ? `: ${result.reason}` : "."}`, "error");
@@ -176,8 +266,8 @@ async function toggleStoreOpen(event) {
       toast("La tienda quedó cerrada en Rappi.");
       return;
     }
-    // Encender no basta si Rappi aún no publica la tienda (p. ej. «Not ready to sell»).
-    const check = await invokeRappi("rappi-operaciones", { action: "store_availability", environment: "DEV", store_id: input.dataset.storeOpen });
+    // Encender no basta si Rappi aún no publica la tienda («Not ready to sell»).
+    const check = await invokeRappi("rappi-operaciones", { action: "store_availability", environment: ENV, store_id: input.dataset.storeOpen });
     input.nextElementSibling.textContent = check.enabled ? "Abierta" : "Encendida, sin publicar";
     toast(check.enabled
       ? "La tienda quedó abierta en Rappi."
@@ -201,7 +291,7 @@ async function showStoreMenu(event) {
   body.innerHTML = `<p class="helper">Consultando el menú en Rappi…</p>`;
   menuDialog.showModal();
   try {
-    const { products } = await invokeRappi("rappi-operaciones", { action: "store_menu", environment: "DEV", store_id: button.dataset.storeMenu });
+    const { products } = await invokeRappi("rappi-operaciones", { action: "store_menu", environment: ENV, store_id: button.dataset.storeMenu });
     body.innerHTML = products.length
       ? `<p class="helper">${products.length} productos publicados.</p>${products.map((product) => `
         <article class="menu-product">
@@ -219,7 +309,7 @@ async function showCheckinCode(event) {
   const button = event.currentTarget;
   setBusy(button, true, "Consultando…");
   try {
-    const result = await invokeRappi("rappi-operaciones", { action: "store_checkin_code", environment: "DEV", store_id: button.dataset.checkin });
+    const result = await invokeRappi("rappi-operaciones", { action: "store_checkin_code", environment: ENV, store_id: button.dataset.checkin });
     button.outerHTML = result.code
       ? `<strong>${escapeHtml(result.code)}</strong>${result.expired_at ? `<br><span class="helper">Vence ${escapeHtml(result.expired_at)}</span>` : ""}`
       : `<span class="helper">Rappi no asignó código</span>`;
@@ -229,52 +319,19 @@ async function showCheckinCode(event) {
   }
 }
 
-function setStep(id, complete, label) {
-  const item = document.querySelector(`#${id}`);
-  item.classList.toggle("complete", complete);
-  item.querySelector("strong").textContent = label;
-}
-
 async function onboard(event) {
   event.preventDefault();
   const button = event.currentTarget.querySelector("button[type=submit]");
   setBusy(button, true, "Conectando…");
   try {
     const values = Object.fromEntries(new FormData(event.currentTarget));
-    const result = await invokeRappi("rappi-admin", { action: "onboard", environment: "DEV", ...values });
+    const result = await invokeRappi("rappi-admin", { action: "onboard", environment: ENV, ...values });
     event.currentTarget.reset();
-    const failures = result.subscription?.results?.filter((row) => !row.ok).length || 0;
-    toast(failures ? `La conexión quedó parcial: ${failures} configuración(es) requieren revisión.` : "Rappi quedó conectado y configurado automáticamente.", failures ? "error" : "success");
-    await loadStatus();
+    const fallos = result.subscription?.results?.filter((row) => !row.ok).length || 0;
+    toast(fallos ? `La conexión quedó a medias: ${fallos} aviso(s) requieren revisión.` : "Rappi quedó conectado y configurado.", fallos ? "error" : "success");
+    await revisar();
   } catch (error) {
     toast(error.message, "error");
-  } finally {
-    setBusy(button, false);
-  }
-}
-
-async function uploadMenu(event) {
-  event.preventDefault();
-  const button = event.currentTarget.querySelector("button[type=submit]");
-  const file = document.querySelector("#menu-file").files?.[0];
-  if (!file) { toast("Selecciona un archivo de menú.", "error"); return; }
-  if (file.size > 2_000_000) { toast("El archivo no puede superar 2 MB.", "error"); return; }
-  setBusy(button, true, "Validando…");
-  try {
-    const parsed = JSON.parse(await file.text());
-    const items = Array.isArray(parsed) ? parsed : parsed?.items;
-    if (!Array.isArray(items) || !items.length) throw new Error("El archivo debe contener una lista de productos en items.");
-    const result = await invokeRappi("rappi-admin", {
-      action: "upload_menu",
-      environment: "DEV",
-      store_id: document.querySelector("#menu-store").value,
-      items,
-    });
-    event.currentTarget.reset();
-    toast(`Menú enviado: ${result.items} producto(s). Rappi iniciará su validación.`);
-    await loadStatus();
-  } catch (error) {
-    toast(error instanceof SyntaxError ? "El archivo no contiene JSON válido." : error.message, "error");
   } finally {
     setBusy(button, false);
   }
