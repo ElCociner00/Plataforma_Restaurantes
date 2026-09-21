@@ -443,13 +443,18 @@ async function menuStatus(ctx: Contexto) {
   }));
 }
 
-/** `menu/approved` responde texto plano: AVAILABLE, PENDING, REJECTED… */
+/**
+ * `menu/approved` responde texto plano (AVAILABLE, PENDING, REJECTED…) o un
+ * booleano suelto. `false` no es un estado desconocido: es el menú recién
+ * enviado que Rappi todavía está revisando, y así lo ve el cliente.
+ */
 function menuApprovalFrom(response: { status: number; body: unknown }): string {
   if (response.status < 200 || response.status >= 300) return "UNKNOWN";
-  const record = (response.body ?? {}) as Record<string, unknown>;
-  const raw = text(record.raw ?? record.status ?? record.state ?? response.body).toUpperCase();
+  const cuerpo = response.body;
+  const record = (cuerpo && typeof cuerpo === "object" ? cuerpo : {}) as Record<string, unknown>;
+  const raw = text(record.raw ?? record.status ?? record.state ?? cuerpo).toUpperCase();
   if (["AVAILABLE", "APPROVED", "TRUE"].includes(raw)) return "APPROVED";
   if (raw.includes("REJECT")) return "REJECTED";
-  if (raw.includes("PENDING") || raw.includes("PROCESS")) return "PENDING";
+  if (raw === "FALSE" || raw.includes("PENDING") || raw.includes("PROCESS")) return "PENDING";
   return "UNKNOWN";
 }
