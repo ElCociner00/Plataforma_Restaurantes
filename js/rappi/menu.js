@@ -40,6 +40,7 @@ function wire() {
   document.querySelector("#group-form").addEventListener("submit", guardarGrupo);
   document.querySelector("#add-option").addEventListener("click", () => agregarFilaOpcion());
   document.querySelector("#publish-menu").addEventListener("click", publicar);
+  document.querySelector("#import-menu").addEventListener("click", importar);
   document.querySelector("#product-image").addEventListener("change", previsualizarImagen);
 }
 
@@ -279,6 +280,26 @@ async function publicar(event) {
   try {
     const resultado = await invokeRappi("rappi-menu", { action: "publicar", store_id: storeId, environment: "DEV" });
     toast(`Menú enviado a Rappi: ${resultado.publicados} productos. Rappi debe aprobarlo antes de mostrarlo.`);
+    await cargar();
+  } catch (error) {
+    toast(error.message, "error");
+  } finally {
+    setBusy(boton, false);
+  }
+}
+
+/** Primera carga: trae lo que la tienda ya tiene publicado en Rappi. */
+async function importar(event) {
+  const boton = event.currentTarget;
+  const storeId = document.querySelector("#publish-store").value;
+  if (!storeId) return toast("Elige una tienda.", "error");
+  if (!window.confirm("Se copiarán a Enkrato los productos que esa tienda ya tiene en Rappi. Los que ya existan aquí no se duplican.
+
+¿Continuar?")) return;
+  setBusy(boton, true, "Trayendo…");
+  try {
+    const r = await invokeRappi("rappi-menu", { action: "importar", store_id: storeId, environment: "DEV" });
+    toast(`Se trajeron ${r.creados} producto(s)${r.omitidos ? `; ${r.omitidos} ya existían o no eran válidos` : ""}.`);
     await cargar();
   } catch (error) {
     toast(error.message, "error");
