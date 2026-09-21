@@ -272,6 +272,7 @@ function buildMenu({ context, environmentForMenu, localContexts = [] }) {
       <button type="button" class="nav-dropdown-toggle">Rappi</button>
       <div class="nav-dropdown-menu">
         <a href="${APP_URLS.rappiOperacion}">Rappi</a>
+        ${isAdminContext(context) ? `<a href="${APP_URLS.rappiMenu}">Menú Rappi</a>` : ""}
         ${isAdminContext(context) ? `<a href="${APP_URLS.rappiIntegracion}">Integración Rappi</a>` : ""}
       </div>
     </div>`;

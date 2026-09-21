@@ -78,6 +78,7 @@ assert(menuMigration.includes("DROP CONSTRAINT IF EXISTS"), "La corrección de g
 const header = await readFile(path.join(root, "js/header.js"), "utf8");
 assert(!header.includes("Movimientos Rappi"), "Header conserva el nombre anterior");
 assert(header.includes("Integración Rappi"), "Header no enlaza la integración Rappi");
+assert(header.includes("Menú Rappi") && header.includes("APP_URLS.rappiMenu"), "Header no enlaza la gestión del menú Rappi");
 assert((header.match(/Integración Loggro/g) || []).length === 2, "Faltan accesos Loggro en ambos acordeones");
 
 const rappiCore = await readFile(path.join(root, "js/rappi/core.js"), "utf8");
