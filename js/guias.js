@@ -33,7 +33,7 @@ for (const tema of TEMAS) {
 }
 
 try {
-  const response = await fetch(`./contenido/${current}.txt`, { cache: "no-cache" });
+  const response = await fetch(`${APP_URLS.guias}contenido/${current}.txt`, { cache: "no-cache" });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   content.innerHTML = renderMarkdown(await response.text());
   document.title = `${TEMAS.find((tema) => tema.id === current).titulo} | Guías de Enkrato`;
