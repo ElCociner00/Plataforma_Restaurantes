@@ -6,6 +6,12 @@ ALTER TABLE public.rappi_menu_categorias
 CREATE UNIQUE INDEX IF NOT EXISTS rappi_menu_categoria_external_uidx
   ON public.rappi_menu_categorias (empresa_id, rappi_category_id)
   WHERE rappi_category_id IS NOT NULL;
+UPDATE public.rappi_menu_categorias
+SET rappi_category_id = 'SEC-' ||
+  trim(both '-' from upper(regexp_replace(
+    translate(nombre, 'áéíóúÁÉÍÓÚñÑ', 'aeiouAEIOUnN'), '[^A-Za-z0-9]+', '-', 'g'
+  ))) || '-' || left(id::text, 8)
+WHERE rappi_category_id IS NULL;
 
 ALTER TABLE public.rappi_menu_productos
   ADD COLUMN IF NOT EXISTS rappi_sku text,
