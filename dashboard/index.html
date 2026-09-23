@@ -76,7 +76,7 @@
     </div>
 
     <!-- Pestañas (Minimalistas) -->
-    <div class="dashboard-tabs" style="display: flex; gap: 2rem; border-bottom: 1px solid var(--ek-line); margin-bottom: 2rem;">
+    <div class="dashboard-tabs" style="display: flex; flex-wrap: wrap; gap: 1rem 2rem; border-bottom: 1px solid var(--ek-line); margin-bottom: 2rem;">
       <button class="tab-btn active" data-tab="tab-conciliacion" style="background: none; border: none; padding: 0.5rem 0; font-weight: var(--ek-weight-semibold); color: var(--ek-ink); border-bottom: 2px solid var(--ek-violet-600); cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
         <i class="ph ph-cash-register"></i> Conciliación
       </button>
@@ -88,6 +88,9 @@
       </button>
       <button class="tab-btn" data-tab="tab-gastos" style="background: none; border: none; padding: 0.5rem 0; font-weight: var(--ek-weight-medium); color: var(--ek-muted); border-bottom: 2px solid transparent; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
         <i class="ph ph-receipt"></i> Gastos de Turno
+      </button>
+      <button class="tab-btn" data-tab="tab-rappi" style="background: none; border: none; padding: 0.5rem 0; font-weight: var(--ek-weight-medium); color: var(--ek-muted); border-bottom: 2px solid transparent; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+        <i class="ph ph-moped"></i> Rappi
       </button>
     </div>
 
@@ -123,6 +126,11 @@
         <p>Cargando estructura de gastos...</p>
       </div>
       <div id="contentGastos" style="display: none;"></div>
+    </div>
+
+    <div class="tab-content" id="tab-rappi" style="display: none;">
+      <div id="loadingRappi" style="text-align: center; padding: 3rem; color: var(--ek-muted);">Cargando datos de Rappi…</div>
+      <div id="contentRappi" style="display: none;"></div>
     </div>
 
   </main>

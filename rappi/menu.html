@@ -7,11 +7,11 @@
   <link rel="stylesheet" href="../css/variables.css?v=20260829v4">
   <link rel="stylesheet" href="../css/main.css?v=20260829v4">
   <link rel="stylesheet" href="../css/rappi.css?v=20260921rappi13">
+  <link rel="stylesheet" href="../css/rappi-menu.css?v=20260922m1">
 </head>
 <body class="rappi-page" data-rappi-page="menu" style="display:none">
   <script type="module" src="../js/router.js?v=20260829v4"></script>
   <script type="module" src="../js/header.js?v=20260921hdr2"></script>
-
   <main class="rappi-main">
     <nav class="rappi-subnav" aria-label="Secciones de Rappi">
       <a href="operacion.html" data-rappi-nav="operation">Pedidos</a>
@@ -19,86 +19,66 @@
       <a href="cuadre.html" data-rappi-nav="cuadre">Cuadre</a>
       <a href="integracion.html" data-rappi-nav="integration">Integración Rappi</a>
     </nav>
-
     <section class="rappi-hero">
-      <div><p class="eyebrow">Tu carta en Rappi</p><h1>Menú</h1><p class="muted">Crea y edita tus productos aquí. Cuando termines, publícalos y aparecerán en Rappi.</p></div>
+      <div><p class="eyebrow">Tu carta en Rappi</p><h1>Menú</h1>
+        <p class="muted">Organiza las secciones, productos y preguntas que verá el cliente.</p>
+        <a class="helper" href="../guias/?tema=rappi-menu">¿Cómo funciona esto?</a></div>
       <button class="button secondary compact" id="refresh-menu" type="button">Actualizar</button>
     </section>
-
     <section id="admin-required" class="notice warning" hidden>Esta sección requiere un usuario administrador.</section>
-
     <div id="menu-content" data-admin-only>
+      <section id="sync-banner" class="notice menu-sync" aria-live="polite">Comprobando el menú de Rappi…</section>
       <section class="card" id="publish-card">
-        <div class="section-heading">
-          <div><h2>Publicar en Rappi</h2><p class="helper">Rappi reemplaza la carta completa en cada publicación: Enkrato envía todos tus productos activos de una vez.</p></div>
-        </div>
+        <div class="section-heading"><div><h2>Publicar en Rappi</h2>
+          <p class="helper">Cada publicación reemplaza la carta completa. Revisa todos los productos antes de enviarla.</p></div></div>
         <div class="form-grid">
           <div class="field"><label for="publish-store">Tienda</label><select id="publish-store"><option value="">Cargando…</option></select></div>
           <div class="field"><label>&nbsp;</label><button class="button" type="button" id="publish-menu">Publicar menú</button></div>
-          <div class="field"><label>&nbsp;</label><button class="button secondary" type="button" id="import-menu">Traer mi menú de Rappi</button></div>
           <div class="field full"><div id="publish-state" class="notice" hidden></div></div>
         </div>
       </section>
-
       <section class="card">
-        <div class="section-heading">
-          <div><h2>Productos</h2><p class="helper" id="products-count">—</p></div>
-          <button class="button compact" type="button" id="new-product">Nuevo producto</button>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Foto</th><th>Producto</th><th>Categoría</th><th>Precio</th><th>Opciones</th><th>Se vende</th><th></th></tr></thead>
-            <tbody id="products-body"><tr><td class="empty-cell" colspan="7">Cargando…</td></tr></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="section-heading">
-          <div><h2>Grupos de opciones</h2><p class="helper">Lo que el cliente elige al pedir: toppings, tamaños, salsas. Se reutilizan en los productos que quieras.</p></div>
-          <button class="button secondary compact" type="button" id="new-group">Nuevo grupo</button>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Grupo</th><th>Cuántas puede elegir</th><th>Opciones</th><th></th></tr></thead>
-            <tbody id="groups-body"><tr><td class="empty-cell" colspan="4">Cargando…</td></tr></tbody>
-          </table>
-        </div>
+        <div class="section-heading"><div><h2>Secciones del menú</h2><p class="helper" id="products-count">—</p></div>
+          <button class="button compact" type="button" id="new-section">Nueva sección</button></div>
+        <div id="menu-sections" class="menu-sections" aria-live="polite"></div>
       </section>
     </div>
   </main>
-
+  <dialog id="section-dialog" aria-labelledby="section-dialog-title">
+    <div class="dialog-content">
+      <div class="dialog-heading"><h2 id="section-dialog-title">Sección del menú</h2><button class="button secondary compact" type="button" data-close-dialog>Cerrar</button></div>
+      <form id="section-form" class="form-grid">
+        <div class="field full"><label for="section-name">Nombre de la sección</label><input id="section-name" required maxlength="60" placeholder="Ej: Shakes especiales"></div>
+        <div class="field full"><button class="button" type="submit">Guardar sección</button></div>
+      </form>
+    </div>
+  </dialog>
   <dialog id="product-dialog" aria-labelledby="product-dialog-title">
     <div class="dialog-content">
       <div class="dialog-heading"><div><p class="eyebrow">Producto</p><h2 id="product-dialog-title">Nuevo producto</h2></div><button class="button secondary compact" type="button" data-close-dialog>Cerrar</button></div>
       <form id="product-form" class="form-grid">
-        <div class="field"><label for="product-name">Nombre</label><input id="product-name" name="nombre" required maxlength="120" placeholder="Ej: Cheesecake de pistacho"></div>
-        <div class="field"><label for="product-price">Precio</label><input id="product-price" name="precio" type="number" min="1" step="1" required placeholder="26900"></div>
-        <div class="field full"><label for="product-description">Descripción</label><textarea id="product-description" name="descripcion" rows="2" maxlength="500" placeholder="Lo que verá el cliente en Rappi"></textarea></div>
-        <div class="field"><label for="product-category">Categoría</label><select id="product-category" name="categoria_id"></select></div>
-        <div class="field"><label for="product-new-category">…o crea una nueva</label><input id="product-new-category" maxlength="60" placeholder="Ej: Shakes"></div>
-        <div class="field"><label for="product-image">Foto del producto</label><input id="product-image" type="file" accept="image/jpeg,image/png,image/webp"></div>
+        <div class="field"><label for="product-name">Nombre</label><input id="product-name" required maxlength="120"></div>
+        <div class="field"><label for="product-price">Precio</label><input id="product-price" type="number" min="1" step="0.01" required></div>
+        <div class="field full"><label for="product-description">Descripción que leerá el cliente</label><textarea id="product-description" rows="2" maxlength="500"></textarea></div>
+        <div class="field"><label for="product-category">Sección del menú</label><select id="product-category" required></select></div>
+        <div class="field"><label for="product-new-category">O crea una nueva sección</label><input id="product-new-category" maxlength="60"></div>
+        <div class="field"><label for="product-image">Foto opcional</label><input id="product-image" type="file" accept="image/jpeg,image/png,image/webp"></div>
         <div class="field"><label>Vista previa</label><img id="product-image-preview" class="product-thumb big" alt="" hidden></div>
-        <div class="field full"><label>Opciones que puede elegir el cliente</label><div id="product-groups" class="chip-list"></div></div>
         <div class="field full"><label class="switch"><input type="checkbox" id="product-active" checked><span>Se vende en Rappi</span></label></div>
+        <div class="field full menu-questions-heading"><h3>Preguntas al cliente</h3><button class="button secondary compact" id="add-question" type="button">Añadir pregunta</button></div>
+        <div class="field full"><p class="helper">Por ejemplo: «Elige tus toppings». Añade las respuestas que puede escoger.</p><div id="product-questions"></div></div>
         <div class="field full"><button class="button" type="submit">Guardar producto</button></div>
       </form>
     </div>
   </dialog>
-
-  <dialog id="group-dialog" aria-labelledby="group-dialog-title">
-    <div class="dialog-content">
-      <div class="dialog-heading"><div><p class="eyebrow">Opciones</p><h2 id="group-dialog-title">Nuevo grupo</h2></div><button class="button secondary compact" type="button" data-close-dialog>Cerrar</button></div>
-      <form id="group-form" class="form-grid">
-        <div class="field full"><label for="group-name">Nombre del grupo</label><input id="group-name" required maxlength="80" placeholder="Ej: Elige tus toppings"></div>
-        <div class="field"><label for="group-min">Mínimo que debe elegir</label><input id="group-min" type="number" min="0" step="1" value="0"></div>
-        <div class="field"><label for="group-max">Máximo que puede elegir</label><input id="group-max" type="number" min="1" step="1" value="1"></div>
-        <div class="field full"><label>Opciones</label><div id="group-options"></div><button class="button secondary compact" type="button" id="add-option">Agregar opción</button></div>
-        <div class="field full"><button class="button" type="submit">Guardar grupo</button></div>
-      </form>
+  <dialog id="leave-dialog" aria-labelledby="leave-dialog-title">
+    <div class="dialog-content"><h2 id="leave-dialog-title">Cambios sin publicar</h2>
+      <p>Si sales ahora, Rappi seguirá mostrando el menú anterior.</p>
+      <div class="menu-leave-actions"><button class="button" id="leave-publish" type="button">Publicar ahora</button>
+        <button class="button secondary" id="leave-anyway" type="button">Salir sin publicar</button>
+        <button class="button secondary" id="leave-cancel" type="button">Cancelar</button></div>
     </div>
   </dialog>
-
-  <script type="module" src="../js/rappi/menu.js?v=20260921rappi15"></script>
+  <script type="module" src="../js/rappi/menu.js?v=20260922m1"></script>
 </body>
 </html>

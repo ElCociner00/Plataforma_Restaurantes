@@ -206,6 +206,75 @@ function reloadActiveTab() {
     loadTabResponsables();
   } else if (activeTab === 'tab-gastos') {
     loadTabGastos();
+  } else if (activeTab === 'tab-rappi') {
+    loadTabRappi();
+  }
+}
+
+let chartRappiValor = null;
+let chartRappiHoras = null;
+
+async function loadTabRappi() {
+  const loading = document.getElementById('loadingRappi');
+  const content = document.getElementById('contentRappi');
+  const rango = getRangoSeleccionado();
+  loading.style.display = 'block';
+  content.style.display = 'none';
+  if (!rango) { loading.style.display = 'none'; return; }
+  try {
+    const { data, error } = await supabase.functions.invoke('rappi-data', {
+      body: {
+        action: 'dashboard_rappi', empresa_id: context.empresa_id,
+        desde: rango.desde, hasta: rango.hasta, sede_id: getSedeSeleccionada(),
+      },
+    });
+    if (error || !data?.ok) throw new Error(data?.message || error?.message || 'Rappi no devolvió datos.');
+    const result = data.data;
+    chartRappiValor?.destroy(); chartRappiHoras?.destroy();
+    chartRappiValor = null; chartRappiHoras = null;
+    if (!result.totals.pedidos) {
+      content.innerHTML = '<div class="card" style="padding:2rem"><h2>Rappi</h2><p>Todavía no hay pedidos de Rappi en producción en este periodo.</p><p style="color:var(--ek-muted)">Los pedidos del simulador DEV no se incluyen en este tablero.</p></div>';
+      return;
+    }
+    const pesos = (value) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value || 0);
+    const number = (value) => new Intl.NumberFormat('es-CO').format(value || 0);
+    const escape = (value) => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+    const total = result.totals;
+    const metric = (name, value) => `<div class="card" style="padding:1.25rem;min-width:155px;flex:1"><small style="color:var(--ek-muted)">${name}</small><strong style="display:block;font-size:1.5rem;margin-top:.35rem">${value}</strong></div>`;
+    const locations = result.locations.length
+      ? `<h2>Por local</h2><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Local</th><th>Pedidos no cancelados</th><th>Valor</th></tr></thead><tbody>${result.locations.map((row) => `<tr><td>${escape(row.nombre)}</td><td>${number(row.pedidos)}</td><td>${pesos(row.valor)}</td></tr>`).join('')}</tbody></table></div>` : '';
+    const top = result.top_products.length
+      ? `<h2>Productos más pedidos</h2><ol>${result.top_products.map((row) => `<li>${escape(row.nombre)} · ${number(row.unidades)}</li>`).join('')}</ol>` : '';
+    content.innerHTML = `
+      <p style="color:var(--ek-muted)">Solo pedidos de Rappi en producción. El valor suma pedidos no cancelados; no equivale a dinero recibido.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:1rem;margin:1.5rem 0">
+        ${metric('Pedidos', number(total.pedidos))}
+        ${metric('Valor no cancelado', pesos(total.valor_no_cancelado))}
+        ${metric('Cancelados', number(total.cancelados))}
+        ${metric('Entregados', number(total.entregados))}
+        ${metric('Turbo / regular', `${number(total.turbo)} / ${number(total.regular)}`)}
+        ${metric('Tiempo medio hasta aceptar', total.aceptacion_minutos === null ? '—' : `${number(total.aceptacion_minutos)} min`)}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:1rem">
+        <section class="card" style="padding:1.25rem"><h2>Valor de pedidos por período</h2><canvas id="chartRappiValor" aria-label="Valor de pedidos de Rappi"></canvas></section>
+        <section class="card" style="padding:1.25rem"><h2>Pedidos por hora</h2><canvas id="chartRappiHoras" aria-label="Pedidos de Rappi por hora"></canvas></section>
+      </div>
+      <section class="card" style="padding:1.5rem;margin-top:1rem">${locations}${top}</section>`;
+    const series = agruparSerie(result.daily, granularidadEfectiva(rango.desde, rango.hasta), ['pedidos', 'cancelados', 'valor']);
+    chartRappiValor = new Chart(document.getElementById('chartRappiValor'), {
+      type: 'bar', data: { labels: series.map((row) => row.etiqueta), datasets: [{ label: 'Valor no cancelado', data: series.map((row) => row.valor), backgroundColor: '#7351c3' }] },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+    });
+    chartRappiHoras = new Chart(document.getElementById('chartRappiHoras'), {
+      type: 'line', data: { labels: result.hourly.map((row) => `${String(row.hora).padStart(2, '0')}:00`), datasets: [{ label: 'Pedidos', data: result.hourly.map((row) => row.pedidos), borderColor: '#7351c3', tension: .25 }] },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } },
+    });
+  } catch (error) {
+    console.error('Error cargando Rappi en el dashboard:', error);
+    content.innerHTML = '<div class="card" style="padding:2rem">No pudimos cargar los datos de Rappi. Inténtalo de nuevo.</div>';
+  } finally {
+    loading.style.display = 'none';
+    content.style.display = 'block';
   }
 }
 

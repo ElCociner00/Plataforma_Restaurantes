@@ -300,7 +300,7 @@ async function processNewOrder(
     order = data;
   }
   await insertOrderEvent(admin, raw, order.id, {
-    rappi_status: nextRappiStatus || null,
+    rappi_status: typeof nextRappiStatus === "string" ? nextRappiStatus : null,
     normalized_status: "RECEIVED",
     provider_event_at: nextAt ? String(nextAt) : null,
     additional_information: { applied_to_current_state: applied },
@@ -466,6 +466,19 @@ async function processMenuStatus(
     menu_approval_status: raw.event_type === "MENU_APPROVED" ? "APPROVED" : "REJECTED",
     menu_updated_at: new Date().toISOString(),
   }).eq("id", store.id);
+  const { data: estado, error: lecturaError } = await admin.from("rappi_menu_estado")
+    .select("empresa_id, hash_pendiente").eq("store_id", store.id).maybeSingle();
+  if (lecturaError) throw lecturaError;
+  if (estado?.hash_pendiente) {
+    const aprobado = raw.event_type === "MENU_APPROVED";
+    const { error } = await admin.from("rappi_menu_estado").update({
+      ...(aprobado ? { hash_publicado: estado.hash_pendiente } : {}),
+      hash_pendiente: null,
+      approval_status: aprobado ? "APPROVED" : "REJECTED",
+      actualizado_en: new Date().toISOString(),
+    }).eq("empresa_id", estado.empresa_id).eq("store_id", store.id).eq("hash_pendiente", estado.hash_pendiente);
+    if (error) throw error;
+  }
 }
 
 /**

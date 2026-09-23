@@ -15,6 +15,7 @@ import {
   type AcceptableOrder,
 } from "../_shared/rappi/orders.ts";
 import type { RappiConnection } from "../_shared/rappi/types.ts";
+import { summarizeRappiDashboard, type DashboardOrder, type DashboardStore } from "./dashboard-metrics.ts";
 
 const LABEL = "rappi-data";
 const FINANCIAL_ACTIONS = new Set([
@@ -53,6 +54,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       case "orders": result = await orders(ctx, body); break;
       case "order_detail": result = await orderDetail(ctx, body); break;
       case "menu_support": result = await menuSupport(ctx, body); break;
+      case "dashboard_rappi": result = await dashboardRappi(ctx, body); break;
       case "finance_summary": result = await financeSummary(ctx, body); break;
       case "payments": result = await payments(ctx, body); break;
       case "payment_detail": result = await paymentDetail(ctx, body); break;
@@ -65,6 +67,64 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return responderError(error, origin, LABEL);
   }
 });
+
+/** Datos del dashboard: solo conexiones PROD y locales del contexto efectivo. */
+async function dashboardRappi(ctx: Contexto, body: Record<string, unknown>) {
+  if (!ctx.esAdmin) throw new ErrorFuncion("ADMIN_REQUIRED", "El dashboard requiere un administrador.", 403);
+  const desde = text(body.desde);
+  const hasta = text(body.hasta);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta) || desde > hasta) {
+    throw new ErrorFuncion("RANGO_INVALIDO", "Elige un rango de fechas válido.", 400);
+  }
+  const start = new Date(`${desde}T00:00:00-05:00`);
+  const end = new Date(`${hasta}T00:00:00-05:00`);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end.getTime() - start.getTime() > 400 * 86400000) {
+    throw new ErrorFuncion("RANGO_INVALIDO", "El rango no puede superar 400 días.", 400);
+  }
+  const endExclusive = new Date(end.getTime() + 86400000).toISOString();
+  const db = ctx.clienteAdmin();
+  const scope = [ctx.empresaId];
+  if (!ctx.esLocal) {
+    const { data: children, error } = await db.from("grupos_empresariales")
+      .select("empresa_id").eq("grupo_id", ctx.empresaId).eq("activo", true);
+    if (error) throw new ErrorFuncion("DASHBOARD_ERROR", error.message, 500);
+    for (const child of children ?? []) if (ctx.esSuperadmin || ctx.empresasVisibles.includes(child.empresa_id)) scope.push(child.empresa_id);
+  }
+  const requested = text(body.sede_id);
+  if (requested && !scope.includes(requested)) throw new ErrorFuncion("SEDE_FUERA_DE_ALCANCE", "No puedes ver esa sede.", 403);
+  const selected = requested || null;
+  const { data: stores, error: storeError } = await db.from("rappi_stores")
+    .select("id, connection_id, enkrato_empresa_id, store_name")
+    .in("enkrato_empresa_id", scope);
+  if (storeError) throw new ErrorFuncion("DASHBOARD_ERROR", storeError.message, 500);
+  const connectionIds = [...new Set((stores ?? []).map((store) => store.connection_id))];
+  if (!connectionIds.length) return { ...summarizeRappiDashboard([], []), production_only: true };
+  const { data: production, error: connectionError } = await db.from("rappi_connections")
+    .select("id").in("id", connectionIds).eq("environment", "PROD");
+  if (connectionError) throw new ErrorFuncion("DASHBOARD_ERROR", connectionError.message, 500);
+  const productionIds = (production ?? []).map((connection) => connection.id);
+  if (!productionIds.length) return { ...summarizeRappiDashboard([], []), production_only: true };
+
+  const orders: DashboardOrder[] = [];
+  const pageSize = 1000;
+  for (let offset = 0; offset < 50000; offset += pageSize) {
+    let query = db.from("rappi_orders").select(
+      "empresa_id, store_id, rappi_order_id, provider_created_at, accepted_at, delivered_at, cancelled_at, operational_status, delivery_operation_type, total_to_pay, tip_amount, total_discounts, items",
+    ).in("empresa_id", scope).in("connection_id", productionIds)
+      .gte("provider_created_at", start.toISOString()).lt("provider_created_at", endExclusive)
+      .order("provider_created_at").range(offset, offset + pageSize - 1);
+    if (selected) query = query.eq("empresa_id", selected);
+    const { data, error } = await query;
+    if (error) throw new ErrorFuncion("DASHBOARD_ERROR", error.message, 500);
+    orders.push(...(data ?? []) as DashboardOrder[]);
+    if ((data ?? []).length < pageSize) break;
+    if (offset + pageSize >= 50000) throw new ErrorFuncion("DASHBOARD_MUY_GRANDE", "El período tiene demasiados pedidos; elige un rango menor.", 413);
+  }
+  return {
+    ...summarizeRappiDashboard(orders, (stores ?? []) as DashboardStore[]),
+    production_only: true,
+  };
+}
 
 async function operationSummary(ctx: Contexto) {
   const db = ctx.clienteAdmin();

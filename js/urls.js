@@ -44,6 +44,7 @@ export const APP_URLS = {
   root: buildAppPath("/"),
   login: buildAppPath("/inicio/"),
   dashboard: buildAppPath("/dashboard/"),
+  guias: buildAppPath("/guias/"),
   localPreselector: buildAppPath("/contexto_local/"),
   registroEmpresa: buildAppPath("/registro/index.html"),
   registroUsuario: buildAppPath("/registro/usuario.html"),

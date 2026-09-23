@@ -277,6 +277,7 @@ function buildMenu({ context, environmentForMenu, localContexts = [] }) {
       </div>
     </div>`;
   menu += `<a class="nav-link-btn" href="${APP_URLS.facturacion}">Facturacion</a>`;
+  menu += `<a class="nav-link-btn" href="${APP_URLS.guias}">Guías</a>`;
 
   const configLink = environmentForMenu === ENV_SIIGO
     ? APP_URLS.configuracionSiigo
