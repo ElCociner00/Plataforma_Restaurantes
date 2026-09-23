@@ -13,7 +13,11 @@
  *
  * Nota: este mapa no altera la lógica; sirve para navegar y parchear sin riesgo funcional.
  */
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// La libreria se sirve desde nuestro propio hosting, no desde un CDN ajeno.
+// Cuando venia de esm.sh, cualquier red que bloqueara ese dominio dejaba la
+// plataforma entera en blanco: este archivo lo importa todo lo demas.
+// Para actualizarla, ver js/vendor/supabase/README.md.
+import { createClient } from "./vendor/supabase/supabase-js.bundle.mjs";
 import { SUPABASE_CONFIG } from "./config.js";
 
 // Configuración explícita para forzar el almacenamiento de sesión
